@@ -3,6 +3,7 @@ import { state, world, input } from "./state.js";
 import { clamp, hexToRgba } from "./utils.js";
 import { drawMap } from "./map.js";
 import { drawEffects } from "./effects.js";
+import { renderLighting } from "./lighting.js";
 
 export const viewport = { width: 1, height: 1, dpr: 1 };
 
@@ -54,6 +55,7 @@ export function render(ctx) {
   drawEffects(ctx);
   drawWeaponFx(ctx);
   ctx.restore();
+  renderLighting(ctx, { camX, camY, viewW, viewH }, viewport);
   drawBossBar(ctx);
   if (state.flash > 0) {
     ctx.fillStyle = `rgba(255,77,109,${state.flash * 0.18})`;

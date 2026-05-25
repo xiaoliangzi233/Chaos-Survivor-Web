@@ -157,8 +157,8 @@ export class BaseEnemy {
     import("../entities.js").then(({ dropGem }) => dropGem(this.x, this.y, this.xp));
     const i = world.enemies.indexOf(this);
     if (i >= 0) world.enemies.splice(i, 1);
-    if (this.behavior === "split_large") for (let n = 0; n < 2; n++) spawnConfigured("slime_medium", this.x, this.y);
-    if (this.behavior === "split_medium") for (let n = 0; n < 2; n++) spawnConfigured("slime_small", this.x, this.y);
+    if (this.behavior === "split_large") splitInto("slime_medium", this.x, this.y, 2, this.r * 0.8);
+    if (this.behavior === "split_medium") splitInto("slime_small", this.x, this.y, 2, this.r * 0.9);
   }
 
   draw(ctx) {
@@ -181,6 +181,14 @@ export function spawnEnemyBullet(x, y, angle, color, speed, damage) {
 
 function spawnMinion(x, y) {
   spawnConfigured("zombie", x + (Math.random() - 0.5) * 90, y + (Math.random() - 0.5) * 90);
+}
+
+function splitInto(id, x, y, count, spread) {
+  const offset = Math.random() * TAU;
+  for (let n = 0; n < count; n++) {
+    const a = offset + (n / count) * TAU;
+    spawnConfigured(id, x + Math.cos(a) * spread, y + Math.sin(a) * spread);
+  }
 }
 
 function addHazard(x, y, color, damage) {

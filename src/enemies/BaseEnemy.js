@@ -1,7 +1,7 @@
 import { TAU, WORLD_SIZE } from "../constants.js";
 import { state, world } from "../state.js";
 import { clamp, distSq } from "../utils.js";
-import { burst, pulse, particle } from "../effects.js";
+import { burst, pulse } from "../effects.js";
 
 export class BaseEnemy {
   constructor(config, x, y) {
@@ -189,28 +189,105 @@ function addHazard(x, y, color, damage) {
 }
 
 function drawEnemyShape(ctx, e) {
-  const s = e.r / 14;
-  const step = Math.sin(e.anim);
-  ctx.scale(e.flip || 1, 1);
-  ctx.fillStyle = "rgba(0,0,0,0.24)";
-  ctx.fillRect(-8 * s, 9 * s, 18 * s, 5 * s);
-  ctx.fillStyle = e.flash > 0 ? "#fff" : e.color;
   if (e.behavior?.includes("split")) {
+    const scale = 1 + Math.sin(e.anim * 2) * 0.08;
+    ctx.scale(scale, 1 / scale);
+    ctx.fillStyle = "rgba(0,0,0,0.25)";
+    ctx.fillRect(-e.r * 0.85, e.r * 0.55, e.r * 1.7, e.r * 0.25);
+    ctx.fillStyle = e.flash > 0 ? "#fff" : e.color;
     ctx.beginPath();
-    ctx.arc(0, -4 * s, e.r, 0, TAU);
+    ctx.arc(0, 0, e.r, 0, TAU);
+    ctx.fill();
+    ctx.fillStyle = "rgba(255,255,255,0.35)";
+    ctx.beginPath();
+    ctx.arc(-e.r * 0.25, -e.r * 0.25, e.r * 0.22, 0, TAU);
     ctx.fill();
   } else if (e.behavior === "pylon" || e.behavior === "shield") {
     ctx.rotate(Math.sin(e.anim) * 0.1);
+    ctx.fillStyle = e.flash > 0 ? "#fff" : e.color;
     ctx.fillRect(-e.r * 0.75, -e.r * 1.2, e.r * 1.5, e.r * 2.2);
+    ctx.strokeStyle = e.elite ? "#ffd166" : "rgba(255,255,255,0.55)";
+    ctx.lineWidth = e.elite ? 3 : 1.5;
+    ctx.strokeRect(-e.r * 0.75, -e.r * 1.2, e.r * 1.5, e.r * 2.2);
   } else {
-    ctx.fillRect(-10 * s, -12 * s, 20 * s, 22 * s);
-    ctx.fillRect(-8 * s, -28 * s, 16 * s, 16 * s);
-    ctx.fillRect(-18 * s, -10 * s + step * 4, 8 * s, 6 * s);
-    ctx.fillRect(10 * s, -10 * s - step * 4, 8 * s, 6 * s);
+    drawZombieShape(ctx, e);
   }
-  ctx.strokeStyle = e.elite ? "#ffd166" : "rgba(255,255,255,0.55)";
-  ctx.lineWidth = e.elite ? 3 : 1.5;
-  ctx.strokeRect(-e.r, -e.r * 1.6, e.r * 2, e.r * 2.5);
+}
+
+function drawZombieShape(ctx, e) {
+  const visualScale = e.id === "zombie" || e.type === "zombie" ? 2 : 1.75;
+  const z = e.r / 14 * visualScale;
+  const walk = Math.sin(e.anim * 1.8);
+  const bob = Math.sin(e.anim * 3.6) * 1.2 * z;
+  const lean = Math.sin(e.anim * 0.8) * 1.8 * z;
+  const flash = e.flash > 0;
+  const skin = flash ? "#ffffff" : zombieSkin(e);
+  const dark = flash ? "#dfefff" : "#315436";
+  const cloth = flash ? "#ffffff" : zombieCloth(e);
+
+  ctx.scale(e.flip || 1, 1);
+  ctx.translate(lean, bob);
+  ctx.fillStyle = "rgba(0,0,0,0.30)";
+  ctx.fillRect(-10 * z, 11 * z, 22 * z, 5 * z);
+
+  ctx.fillStyle = dark;
+  ctx.fillRect(-8 * z, -2 * z + walk * 2.2 * z, 5 * z, 18 * z);
+  ctx.fillRect(3 * z, -2 * z - walk * 2.2 * z, 5 * z, 18 * z);
+  ctx.fillStyle = "#1b2530";
+  ctx.fillRect(-9 * z, 13 * z + walk * 2.2 * z, 7 * z, 4 * z);
+  ctx.fillRect(2 * z, 13 * z - walk * 2.2 * z, 7 * z, 4 * z);
+
+  ctx.fillStyle = cloth;
+  ctx.fillRect(-11 * z, -14 * z, 22 * z, 25 * z);
+  ctx.fillStyle = "rgba(0,0,0,0.28)";
+  ctx.fillRect(-9 * z, -5 * z, 18 * z, 5 * z);
+  ctx.fillStyle = "#ff4d6d";
+  ctx.fillRect(2 * z, -11 * z, 7 * z, 9 * z);
+  ctx.fillStyle = dark;
+  ctx.fillRect(-12 * z, 5 * z, 7 * z, 5 * z);
+  ctx.fillRect(4 * z, 7 * z, 7 * z, 4 * z);
+
+  ctx.fillStyle = skin;
+  ctx.fillRect(-18 * z, -13 * z + walk * 3.4 * z, 9 * z, 6 * z);
+  ctx.fillRect(9 * z, -14 * z - walk * 3.4 * z, 9 * z, 6 * z);
+  ctx.fillRect(-20 * z, -11 * z + walk * 3.4 * z, 5 * z, 5 * z);
+  ctx.fillRect(15 * z, -12 * z - walk * 3.4 * z, 5 * z, 5 * z);
+
+  ctx.translate(Math.sin(e.anim * 1.2) * 1.3 * z, -1.5 * z);
+  ctx.fillStyle = skin;
+  ctx.fillRect(-8 * z, -30 * z, 17 * z, 17 * z);
+  ctx.fillStyle = dark;
+  ctx.fillRect(-9 * z, -31 * z, 8 * z, 5 * z);
+  ctx.fillRect(-10 * z, -24 * z, 4 * z, 7 * z);
+  ctx.fillStyle = "#182018";
+  ctx.fillRect(-4 * z, -24 * z, 3 * z, 3 * z);
+  ctx.fillRect(4 * z, -24 * z, 3 * z, 3 * z);
+  ctx.fillStyle = "#f3f7ff";
+  ctx.fillRect(4 * z, -25 * z, 2 * z, 2 * z);
+  ctx.fillStyle = "#ff4d6d";
+  ctx.fillRect(-2 * z, -17 * z, 8 * z, 2 * z);
+  ctx.fillRect(6 * z, -20 * z, 3 * z, 4 * z);
+
+  ctx.strokeStyle = flash ? "#ffffff" : "rgba(8,18,14,0.65)";
+  ctx.lineWidth = 1.5 * z;
+  ctx.strokeRect(-11 * z, -14 * z, 22 * z, 25 * z);
+  ctx.strokeRect(-8 * z, -30 * z, 17 * z, 17 * z);
+}
+
+function zombieSkin(e) {
+  if (e.behavior === "ranged" || e.behavior === "gunner" || e.behavior === "wizard") return "#9fe7df";
+  if (e.behavior === "blink") return "#b991ff";
+  if (e.behavior === "mine" || e.behavior === "exploder" || e.behavior === "artillery") return "#ffb06e";
+  return "#7ccf68";
+}
+
+function zombieCloth(e) {
+  if (e.id === "tank" || e.type === "tank") return "#6d5bbf";
+  if (e.behavior === "lancer" || e.behavior === "line_raider") return "#d6b64f";
+  if (e.behavior === "ranged" || e.behavior === "gunner" || e.behavior === "wizard") return "#2b8da4";
+  if (e.behavior === "hazard_mage") return "#5f4aa8";
+  if (e.behavior === "summoner") return "#4d7c0f";
+  return "#345a78";
 }
 
 function drawBossShape(ctx, e) {

@@ -141,7 +141,7 @@
   }
   function spawnEnemy(id, x, y) {
     const d = enemyDefs[id] || enemyDefs.zombie, a = Math.random() * TAU, dist = 720 + Math.random() * 220, scale = 1 + s.wave * .08;
-    const e = { id, name: d[0], x: x ?? player.x + Math.cos(a) * dist, y: y ?? player.y + Math.sin(a) * dist, hp: d[1] * scale, maxHp: d[1] * scale, speed: d[2], damage: d[3], r: d[4], xp: d[4] === 25 ? 16 : d[4], color: d[5], behavior: d[8], t: Math.random() * TAU, cd: .8 + Math.random(), flash: 0, hitCd: 0, flip: 1 };
+    const e = { id, name: d[0], x: x ?? player.x + Math.cos(a) * dist, y: y ?? player.y + Math.sin(a) * dist, hp: d[1] * scale, maxHp: d[1] * scale, speed: d[2], damage: d[3], r: d[4], xp: d[4] === 25 ? 16 : d[4], color: d[5], behavior: d[8], t: Math.random() * TAU, cd: .8 + Math.random(), flash: 0, hitCd: 0, flip: 1, dashState: "ready", dashCooldown: 0, dashWindup: 0, dashTime: 0, dashVx: 0, dashVy: 0 };
     clampEnemy(e); enemies.push(e);
   }
   function spawnBoss(wave) {
@@ -159,11 +159,48 @@
       else if (e.behavior === "hazard" || e.behavior === "mine") { chase(e, dx, dy, dist, dt, .65); if (e.cd <= 0) { e.cd = 1.8; hazards.push({ x: e.behavior === "hazard" ? player.x : e.x, y: e.behavior === "hazard" ? player.y : e.y, r: 56, color: e.color, damage: e.damage, life: 3, max: 3 }); } }
       else if (e.behavior === "blink" && e.cd <= 0) { e.cd = 1.8; e.x = player.x - player.dirX * 150; e.y = player.y - player.dirY * 150; ring(e.x, e.y, 42, e.color, .2); }
       else if (e.behavior === "summon" && e.cd <= 0) { e.cd = 2; spawnEnemy("zombie", e.x + rand(-60, 60), e.y + rand(-60, 60)); }
+      else if (e.id === "speeder") updateSpeederAI(e, dx, dy, dist, dt);
       else chase(e, dx, dy, dist, dt, e.behavior === "dash" ? 1.6 : e.behavior === "bat" ? 1.35 : 1);
       if (e.boss && e.cd <= 0) { e.cd = 1.2; for (let n = 0; n < 14; n++) enemyShot(e, n / 14 * TAU + e.t); }
       clampEnemy(e);
       if (dist < player.r + e.r && player.inv <= 0) { player.hp -= e.damage; player.inv = .55; s.shake = 8; burst(player.x, player.y, 10, "#ff4d6d", 120); if (e.behavior === "explode") damageEnemy(e, 9999, e.x, e.y); }
     }
+  }
+  function updateSpeederAI(e, dx, dy, dist, dt){
+    e.dashCooldown=Math.max(0,e.dashCooldown-dt);
+    if(e.dashState==="windup"){
+      e.dashWindup-=dt;
+      e.x-=dx/dist*e.speed*.25*dt;
+      e.y-=dy/dist*e.speed*.25*dt;
+      if(e.dashWindup<=0){
+        const a=Math.atan2(dy,dx);
+        e.dashVx=Math.cos(a)*520;
+        e.dashVy=Math.sin(a)*520;
+        e.dashTime=.34;
+        e.dashState="dashing";
+        burst(e.x,e.y,8,e.color,120);
+      }
+      return;
+    }
+    if(e.dashState==="dashing"){
+      e.x+=e.dashVx*dt;
+      e.y+=e.dashVy*dt;
+      e.dashTime-=dt;
+      if(Math.random()<.8) trail(e.x,e.y,e.x-e.dashVx*.035,e.y-e.dashVy*.035,e.color,9);
+      if(e.dashTime<=0){
+        e.dashState="ready";
+        e.dashCooldown=1.65;
+      }
+      return;
+    }
+    if(dist<280&&e.dashCooldown<=0){
+      e.dashState="windup";
+      e.dashWindup=.42;
+      e.dashCooldown=2.2;
+      ring(e.x,e.y,34,e.color,.22);
+      return;
+    }
+    chase(e,dx,dy,dist,dt,1.15);
   }
   function chase(e, dx, dy, d, dt, mul) { const wob = Math.sin(s.time * 2 + e.x * .01) * .18; e.x += (dx / d + -dy / d * wob) * e.speed * mul * dt; e.y += (dy / d + dx / d * wob) * e.speed * mul * dt; }
   function enemyShot(e, a) { enemyBullets.push({ x: e.x, y: e.y, vx: Math.cos(a) * 180, vy: Math.sin(a) * 180, r: 5, color: e.color, damage: e.damage * .65, life: 4 }); }
@@ -267,6 +304,8 @@
       ctx.rotate(e.t*.25);
       poly(0,0,e.r,8,0,e.flash>0?"#fff":e.color,true);
       poly(0,0,e.r,8,0,"#fff",false);
+    }else if(e.id==="speeder"){
+      drawSpeederEnemy(e);
     }else if(e.behavior==="split"){
       drawSlimeEnemy(e);
     }else{
@@ -326,6 +365,56 @@
     ctx.lineWidth=1.5*z;
     ctx.strokeRect(-11*z,-14*z,22*z,25*z);
     ctx.strokeRect(-8*z,-30*z,17*z,17*z);
+  }
+
+  function drawSpeederEnemy(e){
+    const z=1.85, walk=Math.sin(e.t*9), charge=e.dashState==="windup", dash=e.dashState==="dashing";
+    const lean=dash?8*z:charge?-4*z:Math.sin(e.t*4)*2*z;
+    ctx.save();
+    ctx.scale(e.flip||1,1);
+    ctx.translate(lean,Math.sin(e.t*12)*1.2*z);
+    if(dash){
+      for(let i=3;i>=1;i--){
+        ctx.fillStyle=rgba("#ffd166",.12*i);
+        ctx.fillRect(-28*z-i*9,-22*z+i*2,24*z,40*z);
+      }
+    }
+    if(charge){
+      ctx.strokeStyle=rgba("#ffd166",.85);
+      ctx.lineWidth=2;
+      ctx.beginPath();
+      ctx.moveTo(-28*z,-22*z);ctx.lineTo(-40*z,0);ctx.lineTo(-28*z,22*z);
+      ctx.stroke();
+    }
+    ctx.fillStyle="rgba(0,0,0,.28)";
+    ctx.fillRect(-12*z,12*z,26*z,5*z);
+    ctx.fillStyle=e.flash>0?"#fff":"#e2b84e";
+    ctx.fillRect(-7*z,-13*z,16*z,27*z);
+    ctx.fillStyle=e.flash>0?"#fff":"#ffd166";
+    ctx.fillRect(-8*z,-30*z,17*z,17*z);
+    ctx.fillStyle="#5f3b12";
+    ctx.fillRect(-9*z,-31*z,18*z,5*z);
+    ctx.fillStyle="#23180a";
+    ctx.fillRect(-4*z,-24*z,3*z,3*z);
+    ctx.fillRect(5*z,-24*z,3*z,3*z);
+    ctx.fillStyle="#fff";
+    ctx.fillRect(5*z,-25*z,2*z,2*z);
+    ctx.fillStyle="#ff4d6d";
+    ctx.fillRect(-1*z,-17*z,7*z,2*z);
+    ctx.fillStyle="#e2b84e";
+    ctx.fillRect(-17*z,-10*z+walk*4*z,10*z,5*z);
+    ctx.fillRect(8*z,-8*z-walk*4*z,12*z,5*z);
+    ctx.fillStyle="#5f3b12";
+    ctx.fillRect(-8*z,10*z+walk*4*z,7*z,15*z);
+    ctx.fillRect(3*z,10*z-walk*4*z,7*z,15*z);
+    ctx.fillStyle="#ffd166";
+    ctx.fillRect(-11*z,22*z+walk*4*z,11*z,4*z);
+    ctx.fillRect(2*z,22*z-walk*4*z,11*z,4*z);
+    ctx.strokeStyle=dash?"#fff":"rgba(80,45,8,.85)";
+    ctx.lineWidth=2;
+    ctx.strokeRect(-7*z,-13*z,16*z,27*z);
+    ctx.strokeRect(-8*z,-30*z,17*z,17*z);
+    ctx.restore();
   }
 
   function drawSlimeEnemy(e){

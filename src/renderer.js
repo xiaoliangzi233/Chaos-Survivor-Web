@@ -70,19 +70,78 @@ function drawBounds(ctx) {
 function drawPlayer(ctx) {
   const p = state.player;
   const moving = input.up || input.down || input.left || input.right || Math.abs(input.vx) > 0.05 || Math.abs(input.vy) > 0.05;
-  const radius = p.r * (1 + Math.sin(state.time * 7) * 0.04);
-  const facing = Math.atan2(p.dirY, p.dirX);
+  const hurt = p.invuln > 0;
+  const low = p.hp / p.maxHp < 0.35;
+  const mood = hurt ? "hurt" : low ? "worried" : moving ? "happy" : ["blink", "smile", "curious", "happy"][Math.floor(state.time * 1.15) % 4];
+  const bob = Math.sin(state.time * 7) * (moving ? 2.2 : 1.1);
+  const squash = 1 + Math.sin(state.time * 5) * 0.025;
   ctx.save();
-  ctx.translate(p.x, p.y);
+  ctx.translate(p.x, p.y + bob);
   ctx.fillStyle = "rgba(0,0,0,0.28)";
-  ctx.beginPath(); ctx.ellipse(0, radius * 0.68, 30, 14, 0, 0, TAU); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(0, 20, 24, 8, 0, 0, TAU); ctx.fill();
   drawDashedCircle(ctx, 0, 0, p.magnet, "rgba(90,140,210,0.38)");
-  glow(ctx, 0, 0, radius * 1.05, moving ? 0.46 : 0.32, "#42e8ff");
-  polygon(ctx, 0, 0, radius * 1.08, 8, facing * 0.2, p.invuln > 0 ? "#fff" : "#42e8ff", true);
-  polygon(ctx, 0, 0, radius * 1.08, 8, facing * 0.2, "#f3f7ff", false);
-  ctx.fillStyle = "#031018"; ctx.beginPath(); ctx.arc(0, 0, radius * 0.3, 0, TAU); ctx.fill();
-  drawArrow(ctx, facing, radius, "#f3f7ff");
+  glow(ctx, 0, 0, 24, hurt ? 0.32 : 0.42, hurt ? "#ff9ab0" : "#ffd6a8");
+  ctx.scale(1.02, squash);
+  ctx.fillStyle = hurt ? "#ffd7dd" : "#ffd6a8";
+  ctx.beginPath(); ctx.arc(0, 0, 22, 0, TAU); ctx.fill();
+  ctx.fillStyle = "#ffbd8a";
+  ctx.beginPath(); ctx.arc(-13, 5, 5, 0, TAU); ctx.fill();
+  ctx.beginPath(); ctx.arc(13, 5, 5, 0, TAU); ctx.fill();
+  ctx.fillStyle = "#fff4d8";
+  ctx.beginPath(); ctx.arc(-7, -9, 7, 0, TAU); ctx.fill();
+  ctx.beginPath(); ctx.arc(7, -9, 7, 0, TAU); ctx.fill();
+  drawPlayerEyes(ctx, mood);
+  drawPlayerMouth(ctx, mood);
+  ctx.fillStyle = "rgba(255,255,255,0.65)";
+  ctx.beginPath(); ctx.arc(-8, -13, 4, 0, TAU); ctx.fill();
+  ctx.fillStyle = "#f3b05f";
+  ctx.beginPath(); ctx.arc(0, -1, 2.4, 0, TAU); ctx.fill();
+  ctx.strokeStyle = "#7b4a2b";
+  ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.arc(0, 0, 22, 0, TAU); ctx.stroke();
   ctx.restore();
+}
+
+function drawPlayerEyes(ctx, mood) {
+  ctx.strokeStyle = "#2a1d18";
+  ctx.fillStyle = "#2a1d18";
+  ctx.lineWidth = 2.4;
+  ctx.lineCap = "round";
+  if (mood === "blink") {
+    ctx.beginPath(); ctx.moveTo(-12, -5); ctx.lineTo(-5, -5); ctx.moveTo(5, -5); ctx.lineTo(12, -5); ctx.stroke();
+  } else if (mood === "happy") {
+    ctx.beginPath(); ctx.arc(-8, -6, 4, Math.PI * 0.08, Math.PI * 0.92); ctx.stroke();
+    ctx.beginPath(); ctx.arc(8, -6, 4, Math.PI * 0.08, Math.PI * 0.92); ctx.stroke();
+  } else if (mood === "hurt") {
+    ctx.beginPath();
+    ctx.moveTo(-12, -9); ctx.lineTo(-5, -3); ctx.moveTo(-5, -9); ctx.lineTo(-12, -3);
+    ctx.moveTo(5, -9); ctx.lineTo(12, -3); ctx.moveTo(12, -9); ctx.lineTo(5, -3);
+    ctx.stroke();
+  } else if (mood === "worried") {
+    ctx.fillRect(-11, -6, 5, 6); ctx.fillRect(6, -6, 5, 6);
+    ctx.strokeStyle = "#7b4a2b";
+    ctx.beginPath(); ctx.moveTo(-13, -12); ctx.lineTo(-5, -10); ctx.moveTo(5, -10); ctx.lineTo(13, -12); ctx.stroke();
+  } else {
+    ctx.beginPath(); ctx.arc(-8, -6, 3.3, 0, TAU); ctx.fill();
+    ctx.beginPath(); ctx.arc(8, -6, 3.3, 0, TAU); ctx.fill();
+    ctx.fillStyle = "#fff"; ctx.fillRect(-7, -8, 1.6, 1.6); ctx.fillRect(9, -8, 1.6, 1.6);
+  }
+}
+
+function drawPlayerMouth(ctx, mood) {
+  ctx.strokeStyle = "#7b2f2f";
+  ctx.fillStyle = "#7b2f2f";
+  ctx.lineWidth = 2;
+  ctx.lineCap = "round";
+  if (mood === "hurt") {
+    ctx.beginPath(); ctx.arc(0, 8, 4, 0, TAU); ctx.stroke();
+  } else if (mood === "worried") {
+    ctx.beginPath(); ctx.arc(0, 12, 6, Math.PI * 1.15, Math.PI * 1.85); ctx.stroke();
+  } else if (mood === "curious") {
+    ctx.beginPath(); ctx.arc(0, 8, 3, 0, TAU); ctx.fill();
+  } else {
+    ctx.beginPath(); ctx.arc(0, 4, 8, Math.PI * 0.18, Math.PI * 0.82); ctx.stroke();
+  }
 }
 
 function drawProjectiles(ctx) {

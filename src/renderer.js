@@ -186,9 +186,52 @@ function drawGems(ctx) {
 
 function drawEnemyProjectiles(ctx) {
   for (const b of world.enemyProjectiles) {
+    if (b.shape === "snowflake") {
+      drawSnowflakeProjectile(ctx, b);
+      continue;
+    }
     ctx.fillStyle = b.color; ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, TAU); ctx.fill();
     ctx.fillStyle = "#fff"; ctx.fillRect(b.x - 1, b.y - 1, 2, 2);
   }
+}
+
+function drawSnowflakeProjectile(ctx, b) {
+  const spin = (b.spin || 0) + state.time * 7;
+  ctx.save();
+  ctx.translate(b.x, b.y);
+  ctx.rotate(spin);
+  glow(ctx, 0, 0, b.r * 1.5, 0.42, b.color);
+  ctx.strokeStyle = "#dffcff";
+  ctx.lineWidth = 1.6;
+  ctx.lineCap = "round";
+  for (let i = 0; i < 6; i++) {
+    const a = i * TAU / 6;
+    const ca = Math.cos(a);
+    const sa = Math.sin(a);
+    const len = b.r * 2.15;
+    ctx.beginPath();
+    ctx.moveTo(ca * 2, sa * 2);
+    ctx.lineTo(ca * len, sa * len);
+    ctx.stroke();
+    const bx = Math.cos(a - 0.55) * b.r * 1.2;
+    const by = Math.sin(a - 0.55) * b.r * 1.2;
+    const cx = ca * b.r * 1.2;
+    const cy = sa * b.r * 1.2;
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.lineTo(cx + bx * 0.38, cy + by * 0.38);
+    ctx.moveTo(cx, cy);
+    ctx.lineTo(cx + Math.cos(a + 0.55) * b.r * 0.46, cy + Math.sin(a + 0.55) * b.r * 0.46);
+    ctx.stroke();
+  }
+  ctx.fillStyle = b.color;
+  ctx.beginPath();
+  ctx.arc(0, 0, b.r * 0.62, 0, TAU);
+  ctx.fill();
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(-1.4, -1.4, 2.8, 2.8);
+  ctx.lineCap = "butt";
+  ctx.restore();
 }
 
 function drawHazards(ctx) {

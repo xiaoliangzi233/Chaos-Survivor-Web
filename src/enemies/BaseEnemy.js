@@ -215,7 +215,7 @@ function drawEnemyShape(ctx, e) {
 }
 
 function drawZombieShape(ctx, e) {
-  const visualScale = e.id === "zombie" || e.type === "zombie" ? 2 : 1.75;
+  const visualScale = e.id === "zombie" || e.type === "zombie" ? 1 : 0.875;
   const z = e.r / 14 * visualScale;
   const walk = Math.sin(e.anim * 1.8);
   const bob = Math.sin(e.anim * 3.6) * 1.2 * z;

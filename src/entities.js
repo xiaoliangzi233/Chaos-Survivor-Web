@@ -1,8 +1,9 @@
-import { CELL_SIZE, ENEMY_LIMIT, GEM_LIMIT, TAU, WORLD_SIZE } from "./constants.js";
+import { CELL_SIZE, ENEMY_LIMIT, GEM_LIMIT, WORLD_SIZE } from "./constants.js";
 import { state, world, input } from "./state.js";
 import { clamp, distSq, circleHit } from "./utils.js";
 import { burst, dust } from "./effects.js";
 import { playTone } from "./audio.js";
+import { randomEnemyForWave, spawnEnemyById, spawnWaveBoss } from "./enemyRegistry.js";
 
 export function updatePlayer(dt) {
   const p = state.player;
@@ -31,82 +32,26 @@ export function updatePlayer(dt) {
 export function updateSpawning(dt) {
   const danger = state.wave / 20;
   state.spawnBudget += dt * (3.8 + danger * 12 + state.wave * 0.45);
+  spawnWaveBoss();
   while (state.spawnBudget >= 1 && world.enemies.length < ENEMY_LIMIT) {
     state.spawnBudget--;
-    const roll = Math.random();
-    if (state.wave >= 9 && roll < 0.2) spawnEnemy("tank");
-    else if (state.wave >= 5 && roll < 0.36) spawnEnemy("runner");
-    else if (state.wave >= 3 && roll < 0.5) spawnEnemy("splitter");
-    else spawnEnemy("chaser");
+    spawnEnemyById(randomEnemyForWave(state.wave));
   }
-}
-
-export function spawnEnemy(type) {
-  const angle = Math.random() * TAU;
-  const dist = 720 + Math.random() * 180;
-  const p = state.player;
-  const e = { type, dead: false, x: p.x + Math.cos(angle) * dist, y: p.y + Math.sin(angle) * dist, hitTimer: 0, flash: 0, anim: Math.random() * TAU, flip: Math.cos(angle) > 0 ? -1 : 1 };
-  const scale = 1 + state.wave * 0.08;
-  if (type === "runner") Object.assign(e, { r: 12, hp: 34 * scale, maxHp: 34 * scale, speed: 118 + state.wave * 2.5, damage: 12, xp: 4, color: "#ffd166" });
-  else if (type === "tank") Object.assign(e, { r: 24, hp: 150 * scale, maxHp: 150 * scale, speed: 48 + state.wave, damage: 24, xp: 15, color: "#b48cff" });
-  else if (type === "splitter") Object.assign(e, { r: 16, hp: 64 * scale, maxHp: 64 * scale, speed: 76 + state.wave * 1.3, damage: 15, xp: 8, color: "#77ff8a" });
-  else Object.assign(e, { r: 14, hp: 44 * scale, maxHp: 44 * scale, speed: 78 + state.wave * 1.5, damage: 14, xp: 5, color: "#42e8ff" });
-  const half = WORLD_SIZE / 2;
-  e.x = clamp(e.x, -half + e.r, half - e.r);
-  e.y = clamp(e.y, -half + e.r, half - e.r);
-  world.enemies.push(e);
 }
 
 export function updateEnemies(dt) {
   const p = state.player;
+  for (const e of world.enemies) e.shielded = false;
   for (let i = world.enemies.length - 1; i >= 0; i--) {
     const e = world.enemies[i];
-    const dx = p.x - e.x;
-    const dy = p.y - e.y;
-    const dist = Math.max(1, Math.hypot(dx, dy));
-    const wobble = Math.sin(state.time * 2 + e.x * 0.01) * 0.18;
-    e.x += (dx / dist + -dy / dist * wobble) * e.speed * dt;
-    e.y += (dy / dist + dx / dist * wobble) * e.speed * dt;
-    const half = WORLD_SIZE / 2;
-    e.x = clamp(e.x, -half + e.r, half - e.r);
-    e.y = clamp(e.y, -half + e.r, half - e.r);
-    e.anim += dt * (2.4 + e.speed * 0.035);
-    e.flip = dx < 0 ? -1 : 1;
-    e.hitTimer = Math.max(0, e.hitTimer - dt);
-    e.flash = Math.max(0, e.flash - dt * 8);
-    if (dist < p.r + e.r && p.invuln <= 0) {
-      p.hp -= e.damage;
-      p.invuln = 0.55;
-      state.shake = 8;
-      state.flash = 0.28;
-      burst(p.x, p.y, 12, "#ff4d6d", 120);
-      playTone(90, 0.04, "sawtooth");
-    }
+    e.update(dt);
   }
+  updateEnemyProjectiles(dt);
+  updateHazards(dt);
 }
 
 export function damageEnemy(e, amount, x, y) {
-  if (e.dead) return;
-  e.hp -= amount * state.player.damageScale;
-  e.flash = 1;
-  burst(x, y, 3, "#6fdb6f", 100);
-  if (e.hp <= 0) killEnemy(e);
-}
-
-function killEnemy(e) {
-  e.dead = true;
-  state.kills++;
-  dropGem(e.x, e.y, e.xp);
-  burst(e.x, e.y, e.type === "tank" ? 20 : 10, e.color, 140);
-  const index = world.enemies.indexOf(e);
-  if (index >= 0) world.enemies.splice(index, 1);
-  if (e.type === "splitter") for (let i = 0; i < 2; i++) spawnChild(e);
-}
-
-function spawnChild(parent) {
-  if (world.enemies.length >= ENEMY_LIMIT) return;
-  const e = { type: "chaser", dead: false, x: parent.x + (Math.random() - 0.5) * 40, y: parent.y + (Math.random() - 0.5) * 40, r: 10, hp: 22 + state.wave * 2, maxHp: 22 + state.wave * 2, speed: 108, damage: 9, xp: 2, color: "#77ff8a", hitTimer: 0, flash: 0, anim: Math.random() * TAU, flip: 1 };
-  world.enemies.push(e);
+  e.takeDamage ? e.takeDamage(amount, x, y) : null;
 }
 
 export function dropGem(x, y, value) {
@@ -188,7 +133,39 @@ export function clearEnemies() {
   for (const e of world.enemies) burst(e.x, e.y, e.type === "tank" ? 14 : 7, e.color, 120);
   world.enemies.length = 0;
   world.projectiles.length = 0;
+  world.enemyProjectiles.length = 0;
+  world.hazards.length = 0;
+  world.boss = null;
   world.grid.clear();
+}
+
+function updateEnemyProjectiles(dt) {
+  const p = state.player;
+  for (let i = world.enemyProjectiles.length - 1; i >= 0; i--) {
+    const b = world.enemyProjectiles[i];
+    b.x += b.vx * dt;
+    b.y += b.vy * dt;
+    b.life -= dt;
+    if (circleHit(b.x, b.y, b.r, p.x, p.y, p.r) && p.invuln <= 0) {
+      p.hp -= b.damage;
+      p.invuln = 0.5;
+      burst(p.x, p.y, 8, b.color, 100);
+      world.enemyProjectiles.splice(i, 1);
+    } else if (b.life <= 0) world.enemyProjectiles.splice(i, 1);
+  }
+}
+
+function updateHazards(dt) {
+  const p = state.player;
+  for (let i = world.hazards.length - 1; i >= 0; i--) {
+    const h = world.hazards[i];
+    h.life -= dt;
+    if (distSq(h.x, h.y, p.x, p.y) < (h.r + p.r) ** 2 && p.invuln <= 0) {
+      p.hp -= h.damage;
+      p.invuln = 0.35;
+    }
+    if (h.life <= 0) world.hazards.splice(i, 1);
+  }
 }
 
 function cellKey(x, y) {

@@ -24,9 +24,12 @@ export const state = {
 export const world = {
   enemies: [],
   projectiles: [],
+  enemyProjectiles: [],
+  hazards: [],
   gems: [],
   particles: [],
   grid: new Map(),
+  boss: null,
 };
 
 export const input = {
@@ -74,9 +77,12 @@ export function createWeapons() {
 export function resetRun(map) {
   world.enemies.length = 0;
   world.projectiles.length = 0;
+  world.enemyProjectiles.length = 0;
+  world.hazards.length = 0;
   world.gems.length = 0;
   world.particles.length = 0;
   world.grid.clear();
+  world.boss = null;
 
   state.mode = "choosingWeapon";
   state.time = 0;

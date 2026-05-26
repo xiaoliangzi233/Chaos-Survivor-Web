@@ -299,7 +299,7 @@ export function showEnd(victory) {
   ui.endEyebrow.textContent = victory ? "VICTORY" : "RUN COMPLETE";
   ui.endTitle.textContent = victory ? "20 波已完成" : "生存结束";
   ui.endStats.innerHTML = "";
-  [`时间 ${formatTime(state.time)}`, `等级 ${p.level}`, `击败 ${state.kills}`, `金币 ${state.gold}`].forEach((text) => {
+  [`难度 ${state.difficulty?.name || "未选择"}`, `时间 ${formatTime(state.time)}`, `等级 ${p.level}`, `击败 ${state.kills}`, `金币 ${state.gold}`].forEach((text) => {
     const item = document.createElement("span");
     item.textContent = text;
     ui.endStats.appendChild(item);

@@ -1635,6 +1635,20 @@ h2 {
     grid-template-columns: 1fr;
   }
 
+  .difficulty-head {
+    display: grid;
+    text-align: left;
+  }
+
+  .difficulty-head p {
+    max-width: none;
+    text-align: left;
+  }
+
+  .difficulty-list {
+    grid-template-columns: 1fr;
+  }
+
   .weapon-carousel {
     grid-template-columns: 42px minmax(0, 1fr) 42px;
     gap: 8px;

@@ -1,5 +1,5 @@
 import { state } from "./state.js";
-import { addWeaponToInventory, QUALITY_INFO, QUALITY_ORDER, WEAPON_INFO } from "./inventory.js";
+import { addWeaponToInventory, canFuseWeapons, QUALITY_INFO, QUALITY_ORDER, recomputeAllWeapons, WEAPON_INFO } from "./inventory.js";
 import { playSfx } from "./audio.js";
 
 const SHOP_SLOTS = 4;
@@ -162,8 +162,50 @@ export function purchaseDisabledReason(offer) {
   if (!offer) return "商品不存在";
   if (isSoldOut(offer)) return "商品已售罄";
   if (state.gold < offer.price) return "金币不足";
-  if (offer.category === "武器" && !canAcceptWeapon(offer.weaponId)) return "武器槽已满";
+  if (offer.category === "武器" && !canAcceptWeapon(offer.weaponId, offer.rarity)) return "武器槽已满，且无法合成";
   return "";
+}
+
+export function sellWeaponSlot(uid) {
+  const inv = state.inventory;
+  if (!inv) return { ok: false, reason: "背包不存在" };
+  const idx = inv.weaponSlots.findIndex((slot) => slot.uid === uid);
+  if (idx < 0) return { ok: false, reason: "武器不存在" };
+  const [slot] = inv.weaponSlots.splice(idx, 1);
+  state.gold += weaponSellPrice(slot);
+  if (inv.selectedWeaponUid === uid) inv.selectedWeaponUid = inv.weaponSlots[0]?.uid ?? null;
+  recomputeAllWeapons();
+  playSfx("coin");
+  return { ok: true };
+}
+
+export function sellInventoryItem(id) {
+  const inv = state.inventory;
+  if (!inv) return { ok: false, reason: "背包不存在" };
+  const item = inv.items.find((entry) => entry.id === id);
+  if (!item || item.qty <= 0) return { ok: false, reason: "道具不存在" };
+  item.qty--;
+  state.gold += itemSellPrice(item);
+  if (item.qty <= 0) inv.items.splice(inv.items.indexOf(item), 1);
+  playSfx("coin");
+  return { ok: true };
+}
+
+export function weaponSellPrice(slot) {
+  const rank = Math.max(0, QUALITY_ORDER.indexOf(slot?.quality || "common"));
+  return Math.floor(6 + rank * rank * 7 + rank * 4);
+}
+
+export function itemSellPrice(item) {
+  const template = ITEM_POOL.find((entry) => entry.id === item?.id);
+  return Math.max(2, Math.floor((template?.basePrice || 10) * 0.35));
+}
+
+export function canFuseShopWeapon(weaponId, quality) {
+  const inv = state.inventory;
+  if (!inv || !weaponId || !quality) return false;
+  const incoming = { uid: -1, id: weaponId, quality };
+  return inv.weaponSlots.some((slot) => canFuseWeapons(slot, incoming).ok);
 }
 
 export function isSoldOut(offer) {
@@ -247,13 +289,23 @@ function weightedChoice(entries) {
 }
 
 function buyWeapon(offer) {
-  addWeaponToInventory(offer.weaponId, offer.rarity);
+  const inv = state.inventory;
+  if (!inv) return null;
+  if (inv.weaponSlots.length < 6) return addWeaponToInventory(offer.weaponId, offer.rarity);
+  const incoming = { uid: -1, id: offer.weaponId, quality: offer.rarity };
+  const target = inv.weaponSlots.find((slot) => canFuseWeapons(slot, incoming).ok);
+  if (!target) return null;
+  const nextQuality = canFuseWeapons(target, incoming).nextQuality;
+  target.quality = nextQuality;
+  inv.selectedWeaponUid = target.uid;
+  recomputeAllWeapons();
+  return target;
 }
 
-function canAcceptWeapon(weaponId) {
+function canAcceptWeapon(weaponId, quality) {
   const inv = state.inventory;
   if (!inv) return false;
-  return inv.weaponSlots.length < 6;
+  return inv.weaponSlots.length < 6 || canFuseShopWeapon(weaponId, quality);
 }
 
 function recordItem(id, name, icon, qty, desc) {

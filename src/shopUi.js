@@ -1,13 +1,18 @@
 import { state } from "./state.js";
-import { QUALITY_INFO } from "./inventory.js";
+import { QUALITY_INFO, WEAPON_INFO } from "./inventory.js";
 import {
+  canFuseShopWeapon,
+  itemSellPrice,
   isSoldOut,
   prepareShopOffers,
   purchaseDisabledReason,
   purchaseOffer,
   refreshCost,
   refreshShopOffers,
+  sellInventoryItem,
+  sellWeaponSlot,
   toggleOfferLock,
+  weaponSellPrice,
 } from "./shop.js";
 
 const dom = {};
@@ -18,6 +23,7 @@ export function initShopUi({ continueToNextWave }) {
   dom.overlay = document.getElementById("shopOverlay");
   dom.gold = document.getElementById("shopGoldText");
   dom.list = document.getElementById("shopOfferList");
+  dom.inventory = document.getElementById("shopInventoryPanel");
   dom.refresh = document.getElementById("shopRefreshButton");
   dom.continue = document.getElementById("shopContinueButton");
   dom.hint = document.getElementById("shopHint");
@@ -55,6 +61,7 @@ export function renderShop(message = "") {
   dom.refresh.disabled = state.gold < cost;
   dom.list.innerHTML = "";
   for (const offer of state.shop.offers) dom.list.appendChild(renderOffer(offer));
+  renderShopInventory();
   dom.hint.textContent = message || "锁定的商品不会在刷新或下次进入商店时变化。";
 }
 
@@ -62,6 +69,7 @@ function renderOffer(offer) {
   const quality = QUALITY_INFO[offer.rarity] || QUALITY_INFO.common;
   const soldOut = isSoldOut(offer);
   const reason = purchaseDisabledReason(offer);
+  const canFuseOnFull = offer.category === "武器" && state.inventory?.weaponSlots.length >= 6 && canFuseShopWeapon(offer.weaponId, offer.rarity);
   const card = document.createElement("article");
   card.className = `shop-card${soldOut ? " sold-out" : ""}`;
   card.style.setProperty("--quality", quality.color);
@@ -100,6 +108,7 @@ function renderOffer(offer) {
       <span>数量 x${offer.quantity}</span>
       <span>${offer.purchaseCount}/${offer.maxPurchases}</span>
       <span>${offer.price} 金币</span>
+      ${canFuseOnFull ? "<span>槽满购买后自动合成</span>" : ""}
     </div>
   `;
   const actions = document.createElement("div");
@@ -107,4 +116,64 @@ function renderOffer(offer) {
   actions.append(lock, buy);
   card.appendChild(actions);
   return card;
+}
+
+function renderShopInventory() {
+  if (!dom.inventory || !state.inventory) return;
+  const weaponSlots = state.inventory.weaponSlots;
+  dom.inventory.innerHTML = `
+    <section class="shop-inventory-section">
+      <h3>武器槽 <span>${weaponSlots.length}/6</span></h3>
+      <div class="shop-weapon-slots"></div>
+    </section>
+    <section class="shop-inventory-section">
+      <h3>可出售道具</h3>
+      <div class="shop-item-slots"></div>
+    </section>`;
+
+  const weaponList = dom.inventory.querySelector(".shop-weapon-slots");
+  for (let i = 0; i < 6; i++) {
+    const slot = weaponSlots[i];
+    const row = document.createElement("div");
+    row.className = `shop-slot-row${slot ? "" : " empty"}`;
+    if (!slot) {
+      row.textContent = "空槽位";
+    } else {
+      const info = WEAPON_INFO[slot.id];
+      const quality = QUALITY_INFO[slot.quality] || QUALITY_INFO.common;
+      const price = weaponSellPrice(slot);
+      row.innerHTML = `
+        <i style="color:${quality.color}">${info.icon}</i>
+        <span><strong>${info.name}</strong><small style="color:${quality.color}">${quality.name}</small></span>
+        <button type="button">出售 ${price}</button>`;
+      row.querySelector("button").addEventListener("click", () => {
+        const result = sellWeaponSlot(slot.uid);
+        renderShop(result.ok ? `已出售 ${info.name}，获得 ${price} 金币。` : result.reason);
+      });
+    }
+    weaponList.appendChild(row);
+  }
+
+  const itemList = dom.inventory.querySelector(".shop-item-slots");
+  if (!state.inventory.items.length) {
+    const empty = document.createElement("div");
+    empty.className = "shop-slot-row empty";
+    empty.textContent = "暂无道具";
+    itemList.appendChild(empty);
+    return;
+  }
+  for (const item of state.inventory.items) {
+    const price = itemSellPrice(item);
+    const row = document.createElement("div");
+    row.className = "shop-slot-row";
+    row.innerHTML = `
+      <i>${item.icon}</i>
+      <span><strong>${item.name}</strong><small>x${item.qty}</small></span>
+      <button type="button">出售 ${price}</button>`;
+    row.querySelector("button").addEventListener("click", () => {
+      const result = sellInventoryItem(item.id);
+      renderShop(result.ok ? `已出售 ${item.name}，获得 ${price} 金币。` : result.reason);
+    });
+    itemList.appendChild(row);
+  }
 }

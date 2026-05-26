@@ -1,5 +1,5 @@
 import { state } from "./state.js";
-import { addWeaponToInventory, QUALITY_INFO, QUALITY_ORDER, recomputeAllWeapons, WEAPON_INFO } from "./inventory.js";
+import { addWeaponToInventory, QUALITY_INFO, QUALITY_ORDER, WEAPON_INFO } from "./inventory.js";
 import { playSfx } from "./audio.js";
 
 const SHOP_SLOTS = 4;
@@ -262,19 +262,12 @@ function weightedChoice(entries) {
 }
 
 function buyWeapon(offer) {
-  const slot = addWeaponToInventory(offer.weaponId, offer.rarity);
-  if (slot) {
-    const oldRank = QUALITY_ORDER.indexOf(slot.quality);
-    const newRank = QUALITY_ORDER.indexOf(offer.rarity);
-    if (newRank > oldRank) slot.quality = offer.rarity;
-    recomputeAllWeapons();
-  }
+  addWeaponToInventory(offer.weaponId, offer.rarity);
 }
 
 function canAcceptWeapon(weaponId) {
   const inv = state.inventory;
   if (!inv) return false;
-  if (inv.weaponSlots.some((slot) => slot.id === weaponId)) return true;
   return inv.weaponSlots.length < 6;
 }
 

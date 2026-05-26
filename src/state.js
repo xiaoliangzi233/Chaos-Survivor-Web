@@ -76,7 +76,7 @@ export function createWeapons() {
     ice: { level: 0, timer: 0.8, cooldown: 1.05, count: 1, damage: 16, speed: 430, turnSpeed: 5.2, freezeDuration: 0.45, quality: "common", qualityMult: 1 },
     missile: { level: 0, timer: 1.2, cooldown: 1.75, damage: 26, speed: 360, explodeRadius: 96, explodeDamage: 24, turnSpeed: 2.5, quality: "common", qualityMult: 1 },
     boomerang: { level: 0, timer: 1.4, cooldown: 1.9, count: 1, damage: 20, speed: 520, returnAfter: 0.52, returnSpeed: 1.25, quality: "common", qualityMult: 1 },
-    drone: { level: 0, angle: 0, count: 2, orbitRadius: 78, acquireRange: 560, attackRange: 420, fireCooldown: 0.42, bulletDamage: 9, bulletSpeed: 520, batteryMax: 100, shotCost: 22, rechargeRate: 34, drones: [], quality: "common", qualityMult: 1 },
+    drone: { level: 0, angle: 0, count: 0, orbitRadius: 78, acquireRange: 560, attackRange: 420, fireCooldown: 0.42, bulletDamage: 9, bulletSpeed: 520, batteryMax: 100, shotCost: 22, rechargeRate: 34, drones: [], quality: "common", qualityMult: 1 },
     pulse: { level: 0, timer: 2.4, cooldown: 3.4, damage: 24, radius: 102, quality: "common", qualityMult: 1 },
   };
 }

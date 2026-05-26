@@ -52,17 +52,11 @@ export const WEAPON_INFO = {
 export function addWeaponToInventory(id, quality = "common") {
   const inv = state.inventory;
   if (!inv || !WEAPON_INFO[id]) return null;
-  const existing = inv.weaponSlots.find((slot) => slot.id === id);
-  if (existing) {
-    existing.level += 1;
-    applyWeaponSlot(existing);
-    return existing;
-  }
   if (inv.weaponSlots.length >= 6) return null;
   const slot = { uid: inv.nextUid++, id, quality, level: 1 };
   inv.weaponSlots.push(slot);
   inv.selectedWeaponUid ||= slot.uid;
-  applyWeaponSlot(slot);
+  recomputeAllWeapons();
   return slot;
 }
 
@@ -73,7 +67,7 @@ export function upgradeWeaponSlot(uid) {
   if (state.shards < cost) return false;
   state.shards -= cost;
   slot.level += 1;
-  applyWeaponSlot(slot);
+  recomputeAllWeapons();
   return true;
 }
 
@@ -118,6 +112,8 @@ export function recomputeAllWeapons() {
     weapon.level = 0;
     weapon.quality = "common";
     weapon.qualityMult = 1;
+    weapon.slotCount = 0;
+    if ("count" in weapon) weapon.count = 0;
   }
   for (const slot of state.inventory.weaponSlots) applyWeaponSlot(slot);
 }
@@ -126,9 +122,13 @@ export function applyWeaponSlot(slot) {
   const weapon = state.weapons?.[slot.id];
   if (!weapon) return;
   const qualityLevel = QUALITY_ORDER.indexOf(slot.quality);
-  weapon.level = Math.max(1, slot.level + qualityLevel);
-  weapon.quality = slot.quality;
-  weapon.qualityMult = QUALITY_INFO[slot.quality].mult;
+  const currentQualityLevel = QUALITY_ORDER.indexOf(weapon.quality || "common");
+  weapon.slotCount = (weapon.slotCount || 0) + 1;
+  weapon.level += Math.max(1, slot.level + qualityLevel);
+  if (qualityLevel >= currentQualityLevel) weapon.quality = slot.quality;
+  weapon.qualityMult = Math.max(weapon.qualityMult || 1, QUALITY_INFO[slot.quality].mult);
+  if (slot.id === "drone") weapon.count = weapon.slotCount;
+  else if ("count" in weapon) weapon.count = Math.max(1, weapon.slotCount);
 }
 
 function findWeaponSlot(uid) {

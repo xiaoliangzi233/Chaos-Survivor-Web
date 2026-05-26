@@ -1,6 +1,7 @@
-import { SAVE_KEY, TOTAL_WAVES } from "./constants.js";
+import { TOTAL_WAVES } from "./constants.js";
 import { state } from "./state.js";
 import { choice, formatTime } from "./utils.js";
+import { bestSummaryText, difficultyCards } from "./difficulty.js";
 import {
   findFuseCandidate,
   fuseWeaponSlots,
@@ -32,6 +33,7 @@ export const ui = {
   fpsText: document.getElementById("fpsText"),
   startOverlay: document.getElementById("startOverlay"),
   levelOverlay: document.getElementById("levelOverlay"),
+  difficultyOverlay: document.getElementById("difficultyOverlay"),
   shopOverlay: document.getElementById("shopOverlay"),
   pauseOverlay: document.getElementById("pauseOverlay"),
   inventoryOverlay: document.getElementById("inventoryOverlay"),
@@ -39,6 +41,7 @@ export const ui = {
   levelEyebrow: document.querySelector("#levelOverlay .eyebrow"),
   levelTitle: document.querySelector("#levelOverlay h2"),
   choiceList: document.getElementById("choiceList"),
+  difficultyList: document.getElementById("difficultyList"),
   startButton: document.getElementById("startButton"),
   restartButton: document.getElementById("restartButton"),
   resumeButton: document.getElementById("resumeButton"),
@@ -117,7 +120,37 @@ function setFpsClass(fps) {
 }
 
 export function updateBestText() {
-  ui.bestText.textContent = `最佳纪录 ${formatTime(Number(localStorage.getItem(SAVE_KEY) || 0))}`;
+  ui.bestText.textContent = bestSummaryText(formatTime);
+}
+
+export function showDifficultySelect({ onPick }) {
+  clearPreview();
+  ui.quickActions?.classList.add("blocked");
+  ui.difficultyList.innerHTML = "";
+  for (const item of difficultyCards()) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = `difficulty-card${item.unlocked ? "" : " locked"}${item.completed ? " completed" : ""}${item.currentHighest ? " current" : ""}`;
+    button.disabled = !item.unlocked;
+    button.innerHTML = `
+      <span>${String(item.index + 1).padStart(2, "0")}</span>
+      <strong>${item.name}</strong>
+      <p>${item.unlocked ? item.desc : "击败上一难度解锁。"}</p>
+      <div class="difficulty-meta">
+        <i>敌人 ${Math.round(item.enemyHp * 100)}%</i>
+        <i>伤害 ${Math.round(item.enemyDamage * 100)}%</i>
+        <i>怪潮 ${Math.round(item.spawnRate * 100)}%</i>
+      </div>
+      <em>${item.completed ? `已通关 · ${formatTime(item.bestTime)}` : item.unlocked ? "可挑战" : "未解锁"}</em>`;
+    button.addEventListener("click", () => onPick(item), { once: true });
+    ui.difficultyList.appendChild(button);
+  }
+  ui.difficultyOverlay.classList.add("active");
+}
+
+export function hideDifficultySelect() {
+  ui.difficultyOverlay?.classList.remove("active");
+  ui.quickActions?.classList.remove("blocked");
 }
 
 export function showChoices({ eyebrow, title, items, onPick }) {
@@ -250,6 +283,7 @@ export function hideAllOverlays() {
   ui.quickActions?.classList.remove("blocked");
   ui.startOverlay.classList.remove("active");
   ui.levelOverlay.classList.remove("active");
+  ui.difficultyOverlay?.classList.remove("active");
   ui.shopOverlay?.classList.remove("active");
   ui.pauseOverlay.classList.remove("active");
   ui.inventoryOverlay.classList.remove("active");

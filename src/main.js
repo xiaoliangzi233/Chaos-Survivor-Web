@@ -6,6 +6,8 @@ import {
   updateBestText,
   showChoices,
   showWeaponCarousel,
+  showDifficultySelect,
+  hideDifficultySelect,
   hideChoices,
   showPauseMenu,
   hidePauseMenu,
@@ -25,11 +27,14 @@ import * as effects from "./effects.js";
 import { resizeCanvas, updateCamera, render } from "./renderer.js";
 import { playSfx, startMusic, stopMusic, pauseMusic, resumeMusic } from "./audio.js";
 import { CAMERA_ZOOM } from "./constants.js";
+import { loadDifficultyProgress, recordDifficultyVictory, selectDifficulty, setupDifficultyConfig } from "./difficulty.js";
 
 export async function bootGame() {
   const ctx = ui.canvas.getContext("2d", { alpha: false });
   initInventoryUi();
   initShopUi({ continueToNextWave: finishWaveTransition });
+  await setupDifficultyConfig();
+  loadDifficultyProgress();
   await setupEnemyRegistry();
   let lastTime = 0;
   let fps = 60;
@@ -37,12 +42,29 @@ export async function bootGame() {
   let fpsFrames = 0;
 
   function start() {
+    hideAllOverlays();
+    showDifficultyChoices();
+    playSfx("select");
+  }
+
+  function startWithDifficulty(id) {
+    selectDifficulty(id);
     resetRun(generateMap());
+    selectDifficulty(id);
     state.shop = createShopState();
     hideAllOverlays();
     showStarterChoices();
     playSfx("start");
     startMusic();
+  }
+
+  function showDifficultyChoices() {
+    showDifficultySelect({
+      onPick: (item) => {
+        hideDifficultySelect();
+        startWithDifficulty(item.id);
+      },
+    });
   }
 
   function showStarterChoices() {
@@ -129,6 +151,7 @@ export async function bootGame() {
   function endGame(victory) {
     state.mode = "ended";
     state.victory = victory;
+    if (victory) recordDifficultyVictory();
     const best = Number(localStorage.getItem(SAVE_KEY) || 0);
     if (state.time > best) localStorage.setItem(SAVE_KEY, String(Math.floor(state.time)));
     hidePauseMenu();

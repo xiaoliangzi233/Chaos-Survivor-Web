@@ -3,19 +3,24 @@ import { state, world } from "../state.js";
 import { clamp, distSq } from "../utils.js";
 import { burst, pulse } from "../effects.js";
 import { playSfx } from "../audio.js";
+import { currentDifficulty } from "../difficulty.js";
 
 export class BaseEnemy {
   constructor(config, x, y) {
     Object.assign(this, config);
     const scale = this.boss ? 1 : 1 + state.wave * 0.08;
+    const difficulty = currentDifficulty();
+    const hpMul = this.boss ? difficulty.bossHp : difficulty.enemyHp;
+    const damageMul = this.boss ? difficulty.bossDamage : difficulty.enemyDamage;
+    const speedMul = this.boss ? Math.min(1.12, difficulty.enemySpeed || 1) : difficulty.enemySpeed;
     this.type = config.id;
     this.x = x;
     this.y = y;
     this.r = config.radius;
-    this.hp = config.hp * scale;
+    this.hp = config.hp * scale * (hpMul || 1);
     this.maxHp = this.hp;
-    this.speed = config.speed;
-    this.damage = config.damage;
+    this.speed = config.speed * (speedMul || 1);
+    this.damage = config.damage * (damageMul || 1);
     this.xp = config.xp;
     this.color = config.color;
     this.dead = false;
@@ -28,6 +33,7 @@ export class BaseEnemy {
     this.shielded = false;
     this.knockbackX = 0;
     this.knockbackY = 0;
+    this.difficultyAttackSpeed = difficulty.enemyAttackSpeed || 1;
     this.knockbackResistance = config.knockbackResistance ?? (this.boss ? 0.92 : this.elite ? 0.58 : Math.min(0.62, Math.max(0.16, (this.r - 10) / 36)));
   }
 

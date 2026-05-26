@@ -24,6 +24,9 @@ export const state = {
   inventory: null,
   initialWeaponId: null,
   shop: null,
+  difficultyId: "ember",
+  difficulty: null,
+  difficultyProgress: null,
 };
 
 export const world = {
@@ -128,4 +131,5 @@ export function resetRun(map) {
   state.inventory = createInventory();
   state.initialWeaponId = null;
   state.shop = null;
+  state.difficultyId = state.difficultyId || "ember";
 }

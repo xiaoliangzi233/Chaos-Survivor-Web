@@ -671,6 +671,124 @@ h2 {
   justify-self: start;
 }
 
+.difficulty-panel {
+  width: min(980px, calc(100vw - 28px));
+  max-height: min(760px, calc(100vh - 28px));
+  overflow: hidden;
+  padding: 0;
+  border-color: rgba(66, 232, 255, 0.32);
+  background:
+    linear-gradient(180deg, rgba(12, 18, 34, 0.96), rgba(4, 8, 18, 0.97)),
+    var(--panel-strong);
+}
+
+.difficulty-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 18px 20px 14px;
+  border-bottom: 1px solid rgba(66, 232, 255, 0.2);
+  background:
+    linear-gradient(90deg, rgba(66, 232, 255, 0.1), rgba(255, 209, 102, 0.04)),
+    rgba(255, 255, 255, 0.035);
+}
+
+.difficulty-head h2 {
+  margin-bottom: 0;
+}
+
+.difficulty-head p {
+  max-width: 320px;
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.6;
+  text-align: right;
+}
+
+.difficulty-list {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  max-height: calc(min(760px, calc(100vh - 28px)) - 100px);
+  overflow: auto;
+  padding: 18px 20px 20px;
+}
+
+.difficulty-card {
+  display: grid;
+  gap: 9px;
+  min-height: 198px;
+  border: 1px solid rgba(66, 232, 255, 0.24);
+  border-radius: 6px;
+  padding: 13px;
+  background:
+    linear-gradient(145deg, rgba(66, 232, 255, 0.12), rgba(255, 255, 255, 0.045)),
+    rgba(3, 8, 16, 0.58);
+  color: var(--ink);
+  text-align: left;
+}
+
+.difficulty-card.current {
+  border-color: rgba(255, 209, 102, 0.72);
+  box-shadow: inset 0 0 0 1px rgba(255, 209, 102, 0.28), 0 0 24px rgba(255, 209, 102, 0.12);
+}
+
+.difficulty-card.completed {
+  border-color: rgba(119, 255, 138, 0.5);
+}
+
+.difficulty-card.locked {
+  cursor: not-allowed;
+  opacity: 0.48;
+  filter: grayscale(0.4);
+}
+
+.difficulty-card > span {
+  color: var(--cyan);
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 0.14em;
+}
+
+.difficulty-card strong {
+  font-size: 20px;
+  line-height: 1.15;
+}
+
+.difficulty-card p,
+.difficulty-card em,
+.difficulty-meta i {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.difficulty-card p {
+  min-height: 50px;
+  margin: 0;
+}
+
+.difficulty-meta {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 5px;
+}
+
+.difficulty-meta i {
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 5px;
+  background: rgba(0, 0, 0, 0.18);
+  font-style: normal;
+  text-align: center;
+}
+
+.difficulty-card em {
+  color: #ffd166;
+  font-style: normal;
+  font-weight: 800;
+}
+
 .pause-menu {
   width: min(440px, 100%);
 }

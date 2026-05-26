@@ -5,6 +5,7 @@ import { burst, dust } from "./effects.js";
 import { playSfx } from "./audio.js";
 import { isBossWave, randomEnemyForWave, spawnEnemyById, spawnWaveBoss } from "./enemyRegistry.js";
 import { updateBlackhole } from "./blackhole.js";
+import { difficultyMultiplier, currentDifficulty } from "./difficulty.js";
 
 export function updatePlayer(dt) {
   const p = state.player;
@@ -41,8 +42,9 @@ export function updateSpawning(dt) {
   if (isBossWave(state.wave)) return;
   const danger = state.wave / 20;
   const earlyMul = state.wave <= 3 ? 0.52 : state.wave <= 6 ? 0.68 : state.wave <= 9 ? 0.84 : 1;
-  state.spawnBudget += dt * (2.1 + danger * 10.5 + state.wave * 0.36) * earlyMul;
-  while (state.spawnBudget >= 1 && world.enemies.length < ENEMY_LIMIT) {
+  state.spawnBudget += dt * (2.1 + danger * 10.5 + state.wave * 0.36) * earlyMul * difficultyMultiplier("spawnRate");
+  const enemyLimit = currentDifficulty().enemyLimit || ENEMY_LIMIT;
+  while (state.spawnBudget >= 1 && world.enemies.length < enemyLimit) {
     state.spawnBudget--;
     spawnEnemyById(randomEnemyForWave(state.wave));
   }
@@ -61,7 +63,9 @@ export function updateEnemies(dt) {
       continue;
     }
     if (e.freezeTimer > 0) e.freezeTimer = Math.max(0, e.freezeTimer - dt * 2.5);
+    const beforeCooldowns = snapshotCooldowns(e);
     e.update(dt);
+    applyDifficultyCooldownScale(e, beforeCooldowns);
   }
   updateEnemyProjectiles(dt);
   updateHazards(dt);
@@ -83,7 +87,7 @@ export function applyKnockback(e, dx, dy, force) {
 
 export function dropGem(x, y, value) {
   if (world.gems.length >= GEM_LIMIT) world.gems.shift();
-  world.gems.push({ x, y, value: Math.max(1, Math.round(value)), phase: Math.random() * TAU });
+  world.gems.push({ x, y, value: Math.max(1, Math.round(value * difficultyMultiplier("xpGain"))), phase: Math.random() * TAU });
 }
 
 export function dropCoin(x, y, amount) {
@@ -108,7 +112,7 @@ export function dropCoin(x, y, amount) {
 export function coinAmountForEnemy(enemy) {
   if (!enemy || enemy.boss || enemy.elite || enemy.category !== "小怪") return 0;
   const amount = 1 + Math.floor(Math.random() * 3) + Math.floor((enemy.xp || 1) / 10) + Math.floor(state.wave / 7);
-  return Math.min(8, amount);
+  return Math.min(12, Math.max(1, Math.round(amount * difficultyMultiplier("coinGain"))));
 }
 
 export function updateGems(dt) {
@@ -329,6 +333,25 @@ function updateEnemyKnockback(e, dt) {
   const half = WORLD_SIZE / 2;
   e.x = clamp(e.x, -half + e.r, half - e.r);
   e.y = clamp(e.y, -half + e.r, half - e.r);
+}
+
+function snapshotCooldowns(e) {
+  return {
+    cooldown: e.cooldown,
+    shootCooldown: e.shootCooldown,
+    attackCooldown: e.attackCooldown,
+    stanceCooldown: e.stanceCooldown,
+  };
+}
+
+function applyDifficultyCooldownScale(e, beforeCooldowns) {
+  const attackSpeed = e.difficultyAttackSpeed || 1;
+  if (attackSpeed <= 1) return;
+  for (const key of Object.keys(beforeCooldowns)) {
+    const before = beforeCooldowns[key];
+    if (typeof before !== "number" || typeof e[key] !== "number") continue;
+    if (e[key] > before) e[key] = before + (e[key] - before) / attackSpeed;
+  }
 }
 
 function defaultKnockbackResistance(e) {

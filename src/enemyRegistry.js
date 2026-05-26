@@ -2,6 +2,7 @@ import { WORLD_SIZE, TAU, ENEMY_LIMIT } from "./constants.js";
 import { state, world } from "./state.js";
 import { clamp } from "./utils.js";
 import { setSpawnConfigured } from "./enemies/BaseEnemy.js";
+import { currentDifficulty } from "./difficulty.js";
 import { Zombie } from "./enemies/zombie.js";
 import { Lancer } from "./enemies/lancer.js";
 import { Wisp } from "./enemies/wisp.js";
@@ -80,7 +81,8 @@ export async function setupEnemyRegistry() {
 }
 
 export function spawnEnemyById(id, x = null, y = null) {
-  if (world.enemies.length >= ENEMY_LIMIT) return null;
+  const difficulty = currentDifficulty();
+  if (world.enemies.length >= (difficulty.enemyLimit || ENEMY_LIMIT)) return null;
   const cfg = enemyConfig[id];
   const Klass = classes[id] || Zombie;
   if (!cfg) return null;

@@ -155,7 +155,7 @@ function updateIceWeapon(dt) {
   const p = state.player;
   const rank = qualityRank(w);
   const color = qualityColor(w, "#9ff4ff");
-  const target = nearestEnemy(p.x, p.y, 860);
+  const target = nearestEnemy(p.x, p.y, w.range);
   const base = target ? Math.atan2(target.y - p.y, target.x - p.x) : Math.atan2(p.dirY, p.dirX);
   const count = w.count + (rank >= 1 ? 1 : 0);
   for (let i = 0; i < count; i++) {
@@ -184,7 +184,7 @@ function updateMissileWeapon(dt) {
   const p = state.player;
   const rank = qualityRank(w);
   const color = qualityColor(w, "#ffb347");
-  const target = nearestEnemy(p.x, p.y, 960);
+  const target = nearestEnemy(p.x, p.y, w.range);
   const base = target ? Math.atan2(target.y - p.y, target.x - p.x) : Math.atan2(p.dirY, p.dirX);
   fireProjectile(base, w, {
     shape: "missile",
@@ -213,7 +213,7 @@ function updateBoomerangWeapon(dt) {
   const p = state.player;
   const rank = qualityRank(w);
   const color = qualityColor(w, "#ff65d8");
-  const target = nearestEnemy(p.x, p.y, 720);
+  const target = nearestEnemy(p.x, p.y, w.range);
   const base = target ? Math.atan2(target.y - p.y, target.x - p.x) : Math.atan2(p.dirY, p.dirX);
   for (let i = 0; i < w.count; i++) {
     fireProjectile(base + (i - (w.count - 1) / 2) * 0.34, w, {

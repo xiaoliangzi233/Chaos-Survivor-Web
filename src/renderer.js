@@ -643,6 +643,10 @@ function drawEnemyProjectiles(ctx) {
       drawSnowflakeProjectile(ctx, b);
       continue;
     }
+    if (b.shape === "fireball") {
+      drawFireballProjectile(ctx, b);
+      continue;
+    }
     if (b.shape === "stormBlade" || b.shape === "stormOrb") {
       drawStormProjectile(ctx, b);
       continue;
@@ -650,6 +654,27 @@ function drawEnemyProjectiles(ctx) {
     ctx.fillStyle = b.color; ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, TAU); ctx.fill();
     ctx.fillStyle = "#fff"; ctx.fillRect(b.x - 1, b.y - 1, 2, 2);
   }
+}
+
+function drawFireballProjectile(ctx, b) {
+  const angle = Math.atan2(b.vy, b.vx);
+  ctx.save();
+  ctx.translate(b.x, b.y);
+  ctx.rotate(angle);
+  glow(ctx, 0, 0, b.r * 2.4, 0.5, b.color);
+  ctx.fillStyle = "rgba(255,122,26,0.34)";
+  ctx.beginPath();
+  ctx.ellipse(-b.r * 1.1, 0, b.r * 1.8, b.r * 0.78, 0, 0, TAU);
+  ctx.fill();
+  ctx.fillStyle = b.color;
+  ctx.beginPath();
+  ctx.arc(0, 0, b.r * 1.05, 0, TAU);
+  ctx.fill();
+  ctx.fillStyle = "#fff2a8";
+  ctx.beginPath();
+  ctx.arc(b.r * 0.26, -b.r * 0.15, b.r * 0.42, 0, TAU);
+  ctx.fill();
+  ctx.restore();
 }
 
 function drawStormProjectile(ctx, b) {
@@ -730,11 +755,45 @@ function drawSnowflakeProjectile(ctx, b) {
 function drawHazards(ctx) {
   for (const h of world.hazards) {
     const alpha = Math.max(0, h.life / h.maxLife);
+    if (h.kind === "ember_mine") {
+      drawEmberMineHazard(ctx, h, alpha);
+      continue;
+    }
     ctx.fillStyle = hexToRgba(h.color, alpha * 0.18);
     ctx.beginPath(); ctx.arc(h.x, h.y, h.r, 0, TAU); ctx.fill();
     ctx.strokeStyle = hexToRgba(h.color, alpha * 0.7);
     ctx.lineWidth = 2; ctx.stroke();
   }
+}
+
+function drawEmberMineHazard(ctx, h, alpha) {
+  const armed = (h.armTime || 0) <= 0;
+  const blink = armed ? 0.55 + Math.sin(state.time * 9 + (h.pulse || 0)) * 0.25 : 0.22;
+  const r = h.triggered ? h.r : h.baseRadius || h.r;
+  ctx.save();
+  ctx.translate(h.x, h.y);
+  ctx.fillStyle = hexToRgba("#150905", 0.78 * alpha);
+  ctx.beginPath();
+  ctx.arc(0, 0, r, 0, TAU);
+  ctx.fill();
+  ctx.strokeStyle = hexToRgba(h.color, blink * alpha);
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.arc(0, 0, r * (armed ? 1.15 : 0.86), 0, TAU);
+  ctx.stroke();
+  ctx.fillStyle = hexToRgba("#ffd166", (armed ? 0.8 : 0.35) * alpha);
+  ctx.beginPath();
+  ctx.arc(0, 0, Math.max(3, r * 0.18), 0, TAU);
+  ctx.fill();
+  ctx.strokeStyle = hexToRgba(h.color, 0.42 * alpha);
+  for (let i = 0; i < 5; i++) {
+    const a = i / 5 * TAU + state.time * 0.4;
+    ctx.beginPath();
+    ctx.moveTo(Math.cos(a) * r * 0.28, Math.sin(a) * r * 0.28);
+    ctx.lineTo(Math.cos(a) * r * 0.9, Math.sin(a) * r * 0.9);
+    ctx.stroke();
+  }
+  ctx.restore();
 }
 
 function drawBossBar(ctx) {

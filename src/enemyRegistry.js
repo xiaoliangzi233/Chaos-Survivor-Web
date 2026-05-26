@@ -10,6 +10,7 @@ import { SlimeMedium } from "./enemies/slime_medium.js";
 import { SlimeSmall } from "./enemies/slime_small.js";
 import { BlackholeMage } from "./enemies/blackhole_mage.js";
 import { MechWorm } from "./enemies/mech_worm.js";
+import { Doctor } from "./enemies/doctor.js";
 import { Embermine } from "./enemies/embermine.js";
 import { SiegePylon } from "./enemies/siege_pylon.js";
 import { Razorbat } from "./enemies/razorbat.js";
@@ -19,6 +20,8 @@ import { ShieldCaster } from "./enemies/shield_caster.js";
 import { Wizard } from "./enemies/wizard.js";
 import { Exploder } from "./enemies/exploder.js";
 import { Tank } from "./enemies/tank.js";
+import { Pyromancer } from "./enemies/pyromancer.js";
+import { LaserEye } from "./enemies/laser_eye.js";
 import { Gunner } from "./enemies/gunner.js";
 import { Artillery } from "./enemies/artillery.js";
 import { EliteSummoner } from "./enemies/elite_summoner.js";
@@ -40,6 +43,7 @@ const classes = {
   slime_small: SlimeSmall,
   blackhole_mage: BlackholeMage,
   mech_worm: MechWorm,
+  doctor: Doctor,
   embermine: Embermine,
   siege_pylon: SiegePylon,
   razorbat: Razorbat,
@@ -49,6 +53,8 @@ const classes = {
   wizard: Wizard,
   exploder: Exploder,
   tank: Tank,
+  pyromancer: Pyromancer,
+  laser_eye: LaserEye,
   gunner: Gunner,
   artillery: Artillery,
   elite_summoner: EliteSummoner,

@@ -24,6 +24,12 @@ export function updatePlayer(dt) {
       dust(p.x - vx * 12, p.y - vy * 12, -vx, -vy);
     }
   }
+  if (p.burnTimer > 0) {
+    p.burnTimer = Math.max(0, p.burnTimer - dt);
+    p.hp -= (p.burnDps || 0) * dt;
+    state.flash = Math.max(state.flash, 0.05);
+    if (p.burnTimer <= 0) p.burnDps = 0;
+  }
   const half = WORLD_SIZE / 2 - 60;
   p.x = clamp(p.x, -half, half);
   p.y = clamp(p.y, -half, half);
@@ -208,7 +214,7 @@ export function collectAllExperience() {
 }
 
 export function collectAllCoins() {
-  for (const c of world.coins) state.gold += Math.max(1, Math.round(c.value || 1));
+  for (const c of world.coins) state.gold += Math.max(1, Math.floor((c.value || 1) * 0.5));
   world.coins.length = 0;
 }
 
@@ -233,6 +239,10 @@ function updateEnemyProjectiles(dt) {
     if (circleHit(b.x, b.y, b.r, p.x, p.y, p.r) && p.invuln <= 0) {
       p.hp -= b.damage;
       p.invuln = 0.5;
+      if (b.burnDuration > 0) {
+        p.burnTimer = Math.max(p.burnTimer || 0, b.burnDuration);
+        p.burnDps = Math.max(p.burnDps || 0, b.burnDps || 0);
+      }
       burst(p.x, p.y, 8, b.color, 100);
       playSfx("hurt");
       world.enemyProjectiles.splice(i, 1);
@@ -245,13 +255,28 @@ function updateHazards(dt) {
   for (let i = world.hazards.length - 1; i >= 0; i--) {
     const h = world.hazards[i];
     h.life -= dt;
-    if (distSq(h.x, h.y, p.x, p.y) < (h.r + p.r) ** 2 && p.invuln <= 0) {
+    if (h.kind === "ember_mine") updateEmberMine(h, dt);
+    if (distSq(h.x, h.y, p.x, p.y) < ((h.triggerRadius || h.r) + p.r) ** 2 && h.kind === "ember_mine") h.triggered = true;
+    if (distSq(h.x, h.y, p.x, p.y) < (h.r + p.r) ** 2 && p.invuln <= 0 && (!h.kind || h.kind !== "ember_mine" || h.triggered)) {
       p.hp -= h.damage;
       p.invuln = 0.35;
       playSfx("hurt");
+      if (h.kind === "ember_mine") h.life = 0;
     }
     if (h.life <= 0) world.hazards.splice(i, 1);
   }
+}
+
+function updateEmberMine(h, dt) {
+  h.armTime = Math.max(0, (h.armTime || 0) - dt);
+  h.pulse = (h.pulse || 0) + dt;
+  if (h.armTime > 0) return;
+  if (h.triggered) {
+    h.r = Math.min(h.explodeRadius || 72, h.r + dt * 320);
+    h.life = Math.min(h.life, 0.16);
+    return;
+  }
+  h.r = h.baseRadius || h.r;
 }
 
 function updateEnemyKnockback(e, dt) {

@@ -63,6 +63,8 @@ export function createPlayer() {
     xpNeed: 24,
     magnet: 92,
     invuln: 0,
+    burnTimer: 0,
+    burnDps: 0,
     damageScale: 1,
     dirX: 1,
     dirY: 0,
@@ -72,12 +74,12 @@ export function createPlayer() {
 
 export function createWeapons() {
   return {
-    arc: { level: 0, timer: 0, cooldown: 0.72, damage: 20, range: 620, chainRange: 170, chains: 3, falloff: 0.78, quality: "common", qualityMult: 1 },
-    ice: { level: 0, timer: 0.8, cooldown: 1.05, count: 1, damage: 16, speed: 430, turnSpeed: 5.2, freezeDuration: 0.45, quality: "common", qualityMult: 1 },
-    missile: { level: 0, timer: 1.2, cooldown: 1.75, damage: 26, speed: 360, explodeRadius: 96, explodeDamage: 24, turnSpeed: 2.5, quality: "common", qualityMult: 1 },
-    boomerang: { level: 0, timer: 1.4, cooldown: 1.9, count: 1, damage: 20, speed: 520, returnAfter: 0.52, returnSpeed: 1.25, quality: "common", qualityMult: 1 },
-    drone: { level: 0, angle: 0, count: 0, orbitRadius: 78, acquireRange: 560, attackRange: 420, fireCooldown: 0.42, bulletDamage: 9, bulletSpeed: 520, batteryMax: 100, shotCost: 22, rechargeRate: 34, drones: [], quality: "common", qualityMult: 1 },
-    pulse: { level: 0, timer: 2.4, cooldown: 3.4, damage: 24, radius: 102, quality: "common", qualityMult: 1 },
+    arc: { level: 0, timer: 0, cooldown: 0.58, damage: 26, range: 720, chainRange: 205, chains: 3, falloff: 0.78, quality: "common", qualityMult: 1 },
+    ice: { level: 0, timer: 0.8, cooldown: 0.84, count: 1, damage: 21, range: 980, speed: 500, turnSpeed: 5.8, freezeDuration: 0.45, quality: "common", qualityMult: 1 },
+    missile: { level: 0, timer: 1.2, cooldown: 1.38, damage: 34, range: 1120, speed: 420, explodeRadius: 116, explodeDamage: 31, turnSpeed: 2.9, quality: "common", qualityMult: 1 },
+    boomerang: { level: 0, timer: 1.4, cooldown: 1.48, count: 1, damage: 27, range: 840, speed: 610, returnAfter: 0.6, returnSpeed: 1.35, quality: "common", qualityMult: 1 },
+    drone: { level: 0, angle: 0, count: 0, orbitRadius: 82, acquireRange: 650, attackRange: 500, fireCooldown: 0.34, bulletDamage: 13, bulletSpeed: 610, batteryMax: 150, shotCost: 20, rechargeRate: 46, drones: [], quality: "common", qualityMult: 1 },
+    pulse: { level: 0, timer: 2.4, cooldown: 2.7, damage: 32, radius: 132, quality: "common", qualityMult: 1 },
   };
 }
 

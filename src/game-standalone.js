@@ -43,7 +43,7 @@
     wisp: ["冰霜幽灵", 38, 70, 10, 8, "#9ff4ff", 4, 20, "ranged"],
     slime_large: ["大型史莱姆", 160, 45, 25, 16, "#77ff8a", 5, 20, "split"],
     blackhole_mage: ["黑洞法师", 62, 56, 10, 12, "#8d6bff", 7, 20, "hazard"],
-    blink_skirmisher: ["闪跃游斗者", 58, 92, 16, 10, "#ff65d8", 8, 20, "blink"],
+    mech_worm: ["机械蠕虫", 76, 98, 17, 12, "#ff65d8", 8, 20, "melee"],
     embermine: ["余烬地雷兽", 55, 72, 16, 9, "#ff7a1a", 8, 20, "mine"],
     siege_pylon: ["攻城棱塔", 120, 28, 15, 15, "#42e8ff", 9, 20, "ranged"],
     razorbat: ["刃翼蝠", 36, 150, 13, 8, "#c7d2ff", 9, 20, "bat"],

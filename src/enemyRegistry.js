@@ -9,7 +9,7 @@ import { SlimeLarge } from "./enemies/slime_large.js";
 import { SlimeMedium } from "./enemies/slime_medium.js";
 import { SlimeSmall } from "./enemies/slime_small.js";
 import { BlackholeMage } from "./enemies/blackhole_mage.js";
-import { BlinkSkirmisher } from "./enemies/blink_skirmisher.js";
+import { MechWorm } from "./enemies/mech_worm.js";
 import { Embermine } from "./enemies/embermine.js";
 import { SiegePylon } from "./enemies/siege_pylon.js";
 import { Razorbat } from "./enemies/razorbat.js";
@@ -39,7 +39,7 @@ const classes = {
   slime_medium: SlimeMedium,
   slime_small: SlimeSmall,
   blackhole_mage: BlackholeMage,
-  blink_skirmisher: BlinkSkirmisher,
+  mech_worm: MechWorm,
   embermine: Embermine,
   siege_pylon: SiegePylon,
   razorbat: Razorbat,

@@ -2,17 +2,13 @@ import { createInventory, state } from "./state.js";
 import { QUALITY_INFO, WEAPON_INFO } from "./inventory.js";
 import {
   canFuseShopWeapon,
-  itemSellPrice,
   isSoldOut,
   prepareShopOffers,
   purchaseDisabledReason,
   purchaseOffer,
   refreshCost,
   refreshShopOffers,
-  sellInventoryItem,
-  sellWeaponSlot,
   toggleOfferLock,
-  weaponSellPrice,
 } from "./shop.js";
 
 const dom = {};
@@ -31,13 +27,8 @@ const text = {
   quantity: "\u6570\u91cf",
   fullFuse: "\u6b66\u5668\u69fd\u5df2\u6ee1\uff1a\u8d2d\u4e70\u540e\u5c06\u81ea\u52a8\u5408\u6210",
   weaponSlots: "\u6b66\u5668\u69fd",
-  sellItems: "\u51fa\u552e\u9053\u5177",
   emptySlot: "\u7a7a\u69fd\u4f4d",
   unknownWeapon: "\u672a\u77e5\u6b66\u5668",
-  sell: "\u51fa\u552e",
-  noItems: "\u6682\u65e0\u9053\u5177",
-  soldPrefix: "\u5df2\u51fa\u552e",
-  gainPrefix: "\uff0c\u83b7\u5f97",
 };
 
 export function initShopUi({ continueToNextWave }) {
@@ -156,14 +147,9 @@ function renderShopInventory() {
     <section class="shop-inventory-section">
       <h3>${text.weaponSlots} <span>${weaponSlots.length}/6</span></h3>
       <div class="shop-weapon-slots"></div>
-    </section>
-    <section class="shop-inventory-section">
-      <h3>${text.sellItems}</h3>
-      <div class="shop-item-slots"></div>
     </section>`;
 
   renderShopWeaponSlots(dom.inventory.querySelector(".shop-weapon-slots"), weaponSlots);
-  renderShopItems(dom.inventory.querySelector(".shop-item-slots"));
 }
 
 function renderShopWeaponSlots(container, weaponSlots) {
@@ -181,45 +167,9 @@ function renderShopWeaponSlots(container, weaponSlots) {
 
     const info = WEAPON_INFO[slot.id] || { icon: "?", name: slot.id || text.unknownWeapon };
     const quality = QUALITY_INFO[slot.quality] || QUALITY_INFO.common;
-    const price = weaponSellPrice(slot);
     row.innerHTML = `
       <i style="color:${quality.color}">${info.icon}</i>
-      <span><strong>${info.name}</strong><small style="color:${quality.color}">${quality.name}</small></span>
-      <button type="button">${text.sell} ${price}</button>`;
-    row.querySelector("button").addEventListener("click", () => {
-      const result = sellWeaponSlot(slot.uid);
-      const message = `${text.soldPrefix} ${info.name}${text.gainPrefix} ${price} ${text.coin}\u3002`;
-      renderShop(result.ok ? message : result.reason);
-    });
-    container.appendChild(row);
-  }
-}
-
-function renderShopItems(container) {
-  if (!container) return;
-  container.innerHTML = "";
-  if (!state.inventory.items.length) {
-    const empty = document.createElement("div");
-    empty.className = "shop-slot-row empty";
-    empty.textContent = text.noItems;
-    container.appendChild(empty);
-    return;
-  }
-
-  for (const item of state.inventory.items) {
-    const price = itemSellPrice(item);
-    const row = document.createElement("div");
-    row.className = "shop-slot-row";
-    row.innerHTML = `
-      <i>${item.icon || "?"}</i>
-      <span><strong>${item.name || item.id}</strong><small>x${item.qty}</small></span>
-      <button type="button">${text.sell} ${price}</button>`;
-    row.querySelector("button").addEventListener("click", () => {
-      const result = sellInventoryItem(item.id);
-      const name = item.name || item.id;
-      const message = `${text.soldPrefix} ${name}${text.gainPrefix} ${price} ${text.coin}\u3002`;
-      renderShop(result.ok ? message : result.reason);
-    });
+      <span><strong>${info.name}</strong><small style="color:${quality.color}">${quality.name}</small></span>`;
     container.appendChild(row);
   }
 }

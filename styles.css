@@ -1133,7 +1133,7 @@ h2 {
   display: grid;
   grid-template-columns: 1fr;
   place-items: center;
-  min-height: 58px;
+  min-height: 82px;
   padding: 8px 6px;
   border-color: rgba(66, 232, 255, 0.18);
   background:
@@ -1158,6 +1158,35 @@ h2 {
   margin-top: 3px;
   color: var(--ink);
   font-size: 12px;
+}
+
+.item-sell-button,
+.inventory-sell-button {
+  border: 1px solid rgba(255, 209, 102, 0.32);
+  border-radius: 4px;
+  background: rgba(255, 209, 102, 0.08);
+  color: #ffd166;
+  font-weight: 800;
+}
+
+.item-sell-button {
+  width: 100%;
+  min-height: 24px;
+  margin-top: 4px;
+  padding: 0 5px;
+  font-size: 11px;
+}
+
+.inventory-sell-button {
+  min-height: 36px;
+  padding: 0 10px;
+  font-size: 12px;
+}
+
+.item-sell-button:hover,
+.inventory-sell-button:hover {
+  border-color: rgba(255, 209, 102, 0.7);
+  background: rgba(255, 209, 102, 0.16);
 }
 
 .inventory-tooltip {

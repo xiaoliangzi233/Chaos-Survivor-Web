@@ -8,6 +8,7 @@ import {
   selectWeaponSlot,
   selectedWeaponSlot,
 } from "./inventory.js";
+import { itemSellPrice, sellInventoryItem, sellWeaponSlot, weaponSellPrice } from "./shop.js";
 
 let initialized = false;
 let previousMode = "playing";
@@ -15,6 +16,34 @@ let fuseMaterialUid = null;
 let fuseMessage = "";
 
 const dom = {};
+const text = {
+  inventoryApi: "survivorInventory",
+  hp: "\u751f\u547d",
+  level: "\u7b49\u7ea7",
+  xp: "\u7ecf\u9a8c",
+  speed: "\u79fb\u52a8\u901f\u5ea6",
+  magnet: "\u62fe\u53d6\u534a\u5f84",
+  damage: "\u4f24\u5bb3\u500d\u7387",
+  gold: "\u91d1\u5e01",
+  weapons: "\u6b66\u5668",
+  emptySlot: "\u7a7a\u69fd\u4f4d",
+  noWeapon: "\u5f53\u524d\u6ca1\u6709\u6b66\u5668\u3002\u5148\u9009\u62e9\u5f00\u5c40\u6b66\u5668\u6216\u5728\u5546\u5e97\u8d2d\u4e70\u65b0\u6b66\u5668\u3002",
+  qualityMult: "\u54c1\u8d28\u500d\u7387",
+  sell: "\u51fa\u552e",
+  sellWeapon: "\u51fa\u552e\u6b66\u5668",
+  sold: "\u5df2\u51fa\u552e",
+  gain: "\uff0c\u83b7\u5f97",
+  fuse: "\u5408\u6210\u6b66\u5668",
+  noFuse: "\u65e0\u6cd5\u5408\u6210",
+  fuseSuccess: "\u5408\u6210\u6210\u529f",
+  result: "\u7ed3\u679c",
+  rule: "\u89c4\u5219",
+  mainWeapon: "\u4e3b\u6b66\u5668",
+  material: "\u6750\u6599",
+  noMaterial: "\u6682\u65e0\u53ef\u5408\u6210\u6b66\u5668",
+  fuseHint: "\u540c\u4e00\u79cd\u6b66\u5668\u3001\u540c\u4e00\u79cd\u54c1\u8d28\u624d\u80fd\u5408\u6210\uff1b\u4f20\u8bf4\u54c1\u8d28\u65e0\u6cd5\u7ee7\u7eed\u5408\u6210\u3002",
+  coin: "\u91d1\u5e01",
+};
 
 export function initInventoryUi() {
   if (initialized) return;
@@ -39,7 +68,7 @@ export function initInventoryUi() {
   dom.closeButton?.addEventListener("click", closeInventory);
   document.addEventListener("keydown", handleKeyDown, { capture: true });
 
-  window.survivorInventory = {
+  window[text.inventoryApi] = {
     open: openInventory,
     close: closeInventory,
     toggle: toggleInventory,
@@ -106,13 +135,13 @@ function renderStats() {
   const p = state.player;
   dom.stats.innerHTML = "";
   [
-    ["生命", `${Math.ceil(p.hp)} / ${p.maxHp}`],
-    ["等级", `Lv.${p.level}`],
-    ["经验", `${Math.floor(p.xp)} / ${p.xpNeed}`],
-    ["移动速度", Math.round(p.speed)],
-    ["拾取半径", Math.round(p.magnet)],
-    ["伤害倍率", `${Math.round(p.damageScale * 100)}%`],
-    ["金币", state.gold],
+    [text.hp, `${Math.ceil(p.hp)} / ${p.maxHp}`],
+    [text.level, `Lv.${p.level}`],
+    [text.xp, `${Math.floor(p.xp)} / ${p.xpNeed}`],
+    [text.speed, Math.round(p.speed)],
+    [text.magnet, Math.round(p.magnet)],
+    [text.damage, `${Math.round(p.damageScale * 100)}%`],
+    [text.gold, state.gold],
   ].forEach(([label, value]) => {
     const row = document.createElement("span");
     row.innerHTML = `<b>${label}</b><strong>${value}</strong>`;
@@ -121,8 +150,8 @@ function renderStats() {
 }
 
 function renderSummary() {
-  if (dom.weaponCount) dom.weaponCount.textContent = `武器 ${state.inventory.weaponSlots.length}/6`;
-  if (dom.goldCount) dom.goldCount.textContent = `金币 ${state.gold}`;
+  if (dom.weaponCount) dom.weaponCount.textContent = `${text.weapons} ${state.inventory.weaponSlots.length}/6`;
+  if (dom.goldCount) dom.goldCount.textContent = `${text.gold} ${state.gold}`;
 }
 
 function renderSlots() {
@@ -138,10 +167,10 @@ function renderSlots() {
     button.type = "button";
     if (!slot) {
       button.className = "weapon-slot empty";
-      button.textContent = "空槽位";
+      button.textContent = text.emptySlot;
     } else {
-      const info = WEAPON_INFO[slot.id];
-      const quality = QUALITY_INFO[slot.quality];
+      const info = WEAPON_INFO[slot.id] || { icon: "?", name: slot.id };
+      const quality = QUALITY_INFO[slot.quality] || QUALITY_INFO.common;
       const isActive = state.inventory.selectedWeaponUid === slot.uid;
       const isMaterial = fuseMaterialUid === slot.uid;
       const canUseAsMaterial = selected && canFuseWeapons(selected, slot).ok;
@@ -169,17 +198,18 @@ function renderDetail() {
   dom.detail.innerHTML = "";
 
   if (!slot) {
-    dom.detail.innerHTML = `<div class="empty-detail">当前没有武器。先选择开局武器或在商店购买新武器。</div>`;
+    dom.detail.innerHTML = `<div class="empty-detail">${text.noWeapon}</div>`;
     dom.fuseButton.disabled = true;
     fuseMaterialUid = null;
     return;
   }
 
-  const info = WEAPON_INFO[slot.id];
-  const quality = QUALITY_INFO[slot.quality];
+  const info = WEAPON_INFO[slot.id] || { icon: "?", name: slot.id, desc: "", tags: [] };
+  const quality = QUALITY_INFO[slot.quality] || QUALITY_INFO.common;
   const material = normalizeFuseMaterial();
   const fuseCheck = canFuseWeapons(slot, material);
   const nextQuality = fuseCheck.nextQuality ? QUALITY_INFO[fuseCheck.nextQuality] : null;
+  const sellPrice = weaponSellPrice(slot);
   dom.detail.innerHTML = `
     <div class="weapon-detail-card">
       <div class="weapon-detail-title">
@@ -190,13 +220,25 @@ function renderDetail() {
         </div>
       </div>
       <p>${info.desc}</p>
-      <div class="weapon-tags detail-tags">${info.tags.map((tag) => `<span>${tag}</span>`).join("")}</div>
-      <p>品质倍率：${Math.round(quality.mult * 100)}%</p>
+      <div class="weapon-tags detail-tags">${(info.tags || []).map((tag) => `<span>${tag}</span>`).join("")}</div>
+      <p>${text.qualityMult}: ${Math.round(quality.mult * 100)}%</p>
+      <button class="inventory-sell-button" type="button">${text.sellWeapon} +${sellPrice} ${text.coin}</button>
       ${renderFusePreview(slot, material, fuseCheck, nextQuality)}
     </div>`;
 
+  dom.detail.querySelector(".inventory-sell-button")?.addEventListener("click", () => {
+    const current = selectedWeaponSlot();
+    if (!current) return;
+    const price = weaponSellPrice(current);
+    const currentInfo = WEAPON_INFO[current.id] || { name: current.id };
+    const result = sellWeaponSlot(current.uid);
+    fuseMaterialUid = normalizeFuseMaterial()?.uid ?? null;
+    fuseMessage = result.ok ? `${text.sold} ${currentInfo.name}${text.gain} ${price} ${text.coin}\u3002` : result.reason;
+    renderInventory();
+  });
+
   dom.fuseButton.disabled = !fuseCheck.ok;
-  dom.fuseButton.textContent = fuseCheck.ok ? "合成武器" : "无法合成";
+  dom.fuseButton.textContent = fuseCheck.ok ? text.fuse : text.noFuse;
   dom.fuseButton.onclick = () => {
     const currentMaterial = normalizeFuseMaterial();
     const check = canFuseWeapons(slot, currentMaterial);
@@ -208,7 +250,7 @@ function renderDetail() {
     const resultQuality = QUALITY_INFO[check.nextQuality];
     if (fuseWeaponSlots(slot.uid, currentMaterial.uid)) {
       fuseMaterialUid = normalizeFuseMaterial()?.uid ?? null;
-      fuseMessage = `合成成功：${resultQuality.name} ${info.name}`;
+      fuseMessage = `${text.fuseSuccess}: ${resultQuality.name} ${info.name}`;
       renderInventory();
     }
   };
@@ -225,26 +267,26 @@ function normalizeFuseMaterial() {
 }
 
 function renderFusePreview(slot, material, fuseCheck, nextQuality) {
-  const info = WEAPON_INFO[slot.id];
+  const info = WEAPON_INFO[slot.id] || { name: slot.id };
   const result = fuseCheck.ok
-    ? `<div class="fuse-result"><span>结果</span><strong style="color:${nextQuality.color}">${nextQuality.name} ${info.name}</strong></div>`
-    : `<div class="fuse-result disabled"><span>规则</span><strong>${fuseCheck.reason}</strong></div>`;
+    ? `<div class="fuse-result"><span>${text.result}</span><strong style="color:${nextQuality.color}">${nextQuality.name} ${info.name}</strong></div>`
+    : `<div class="fuse-result disabled"><span>${text.rule}</span><strong>${fuseCheck.reason}</strong></div>`;
   return `
     <div class="fuse-panel">
       <div class="fuse-row">
-        ${renderFuseMini(slot, "主武器")}
+        ${renderFuseMini(slot, text.mainWeapon)}
         <b>+</b>
-        ${material ? renderFuseMini(material, "材料") : `<div class="fuse-mini empty"><span>材料</span><strong>暂无可合成武器</strong></div>`}
+        ${material ? renderFuseMini(material, text.material) : `<div class="fuse-mini empty"><span>${text.material}</span><strong>${text.noMaterial}</strong></div>`}
       </div>
       ${result}
-      <p class="fuse-hint">同一种武器、同一种品质才能合成；传说品质无法继续合成。</p>
+      <p class="fuse-hint">${text.fuseHint}</p>
       ${fuseMessage ? `<p class="fuse-message">${fuseMessage}</p>` : ""}
     </div>`;
 }
 
 function renderFuseMini(slot, label) {
-  const info = WEAPON_INFO[slot.id];
-  const quality = QUALITY_INFO[slot.quality];
+  const info = WEAPON_INFO[slot.id] || { icon: "?", name: slot.id };
+  const quality = QUALITY_INFO[slot.quality] || QUALITY_INFO.common;
   return `
     <div class="fuse-mini">
       <span>${label}</span>
@@ -260,19 +302,31 @@ function renderItems() {
     const row = document.createElement("div");
     row.className = "item-card";
     const qty = item.qty;
-    row.setAttribute("data-tip", `${item.name}: ${item.desc}`);
-    row.innerHTML = `<i>${item.icon}</i><strong>x${qty}</strong>`;
-    const tipText = `${item.name}: ${item.desc}`;
+    const price = itemSellPrice(item);
+    const tipText = `${item.name || item.id}: ${item.desc || ""}`;
+    row.setAttribute("data-tip", tipText);
+    row.innerHTML = `
+      <i>${item.icon || "?"}</i>
+      <strong>x${qty}</strong>
+      <button type="button" class="item-sell-button">${text.sell} ${price}</button>`;
     row.addEventListener("mouseenter", (event) => showItemTooltip(event, tipText));
     row.addEventListener("mousemove", (event) => moveItemTooltip(event));
     row.addEventListener("mouseleave", hideItemTooltip);
+    row.querySelector("button")?.addEventListener("click", (event) => {
+      event.stopPropagation();
+      hideItemTooltip();
+      const itemName = item.name || item.id;
+      const result = sellInventoryItem(item.id);
+      fuseMessage = result.ok ? `${text.sold} ${itemName}${text.gain} ${price} ${text.coin}\u3002` : result.reason;
+      renderInventory();
+    });
     dom.items.appendChild(row);
   }
 }
 
-function showItemTooltip(event, text) {
+function showItemTooltip(event, content) {
   if (!dom.tooltip) return;
-  const [title, ...desc] = text.split(": ");
+  const [title, ...desc] = content.split(": ");
   dom.tooltip.innerHTML = `<strong>${title}</strong><span>${desc.join(": ")}</span>`;
   dom.tooltip.classList.add("active");
   moveItemTooltip(event);

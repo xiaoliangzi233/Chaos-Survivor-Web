@@ -5,7 +5,6 @@ import { hexToRgba } from "./utils.js";
 const LIGHT_SCALE = 0.5;
 const MAX_PROJECTILE_LIGHTS = 90;
 const MAX_GEM_LIGHTS = 42;
-const MAX_COIN_LIGHTS = 36;
 const MAX_MAP_LIGHTS = 80;
 const MAX_ENEMY_LIGHTS = 28;
 
@@ -63,7 +62,6 @@ function collectLights(camera, viewport) {
   addEntityLights(lights, camera, viewport);
   addProjectileLights(lights, camera, viewport);
   addGemLights(lights, camera, viewport);
-  addCoinLights(lights, camera, viewport);
   addFxLights(lights, camera, viewport);
   return lights;
 }
@@ -209,23 +207,6 @@ function addGemLights(lights, camera, viewport) {
       color: g.value >= 15 ? "#b48cff" : "#42e8ff",
       strength: 0.2,
       core: 0.08,
-    });
-    count++;
-  }
-}
-
-function addCoinLights(lights, camera, viewport) {
-  let count = 0;
-  for (const c of world.coins || []) {
-    if (count >= MAX_COIN_LIGHTS) break;
-    if (!worldVisible(c.x, c.y, 70, camera)) continue;
-    addWorldLight(lights, camera, viewport, {
-      x: c.x,
-      y: c.y,
-      radius: 42 + Math.min(28, c.value * 4),
-      color: "#ffd166",
-      strength: 0.16,
-      core: 0.18,
     });
     count++;
   }

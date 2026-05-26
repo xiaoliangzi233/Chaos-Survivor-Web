@@ -2,8 +2,8 @@ import { PARTICLE_LIMIT, TAU } from "./constants.js";
 import { state, world } from "./state.js";
 import { clamp, hexToRgba } from "./utils.js";
 
-const AMBIENT_LIMIT = 130;
-const AMBIENT_MAX_SPAWN = 5;
+const AMBIENT_LIMIT = 70;
+const AMBIENT_MAX_SPAWN = 3;
 let ambientTimer = 0;
 
 export function particle(kind, x, y, options = {}) {
@@ -69,7 +69,7 @@ export function updateAmbientParticles(dt, viewW, viewH) {
   if (!map || !state.player) return;
   ambientTimer -= dt;
   if (ambientTimer > 0) return;
-  ambientTimer = 0.045 + Math.random() * 0.075;
+  ambientTimer = 0.09 + Math.random() * 0.12;
   const ambientCount = world.particles.reduce((sum, p) => sum + (p.ambient ? 1 : 0), 0);
   if (ambientCount >= AMBIENT_LIMIT) return;
 
@@ -81,7 +81,7 @@ export function updateAmbientParticles(dt, viewW, viewH) {
 
 function spawnAmbientFromMap(map, camX, camY, viewW, viewH, budget) {
   let spawned = 0;
-  for (let attempts = 0; attempts < 10 && spawned < budget; attempts++) {
+  for (let attempts = 0; attempts < 6 && spawned < budget; attempts++) {
     const roll = Math.random();
     if (roll < 0.28 && sampleGlowTile(map, camX, camY, viewW, viewH)) spawned++;
     else if (roll < 0.52 && sampleEnergyLine(map, camX, camY, viewW, viewH)) spawned++;
@@ -179,10 +179,10 @@ function spawnAmbientMist(x, y, color) {
   particle("mist", x, y, {
     vx: 5 + Math.random() * 13,
     vy: (Math.random() - 0.5) * 5,
-    life: 4.2 + Math.random() * 3.2,
-    size: 30 + Math.random() * 58,
+    life: 3.2 + Math.random() * 2.4,
+    size: 24 + Math.random() * 42,
     color,
-    alpha: 0.11,
+    alpha: 0.075,
     drift: 6,
     angle: Math.random() * TAU,
     ambient: true,
@@ -285,13 +285,13 @@ function drawMist(ctx, p, alpha) {
   ctx.save();
   ctx.translate(p.x, p.y);
   ctx.rotate(p.angle + wobble);
-  drawMistBlob(ctx, 0, 0, p.size * 1.9, p.size * 0.72, p.color, a * 0.42);
-  for (let i = 0; i < 6; i++) {
+  drawMistBlob(ctx, 0, 0, p.size * 1.55, p.size * 0.66, p.color, a * 0.34);
+  for (let i = 0; i < 3; i++) {
     const localSeed = p.seed + i * 2.37;
     const ox = Math.sin(localSeed + p.t * 0.18) * p.size * (0.34 + i * 0.035);
     const oy = Math.cos(localSeed * 1.31 + p.t * 0.14) * p.size * 0.22;
     const r = p.size * (0.28 + (i % 3) * 0.08);
-    drawMistBlob(ctx, ox, oy, r * 1.25, r * 0.82, p.color, a * (0.24 - i * 0.018));
+    drawMistBlob(ctx, ox, oy, r * 1.1, r * 0.74, p.color, a * (0.2 - i * 0.025));
   }
   ctx.restore();
 }

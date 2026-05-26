@@ -183,7 +183,8 @@ function renderItems() {
     const row = document.createElement("div");
     row.className = "item-card";
     const qty = item.id === "shard_core" ? state.shards : item.qty;
-    row.innerHTML = `<span>${item.icon} ${item.name}</span><strong>x${qty}</strong><small>${item.desc}</small>`;
+    row.setAttribute("data-tip", `${item.name}：${item.desc}`);
+    row.innerHTML = `<i>${item.icon}</i><strong>x${qty}</strong>`;
     dom.items.appendChild(row);
   }
 }

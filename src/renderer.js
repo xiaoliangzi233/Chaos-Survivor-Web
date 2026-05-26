@@ -422,20 +422,18 @@ function drawGems(ctx) {
 function drawCoins(ctx) {
   for (const c of world.coins) {
     if (!inView(c.x, c.y, 40)) continue;
-    const bob = Math.sin(state.time * 7 + c.phase) * 2;
-    const r = c.value >= 5 ? 6 : 5;
-    glow(ctx, c.x, c.y + bob, r * 2.2, 0.34, "#ffd166");
+    const r = c.value >= 5 ? 5.5 : 4.5;
     ctx.fillStyle = "#ffd166";
     ctx.beginPath();
-    ctx.arc(c.x, c.y + bob, r, 0, TAU);
+    ctx.arc(c.x, c.y, r, 0, TAU);
     ctx.fill();
     ctx.strokeStyle = "#fff3b0";
-    ctx.lineWidth = 1.4;
+    ctx.lineWidth = 1;
     ctx.beginPath();
-    ctx.arc(c.x, c.y + bob, r * 0.62, 0, TAU);
+    ctx.arc(c.x, c.y, r * 0.58, 0, TAU);
     ctx.stroke();
     ctx.fillStyle = "rgba(3,6,12,0.45)";
-    ctx.fillRect(c.x - 1, c.y + bob - r * 0.45, 2, r * 0.9);
+    ctx.fillRect(c.x - 1, c.y - r * 0.42, 2, r * 0.84);
   }
 }
 

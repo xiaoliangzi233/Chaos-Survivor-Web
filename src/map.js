@@ -170,18 +170,42 @@ function addFixedRoomProps(rng, room, props, decals, energyLines, cables, fogBan
 
   if (room.zone === "reactor") {
     props.push(createProp(rng, cx, cy, "reactorCore", 70, "#7dd3fc"));
+    props.push(createProp(rng, cx, room.y + 118, "largeGenerator", 58 + rng() * 12, "#7dd3fc", 0));
+    props.push(createProp(rng, cx, room.y + room.h - 118, "largeGenerator", 58 + rng() * 12, "#72ffb4", Math.PI));
+    props.push(createProp(rng, room.x + 120, cy, "overheadLightRig", 44, "#7dd3fc", Math.PI / 2));
+    props.push(createProp(rng, room.x + room.w - 120, cy, "overheadLightRig", 44, "#7dd3fc", Math.PI / 2));
     decals.push(createDecal(rng, cx, cy, "reactorRing", "#7dd3fc", 0, 260, 260));
     for (let i = 0; i < 4; i++) energyLines.push(createEnergyLine(rng, cx, cy, i % 2 === 0, 360 + i * 80, i % 2 ? "#72ffb4" : "#7dd3fc"));
+    for (let i = 0; i < 4; i++) props.push(createProp(rng, cx + Math.cos(i * TAU / 4) * 260, cy + Math.sin(i * TAU / 4) * 190, "serverCabinet", 30 + rng() * 8, "#7dd3fc", i % 2 ? Math.PI / 2 : 0));
   } else if (room.zone === "bio" || room.zone === "cryo") {
     const count = 3 + Math.floor(rng() * 3);
     for (let i = 0; i < count; i++) props.push(createProp(rng, room.x + 150 + rng() * (room.w - 300), room.y + 120 + rng() * (room.h - 240), room.zone === "bio" ? "specimenTank" : "cryoPod", 34 + rng() * 18, accent));
+    for (let i = 0; i < 3; i++) props.push(createProp(rng, room.x + 120 + rng() * (room.w - 240), room.y + 110 + rng() * (room.h - 220), "labBench", 32 + rng() * 12, accent, rng() < 0.5 ? 0 : Math.PI / 2));
+    for (let i = 0; i < 2; i++) props.push(createProp(rng, room.x + 110 + rng() * (room.w - 220), room.y + 110 + rng() * (room.h - 220), room.zone === "bio" ? "bioCanister" : "coolantTank", 24 + rng() * 10, accent));
+    props.push(createProp(rng, room.x + room.w * 0.5, room.y + 92, room.zone === "bio" ? "containmentChamber" : "cryoArray", 54 + rng() * 12, accent, 0));
+    props.push(createProp(rng, room.x + 90, room.y + room.h * 0.55, "observationWindow", 56 + rng() * 10, accent, Math.PI / 2));
+    props.push(createProp(rng, room.x + room.w - 90, room.y + room.h * 0.45, "deconGate", 46 + rng() * 8, accent, Math.PI / 2));
+    if (rng() < 0.75) props.push(createProp(rng, room.x + 100 + rng() * (room.w - 200), room.y + 100 + rng() * (room.h - 200), "brokenGlass", 26 + rng() * 18, "#d9fbff", rng() * TAU));
     if (rng() < 0.8) fogBanks.push(createFog(room.x + room.w * rng(), room.y + room.h * rng(), 180 + rng() * 180, 70 + rng() * 70, accent, 0.035));
   } else if (room.zone === "control") {
     for (let i = 0; i < 5; i++) props.push(createProp(rng, room.x + 130 + i * 160, room.y + 120 + rng() * 360, "terminal", 28 + rng() * 10, i % 2 ? "#72ffb4" : "#ffd166"));
+    for (let i = 0; i < 4; i++) props.push(createProp(rng, room.x + 120 + rng() * (room.w - 240), room.y + 90 + rng() * (room.h - 180), "serverCabinet", 34 + rng() * 10, i % 2 ? "#7dd3fc" : "#72ffb4", rng() < 0.5 ? 0 : Math.PI / 2));
+    for (let i = 0; i < 3; i++) props.push(createProp(rng, room.x + 80 + rng() * (room.w - 160), room.y + 70 + rng() * (room.h - 140), "warningSign", 20 + rng() * 8, "#ffd166", rng() < 0.5 ? 0 : Math.PI / 2));
+    for (let i = 0; i < 3; i++) props.push(createProp(rng, room.x + 90 + rng() * (room.w - 180), room.y + 80 + rng() * (room.h - 160), "hangingCable", 30 + rng() * 18, "#64748b", rng() * TAU));
+    props.push(createProp(rng, cx, room.y + 96, "commandConsole", 58 + rng() * 10, "#ffd166", 0));
+    props.push(createProp(rng, cx, room.y + room.h - 96, "observationWindow", 64 + rng() * 10, "#7dd3fc", 0));
+    props.push(createProp(rng, room.x + 88, cy, "serverWall", 58 + rng() * 12, "#72ffb4", Math.PI / 2));
   } else if (room.zone === "storage") {
     for (let i = 0; i < 6; i++) props.push(createProp(rng, room.x + 80 + rng() * (room.w - 160), room.y + 80 + rng() * (room.h - 160), rng() < 0.55 ? "brokenRack" : "crateStack", 28 + rng() * 20, accent));
+    for (let i = 0; i < 3; i++) props.push(createProp(rng, room.x + 90 + rng() * (room.w - 180), room.y + 90 + rng() * (room.h - 180), rng() < 0.5 ? "warningSign" : "hangingCable", 24 + rng() * 12, rng() < 0.5 ? "#ffd166" : "#64748b", rng() * TAU));
+    props.push(createProp(rng, cx, cy, "cargoLift", 76 + rng() * 16, "#ffd166", rng() < 0.5 ? 0 : Math.PI / 2));
+    props.push(createProp(rng, room.x + room.w - 105, room.y + 120, "largeGenerator", 48 + rng() * 10, "#ff7a1a", Math.PI / 2));
   } else {
     props.push(createProp(rng, cx + (rng() - 0.5) * room.w * 0.5, cy + (rng() - 0.5) * room.h * 0.5, "ventPipe", 36 + rng() * 24, accent, rng() < 0.5 ? 0 : Math.PI / 2));
+    props.push(createProp(rng, cx + (rng() - 0.5) * room.w * 0.5, cy + (rng() - 0.5) * room.h * 0.5, "ceilingFanShadow", 54 + rng() * 22, "#9aa7b4", rng() * TAU));
+    props.push(createProp(rng, room.x + 80 + rng() * (room.w - 160), room.y + 80 + rng() * (room.h - 160), "hangingCable", 32 + rng() * 16, "#64748b", rng() * TAU));
+    props.push(createProp(rng, cx, room.y + 78, "overheadLightRig", 44 + rng() * 10, accent, 0));
+    props.push(createProp(rng, room.x + room.w - 78, cy, "deconGate", 42 + rng() * 8, accent, Math.PI / 2));
   }
 
   if (rng() < 0.7) cables.push(createCable(rng, room.x + 60, cy, true, accent, room.w - 120));
@@ -196,6 +220,12 @@ function addPerimeterServiceLines(rng, half, props, cables, energyLines, fogBank
     const y = side === 0 ? -half + 120 : side === 2 ? half - 120 : -half + 300 + rng() * (WORLD_SIZE - 600);
     props.push(createProp(rng, x, y, i % 3 === 0 ? "ventPipe" : "wallLight", 24 + rng() * 18, i % 3 ? "#7dd3fc" : "#9aa7b4", horizontal ? 0 : Math.PI / 2));
     if (rng() < 0.72) cables.push(createCable(rng, x, y, horizontal, "#64748b", 180 + rng() * 280));
+  }
+  for (let i = 0; i < 8; i++) {
+    const horizontal = i % 2 === 0;
+    const x = -half + 520 + rng() * (WORLD_SIZE - 1040);
+    const y = -half + 520 + rng() * (WORLD_SIZE - 1040);
+    props.push(createProp(rng, x, y, horizontal ? "overheadLightRig" : "serverWall", 40 + rng() * 12, horizontal ? "#7dd3fc" : "#72ffb4", horizontal ? 0 : Math.PI / 2));
   }
   for (let i = 0; i < 10; i++) {
     const horizontal = rng() < 0.5;
@@ -555,13 +585,29 @@ function drawRoomBorders(ctx, map, camX, camY, viewW, viewH) {
 
 function drawProps(ctx, map, camX, camY, viewW, viewH, time) {
   for (const prop of map.props || []) {
-    if (!rectVisible(prop.x - 100, prop.y - 100, 200, 200, camX, camY, viewW, viewH, 90)) continue;
+    const pad = Math.max(110, prop.size * 3.2);
+    if (!rectVisible(prop.x - pad, prop.y - pad, pad * 2, pad * 2, camX, camY, viewW, viewH, 90)) continue;
     ctx.save();
     ctx.translate(prop.x, prop.y);
     ctx.rotate(prop.rot);
     if (prop.kind === "wallLight") drawWallLight(ctx, prop, time);
     else if (prop.kind === "reactorCore") drawReactorCore(ctx, prop, time);
     else if (prop.kind === "specimenTank" || prop.kind === "cryoPod") drawTank(ctx, prop, time);
+    else if (prop.kind === "labBench") drawLabBench(ctx, prop, time);
+    else if (prop.kind === "serverCabinet") drawServerCabinet(ctx, prop, time);
+    else if (prop.kind === "hangingCable") drawHangingCable(ctx, prop, time);
+    else if (prop.kind === "brokenGlass") drawBrokenGlass(ctx, prop);
+    else if (prop.kind === "warningSign") drawWarningSign(ctx, prop, time);
+    else if (prop.kind === "bioCanister" || prop.kind === "coolantTank") drawCanister(ctx, prop, time);
+    else if (prop.kind === "ceilingFanShadow") drawCeilingFanShadow(ctx, prop, time);
+    else if (prop.kind === "containmentChamber" || prop.kind === "cryoArray") drawContainmentChamber(ctx, prop, time);
+    else if (prop.kind === "observationWindow") drawObservationWindow(ctx, prop, time);
+    else if (prop.kind === "largeGenerator") drawLargeGenerator(ctx, prop, time);
+    else if (prop.kind === "commandConsole") drawCommandConsole(ctx, prop, time);
+    else if (prop.kind === "serverWall") drawServerWall(ctx, prop, time);
+    else if (prop.kind === "cargoLift") drawCargoLift(ctx, prop, time);
+    else if (prop.kind === "deconGate") drawDeconGate(ctx, prop, time);
+    else if (prop.kind === "overheadLightRig") drawOverheadLightRig(ctx, prop, time);
     else if (prop.kind === "terminal") drawTerminal(ctx, prop, time);
     else if (prop.kind === "brokenRack" || prop.kind === "crateStack") drawStorageProp(ctx, prop);
     else if (prop.kind === "ventPipe") drawVentPipe(ctx, prop, time);
@@ -623,6 +669,325 @@ function drawTank(ctx, prop, time) {
   ctx.strokeRect(-s * 0.46, -s * 0.85, s * 0.92, s * 1.7);
   ctx.fillStyle = "rgba(255,255,255,0.12)";
   ctx.fillRect(-s * 0.23, -s * 0.58, s * 0.13, s * 0.92);
+}
+
+function drawLabBench(ctx, prop, time) {
+  const s = prop.size;
+  ctx.fillStyle = "rgba(0,0,0,0.52)";
+  ctx.fillRect(-s * 1.3, -s * 0.42, s * 2.6, s * 0.84);
+  ctx.strokeStyle = "rgba(255,255,255,0.11)";
+  ctx.lineWidth = 2;
+  ctx.strokeRect(-s * 1.3, -s * 0.42, s * 2.6, s * 0.84);
+  ctx.fillStyle = "rgba(255,255,255,0.08)";
+  ctx.fillRect(-s * 1.08, -s * 0.2, s * 0.52, s * 0.18);
+  ctx.fillStyle = hexToRgba(prop.color, 0.16 + Math.max(0, Math.sin(time * 2.6 + prop.phase)) * 0.08);
+  ctx.fillRect(s * 0.48, -s * 0.28, s * 0.42, s * 0.32);
+  ctx.strokeStyle = hexToRgba(prop.color, 0.28);
+  ctx.lineWidth = 1.5;
+  for (let i = 0; i < 3; i++) {
+    const x = -s * 0.28 + i * s * 0.18;
+    ctx.beginPath();
+    ctx.moveTo(x, -s * 0.28);
+    ctx.lineTo(x, s * 0.16);
+    ctx.stroke();
+    ctx.fillStyle = i % 2 ? "#72ffb4" : "#7dd3fc";
+    ctx.fillRect(x - 2, s * 0.1, 4, s * 0.12);
+  }
+  ctx.fillStyle = "rgba(255,255,255,0.12)";
+  ctx.fillRect(-s * 1.1, s * 0.5, s * 0.16, s * 0.42);
+  ctx.fillRect(s * 0.95, s * 0.5, s * 0.16, s * 0.42);
+}
+
+function drawServerCabinet(ctx, prop, time) {
+  const s = prop.size;
+  const pulse = 0.32 + Math.max(0, Math.sin(time * 3.6 + prop.phase)) * 0.28;
+  ctx.fillStyle = "rgba(0,0,0,0.62)";
+  ctx.fillRect(-s * 0.58, -s * 1.2, s * 1.16, s * 2.4);
+  ctx.strokeStyle = "rgba(255,255,255,0.13)";
+  ctx.lineWidth = 2;
+  ctx.strokeRect(-s * 0.58, -s * 1.2, s * 1.16, s * 2.4);
+  ctx.strokeStyle = "rgba(255,255,255,0.08)";
+  for (let y = -s * 0.86; y < s * 0.85; y += s * 0.32) {
+    ctx.beginPath();
+    ctx.moveTo(-s * 0.42, y);
+    ctx.lineTo(s * 0.42, y);
+    ctx.stroke();
+  }
+  for (let i = 0; i < 6; i++) {
+    ctx.fillStyle = hexToRgba(i % 3 === 0 ? "#72ffb4" : prop.color, pulse * (i % 2 ? 0.55 : 0.9));
+    ctx.fillRect(s * 0.25, -s * 0.86 + i * s * 0.28, 4, 4);
+  }
+}
+
+function drawHangingCable(ctx, prop, time) {
+  const s = prop.size;
+  ctx.lineCap = "round";
+  for (let i = 0; i < 4; i++) {
+    const x = (i - 1.5) * s * 0.18;
+    const sway = Math.sin(time * 0.9 + prop.phase + i) * s * 0.08;
+    ctx.strokeStyle = i === 1 ? hexToRgba(prop.color, 0.8) : "rgba(0,0,0,0.65)";
+    ctx.lineWidth = i === 1 ? 2.4 : 4;
+    ctx.beginPath();
+    ctx.moveTo(x, -s * 0.82);
+    ctx.bezierCurveTo(x + sway, -s * 0.3, x - sway * 0.6, s * 0.12, x + sway * 0.4, s * 0.82);
+    ctx.stroke();
+  }
+  if (Math.sin(time * 12 + prop.phase) > 0.82) {
+    ctx.fillStyle = hexToRgba("#ff7a1a", 0.55);
+    ctx.fillRect(s * 0.16, s * 0.62, 5, 5);
+  }
+  ctx.lineCap = "butt";
+}
+
+function drawBrokenGlass(ctx, prop) {
+  const s = prop.size;
+  ctx.fillStyle = "rgba(217,251,255,0.045)";
+  ctx.beginPath();
+  ctx.ellipse(0, 0, s * 1.1, s * 0.42, 0, 0, TAU);
+  ctx.fill();
+  ctx.strokeStyle = "rgba(217,251,255,0.22)";
+  ctx.lineWidth = 1;
+  for (let i = 0; i < 8; i++) {
+    const a = prop.phase + i * 1.73;
+    const r = s * (0.18 + (i % 3) * 0.16);
+    ctx.beginPath();
+    ctx.moveTo(Math.cos(a) * r * 0.25, Math.sin(a) * r * 0.12);
+    ctx.lineTo(Math.cos(a) * r, Math.sin(a) * r * 0.45);
+    ctx.stroke();
+  }
+}
+
+function drawWarningSign(ctx, prop, time) {
+  const s = prop.size;
+  const pulse = 0.18 + Math.max(0, Math.sin(time * 2.2 + prop.phase)) * 0.08;
+  ctx.fillStyle = "rgba(0,0,0,0.44)";
+  ctx.fillRect(-s * 1.05, -s * 0.5, s * 2.1, s);
+  ctx.strokeStyle = hexToRgba(prop.color, 0.35 + pulse);
+  ctx.lineWidth = 2;
+  ctx.strokeRect(-s * 1.05, -s * 0.5, s * 2.1, s);
+  ctx.fillStyle = hexToRgba(prop.color, 0.24);
+  ctx.beginPath();
+  ctx.moveTo(-s * 0.82, s * 0.34);
+  ctx.lineTo(-s * 0.56, -s * 0.34);
+  ctx.lineTo(-s * 0.3, s * 0.34);
+  ctx.closePath();
+  ctx.fill();
+  ctx.fillStyle = hexToRgba("#ffffff", 0.18);
+  for (let i = 0; i < 3; i++) ctx.fillRect(-s * 0.1, -s * 0.28 + i * s * 0.22, s * (0.76 - i * 0.12), 3);
+}
+
+function drawCanister(ctx, prop, time) {
+  const s = prop.size;
+  const pulse = 0.34 + Math.max(0, Math.sin(time * 2.4 + prop.phase)) * 0.24;
+  glow(ctx, 0, 0, s * 1.5, prop.color, pulse * 0.08);
+  ctx.fillStyle = "rgba(0,0,0,0.56)";
+  ctx.fillRect(-s * 0.45, -s * 0.82, s * 0.9, s * 1.64);
+  ctx.strokeStyle = "rgba(255,255,255,0.15)";
+  ctx.lineWidth = 2;
+  ctx.strokeRect(-s * 0.45, -s * 0.82, s * 0.9, s * 1.64);
+  ctx.fillStyle = hexToRgba(prop.color, prop.kind === "bioCanister" ? 0.3 : 0.22);
+  ctx.fillRect(-s * 0.29, -s * 0.52, s * 0.58, s * 0.86);
+  ctx.fillStyle = hexToRgba("#ffffff", 0.18);
+  ctx.fillRect(-s * 0.18, -s * 0.46, s * 0.08, s * 0.72);
+  ctx.fillStyle = hexToRgba(prop.color, pulse * 0.55);
+  ctx.fillRect(-s * 0.34, s * 0.58, s * 0.68, 4);
+}
+
+function drawCeilingFanShadow(ctx, prop, time) {
+  const s = prop.size;
+  ctx.save();
+  ctx.rotate(time * 0.32 + prop.phase);
+  ctx.fillStyle = "rgba(0,0,0,0.18)";
+  ctx.beginPath();
+  ctx.arc(0, 0, s * 0.18, 0, TAU);
+  ctx.fill();
+  for (let i = 0; i < 4; i++) {
+    ctx.rotate(TAU / 4);
+    ctx.beginPath();
+    ctx.ellipse(s * 0.5, 0, s * 0.55, s * 0.11, 0, 0, TAU);
+    ctx.fill();
+  }
+  ctx.strokeStyle = "rgba(255,255,255,0.045)";
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.arc(0, 0, s * 0.78, 0, TAU);
+  ctx.stroke();
+  ctx.restore();
+}
+
+function drawContainmentChamber(ctx, prop, time) {
+  const s = prop.size;
+  const pulse = 0.22 + Math.max(0, Math.sin(time * 2.1 + prop.phase)) * 0.16;
+  glow(ctx, 0, 0, s * 2.0, prop.color, pulse * 0.28);
+  ctx.fillStyle = "rgba(0,0,0,0.54)";
+  ctx.fillRect(-s * 1.45, -s * 0.72, s * 2.9, s * 1.44);
+  ctx.strokeStyle = "rgba(255,255,255,0.16)";
+  ctx.lineWidth = 3;
+  ctx.strokeRect(-s * 1.45, -s * 0.72, s * 2.9, s * 1.44);
+  for (let i = -1; i <= 1; i++) {
+    const x = i * s * 0.78;
+    ctx.fillStyle = hexToRgba(prop.color, prop.kind === "cryoArray" ? 0.18 : 0.14);
+    ctx.fillRect(x - s * 0.28, -s * 0.56, s * 0.56, s * 1.12);
+    ctx.strokeStyle = hexToRgba("#ffffff", 0.2);
+    ctx.strokeRect(x - s * 0.28, -s * 0.56, s * 0.56, s * 1.12);
+    ctx.fillStyle = hexToRgba("#ffffff", 0.12);
+    ctx.fillRect(x - s * 0.18, -s * 0.46, s * 0.08, s * 0.84);
+  }
+  ctx.fillStyle = hexToRgba(prop.color, pulse);
+  ctx.fillRect(-s * 1.28, s * 0.62, s * 2.56, 4);
+}
+
+function drawObservationWindow(ctx, prop, time) {
+  const s = prop.size;
+  const pulse = 0.08 + Math.max(0, Math.sin(time * 1.6 + prop.phase)) * 0.06;
+  ctx.fillStyle = "rgba(0,0,0,0.52)";
+  ctx.fillRect(-s * 1.55, -s * 0.46, s * 3.1, s * 0.92);
+  ctx.fillStyle = hexToRgba(prop.color, 0.09 + pulse);
+  ctx.fillRect(-s * 1.34, -s * 0.3, s * 2.68, s * 0.6);
+  ctx.strokeStyle = "rgba(255,255,255,0.16)";
+  ctx.lineWidth = 3;
+  ctx.strokeRect(-s * 1.55, -s * 0.46, s * 3.1, s * 0.92);
+  ctx.strokeStyle = "rgba(255,255,255,0.12)";
+  for (let i = -1; i <= 1; i++) {
+    ctx.beginPath();
+    ctx.moveTo(i * s * 0.46, -s * 0.42);
+    ctx.lineTo(i * s * 0.46, s * 0.42);
+    ctx.stroke();
+  }
+  ctx.strokeStyle = hexToRgba("#ffffff", 0.1);
+  ctx.beginPath();
+  ctx.moveTo(-s * 1.12, s * 0.22);
+  ctx.lineTo(-s * 0.7, -s * 0.18);
+  ctx.lineTo(-s * 0.22, s * 0.08);
+  ctx.stroke();
+}
+
+function drawLargeGenerator(ctx, prop, time) {
+  const s = prop.size;
+  const pulse = 0.3 + Math.max(0, Math.sin(time * 2.8 + prop.phase)) * 0.28;
+  glow(ctx, 0, 0, s * 1.85, prop.color, pulse * 0.22);
+  ctx.fillStyle = "rgba(0,0,0,0.62)";
+  ctx.fillRect(-s * 1.2, -s * 0.62, s * 2.4, s * 1.24);
+  ctx.strokeStyle = "rgba(255,255,255,0.14)";
+  ctx.lineWidth = 2.5;
+  ctx.strokeRect(-s * 1.2, -s * 0.62, s * 2.4, s * 1.24);
+  ctx.fillStyle = hexToRgba(prop.color, 0.18 + pulse * 0.12);
+  ctx.fillRect(-s * 0.9, -s * 0.32, s * 0.58, s * 0.64);
+  ctx.fillRect(s * 0.32, -s * 0.32, s * 0.58, s * 0.64);
+  ctx.strokeStyle = hexToRgba(prop.color, 0.42);
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.arc(0, 0, s * 0.34, time * 0.9 + prop.phase, time * 0.9 + prop.phase + Math.PI * 1.45);
+  ctx.stroke();
+  ctx.fillStyle = "rgba(255,255,255,0.1)";
+  for (let x = -s; x <= s; x += s * 0.4) ctx.fillRect(x, s * 0.68, s * 0.14, s * 0.2);
+}
+
+function drawCommandConsole(ctx, prop, time) {
+  const s = prop.size;
+  const pulse = 0.2 + Math.max(0, Math.sin(time * 4.2 + prop.phase)) * 0.26;
+  ctx.fillStyle = "rgba(0,0,0,0.58)";
+  ctx.fillRect(-s * 1.55, -s * 0.5, s * 3.1, s);
+  ctx.strokeStyle = "rgba(255,255,255,0.14)";
+  ctx.lineWidth = 2;
+  ctx.strokeRect(-s * 1.55, -s * 0.5, s * 3.1, s);
+  for (let i = 0; i < 4; i++) {
+    ctx.fillStyle = hexToRgba(i % 2 ? "#72ffb4" : prop.color, pulse * (0.7 + i * 0.08));
+    ctx.fillRect(-s * 1.25 + i * s * 0.65, -s * 0.25, s * 0.42, s * 0.28);
+    ctx.fillStyle = "rgba(255,255,255,0.12)";
+    ctx.fillRect(-s * 1.2 + i * s * 0.65, s * 0.12, s * 0.22, 3);
+  }
+}
+
+function drawServerWall(ctx, prop, time) {
+  const s = prop.size;
+  ctx.fillStyle = "rgba(0,0,0,0.64)";
+  ctx.fillRect(-s * 0.72, -s * 1.55, s * 1.44, s * 3.1);
+  ctx.strokeStyle = "rgba(255,255,255,0.12)";
+  ctx.lineWidth = 2;
+  ctx.strokeRect(-s * 0.72, -s * 1.55, s * 1.44, s * 3.1);
+  for (let row = 0; row < 7; row++) {
+    const y = -s * 1.2 + row * s * 0.36;
+    ctx.strokeStyle = "rgba(255,255,255,0.07)";
+    ctx.beginPath();
+    ctx.moveTo(-s * 0.52, y);
+    ctx.lineTo(s * 0.52, y);
+    ctx.stroke();
+    ctx.fillStyle = hexToRgba(row % 2 ? "#72ffb4" : prop.color, 0.18 + Math.max(0, Math.sin(time * 4 + prop.phase + row)) * 0.22);
+    ctx.fillRect(s * 0.34, y - 3, 5, 5);
+  }
+}
+
+function drawCargoLift(ctx, prop, time) {
+  const s = prop.size;
+  const pulse = 0.1 + Math.max(0, Math.sin(time * 2 + prop.phase)) * 0.07;
+  ctx.fillStyle = "rgba(0,0,0,0.38)";
+  ctx.fillRect(-s * 1.2, -s * 0.85, s * 2.4, s * 1.7);
+  ctx.strokeStyle = hexToRgba(prop.color, 0.26 + pulse);
+  ctx.lineWidth = 3;
+  ctx.strokeRect(-s * 1.2, -s * 0.85, s * 2.4, s * 1.7);
+  ctx.strokeStyle = "rgba(255,255,255,0.1)";
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(-s * 1.0, -s * 0.65);
+  ctx.lineTo(s * 1.0, s * 0.65);
+  ctx.moveTo(s * 1.0, -s * 0.65);
+  ctx.lineTo(-s * 1.0, s * 0.65);
+  ctx.stroke();
+  drawWarningBands(ctx, s * 1.05, s * 0.65, prop.color);
+}
+
+function drawDeconGate(ctx, prop, time) {
+  const s = prop.size;
+  const pulse = 0.16 + Math.max(0, Math.sin(time * 3.4 + prop.phase)) * 0.18;
+  glow(ctx, 0, 0, s * 1.35, prop.color, pulse * 0.18);
+  ctx.fillStyle = "rgba(0,0,0,0.55)";
+  ctx.fillRect(-s * 0.6, -s * 1.35, s * 1.2, s * 2.7);
+  ctx.strokeStyle = "rgba(255,255,255,0.14)";
+  ctx.lineWidth = 2;
+  ctx.strokeRect(-s * 0.6, -s * 1.35, s * 1.2, s * 2.7);
+  ctx.strokeStyle = hexToRgba(prop.color, 0.38 + pulse);
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.moveTo(-s * 0.36, -s * 1.05);
+  ctx.lineTo(-s * 0.36, s * 1.05);
+  ctx.moveTo(s * 0.36, -s * 1.05);
+  ctx.lineTo(s * 0.36, s * 1.05);
+  ctx.stroke();
+  ctx.fillStyle = hexToRgba("#ffffff", 0.18);
+  ctx.fillRect(-s * 0.2, -s * 0.08, s * 0.4, s * 0.16);
+}
+
+function drawOverheadLightRig(ctx, prop, time) {
+  const s = prop.size;
+  const pulse = 0.4 + Math.max(0, Math.sin(time * 4.6 + prop.phase)) * 0.28;
+  glow(ctx, 0, 0, s * 2.25, prop.color, pulse * 0.1);
+  ctx.fillStyle = "rgba(0,0,0,0.46)";
+  ctx.fillRect(-s * 1.6, -s * 0.22, s * 3.2, s * 0.44);
+  for (let i = -1; i <= 1; i++) {
+    ctx.fillStyle = hexToRgba(prop.color, pulse * 0.36);
+    ctx.fillRect(i * s * 0.78 - s * 0.26, -s * 0.08, s * 0.52, s * 0.16);
+    ctx.fillStyle = hexToRgba("#ffffff", pulse * 0.18);
+    ctx.fillRect(i * s * 0.78 - s * 0.19, -1, s * 0.16, 2);
+  }
+}
+
+function drawWarningBands(ctx, w, h, color) {
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(-w, -h, w * 2, h * 2);
+  ctx.clip();
+  for (let x = -w * 1.1; x < w * 1.2; x += 18) {
+    ctx.fillStyle = hexToRgba(color, 0.16);
+    ctx.beginPath();
+    ctx.moveTo(x, h);
+    ctx.lineTo(x + 8, h);
+    ctx.lineTo(x + 26, -h);
+    ctx.lineTo(x + 18, -h);
+    ctx.closePath();
+    ctx.fill();
+  }
+  ctx.restore();
 }
 
 function drawTerminal(ctx, prop, time) {

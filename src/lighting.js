@@ -92,13 +92,29 @@ function addMapLights(lights, camera, viewport) {
     const pulse = 0.75 + Math.sin(state.time * 2.2 + prop.phase) * 0.25;
     const radiusMul =
       prop.kind === "reactorCore" ? 5.6 :
+        prop.kind === "largeGenerator" ? 4.8 :
+          prop.kind === "overheadLightRig" ? 4.6 :
+            prop.kind === "containmentChamber" || prop.kind === "cryoArray" ? 4.0 :
+              prop.kind === "commandConsole" || prop.kind === "serverWall" ? 3.8 :
+                prop.kind === "deconGate" ? 3.4 :
         prop.kind === "wallLight" ? 4.2 :
-          prop.kind === "terminal" || prop.kind === "specimenTank" || prop.kind === "cryoPod" ? 3.6 :
+          prop.kind === "serverCabinet" ? 3.4 :
+            prop.kind === "bioCanister" || prop.kind === "coolantTank" ? 3.1 :
+              prop.kind === "labBench" ? 2.6 :
+                prop.kind === "terminal" || prop.kind === "specimenTank" || prop.kind === "cryoPod" ? 3.6 :
             prop.kind === "beacon" ? 5.2 : prop.kind === "dataCore" ? 4.5 : prop.kind === "relayPad" ? 3.2 : 2.8;
     const strengthBase =
       prop.kind === "reactorCore" ? 0.42 :
+        prop.kind === "largeGenerator" ? 0.3 :
+          prop.kind === "overheadLightRig" ? 0.28 :
+            prop.kind === "containmentChamber" || prop.kind === "cryoArray" ? 0.24 :
+              prop.kind === "commandConsole" || prop.kind === "serverWall" ? 0.22 :
+                prop.kind === "deconGate" ? 0.2 :
         prop.kind === "wallLight" ? 0.32 :
-          prop.kind === "terminal" || prop.kind === "specimenTank" || prop.kind === "cryoPod" ? 0.24 :
+          prop.kind === "serverCabinet" ? 0.2 :
+            prop.kind === "bioCanister" || prop.kind === "coolantTank" ? 0.18 :
+              prop.kind === "labBench" ? 0.12 :
+                prop.kind === "terminal" || prop.kind === "specimenTank" || prop.kind === "cryoPod" ? 0.24 :
             prop.kind === "beacon" ? 0.46 : prop.kind === "relayPad" ? 0.24 : prop.kind === "dataCore" ? 0.36 : 0.16;
     addWorldLight(lights, camera, viewport, {
       x: prop.x,

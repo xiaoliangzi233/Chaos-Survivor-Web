@@ -126,14 +126,20 @@ function sampleProp(map, camX, camY, viewW, viewH) {
   const r = prop.size * (0.45 + Math.random() * 1.35);
   const x = prop.x + Math.cos(angle) * r;
   const y = prop.y + Math.sin(angle) * r;
-  if (prop.kind === "ventPipe" || prop.kind === "cryoPod") {
+  if (prop.kind === "ventPipe" || prop.kind === "cryoPod" || prop.kind === "coolantTank" || prop.kind === "cryoArray") {
     spawnAmbientMist(x, y, color, prop.kind === "cryoPod" ? 0.065 : 0.05);
-  } else if (prop.kind === "wallLight") {
+  } else if (prop.kind === "bioCanister" || prop.kind === "containmentChamber") {
+    if (Math.random() < 0.74) spawnAmbientMist(x, y, color, 0.062);
+    else spawnAmbientMoteAt(x, y, color, 0.28);
+  } else if (prop.kind === "wallLight" || prop.kind === "overheadLightRig" || prop.kind === "deconGate") {
     if (Math.random() < 0.72) spawnAmbientMoteAt(x, y, color, 0.42);
     else spawnAmbientEmber(x, y, color, 0.55);
-  } else if (prop.kind === "terminal" || prop.kind === "reactorCore") {
+  } else if (prop.kind === "terminal" || prop.kind === "reactorCore" || prop.kind === "serverCabinet" || prop.kind === "serverWall" || prop.kind === "commandConsole" || prop.kind === "largeGenerator" || prop.kind === "labBench") {
     spawnAmbientScan(x, y, prop.rot || Math.random() * TAU, color);
-  } else if (prop.kind === "brokenRack" || prop.kind === "crateStack") {
+  } else if (prop.kind === "hangingCable") {
+    if (Math.random() < 0.62) spawnAmbientEmber(x, y, "#ff7a1a", 0.5);
+    else spawnAmbientMoteAt(x, y, "#9aa7b4", 0.16);
+  } else if (prop.kind === "brokenRack" || prop.kind === "crateStack" || prop.kind === "brokenGlass") {
     if (Math.random() < 0.55) spawnAmbientMoteAt(x, y, "#9aa7b4", 0.16);
     else spawnAmbientEmber(x, y, "#ff7a1a", 0.42);
   } else if (Math.random() < 0.78) spawnAmbientMoteAt(x, y, color, 0.38);

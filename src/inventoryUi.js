@@ -1,8 +1,18 @@
 import { state } from "./state.js";
-import { findFuseCandidate, fuseWeaponSlots, QUALITY_INFO, WEAPON_INFO, selectWeaponSlot, selectedWeaponSlot } from "./inventory.js";
+import {
+  canFuseWeapons,
+  findFuseCandidate,
+  fuseWeaponSlots,
+  QUALITY_INFO,
+  WEAPON_INFO,
+  selectWeaponSlot,
+  selectedWeaponSlot,
+} from "./inventory.js";
 
 let initialized = false;
 let previousMode = "playing";
+let fuseMaterialUid = null;
+let fuseMessage = "";
 
 const dom = {};
 
@@ -46,6 +56,7 @@ export function openInventory() {
   previousMode = state.mode;
   if (previousMode === "paused") dom.pauseOverlay?.classList.remove("active");
   state.mode = "inventory";
+  fuseMaterialUid = normalizeFuseMaterial()?.uid ?? null;
   renderInventory();
   dom.overlay?.classList.add("active");
   return true;
@@ -54,6 +65,8 @@ export function openInventory() {
 export function closeInventory() {
   if (!isInventoryOpen()) return false;
   hideItemTooltip();
+  fuseMaterialUid = null;
+  fuseMessage = "";
   dom.overlay?.classList.remove("active");
   state.mode = previousMode === "paused" ? "paused" : "playing";
   if (state.mode === "paused") dom.pauseOverlay?.classList.add("active");
@@ -114,6 +127,7 @@ function renderSummary() {
 
 function renderSlots() {
   const slots = state.inventory.weaponSlots;
+  const selected = selectedWeaponSlot();
   dom.slots.innerHTML = "";
   const count = document.querySelector(".inventory-weapons h3 span");
   if (count) count.textContent = `${slots.length}/6`;
@@ -128,10 +142,21 @@ function renderSlots() {
     } else {
       const info = WEAPON_INFO[slot.id];
       const quality = QUALITY_INFO[slot.quality];
-      button.className = `weapon-slot${state.inventory.selectedWeaponUid === slot.uid ? " active" : ""}`;
+      const isActive = state.inventory.selectedWeaponUid === slot.uid;
+      const isMaterial = fuseMaterialUid === slot.uid;
+      const canUseAsMaterial = selected && canFuseWeapons(selected, slot).ok;
+      button.className = `weapon-slot${isActive ? " active" : ""}${isMaterial ? " material" : ""}${canUseAsMaterial ? " fuseable" : ""}`;
       button.innerHTML = `<i style="color:${quality.color}">${info.icon}</i><span><strong>${info.name}</strong><small style="color:${quality.color}">${quality.name}</small></span>`;
       button.addEventListener("click", () => {
-        selectWeaponSlot(slot.uid);
+        const current = selectedWeaponSlot();
+        if (current && canFuseWeapons(current, slot).ok) {
+          fuseMaterialUid = slot.uid;
+          fuseMessage = "";
+        } else {
+          selectWeaponSlot(slot.uid);
+          fuseMaterialUid = normalizeFuseMaterial()?.uid ?? null;
+          fuseMessage = "";
+        }
         renderInventory();
       });
     }
@@ -144,14 +169,17 @@ function renderDetail() {
   dom.detail.innerHTML = "";
 
   if (!slot) {
-    dom.detail.innerHTML = `<div class="empty-detail">当前没有武器。先选择开局武器或在升级时获得新武器。</div>`;
+    dom.detail.innerHTML = `<div class="empty-detail">当前没有武器。先选择开局武器或在商店购买新武器。</div>`;
     dom.fuseButton.disabled = true;
+    fuseMaterialUid = null;
     return;
   }
 
   const info = WEAPON_INFO[slot.id];
   const quality = QUALITY_INFO[slot.quality];
-  const candidate = findFuseCandidate(slot);
+  const material = normalizeFuseMaterial();
+  const fuseCheck = canFuseWeapons(slot, material);
+  const nextQuality = fuseCheck.nextQuality ? QUALITY_INFO[fuseCheck.nextQuality] : null;
   dom.detail.innerHTML = `
     <div class="weapon-detail-card">
       <div class="weapon-detail-title">
@@ -164,15 +192,66 @@ function renderDetail() {
       <p>${info.desc}</p>
       <div class="weapon-tags detail-tags">${info.tags.map((tag) => `<span>${tag}</span>`).join("")}</div>
       <p>品质倍率：${Math.round(quality.mult * 100)}%</p>
-      <p>合成规则：两把相同品质武器可合成为下一品质。</p>
+      ${renderFusePreview(slot, material, fuseCheck, nextQuality)}
     </div>`;
 
-  dom.fuseButton.disabled = !candidate;
-  dom.fuseButton.textContent = "合成品质";
+  dom.fuseButton.disabled = !fuseCheck.ok;
+  dom.fuseButton.textContent = fuseCheck.ok ? "合成武器" : "无法合成";
   dom.fuseButton.onclick = () => {
-    const next = findFuseCandidate(slot);
-    if (next && fuseWeaponSlots(slot.uid, next.uid)) renderInventory();
+    const currentMaterial = normalizeFuseMaterial();
+    const check = canFuseWeapons(slot, currentMaterial);
+    if (!check.ok) {
+      fuseMessage = check.reason;
+      renderInventory();
+      return;
+    }
+    const resultQuality = QUALITY_INFO[check.nextQuality];
+    if (fuseWeaponSlots(slot.uid, currentMaterial.uid)) {
+      fuseMaterialUid = normalizeFuseMaterial()?.uid ?? null;
+      fuseMessage = `合成成功：${resultQuality.name} ${info.name}`;
+      renderInventory();
+    }
   };
+}
+
+function normalizeFuseMaterial() {
+  const selected = selectedWeaponSlot();
+  if (!selected) return null;
+  const existing = state.inventory.weaponSlots.find((slot) => slot.uid === fuseMaterialUid);
+  if (existing && canFuseWeapons(selected, existing).ok) return existing;
+  const candidate = findFuseCandidate(selected);
+  fuseMaterialUid = candidate?.uid ?? null;
+  return candidate || null;
+}
+
+function renderFusePreview(slot, material, fuseCheck, nextQuality) {
+  const info = WEAPON_INFO[slot.id];
+  const result = fuseCheck.ok
+    ? `<div class="fuse-result"><span>结果</span><strong style="color:${nextQuality.color}">${nextQuality.name} ${info.name}</strong></div>`
+    : `<div class="fuse-result disabled"><span>规则</span><strong>${fuseCheck.reason}</strong></div>`;
+  return `
+    <div class="fuse-panel">
+      <div class="fuse-row">
+        ${renderFuseMini(slot, "主武器")}
+        <b>+</b>
+        ${material ? renderFuseMini(material, "材料") : `<div class="fuse-mini empty"><span>材料</span><strong>暂无可合成武器</strong></div>`}
+      </div>
+      ${result}
+      <p class="fuse-hint">同一种武器、同一种品质才能合成；传说品质无法继续合成。</p>
+      ${fuseMessage ? `<p class="fuse-message">${fuseMessage}</p>` : ""}
+    </div>`;
+}
+
+function renderFuseMini(slot, label) {
+  const info = WEAPON_INFO[slot.id];
+  const quality = QUALITY_INFO[slot.quality];
+  return `
+    <div class="fuse-mini">
+      <span>${label}</span>
+      <i style="color:${quality.color}">${info.icon}</i>
+      <strong>${info.name}</strong>
+      <small style="color:${quality.color}">${quality.name}</small>
+    </div>`;
 }
 
 function renderItems() {
@@ -181,7 +260,7 @@ function renderItems() {
     const row = document.createElement("div");
     row.className = "item-card";
     const qty = item.qty;
-    row.setAttribute("data-tip", `${item.name}：${item.desc}`);
+    row.setAttribute("data-tip", `${item.name}: ${item.desc}`);
     row.innerHTML = `<i>${item.icon}</i><strong>x${qty}</strong>`;
     const tipText = `${item.name}: ${item.desc}`;
     row.addEventListener("mouseenter", (event) => showItemTooltip(event, tipText));

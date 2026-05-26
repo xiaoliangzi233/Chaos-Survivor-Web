@@ -20,7 +20,7 @@ export const WEAPON_INFO = {
   ice: {
     icon: "❄",
     name: "霜晶追踪",
-    desc: "追踪冰晶会持续转向追猎，命中后短暂冻结未死亡目标。",
+    desc: "追踪冰刀会持续转向追猎，命中后短暂冻结未死亡目标。",
     tags: ["追踪", "冻结控制", "单体压制"],
   },
   missile: {
@@ -61,19 +61,34 @@ export function addWeaponToInventory(id, quality = "common") {
 }
 
 export function fuseWeaponSlots(aUid, bUid) {
-  if (aUid === bUid) return false;
   const a = findWeaponSlot(aUid);
   const b = findWeaponSlot(bUid);
-  if (!a || !b || a.quality !== b.quality || a.quality === "legendary") return false;
+  const check = canFuseWeapons(a, b);
+  if (!check.ok) return false;
 
-  const nextQuality = QUALITY_ORDER[QUALITY_ORDER.indexOf(a.quality) + 1];
-  a.quality = nextQuality;
+  a.quality = check.nextQuality;
   a.level = Math.max(a.level, b.level);
   const idx = state.inventory.weaponSlots.indexOf(b);
   if (idx >= 0) state.inventory.weaponSlots.splice(idx, 1);
   state.inventory.selectedWeaponUid = a.uid;
   recomputeAllWeapons();
   return true;
+}
+
+export function nextQualityOf(quality) {
+  const idx = QUALITY_ORDER.indexOf(quality);
+  if (idx < 0 || idx >= QUALITY_ORDER.length - 1) return null;
+  return QUALITY_ORDER[idx + 1];
+}
+
+export function canFuseWeapons(a, b) {
+  if (!a || !b) return { ok: false, reason: "请选择两把武器" };
+  if (a.uid === b.uid) return { ok: false, reason: "请选择两把不同武器" };
+  if (a.id !== b.id) return { ok: false, reason: "只能合成同一种武器" };
+  if (a.quality !== b.quality) return { ok: false, reason: "只能合成同品质武器" };
+  const nextQuality = nextQualityOf(a.quality);
+  if (!nextQuality) return { ok: false, reason: "传说品质无法继续合成" };
+  return { ok: true, nextQuality };
 }
 
 export function selectWeaponSlot(uid) {
@@ -87,7 +102,7 @@ export function selectedWeaponSlot() {
 
 export function findFuseCandidate(slot) {
   if (!slot || slot.quality === "legendary") return null;
-  return state.inventory.weaponSlots.find((other) => other.uid !== slot.uid && other.quality === slot.quality) || null;
+  return state.inventory.weaponSlots.find((other) => canFuseWeapons(slot, other).ok) || null;
 }
 
 export function recomputeAllWeapons() {

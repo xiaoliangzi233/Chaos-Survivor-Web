@@ -19,9 +19,10 @@ import { closeInventory, initInventoryUi, isInventoryOpen } from "./inventoryUi.
 import { isBossWave, setupEnemyRegistry } from "./enemyRegistry.js";
 import { updatePlayer, updateSpawning, updateEnemies, rebuildGrid, updateGems, collectAllExperience, clearEnemies } from "./entities.js";
 import { updateWeapons, STARTER_WEAPONS, UPGRADE_DEFS, activateWeapon } from "./weapons.js";
-import { updateEffects } from "./effects.js";
+import * as effects from "./effects.js";
 import { resizeCanvas, updateCamera, render } from "./renderer.js";
 import { playSfx, startMusic, stopMusic, pauseMusic, resumeMusic } from "./audio.js";
+import { CAMERA_ZOOM } from "./constants.js";
 
 export async function bootGame() {
   const ctx = ui.canvas.getContext("2d", { alpha: false });
@@ -168,7 +169,8 @@ export async function bootGame() {
     rebuildGrid();
     updateWeapons(dt);
     updateGems(dt);
-    updateEffects(dt);
+    effects.updateAmbientParticles?.(dt, ui.canvas.clientWidth / CAMERA_ZOOM, ui.canvas.clientHeight / CAMERA_ZOOM);
+    effects.updateEffects(dt);
     updateCamera(dt);
     checkLevelUps();
     if (state.player.hp <= 0) endGame(false);

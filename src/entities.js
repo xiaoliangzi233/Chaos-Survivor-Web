@@ -4,6 +4,7 @@ import { clamp, distSq, circleHit } from "./utils.js";
 import { burst, dust } from "./effects.js";
 import { playSfx } from "./audio.js";
 import { isBossWave, randomEnemyForWave, spawnEnemyById, spawnWaveBoss } from "./enemyRegistry.js";
+import { updateBlackhole } from "./blackhole.js";
 
 export function updatePlayer(dt) {
   const p = state.player;
@@ -58,6 +59,7 @@ export function updateEnemies(dt) {
   }
   updateEnemyProjectiles(dt);
   updateHazards(dt);
+  updateBlackhole(dt);
 }
 
 export function damageEnemy(e, amount, x, y) {
@@ -216,6 +218,7 @@ export function clearEnemies() {
   world.projectiles.length = 0;
   world.enemyProjectiles.length = 0;
   world.hazards.length = 0;
+  world.blackhole = null;
   world.boss = null;
   world.grid.clear();
 }

@@ -4,6 +4,7 @@ import { clamp, hexToRgba } from "./utils.js";
 import { drawMap } from "./map.js";
 import { drawEffects } from "./effects.js";
 import { renderLighting } from "./lighting.js";
+import { drawBlackhole } from "./blackhole.js";
 
 export const viewport = { width: 1, height: 1, dpr: 1 };
 
@@ -65,6 +66,7 @@ export function render(ctx) {
   drawPlayer(ctx);
   drawEnemyProjectiles(ctx);
   drawHazards(ctx);
+  drawBlackhole(ctx);
   drawEffects(ctx);
   drawWeaponFx(ctx);
   ctx.restore();

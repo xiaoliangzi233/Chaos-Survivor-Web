@@ -63,6 +63,7 @@ function collectLights(camera, viewport) {
   addEntityLights(lights, camera, viewport);
   addProjectileLights(lights, camera, viewport);
   addGemLights(lights, camera, viewport);
+  addBlackholeLight(lights, camera, viewport);
   addFxLights(lights, camera, viewport);
   return lights;
 }
@@ -211,6 +212,19 @@ function addGemLights(lights, camera, viewport) {
     });
     count++;
   }
+}
+
+function addBlackholeLight(lights, camera, viewport) {
+  const h = world.blackhole;
+  if (!h || !worldVisible(h.x, h.y, h.r + 140, camera)) return;
+  addWorldLight(lights, camera, viewport, {
+    x: h.x,
+    y: h.y,
+    radius: h.r * 1.75,
+    color: h.color,
+    strength: 0.42 + h.level * 0.045,
+    core: 0.08,
+  });
 }
 
 function addFxLights(lights, camera, viewport) {

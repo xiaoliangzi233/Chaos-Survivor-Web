@@ -37,6 +37,7 @@ export const world = {
   weaponFx: [],
   grid: new Map(),
   boss: null,
+  blackhole: null,
 };
 
 export const input = {
@@ -100,6 +101,7 @@ export function resetRun(map) {
   world.weaponFx.length = 0;
   world.grid.clear();
   world.boss = null;
+  world.blackhole = null;
 
   state.mode = "choosingWeapon";
   state.time = 0;

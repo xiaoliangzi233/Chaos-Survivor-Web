@@ -4,6 +4,11 @@ import { burst, pulse, trail } from "../effects.js";
 import { clamp } from "../utils.js";
 import { BaseEnemy } from "./BaseEnemy.js";
 
+const DASH_TRIGGER_RANGE = 330;
+const DASH_SPEED = 760;
+const DASH_TIME = 0.58;
+const DASH_DISTANCE = DASH_SPEED * DASH_TIME;
+
 export class Lancer extends BaseEnemy {
   constructor(config, x, y) {
     super(config, x, y);
@@ -38,9 +43,9 @@ export class Lancer extends BaseEnemy {
       this.y -= ny * this.speed * 0.42 * dt;
       if (this.windupTime <= 0) {
         this.attackState = "dashing";
-        this.dashTime = 0.28;
-        this.dashVx = Math.cos(this.lockAngle) * 560;
-        this.dashVy = Math.sin(this.lockAngle) * 560;
+        this.dashTime = DASH_TIME;
+        this.dashVx = Math.cos(this.lockAngle) * DASH_SPEED;
+        this.dashVy = Math.sin(this.lockAngle) * DASH_SPEED;
         burst(this.x, this.y, 7, "#ffe7b0", 150);
       }
     } else if (this.attackState === "dashing") {
@@ -64,7 +69,7 @@ export class Lancer extends BaseEnemy {
       if (this.recoverTime <= 0) this.attackState = "approach";
     } else {
       this.chase(dt, dx, dy, d, 1.02);
-      if (d < 360 && this.attackCooldown <= 0) {
+      if (d < DASH_TRIGGER_RANGE && this.attackCooldown <= 0) {
         this.attackState = "windup";
         this.windupTime = 0.52;
         this.lockAngle = Math.atan2(dy, dx);
@@ -76,7 +81,10 @@ export class Lancer extends BaseEnemy {
     this.x = clamp(this.x, -half + this.r, half - this.r);
     this.y = clamp(this.y, -half + this.r, half - this.r);
 
-    if (d < p.r + this.r + (this.attackState === "dashing" ? 10 : 0) && p.invuln <= 0) {
+    const hitDx = p.x - this.x;
+    const hitDy = p.y - this.y;
+    const hitDist = Math.hypot(hitDx, hitDy);
+    if (hitDist < p.r + this.r + (this.attackState === "dashing" ? 14 : 0) && p.invuln <= 0) {
       p.hp -= this.attackState === "dashing" ? this.damage * 1.35 : this.damage;
       p.invuln = 0.55;
       state.shake = this.attackState === "dashing" ? 11 : 7;
@@ -115,7 +123,7 @@ export class Lancer extends BaseEnemy {
 }
 
 function drawLungeTelegraph(ctx, e) {
-  const length = 170;
+  const length = DASH_DISTANCE;
   const a = e.lockAngle;
   const pulseAlpha = 0.38 + Math.sin(e.anim * 10) * 0.16;
   ctx.save();

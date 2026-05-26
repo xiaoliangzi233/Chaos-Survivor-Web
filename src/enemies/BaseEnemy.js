@@ -160,12 +160,10 @@ export class BaseEnemy {
     if (this.boss && world.boss === this) world.boss = null;
     burst(this.x, this.y, this.boss ? 48 : 12, this.color, this.boss ? 240 : 140);
     playSfx(this.boss ? "explode" : "hit");
-    import("../entities.js").then(({ dropGem, dropCoin }) => {
+    import("../entities.js").then(({ coinAmountForEnemy, dropGem, dropCoin }) => {
       dropGem(this.x, this.y, this.xp);
-      if (!this.boss && !this.elite && this.category === "小怪") {
-        const amount = 1 + Math.floor(Math.random() * 3) + Math.floor((this.xp || 1) / 10) + Math.floor(state.wave / 7);
-        dropCoin(this.x, this.y, Math.min(8, amount));
-      }
+      const amount = coinAmountForEnemy(this);
+      if (amount > 0) dropCoin(this.x, this.y, amount);
     });
     const i = world.enemies.indexOf(this);
     if (i >= 0) world.enemies.splice(i, 1);

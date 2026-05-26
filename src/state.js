@@ -74,12 +74,12 @@ export function createPlayer() {
 
 export function createWeapons() {
   return {
-    arc: { level: 0, timer: 0, cooldown: 0.58, damage: 26, range: 720, chainRange: 205, chains: 3, falloff: 0.78, quality: "common", qualityMult: 1 },
-    ice: { level: 0, timer: 0.8, cooldown: 0.84, count: 1, damage: 21, range: 980, speed: 500, turnSpeed: 5.8, freezeDuration: 0.45, quality: "common", qualityMult: 1 },
-    missile: { level: 0, timer: 1.2, cooldown: 1.38, damage: 34, range: 1120, speed: 420, explodeRadius: 116, explodeDamage: 31, turnSpeed: 2.9, quality: "common", qualityMult: 1 },
-    boomerang: { level: 0, timer: 1.4, cooldown: 1.48, count: 1, damage: 27, range: 840, speed: 610, returnAfter: 0.6, returnSpeed: 1.35, quality: "common", qualityMult: 1 },
-    drone: { level: 0, angle: 0, count: 0, orbitRadius: 82, acquireRange: 650, attackRange: 500, fireCooldown: 0.34, bulletDamage: 13, bulletSpeed: 610, batteryMax: 150, shotCost: 20, rechargeRate: 46, drones: [], quality: "common", qualityMult: 1 },
-    pulse: { level: 0, timer: 2.4, cooldown: 2.7, damage: 32, radius: 132, quality: "common", qualityMult: 1 },
+    arc: { level: 0, timer: 0, cooldown: 0.58, damage: 65, range: 720, chainRange: 205, chains: 3, falloff: 0.78, quality: "common", qualityMult: 1 },
+    ice: { level: 0, timer: 0.8, cooldown: 0.84, count: 1, damage: 53, range: 980, speed: 500, turnSpeed: 5.8, freezeDuration: 0.45, quality: "common", qualityMult: 1 },
+    missile: { level: 0, timer: 1.2, cooldown: 1.38, damage: 85, range: 1120, speed: 420, explodeRadius: 116, explodeDamage: 78, turnSpeed: 2.9, quality: "common", qualityMult: 1 },
+    boomerang: { level: 0, timer: 1.4, cooldown: 1.48, count: 1, damage: 68, range: 840, speed: 610, returnAfter: 0.6, returnSpeed: 1.35, quality: "common", qualityMult: 1 },
+    drone: { level: 0, angle: 0, count: 0, orbitRadius: 82, acquireRange: 650, attackRange: 500, fireCooldown: 0.34, bulletDamage: 33, bulletSpeed: 610, batteryMax: 150, shotCost: 20, rechargeRate: 46, drones: [], quality: "common", qualityMult: 1 },
+    pulse: { level: 0, timer: 2.4, cooldown: 2.7, damage: 80, radius: 132, quality: "common", qualityMult: 1 },
   };
 }
 

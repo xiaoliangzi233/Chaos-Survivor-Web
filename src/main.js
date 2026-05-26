@@ -95,8 +95,8 @@ export async function bootGame() {
     state.pendingVictory = state.wave >= TOTAL_WAVES;
     state.pendingNextWave = !state.pendingVictory;
     collectAllExperience();
-    collectAllCoins();
     clearEnemies();
+    collectAllCoins();
     if (!checkLevelUps()) openShopAfterWave();
   }
 

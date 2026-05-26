@@ -105,6 +105,12 @@ export function dropCoin(x, y, amount) {
   while (world.coins.length > GEM_LIMIT) world.coins.shift();
 }
 
+export function coinAmountForEnemy(enemy) {
+  if (!enemy || enemy.boss || enemy.elite || enemy.category !== "小怪") return 0;
+  const amount = 1 + Math.floor(Math.random() * 3) + Math.floor((enemy.xp || 1) / 10) + Math.floor(state.wave / 7);
+  return Math.min(8, amount);
+}
+
 export function updateGems(dt) {
   const p = state.player;
   for (let i = world.gems.length - 1; i >= 0; i--) {
@@ -214,12 +220,17 @@ export function collectAllExperience() {
 }
 
 export function collectAllCoins() {
-  for (const c of world.coins) state.gold += Math.max(1, Math.floor((c.value || 1) * 0.5));
+  const total = world.coins.reduce((sum, c) => sum + Math.max(1, Math.round(c.value || 1)), 0);
+  if (total > 0) state.gold += Math.max(1, Math.floor(total * 0.5));
   world.coins.length = 0;
 }
 
 export function clearEnemies() {
-  for (const e of world.enemies) burst(e.x, e.y, e.type === "tank" ? 14 : 7, e.color, 120);
+  for (const e of world.enemies) {
+    const amount = coinAmountForEnemy(e);
+    if (amount > 0) dropCoin(e.x, e.y, amount);
+    burst(e.x, e.y, e.type === "tank" ? 14 : 7, e.color, 120);
+  }
   world.enemies.length = 0;
   world.projectiles.length = 0;
   world.enemyProjectiles.length = 0;

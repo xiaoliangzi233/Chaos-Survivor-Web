@@ -33,7 +33,8 @@ export function updateSpawning(dt) {
   spawnWaveBoss();
   if (isBossWave(state.wave)) return;
   const danger = state.wave / 20;
-  state.spawnBudget += dt * (3.8 + danger * 12 + state.wave * 0.45);
+  const earlyMul = state.wave <= 3 ? 0.52 : state.wave <= 6 ? 0.68 : state.wave <= 9 ? 0.84 : 1;
+  state.spawnBudget += dt * (2.1 + danger * 10.5 + state.wave * 0.36) * earlyMul;
   while (state.spawnBudget >= 1 && world.enemies.length < ENEMY_LIMIT) {
     state.spawnBudget--;
     spawnEnemyById(randomEnemyForWave(state.wave));
@@ -45,6 +46,7 @@ export function updateEnemies(dt) {
   for (const e of world.enemies) e.shielded = false;
   for (let i = world.enemies.length - 1; i >= 0; i--) {
     const e = world.enemies[i];
+    updateEnemyKnockback(e, dt);
     if (e.freezeTimer > 0 && !e.boss) {
       e.freezeTimer = Math.max(0, e.freezeTimer - dt);
       e.hitTimer = Math.max(0, e.hitTimer - dt);
@@ -60,6 +62,15 @@ export function updateEnemies(dt) {
 
 export function damageEnemy(e, amount, x, y) {
   e.takeDamage ? e.takeDamage(amount, x, y) : null;
+}
+
+export function applyKnockback(e, dx, dy, force) {
+  if (!e || e.dead || force <= 0) return;
+  const len = Math.max(1, Math.hypot(dx, dy));
+  const resistance = e.knockbackResistance ?? defaultKnockbackResistance(e);
+  const applied = force * Math.max(0.08, 1 - resistance);
+  e.knockbackX = (e.knockbackX || 0) + (dx / len) * applied;
+  e.knockbackY = (e.knockbackY || 0) + (dy / len) * applied;
 }
 
 export function dropGem(x, y, value) {
@@ -176,6 +187,33 @@ function updateHazards(dt) {
     }
     if (h.life <= 0) world.hazards.splice(i, 1);
   }
+}
+
+function updateEnemyKnockback(e, dt) {
+  const kx = e.knockbackX || 0;
+  const ky = e.knockbackY || 0;
+  if (Math.abs(kx) + Math.abs(ky) < 0.1) {
+    e.knockbackX = 0;
+    e.knockbackY = 0;
+    return;
+  }
+  e.x += kx * dt;
+  e.y += ky * dt;
+  const drag = Math.exp(-dt * 8.5);
+  e.knockbackX = kx * drag;
+  e.knockbackY = ky * drag;
+  const half = WORLD_SIZE / 2;
+  e.x = clamp(e.x, -half + e.r, half - e.r);
+  e.y = clamp(e.y, -half + e.r, half - e.r);
+}
+
+function defaultKnockbackResistance(e) {
+  if (e.boss) return 0.92;
+  if (e.elite) return 0.58;
+  if (e.type === "tank" || e.behavior === "split_large") return 0.64;
+  if (e.behavior === "pylon" || e.behavior === "shield") return 0.52;
+  if (e.behavior === "lancer" || e.behavior === "bat" || e.type === "slime_small") return 0.2;
+  return clamp((e.r - 10) / 34, 0.18, 0.5);
 }
 
 function cellKey(x, y) {

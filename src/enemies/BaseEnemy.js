@@ -26,6 +26,9 @@ export class BaseEnemy {
     this.flip = 1;
     this.phase = 0;
     this.shielded = false;
+    this.knockbackX = 0;
+    this.knockbackY = 0;
+    this.knockbackResistance = config.knockbackResistance ?? (this.boss ? 0.92 : this.elite ? 0.58 : Math.min(0.62, Math.max(0.16, (this.r - 10) / 36)));
   }
 
   update(dt) {
@@ -265,63 +268,112 @@ function drawFallbackSlimeShape(ctx, e) {
 }
 
 function drawZombieShape(ctx, e) {
-  const visualScale = e.id === "zombie" || e.type === "zombie" ? 1 : 0.875;
+  const visualScale = e.id === "zombie" || e.type === "zombie" ? 1.08 : 0.88;
   const z = e.r / 14 * visualScale;
-  const walk = Math.sin(e.anim * 1.8);
-  const bob = Math.sin(e.anim * 3.6) * 1.2 * z;
-  const lean = Math.sin(e.anim * 0.8) * 1.8 * z;
+  const walk = Math.sin(e.anim * 2.15);
+  const step = Math.cos(e.anim * 2.15);
+  const bob = Math.abs(step) * -1.5 * z;
+  const sway = Math.sin(e.anim * 1.05) * 2.1 * z;
   const flash = e.flash > 0;
   const skin = flash ? "#ffffff" : zombieSkin(e);
   const dark = flash ? "#dfefff" : "#315436";
   const cloth = flash ? "#ffffff" : zombieCloth(e);
+  const wound = flash ? "#ffffff" : "#b91c1c";
 
   ctx.scale(e.flip || 1, 1);
-  ctx.translate(lean, bob);
+  ctx.translate(sway, bob);
   ctx.fillStyle = "rgba(0,0,0,0.30)";
-  ctx.fillRect(-10 * z, 11 * z, 22 * z, 5 * z);
+  ctx.beginPath();
+  ctx.ellipse(0, 15 * z, 16 * z, 5 * z, 0, 0, TAU);
+  ctx.fill();
 
-  ctx.fillStyle = dark;
-  ctx.fillRect(-8 * z, -2 * z + walk * 2.2 * z, 5 * z, 18 * z);
-  ctx.fillRect(3 * z, -2 * z - walk * 2.2 * z, 5 * z, 18 * z);
-  ctx.fillStyle = "#1b2530";
-  ctx.fillRect(-9 * z, 13 * z + walk * 2.2 * z, 7 * z, 4 * z);
-  ctx.fillRect(2 * z, 13 * z - walk * 2.2 * z, 7 * z, 4 * z);
+  ctx.rotate(Math.sin(e.anim * 0.9) * 0.055);
+  drawZombieLeg(ctx, -6 * z, -1 * z, walk, z, dark);
+  drawZombieLeg(ctx, 5 * z, -1 * z, -walk, z, dark);
 
+  ctx.save();
+  ctx.rotate(Math.sin(e.anim * 1.3) * 0.08);
   ctx.fillStyle = cloth;
-  ctx.fillRect(-11 * z, -14 * z, 22 * z, 25 * z);
-  ctx.fillStyle = "rgba(0,0,0,0.28)";
-  ctx.fillRect(-9 * z, -5 * z, 18 * z, 5 * z);
-  ctx.fillStyle = "#ff4d6d";
-  ctx.fillRect(2 * z, -11 * z, 7 * z, 9 * z);
-  ctx.fillStyle = dark;
-  ctx.fillRect(-12 * z, 5 * z, 7 * z, 5 * z);
-  ctx.fillRect(4 * z, 7 * z, 7 * z, 4 * z);
+  ctx.beginPath();
+  ctx.moveTo(-12 * z, -15 * z);
+  ctx.lineTo(10 * z, -16 * z);
+  ctx.lineTo(13 * z, 9 * z);
+  ctx.lineTo(4 * z, 13 * z);
+  ctx.lineTo(-8 * z, 12 * z);
+  ctx.lineTo(-13 * z, 6 * z);
+  ctx.closePath();
+  ctx.fill();
+  ctx.fillStyle = "rgba(0,0,0,0.22)";
+  ctx.fillRect(-10 * z, -3 * z, 21 * z, 5 * z);
+  ctx.fillStyle = wound;
+  ctx.fillRect(1 * z, -11 * z, 8 * z, 10 * z);
+  ctx.fillStyle = flash ? "#ffffff" : "#26344a";
+  ctx.fillRect(-9 * z, -13 * z, 8 * z, 5 * z);
+  ctx.strokeStyle = flash ? "#ffffff" : "rgba(7,16,13,0.72)";
+  ctx.lineWidth = 1.4 * z;
+  ctx.stroke();
+  ctx.restore();
 
-  ctx.fillStyle = skin;
-  ctx.fillRect(-18 * z, -13 * z + walk * 3.4 * z, 9 * z, 6 * z);
-  ctx.fillRect(9 * z, -14 * z - walk * 3.4 * z, 9 * z, 6 * z);
-  ctx.fillRect(-20 * z, -11 * z + walk * 3.4 * z, 5 * z, 5 * z);
-  ctx.fillRect(15 * z, -12 * z - walk * 3.4 * z, 5 * z, 5 * z);
+  drawZombieArm(ctx, -11 * z, -9 * z, -1, walk, z, skin, dark);
+  drawZombieArm(ctx, 10 * z, -10 * z, 1, -walk, z, skin, dark);
 
-  ctx.translate(Math.sin(e.anim * 1.2) * 1.3 * z, -1.5 * z);
+  ctx.save();
+  ctx.translate(Math.sin(e.anim * 1.45) * 1.6 * z, -2.2 * z);
+  ctx.rotate(Math.sin(e.anim * 1.1) * 0.08);
   ctx.fillStyle = skin;
-  ctx.fillRect(-8 * z, -30 * z, 17 * z, 17 * z);
+  ctx.beginPath();
+  ctx.moveTo(-9 * z, -31 * z);
+  ctx.lineTo(8 * z, -32 * z);
+  ctx.lineTo(11 * z, -19 * z);
+  ctx.lineTo(5 * z, -12 * z);
+  ctx.lineTo(-7 * z, -13 * z);
+  ctx.lineTo(-11 * z, -22 * z);
+  ctx.closePath();
+  ctx.fill();
   ctx.fillStyle = dark;
-  ctx.fillRect(-9 * z, -31 * z, 8 * z, 5 * z);
-  ctx.fillRect(-10 * z, -24 * z, 4 * z, 7 * z);
+  ctx.fillRect(-10 * z, -32 * z, 9 * z, 5 * z);
+  ctx.fillRect(-11 * z, -25 * z, 5 * z, 8 * z);
+  ctx.fillRect(6 * z, -31 * z, 4 * z, 8 * z);
   ctx.fillStyle = "#182018";
-  ctx.fillRect(-4 * z, -24 * z, 3 * z, 3 * z);
-  ctx.fillRect(4 * z, -24 * z, 3 * z, 3 * z);
+  ctx.fillRect(-5 * z, -24 * z, 4 * z, 4 * z);
+  ctx.fillRect(4 * z, -24 * z, 4 * z, 4 * z);
   ctx.fillStyle = "#f3f7ff";
-  ctx.fillRect(4 * z, -25 * z, 2 * z, 2 * z);
-  ctx.fillStyle = "#ff4d6d";
-  ctx.fillRect(-2 * z, -17 * z, 8 * z, 2 * z);
-  ctx.fillRect(6 * z, -20 * z, 3 * z, 4 * z);
+  ctx.fillRect(5 * z, -25 * z, 2 * z, 2 * z);
+  ctx.fillStyle = wound;
+  ctx.fillRect(-1 * z, -17 * z, 8 * z, 2.5 * z);
+  ctx.fillRect(7 * z, -20 * z, 3 * z, 4 * z);
 
   ctx.strokeStyle = flash ? "#ffffff" : "rgba(8,18,14,0.65)";
   ctx.lineWidth = 1.5 * z;
-  ctx.strokeRect(-11 * z, -14 * z, 22 * z, 25 * z);
-  ctx.strokeRect(-8 * z, -30 * z, 17 * z, 17 * z);
+  ctx.stroke();
+  ctx.restore();
+}
+
+function drawZombieLeg(ctx, x, y, phase, z, color) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(phase * 0.18);
+  ctx.fillStyle = color;
+  ctx.fillRect(-3 * z, 0, 6 * z, 17 * z);
+  ctx.fillStyle = "#16202b";
+  ctx.fillRect(-5 * z, 14 * z, 9 * z, 4 * z);
+  ctx.restore();
+}
+
+function drawZombieArm(ctx, x, y, side, phase, z, skin, sleeve) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(side * (0.12 + phase * 0.18));
+  ctx.fillStyle = sleeve;
+  rectDir(ctx, 0, -3 * z, side * 9 * z, 6 * z);
+  ctx.fillStyle = skin;
+  rectDir(ctx, side * 7 * z, -3 * z, side * 10 * z, 6 * z);
+  rectDir(ctx, side * 15 * z, -2 * z, side * 5 * z, 5 * z);
+  ctx.restore();
+}
+
+function rectDir(ctx, x, y, w, h) {
+  ctx.fillRect(Math.min(x, x + w), y, Math.abs(w), h);
 }
 
 function zombieSkin(e) {

@@ -64,7 +64,7 @@ export async function bootGame() {
     if (p.xp < p.xpNeed) return false;
     p.xp -= p.xpNeed;
     p.level++;
-    p.xpNeed = Math.floor(p.xpNeed * 1.22 + 8);
+    p.xpNeed = Math.floor(p.xpNeed * 1.3 + 14 + p.level * 1.6);
     playSfx("level");
     showLevelChoices();
     return true;

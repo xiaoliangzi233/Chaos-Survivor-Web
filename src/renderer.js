@@ -176,7 +176,7 @@ function drawDrones(ctx) {
   if (!w || w.level <= 0) return;
   for (const d of w.drones) {
     if (!inView(d.x, d.y, 60)) continue;
-    drawDrone(ctx, d.x, d.y, d.anim, d.mode === "attack");
+    drawDrone(ctx, d.x, d.y, d.anim, d.mode === "attack", d.energy, w.batteryMax);
   }
 }
 
@@ -290,7 +290,7 @@ function drawDroneBolt(ctx, b) {
   ctx.stroke();
 }
 
-function drawDrone(ctx, x, y, t, attacking) {
+function drawDrone(ctx, x, y, t, attacking, energy = 1, maxEnergy = 1) {
   ctx.save();
   ctx.translate(x, y + Math.sin(t * 9) * 1.5);
   ctx.rotate(Math.sin(t * 3) * 0.1);
@@ -313,6 +313,11 @@ function drawDrone(ctx, x, y, t, attacking) {
     ctx.fillStyle = attacking ? "rgba(119,255,138,0.75)" : "rgba(66,232,255,0.75)";
     ctx.fillRect(sx - 2, -2, 4, 4);
   }
+  const ratio = Math.max(0, Math.min(1, energy / Math.max(1, maxEnergy)));
+  ctx.fillStyle = "rgba(0,0,0,0.55)";
+  ctx.fillRect(-12, 11, 24, 3);
+  ctx.fillStyle = ratio > 0.35 ? "#77ff8a" : "#ff4d6d";
+  ctx.fillRect(-12, 11, 24 * ratio, 3);
   ctx.restore();
 }
 

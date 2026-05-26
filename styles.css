@@ -323,13 +323,15 @@ h2 {
 
 .weapon-carousel {
   display: grid;
-  grid-template-columns: 46px minmax(0, 1fr) 46px;
+  grid-template-columns: 54px minmax(0, 1fr) 54px;
   gap: 12px;
-  align-items: stretch;
+  align-items: center;
 }
 
 .weapon-nav {
-  min-height: 100%;
+  width: 54px;
+  height: 86px;
+  align-self: center;
   border: 1px solid var(--edge);
   border-radius: 4px;
   background: rgba(255, 255, 255, 0.07);
@@ -460,8 +462,13 @@ h2 {
   }
 
   .weapon-carousel {
-    grid-template-columns: 40px minmax(0, 1fr) 40px;
+    grid-template-columns: 42px minmax(0, 1fr) 42px;
     gap: 8px;
+  }
+
+  .weapon-nav {
+    width: 42px;
+    height: 72px;
   }
 
   .weapon-preview {

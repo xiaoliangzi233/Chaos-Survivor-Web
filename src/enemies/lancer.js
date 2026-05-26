@@ -91,8 +91,9 @@ export class Lancer extends BaseEnemy {
     const recover = this.attackState === "recover";
     const z = 1.02;
     const walk = Math.sin(this.anim);
-    const crouch = charge ? 3 : recover ? -1 : 0;
-    const lean = dash ? 7 : charge ? -5 : Math.sin(this.anim * 0.7) * 1.2;
+    const run = Math.cos(this.anim);
+    const crouch = charge ? 3 : recover ? -1 : Math.abs(run) * -1.6;
+    const lean = dash ? 7 : charge ? -5 : 2.2 + Math.sin(this.anim * 0.7) * 1.6;
     const flash = this.flash > 0;
 
     ctx.save();
@@ -103,11 +104,11 @@ export class Lancer extends BaseEnemy {
 
     if (dash) drawDashAfterimage(ctx);
     drawShadow(ctx, z);
-    drawLegs(ctx, z, walk, charge);
-    drawCloak(ctx, z, flash, charge, dash);
+    drawLegs(ctx, z, walk, run, charge, dash);
+    drawCloak(ctx, z, flash, charge, dash, run);
     drawKnifeArm(ctx, z, flash, charge, dash);
-    drawOffhand(ctx, z, flash, walk);
-    drawHead(ctx, z, flash, charge);
+    drawOffhand(ctx, z, flash, walk, dash);
+    drawHead(ctx, z, flash, charge, run);
     drawBladeGlint(ctx, charge, dash);
     ctx.restore();
   }
@@ -152,27 +153,36 @@ function drawShadow(ctx, z) {
   ctx.fill();
 }
 
-function drawLegs(ctx, z, walk, charge) {
-  const bend = charge ? 2.8 : 0;
+function drawLegs(ctx, z, walk, run, charge, dash) {
+  const bend = charge ? 2.8 : dash ? -1 : 0;
+  const stride = charge ? 1.2 : dash ? 1.8 : 3.4;
   ctx.fillStyle = "#1a202c";
-  ctx.fillRect(-8 * z, 4 * z + walk * 2 * z + bend, 6 * z, 17 * z);
-  ctx.fillRect(3 * z, 4 * z - walk * 2 * z + bend, 6 * z, 17 * z);
+  ctx.save();
+  ctx.translate(-6 * z + run * 2.4 * z, 4 * z + walk * stride * z + bend);
+  ctx.rotate(walk * 0.22);
+  ctx.fillRect(-3 * z, 0, 6 * z, 17 * z);
+  ctx.restore();
+  ctx.save();
+  ctx.translate(6 * z - run * 2.4 * z, 4 * z - walk * stride * z + bend);
+  ctx.rotate(-walk * 0.22);
+  ctx.fillRect(-3 * z, 0, 6 * z, 17 * z);
+  ctx.restore();
   ctx.fillStyle = "#0b1019";
-  ctx.fillRect(-10 * z, 18 * z + walk * 2 * z + bend, 9 * z, 4 * z);
-  ctx.fillRect(2 * z, 18 * z - walk * 2 * z + bend, 9 * z, 4 * z);
+  ctx.fillRect(-11 * z + run * 3.2 * z, 18 * z + walk * stride * z + bend, 10 * z, 4 * z);
+  ctx.fillRect(1 * z - run * 3.2 * z, 18 * z - walk * stride * z + bend, 10 * z, 4 * z);
 }
 
-function drawCloak(ctx, z, flash, charge, dash) {
+function drawCloak(ctx, z, flash, charge, dash, run) {
   const cloak = flash ? "#ffffff" : "#2a2035";
   const scarf = flash ? "#ffffff" : "#ff9f6e";
   ctx.fillStyle = cloak;
   ctx.beginPath();
   ctx.moveTo(-11 * z, -15 * z);
   ctx.lineTo(10 * z, -14 * z);
-  ctx.lineTo(14 * z, 11 * z);
-  ctx.lineTo(5 * z, 15 * z);
-  ctx.lineTo(-7 * z, 13 * z);
-  ctx.lineTo(-14 * z, 8 * z);
+  ctx.lineTo(14 * z, 11 * z + Math.abs(run) * 1.5 * z);
+  ctx.lineTo(4 * z, 16 * z);
+  ctx.lineTo(-8 * z, 13 * z + (dash ? 4 * z : 0));
+  ctx.lineTo((-14 - Math.abs(run) * 2) * z, 8 * z);
   ctx.closePath();
   ctx.fill();
   ctx.fillStyle = flash ? "#ffffff" : "#141827";
@@ -210,14 +220,16 @@ function drawKnifeArm(ctx, z, flash, charge, dash) {
   ctx.stroke();
 }
 
-function drawOffhand(ctx, z, flash, walk) {
+function drawOffhand(ctx, z, flash, walk, dash) {
   ctx.fillStyle = flash ? "#ffffff" : "#232a44";
-  ctx.fillRect(-15 * z, -4 * z + walk * z, 9 * z, 5 * z);
+  ctx.fillRect(-15 * z, -4 * z + walk * (dash ? 0.4 : 2) * z, 9 * z, 5 * z);
   ctx.fillStyle = flash ? "#ffffff" : "#ffcf8a";
-  ctx.fillRect(-18 * z, -3 * z + walk * z, 4 * z, 4 * z);
+  ctx.fillRect(-18 * z, -3 * z + walk * (dash ? 0.4 : 2) * z, 4 * z, 4 * z);
 }
 
-function drawHead(ctx, z, flash, charge) {
+function drawHead(ctx, z, flash, charge, run) {
+  ctx.save();
+  ctx.translate(0, Math.abs(run) * -0.7 * z);
   ctx.fillStyle = flash ? "#ffffff" : "#171c2b";
   ctx.beginPath();
   ctx.moveTo(-9 * z, -30 * z);
@@ -242,6 +254,7 @@ function drawHead(ctx, z, flash, charge) {
   ctx.strokeStyle = "rgba(255,207,138,0.7)";
   ctx.lineWidth = 1.5;
   ctx.stroke();
+  ctx.restore();
 }
 
 function drawBladeGlint(ctx, charge, dash) {

@@ -1,7 +1,7 @@
 import { PROJECTILE_LIMIT, TAU, WORLD_SIZE } from "./constants.js";
 import { state, world } from "./state.js";
 import { angleDiff, circleHit, clamp, distSq } from "./utils.js";
-import { damageEnemy, nearestEnemy, queryEnemies } from "./entities.js";
+import { applyKnockback, damageEnemy, nearestEnemy, queryEnemies } from "./entities.js";
 import { burst, pulse, trail } from "./effects.js";
 import { playSfx } from "./audio.js";
 
@@ -9,8 +9,8 @@ export const STARTER_WEAPONS = [
   { id: "arc", icon: "⚡", name: "棱镜电弧", desc: "自动锁定最近敌人，闪电会在附近目标间连续传导。" },
   { id: "ice", icon: "❄", name: "霜晶追踪", desc: "追踪冰晶会持续转向追猎，命中后短暂冻结未死亡目标。" },
   { id: "missile", icon: "◆", name: "核心飞弹", desc: "追踪飞弹命中后产生范围爆炸，适合清理密集怪群。" },
-  { id: "boomerang", icon: "✧", name: "霓虹回旋刃", desc: "远距离飞出后高速回收，往返切割同一条路径上的敌人。" },
-  { id: "drone", icon: "◈", name: "星环无人机", desc: "无人机平时环绕玩家，发现敌人后飞出并发射能量弹。" },
+  { id: "boomerang", icon: "✧", name: "霓虹回旋刃", desc: "远距离飞出后高速回收，往返切割同一路径上的敌人。" },
+  { id: "drone", icon: "◈", name: "星环无人机", desc: "无人机会离身攻击，电量不足时返回玩家身边充电。" },
 ];
 
 export const UPGRADE_DEFS = [
@@ -18,7 +18,7 @@ export const UPGRADE_DEFS = [
   { id: "ice", icon: "❄", name: "霜晶折射", desc: "冰晶数量、伤害、冻结时间和转向能力提升。", apply: () => { activateWeapon("ice"); const w = state.weapons.ice; w.count = Math.min(4, w.count + 1); w.damage += 5; w.turnSpeed += 0.55; w.freezeDuration = Math.min(1.1, w.freezeDuration + 0.12); w.cooldown = Math.max(0.46, w.cooldown * 0.9); } },
   { id: "missile", icon: "◆", name: "飞弹裂变", desc: "核心飞弹爆炸范围和爆炸伤害提高。", apply: () => { activateWeapon("missile"); const w = state.weapons.missile; w.damage += 7; w.explodeDamage += 8; w.explodeRadius += 12; w.cooldown = Math.max(0.92, w.cooldown * 0.9); } },
   { id: "boomerang", icon: "✧", name: "回旋增幅", desc: "霓虹回旋刃数量、伤害和飞行距离提高。", apply: () => { activateWeapon("boomerang"); const w = state.weapons.boomerang; w.count = Math.min(4, w.count + 1); w.damage += 5; w.returnAfter = Math.min(0.9, w.returnAfter + 0.08); } },
-  { id: "drone", icon: "◈", name: "无人机编队", desc: "增加无人机数量，并提高无人机弹幕伤害。", apply: () => { activateWeapon("drone"); const w = state.weapons.drone; w.count = Math.min(5, w.count + 1); w.bulletDamage += 3; w.fireCooldown = Math.max(0.24, w.fireCooldown * 0.92); } },
+  { id: "drone", icon: "◈", name: "无人机编队", desc: "增加无人机数量，提高弹幕伤害和电池容量。", apply: () => { activateWeapon("drone"); const w = state.weapons.drone; w.count = Math.min(5, w.count + 1); w.bulletDamage += 3; w.batteryMax += 12; w.fireCooldown = Math.max(0.24, w.fireCooldown * 0.92); } },
   { id: "pulse", icon: "◎", name: "脉冲新星", desc: "周期性范围爆发更强、更大。", apply: () => { activateWeapon("pulse"); const w = state.weapons.pulse; w.damage += 9; w.radius += 16; w.cooldown = Math.max(1.4, w.cooldown * 0.9); } },
   { id: "speed", icon: "→", name: "相位步", desc: "移动速度提高，拾取半径扩大。", apply: () => { state.player.speed += 18; state.player.magnet += 10; } },
   { id: "guard", icon: "▣", name: "晶盾增幅", desc: "最大生命提高，并立即恢复生命。", apply: () => { state.player.maxHp += 18; state.player.hp = Math.min(state.player.maxHp, state.player.hp + 42); } },
@@ -51,12 +51,15 @@ function updateArcWeapon(dt) {
   const segments = [];
   let source = { x: p.x, y: p.y };
   let target = first;
-  let damage = scaled(w.damage);
+  let damage = w.damage;
 
   for (let i = 0; i < w.chains && target; i++) {
     visited.add(target);
+    const dx = target.x - source.x;
+    const dy = target.y - source.y;
     segments.push({ x1: source.x, y1: source.y, x2: target.x, y2: target.y, seed: Math.random() * 999 });
     damageEnemy(target, damage, target.x, target.y);
+    applyKnockback(target, dx, dy, 70);
     burst(target.x, target.y, 6, "#42e8ff", 150);
     source = target;
     damage *= w.falloff;
@@ -100,6 +103,7 @@ function updateIceWeapon(dt) {
       radius: 5,
       life: 2.4,
       freezeDuration: w.freezeDuration,
+      knockback: 92,
     });
   }
   playSfx("shoot");
@@ -118,9 +122,11 @@ function updateMissileWeapon(dt) {
     turnSpeed: w.turnSpeed,
     pierce: 1,
     radius: 6,
-    life: 3.0,
+    life: 18,
+    noLifeExpire: true,
     explodeRadius: w.explodeRadius,
     explodeDamage: w.explodeDamage,
+    knockback: 145,
   });
   playSfx("shoot");
 }
@@ -142,6 +148,7 @@ function updateBoomerangWeapon(dt) {
       radius: 7,
       speed: w.speed,
       life: 2.35,
+      knockback: 118,
     });
   }
   playSfx("shoot");
@@ -162,8 +169,23 @@ function updateDroneWeapon(dt) {
     const target = nearestEnemy(d.x, d.y, w.acquireRange);
     d.fireTimer = Math.max(0, d.fireTimer - dt);
     d.anim += dt;
+    d.energy = Math.min(w.batteryMax, d.energy ?? w.batteryMax);
 
-    if (target) {
+    const shouldRecharge = !target || d.energy < w.shotCost || d.mode === "recharge";
+    if (shouldRecharge) {
+      d.mode = d.energy >= w.batteryMax && target ? "attack" : "recharge";
+      d.targetId = null;
+      moveDrone(d, orbitX, orbitY, dt, 460);
+      if (distSq(d.x, d.y, orbitX, orbitY) < 28 * 28) {
+        d.energy = Math.min(w.batteryMax, d.energy + w.rechargeRate * dt);
+      }
+      if (d.energy < w.batteryMax || !target) {
+        trail(d.x, d.y, d.prevX, d.prevY, "#ffd166", 5);
+        continue;
+      }
+    }
+
+    if (target && d.energy >= w.shotCost) {
       d.mode = "attack";
       d.targetId = target;
       const desiredX = target.x - Math.cos(orbitAngle) * 92;
@@ -171,15 +193,12 @@ function updateDroneWeapon(dt) {
       moveDrone(d, desiredX, desiredY, dt, 520);
       if (d.fireTimer <= 0 && distSq(d.x, d.y, target.x, target.y) <= w.attackRange * w.attackRange) {
         d.fireTimer = w.fireCooldown;
+        d.energy = Math.max(0, d.energy - w.shotCost);
         const a = Math.atan2(target.y - d.y, target.x - d.x);
         fireDroneBullet(d.x, d.y, a, w);
         world.weaponFx.push({ kind: "muzzle", x: d.x, y: d.y, angle: a, life: 0.1, maxLife: 0.1, color: "#77ff8a" });
         playSfx("shoot");
       }
-    } else {
-      d.mode = "orbit";
-      d.targetId = null;
-      moveDrone(d, orbitX, orbitY, dt, 440);
     }
 
     trail(d.x, d.y, d.prevX, d.prevY, d.mode === "attack" ? "#77ff8a" : "#ffd166", 5);
@@ -197,11 +216,13 @@ function syncDrones(w) {
       prevY: p.y,
       mode: "orbit",
       fireTimer: Math.random() * w.fireCooldown,
+      energy: w.batteryMax,
       anim: Math.random() * TAU,
       targetId: null,
     });
   }
   if (w.drones.length > w.count) w.drones.length = w.count;
+  for (const d of w.drones) d.energy = Math.min(w.batteryMax, d.energy ?? w.batteryMax);
 }
 
 function moveDrone(d, x, y, dt, speed) {
@@ -224,7 +245,7 @@ function fireDroneBullet(x, y, angle, w) {
     vy: Math.sin(angle) * speed,
     speed,
     angle,
-    damage: scaled(w.bulletDamage),
+    damage: w.bulletDamage,
     pierce: 1,
     r: 4,
     life: 0.95,
@@ -240,6 +261,7 @@ function fireDroneBullet(x, y, angle, w) {
     explodeRadius: 0,
     explodeDamage: 0,
     freezeDuration: 0,
+    knockback: 86,
     hitIds: new Set(),
     spin: Math.random() * TAU,
     trailTimer: 0,
@@ -251,7 +273,10 @@ function updatePulseWeapon(dt) {
   if (!tickWeapon(w, dt)) return;
   const hits = [];
   queryEnemies(state.player.x, state.player.y, w.radius, hits);
-  for (const e of hits) damageEnemy(e, scaled(w.damage), e.x, e.y);
+  for (const e of hits) {
+    damageEnemy(e, w.damage, e.x, e.y);
+    applyKnockback(e, e.x - state.player.x, e.y - state.player.y, 105);
+  }
   pulse(state.player.x, state.player.y, w.radius, "#77ff8a", 0.34);
   world.weaponFx.push({ kind: "pulse", x: state.player.x, y: state.player.y, radius: w.radius, life: 0.32, maxLife: 0.32, color: "#77ff8a" });
   playSfx("explode");
@@ -280,7 +305,7 @@ function fireProjectile(angle, w, opt) {
     vy: Math.sin(angle) * speed,
     speed,
     angle,
-    damage: scaled(w.damage),
+    damage: w.damage,
     pierce: opt.pierce,
     r: opt.radius,
     life: opt.life,
@@ -294,8 +319,10 @@ function fireProjectile(angle, w, opt) {
     returnSpeed: opt.returnSpeed || 1,
     returnTimer: 0,
     explodeRadius: opt.explodeRadius || 0,
-    explodeDamage: scaled(opt.explodeDamage || 0),
+    explodeDamage: opt.explodeDamage || 0,
     freezeDuration: opt.freezeDuration || 0,
+    noLifeExpire: opt.noLifeExpire || false,
+    knockback: opt.knockback || 80,
     hitIds: new Set(),
     spin: Math.random() * TAU,
     trailTimer: 0,
@@ -328,6 +355,7 @@ function updateProjectiles(dt) {
       b.hitIds.add(e);
       b.pierce--;
       damageEnemy(e, b.damage, b.x, b.y);
+      applyKnockback(e, b.vx, b.vy, b.knockback);
       if (b.freezeDuration > 0 && !e.dead && !e.boss) e.freezeTimer = Math.max(e.freezeTimer || 0, b.freezeDuration);
       burst(b.x, b.y, b.shape === "ice" ? 12 : 8, b.color, b.shape === "missile" ? 220 : 170);
       world.weaponFx.push({ kind: b.shape === "ice" ? "iceHit" : "hit", x: b.x, y: b.y, life: 0.18, maxLife: 0.18, color: b.color });
@@ -339,7 +367,8 @@ function updateProjectiles(dt) {
       }
     }
 
-    if (b.life <= 0 || b.pierce <= 0 || Math.abs(b.x) > half || Math.abs(b.y) > half) world.projectiles.splice(i, 1);
+    const expired = !b.noLifeExpire && b.life <= 0;
+    if (expired || b.pierce <= 0 || Math.abs(b.x) > half || Math.abs(b.y) > half) world.projectiles.splice(i, 1);
   }
 }
 
@@ -367,8 +396,11 @@ function explode(b) {
   queryEnemies(b.x, b.y, b.explodeRadius, hits);
   for (const e of hits) {
     if (b.hitIds.has(e)) continue;
-    const falloff = clamp(1 - Math.hypot(e.x - b.x, e.y - b.y) / b.explodeRadius, 0.18, 1);
+    const dx = e.x - b.x;
+    const dy = e.y - b.y;
+    const falloff = clamp(1 - Math.hypot(dx, dy) / b.explodeRadius, 0.18, 1);
     damageEnemy(e, b.explodeDamage * falloff, b.x, b.y);
+    applyKnockback(e, dx, dy, 165 * falloff);
   }
   pulse(b.x, b.y, b.explodeRadius, b.color, 0.3);
   world.weaponFx.push({ kind: "explosion", x: b.x, y: b.y, radius: b.explodeRadius, life: 0.38, maxLife: 0.38, color: b.color, seed: Math.random() * 999 });
@@ -380,8 +412,4 @@ function updateWeaponFx(dt) {
     fx.life -= dt;
     if (fx.life <= 0) world.weaponFx.splice(i, 1);
   }
-}
-
-function scaled(value) {
-  return value;
 }

@@ -1,12 +1,52 @@
 import { WORLD_SIZE, TAU } from "./constants.js";
+import { state } from "./state.js";
 import { hexToRgba, mulberry32 } from "./utils.js";
+
+const STATIC_CACHE_SCALE = 0.5;
+const PROP_LAYER_FLOOR = "floor";
+const PROP_LAYER_PROP = "prop";
+
+const KEY_PROP_KINDS = new Set([
+  "reactorCore",
+  "cargoLift",
+  "commandConsole",
+  "containmentChamber",
+  "cryoArray",
+  "serverWall",
+  "largeGenerator",
+  "leakingPipeVent",
+  "flickerBeacon",
+]);
+
+const RECTANGULAR_PROP_KINDS = new Set([
+  "labBench",
+  "serverCabinet",
+  "containmentChamber",
+  "cryoArray",
+  "observationWindow",
+  "largeGenerator",
+  "commandConsole",
+  "serverWall",
+  "cargoLift",
+  "deconGate",
+  "terminal",
+  "brokenRack",
+  "crateStack",
+  "fallenMonitor",
+  "surgicalTray",
+  "hazardBarrel",
+  "looseCanister",
+  "brokenRobotArm",
+  "leakingPipeVent",
+  "flickerBeacon",
+]);
 
 const LAB_PALETTE = {
   base: "#071018",
   dark: "#03070d",
-  floor: ["#111a22", "#151f29", "#18252f", "#0e171f"],
-  roomFloor: ["#18232b", "#1b2933", "#202f38", "#142028"],
-  corridor: ["#101922", "#13202a", "#162531"],
+  floor: ["#101922", "#121d26", "#15222b", "#0e171f"],
+  roomFloor: ["#15212a", "#172630", "#1a2a34", "#111c24"],
+  corridor: ["#0f1821", "#111d26", "#14232d"],
   line: "#7dd3fc",
   accent: ["#7dd3fc", "#72ffb4", "#ffd166", "#ff7a1a"],
   warning: "#ffd166",
@@ -30,19 +70,20 @@ export function generateMap() {
   for (const corridor of corridors) addCorridorTiles(rng, corridor, tiles, floorDecals, props, energyLines, cableRuns);
   addPerimeterServiceLines(rng, half, props, cableRuns, energyLines, fogBanks);
   addRandomWear(rng, tiles, floorDecals);
+  const doors = createDoorways(rooms, corridors);
 
-  return { tileSize, palette: LAB_PALETTE, rooms, corridors, tiles, props, energyLines, floorDecals, cableRuns, fogBanks };
+  const map = { tileSize, palette: LAB_PALETTE, rooms, corridors, doors, tiles, props, energyLines, floorDecals, cableRuns, fogBanks };
+  finalizeMapLayers(map);
+  return map;
 }
 
 export function drawMap(ctx, map, camX, camY, viewW, viewH, time) {
   if (!map) return;
-  drawBase(ctx, map, camX, camY, viewW, viewH, time);
-  drawTiles(ctx, map, camX, camY, viewW, viewH, time);
-  drawFloorDecals(ctx, map, camX, camY, viewW, viewH, time);
-  drawCableRuns(ctx, map, camX, camY, viewW, viewH, time);
+  ensureStaticMapCache(map);
+  drawStaticMapCache(ctx, map, camX, camY, viewW, viewH);
+  drawDynamicAtmosphere(ctx, map, camX, camY, viewW, viewH, time);
   drawEnergyLines(ctx, map, camX, camY, viewW, viewH, time);
-  drawRoomBorders(ctx, map, camX, camY, viewW, viewH);
-  drawProps(ctx, map, camX, camY, viewW, viewH, time);
+  drawDynamicProps(ctx, map, camX, camY, viewW, viewH, time);
   drawFog(ctx, map, camX, camY, viewW, viewH, time);
 }
 
@@ -82,6 +123,37 @@ function createCorridors(rooms) {
     corridors.push({ x: cx - 90, y: Math.min(cy, ry), w: 180, h: Math.abs(cy - ry), axis: "v" });
   }
   return corridors.filter((c) => c.w > 0 && c.h > 0);
+}
+
+function createDoorways(rooms, corridors) {
+  const doors = [];
+  for (const room of rooms) {
+    const cx = room.x + room.w / 2;
+    const cy = room.y + room.h / 2;
+    for (const corridor of corridors) {
+      const vertical = corridor.axis === "v";
+      if (vertical) {
+        const x = corridor.x + corridor.w / 2;
+        if (x < room.x || x > room.x + room.w) continue;
+        if (Math.abs(corridor.y - (room.y + room.h)) < 6 || Math.abs(corridor.y + corridor.h - room.y) < 6 || (cy >= corridor.y && cy <= corridor.y + corridor.h)) {
+          doors.push({ x, y: cy < corridor.y ? room.y + room.h : room.y, horizontal: true, w: 146, zone: room.zone });
+        }
+      } else {
+        const y = corridor.y + corridor.h / 2;
+        if (y < room.y || y > room.y + room.h) continue;
+        if (Math.abs(corridor.x - (room.x + room.w)) < 6 || Math.abs(corridor.x + corridor.w - room.x) < 6 || (cx >= corridor.x && cx <= corridor.x + corridor.w)) {
+          doors.push({ x: cx < corridor.x ? room.x + room.w : room.x, y, horizontal: false, w: 146, zone: room.zone });
+        }
+      }
+    }
+  }
+  const seen = new Set();
+  return doors.filter((d) => {
+    const key = `${Math.round(d.x / 24)},${Math.round(d.y / 24)},${d.horizontal}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  }).slice(0, 42);
 }
 
 function addRoomTiles(rng, room, tiles, decals, props, energyLines, cables, fogBanks) {
@@ -135,12 +207,14 @@ function pickTileSpan(rng, zone) {
 function createLabTile(rng, x, y, w, h, zone, corridor) {
   const floor = corridor ? LAB_PALETTE.corridor : zone === "reactor" ? LAB_PALETTE.roomFloor : LAB_PALETTE.floor;
   const accent = zone === "bio" ? "#72ffb4" : zone === "cryo" ? "#7dd3fc" : zone === "control" ? "#ffd166" : LAB_PALETTE.accent[Math.floor(rng() * LAB_PALETTE.accent.length)];
+  const material = pickTileMaterial(rng, zone, corridor);
   return {
     x, y, w, h, zone,
+    material,
     color: floor[Math.floor(rng() * floor.length)],
     accent,
-    panel: rng() < (corridor ? 0.78 : 0.62),
-    grate: rng() < (zone === "service" ? 0.28 : 0.12),
+    panel: rng() < (corridor ? 0.86 : 0.76),
+    grate: material === "utilityGrate" || rng() < (zone === "service" ? 0.22 : 0.06),
     crack: rng() < 0.2,
     stain: rng() < 0.32,
     scuff: rng(),
@@ -152,6 +226,15 @@ function createLabTile(rng, x, y, w, h, zone, corridor) {
     wear: rng(),
     detailKind: Math.floor(rng() * 6),
   };
+}
+
+function pickTileMaterial(rng, zone, corridor) {
+  if (corridor) return rng() < 0.55 ? "accessPlate" : "utilityGrate";
+  if (zone === "service") return rng() < 0.5 ? "utilityGrate" : "accessPlate";
+  if (zone === "reactor") return rng() < 0.5 ? "sealedPanel" : "labComposite";
+  if (zone === "storage") return rng() < 0.42 ? "accessPlate" : "sealedPanel";
+  if (zone === "bio" || zone === "cryo") return rng() < 0.58 ? "labComposite" : "sealedPanel";
+  return rng() < 0.48 ? "sealedPanel" : "accessPlate";
 }
 
 function maybeAddRoomDecal(rng, x, y, w, h, zone, decals) {
@@ -208,8 +291,47 @@ function addFixedRoomProps(rng, room, props, decals, energyLines, cables, fogBan
     props.push(createProp(rng, room.x + room.w - 78, cy, "deconGate", 42 + rng() * 8, accent, Math.PI / 2));
   }
 
+  addAbandonedLabDetails(rng, room, props, decals, fogBanks, accent);
+
   if (rng() < 0.7) cables.push(createCable(rng, room.x + 60, cy, true, accent, room.w - 120));
   if (rng() < 0.55) cables.push(createCable(rng, cx, room.y + 60, false, accent, room.h - 120));
+}
+
+function addAbandonedLabDetails(rng, room, props, decals, fogBanks, accent) {
+  const left = room.x + room.w * 0.22;
+  const right = room.x + room.w * 0.78;
+  const top = room.y + room.h * 0.24;
+  const mid = room.y + room.h * 0.52;
+  const bottom = room.y + room.h * 0.76;
+
+  if (room.zone === "bio" || room.zone === "cryo") {
+    props.push(createProp(rng, left, bottom, "looseCanister", 22 + rng() * 8, accent, rng() * TAU));
+    props.push(createProp(rng, right, top, "surgicalTray", 28 + rng() * 8, "#9aa7b4", rng() < 0.5 ? 0 : Math.PI / 2));
+    props.push(createDynamicProp(rng, right, bottom, "steamLeak", 30 + rng() * 10, accent, rng() * TAU));
+    decals.push(createDecal(rng, left + 44, bottom + 10, "spill", accent, rng() * TAU, 80, 38));
+  } else if (room.zone === "control") {
+    props.push(createProp(rng, left, bottom, "fallenMonitor", 30 + rng() * 8, "#7dd3fc", -0.25 + rng() * 0.5));
+    props.push(createProp(rng, right, mid, "brokenRobotArm", 34 + rng() * 8, "#9aa7b4", rng() * TAU));
+    props.push(createDynamicProp(rng, room.x + room.w * 0.52, bottom, "flickerBeacon", 20 + rng() * 6, "#ffd166", 0));
+  } else if (room.zone === "storage") {
+    props.push(createProp(rng, left, top, "hazardBarrel", 28 + rng() * 8, "#ff7a1a", rng() * TAU));
+    props.push(createProp(rng, right, bottom, "looseCanister", 24 + rng() * 8, "#72ffb4", rng() * TAU));
+    props.push(createDynamicProp(rng, room.x + room.w * 0.48, top, "swingingCable", 34 + rng() * 12, "#64748b", rng() * TAU));
+  } else if (room.zone === "service") {
+    props.push(createProp(rng, left, mid, "leakingPipeVent", 36 + rng() * 10, "#9aa7b4", rng() < 0.5 ? 0 : Math.PI / 2));
+    props.push(createDynamicProp(rng, right, top, "swingingCable", 30 + rng() * 12, "#64748b", rng() * TAU));
+    props.push(createDynamicProp(rng, right, bottom, "steamLeak", 28 + rng() * 10, accent, rng() * TAU));
+  } else if (room.zone === "reactor") {
+    props.push(createProp(rng, left, bottom, "hazardBarrel", 26 + rng() * 8, "#ff7a1a", rng() * TAU));
+    props.push(createDynamicProp(rng, right, top, "flickerBeacon", 22 + rng() * 6, "#ffd166", 0));
+  } else {
+    props.push(createProp(rng, left, top, "fallenMonitor", 28 + rng() * 8, accent, rng() * TAU));
+    props.push(createDynamicProp(rng, right, bottom, "steamLeak", 28 + rng() * 10, accent, rng() * TAU));
+  }
+
+  if (rng() < 0.55) {
+    fogBanks.push(createFog(room.x + room.w * (0.25 + rng() * 0.5), room.y + room.h * (0.25 + rng() * 0.5), 120 + rng() * 110, 42 + rng() * 38, accent, 0.018));
+  }
 }
 
 function addPerimeterServiceLines(rng, half, props, cables, energyLines, fogBanks) {
@@ -247,6 +369,10 @@ function createProp(rng, x, y, kind, size, color, rot = rng() * TAU) {
   return { x, y, kind, size, color, alt: LAB_PALETTE.accent[Math.floor(rng() * LAB_PALETTE.accent.length)], phase: rng() * TAU, rot };
 }
 
+function createDynamicProp(rng, x, y, kind, size, color, rot = rng() * TAU) {
+  return { ...createProp(rng, x, y, kind, size, color, rot), dynamicDecor: true };
+}
+
 function createDecal(rng, x, y, kind, color, rot = 0, w = 70, h = 40) {
   return { x, y, kind, w: Math.max(18, w * (0.7 + rng() * 0.5)), h: Math.max(12, h * (0.75 + rng() * 0.5)), color, phase: rng() * TAU, rot };
 }
@@ -270,14 +396,229 @@ function createFog(x, y, rx, ry, color, alpha) {
   return { x, y, rx, ry, color, alpha, phase: Math.random() * TAU };
 }
 
-function drawBase(ctx, map, camX, camY, viewW, viewH, time) {
+function finalizeMapLayers(map) {
+  const floorFootprints = [];
+  map.floorDecals = filterFloorItems(map.floorDecals || [], floorFootprints, getFloorDecalPriority, getFloorFootprint);
+  map.cableRuns = filterFloorItems(map.cableRuns || [], floorFootprints, () => 2, getCableFootprint);
+  map.props = filterPropItems(map.props || []);
+}
+
+function filterFloorItems(items, acceptedFootprints, priorityFn, footprintFn) {
+  return [...items]
+    .map((item, index) => ({ item, index }))
+    .sort((a, b) => priorityFn(b.item) - priorityFn(a.item) || a.index - b.index)
+    .reduce((accepted, entry) => {
+      entry.item.layer = PROP_LAYER_FLOOR;
+      const footprint = footprintFn(entry.item);
+      if (!footprint || acceptedFootprints.some((other) => footprintsOverlap(footprint, other, 8))) return accepted;
+      acceptedFootprints.push(footprint);
+      accepted.push(entry.item);
+      return accepted;
+    }, []);
+}
+
+function filterPropItems(props) {
+  const acceptedFootprints = [];
+  return [...props]
+    .map((prop, index) => ({ prop: enrichPropLayer(prop), index }))
+    .sort((a, b) => getPropPriority(b.prop) - getPropPriority(a.prop) || a.index - b.index)
+    .reduce((accepted, entry) => {
+      const footprint = getPropFootprint(entry.prop);
+      if (!footprint || acceptedFootprints.some((other) => footprintsOverlap(footprint, other, 12))) return accepted;
+      acceptedFootprints.push(footprint);
+      accepted.push(entry.prop);
+      return accepted;
+    }, [])
+    .sort(comparePropsForDraw);
+}
+
+function enrichPropLayer(prop) {
+  prop.layer = PROP_LAYER_PROP;
+  prop.height = getPropHeight(prop);
+  prop.sortOffset = getPropSortOffset(prop);
+  return prop;
+}
+
+function getFloorDecalPriority(item) {
+  if (item.kind === "reactorRing") return 6;
+  if (item.kind === "hatch" || item.kind === "grate") return 5;
+  if (item.kind === "arrow") return 4;
+  if (item.kind === "spill") return 3;
+  if (item.kind === "scorch") return 2;
+  return 1;
+}
+
+function getPropPriority(prop) {
+  if (KEY_PROP_KINDS.has(prop.kind)) return 5;
+  if (prop.kind === "wallLight" || prop.kind === "overheadLightRig") return 4;
+  if (prop.dynamicDecor) return 4;
+  if (prop.kind === "fallenMonitor" || prop.kind === "surgicalTray" || prop.kind === "hazardBarrel" || prop.kind === "looseCanister" || prop.kind === "brokenRobotArm") return 3;
+  if (isStaticProp(prop)) return 3;
+  return 1;
+}
+
+function getFloorFootprint(item) {
+  return {
+    x: item.x - item.w * 0.5,
+    y: item.y - item.h * 0.5,
+    w: item.w,
+    h: item.h,
+  };
+}
+
+function getCableFootprint(cable) {
+  const half = cable.length * 0.5;
+  const bendPad = cable.bend ? 42 : 0;
+  return cable.horizontal
+    ? { x: cable.x - half - 8, y: cable.y - 9, w: cable.length + 16, h: 18 + bendPad }
+    : { x: cable.x - 9, y: cable.y - half - 8, w: 18 + bendPad, h: cable.length + 16 };
+}
+
+function getPropFootprint(prop) {
+  const rawDims = getPropFootprintSize(prop);
+  const minSpan = prop.size * 2;
+  const dims = {
+    w: Math.max(rawDims.w, minSpan),
+    h: Math.max(rawDims.h, minSpan),
+  };
+  const c = Math.abs(Math.cos(prop.rot || 0));
+  const s = Math.abs(Math.sin(prop.rot || 0));
+  const w = dims.w * c + dims.h * s;
+  const h = dims.w * s + dims.h * c;
+  return { x: prop.x - w * 0.5, y: prop.y - h * 0.5, w, h };
+}
+
+function getPropFootprintSize(prop) {
+  const s = prop.size;
+  if (prop.kind === "reactorCore") return { w: s * 2.1, h: s * 2.1 };
+  if (prop.kind === "labBench") return { w: s * 2.9, h: s * 1.22 };
+  if (prop.kind === "containmentChamber" || prop.kind === "cryoArray") return { w: s * 3.08, h: s * 1.62 };
+  if (prop.kind === "observationWindow") return { w: s * 3.25, h: s * 1.08 };
+  if (prop.kind === "largeGenerator") return { w: s * 2.55, h: s * 1.42 };
+  if (prop.kind === "commandConsole") return { w: s * 3.25, h: s * 1.18 };
+  if (prop.kind === "serverWall") return { w: s * 1.62, h: s * 3.25 };
+  if (prop.kind === "cargoLift") return { w: s * 2.55, h: s * 1.9 };
+  if (prop.kind === "deconGate") return { w: s * 1.36, h: s * 2.88 };
+  if (prop.kind === "overheadLightRig") return { w: s * 3.35, h: s * 0.72 };
+  if (prop.kind === "wallLight") return { w: s * 2.6, h: s * 0.86 };
+  if (prop.kind === "terminal") return { w: s * 1.95, h: s * 1.26 };
+  if (prop.kind === "serverCabinet") return { w: s * 1.36, h: s * 2.56 };
+  if (prop.kind === "specimenTank" || prop.kind === "cryoPod") return { w: s * 1.16, h: s * 1.9 };
+  if (prop.kind === "bioCanister" || prop.kind === "coolantTank") return { w: s * 1.14, h: s * 1.86 };
+  if (prop.kind === "hangingCable") return { w: s * 0.78, h: s * 1.9 };
+  if (prop.kind === "ventPipe") return { w: s * 2.9, h: s * 0.72 };
+  if (prop.kind === "ceilingFanShadow") return { w: s * 1.78, h: s * 1.78 };
+  if (prop.kind === "brokenGlass") return { w: s * 2.3, h: s * 0.9 };
+  if (prop.kind === "warningSign") return { w: s * 2.2, h: s * 1.1 };
+  if (prop.kind === "fallenMonitor") return { w: s * 2.2, h: s * 1.05 };
+  if (prop.kind === "surgicalTray") return { w: s * 2.0, h: s * 1.1 };
+  if (prop.kind === "hazardBarrel" || prop.kind === "looseCanister") return { w: s * 1.25, h: s * 1.25 };
+  if (prop.kind === "brokenRobotArm") return { w: s * 2.15, h: s * 1.25 };
+  if (prop.kind === "leakingPipeVent") return { w: s * 2.45, h: s * 0.95 };
+  if (prop.kind === "steamLeak") return { w: s * 1.45, h: s * 1.05 };
+  if (prop.kind === "swingingCable") return { w: s * 0.95, h: s * 2.25 };
+  if (prop.kind === "flickerBeacon") return { w: s * 1.15, h: s * 1.15 };
+  return { w: s * 1.8, h: s * 1.2 };
+}
+
+function getPropHeight(prop) {
+  if (prop.kind === "wallLight" || prop.kind === "overheadLightRig" || prop.kind === "hangingCable") return prop.size * 1.2;
+  if (prop.kind === "reactorCore" || prop.kind === "serverWall") return prop.size * 1.1;
+  if (prop.kind === "brokenGlass" || prop.kind === "ceilingFanShadow" || prop.kind === "cargoLift") return prop.size * 0.18;
+  if (prop.kind === "steamLeak") return prop.size * 0.1;
+  if (prop.kind === "swingingCable") return prop.size * 1.25;
+  if (prop.kind === "flickerBeacon") return prop.size * 0.55;
+  if (prop.kind === "terminal" || prop.kind === "warningSign") return prop.size * 0.46;
+  return prop.size * 0.72;
+}
+
+function getPropSortOffset(prop) {
+  if (prop.kind === "wallLight" || prop.kind === "overheadLightRig" || prop.kind === "hangingCable" || prop.kind === "swingingCable") return -prop.size * 0.8;
+  if (prop.kind === "serverWall" || prop.kind === "observationWindow" || prop.kind === "deconGate") return -prop.size * 0.35;
+  return prop.size * 0.35;
+}
+
+function footprintsOverlap(a, b, padding = 0) {
+  return a.x < b.x + b.w + padding &&
+    a.x + a.w + padding > b.x &&
+    a.y < b.y + b.h + padding &&
+    a.y + a.h + padding > b.y;
+}
+
+function comparePropsForDraw(a, b) {
+  const layerA = a.layer === PROP_LAYER_FLOOR ? 0 : 1;
+  const layerB = b.layer === PROP_LAYER_FLOOR ? 0 : 1;
+  return layerA - layerB || (a.y + (a.sortOffset || 0)) - (b.y + (b.sortOffset || 0)) || a.x - b.x;
+}
+
+function ensureStaticMapCache(map) {
+  if (map.staticCache) return;
+  const size = Math.ceil(WORLD_SIZE * STATIC_CACHE_SCALE);
+  const canvas = document.createElement("canvas");
+  canvas.width = size;
+  canvas.height = size;
+  const cctx = canvas.getContext("2d", { alpha: false });
+  cctx.imageSmoothingEnabled = false;
+  cctx.save();
+  cctx.scale(STATIC_CACHE_SCALE, STATIC_CACHE_SCALE);
+  cctx.translate(WORLD_SIZE / 2, WORLD_SIZE / 2);
+  drawBase(cctx, map, -WORLD_SIZE / 2, -WORLD_SIZE / 2, WORLD_SIZE, WORLD_SIZE, 0, true);
+  drawTiles(cctx, map, -WORLD_SIZE / 2, -WORLD_SIZE / 2, WORLD_SIZE, WORLD_SIZE, 0);
+  drawFloorDecals(cctx, map, -WORLD_SIZE / 2, -WORLD_SIZE / 2, WORLD_SIZE, WORLD_SIZE, 0);
+  drawCableRuns(cctx, map, -WORLD_SIZE / 2, -WORLD_SIZE / 2, WORLD_SIZE, WORLD_SIZE, 0, true);
+  drawRoomShadows(cctx, map, -WORLD_SIZE / 2, -WORLD_SIZE / 2, WORLD_SIZE, WORLD_SIZE);
+  drawRoomBorders(cctx, map, -WORLD_SIZE / 2, -WORLD_SIZE / 2, WORLD_SIZE, WORLD_SIZE);
+  drawDoorways(cctx, map, -WORLD_SIZE / 2, -WORLD_SIZE / 2, WORLD_SIZE, WORLD_SIZE);
+  drawStaticProps(cctx, map, -WORLD_SIZE / 2, -WORLD_SIZE / 2, WORLD_SIZE, WORLD_SIZE);
+  cctx.restore();
+  map.staticCache = { canvas, scale: STATIC_CACHE_SCALE };
+}
+
+function drawStaticMapCache(ctx, map, camX, camY, viewW, viewH) {
+  const cache = map.staticCache;
+  if (!cache) return;
+  const sx = (camX + WORLD_SIZE / 2) * cache.scale;
+  const sy = (camY + WORLD_SIZE / 2) * cache.scale;
+  const sw = viewW * cache.scale;
+  const sh = viewH * cache.scale;
+  ctx.save();
+  ctx.imageSmoothingEnabled = false;
+  ctx.drawImage(cache.canvas, sx, sy, sw, sh, camX, camY, viewW, viewH);
+  ctx.restore();
+}
+
+function drawDynamicAtmosphere(ctx, map, camX, camY, viewW, viewH, time) {
+  const mood = waveMood();
+  if (mood.alpha <= 0) return;
+  ctx.fillStyle = hexToRgba(mood.color, mood.alpha + Math.sin(time * mood.speed) * mood.pulse);
+  ctx.fillRect(camX, camY, viewW, viewH);
+  if (mood.scan > 0) {
+    ctx.strokeStyle = hexToRgba(mood.color, mood.scan);
+    ctx.lineWidth = 2;
+    const y = camY + ((time * 72) % Math.max(1, viewH));
+    ctx.beginPath();
+    ctx.moveTo(camX, y);
+    ctx.lineTo(camX + viewW, y);
+    ctx.stroke();
+  }
+}
+
+function waveMood() {
+  const wave = state.wave || 1;
+  if (state.bossWaveActive || wave >= 16) return { color: "#ff4d6d", alpha: 0.045, pulse: 0.018, speed: 2.4, scan: 0.12 };
+  if (wave >= 11) return { color: "#ffd166", alpha: 0.028, pulse: 0.012, speed: 1.8, scan: 0.06 };
+  if (wave >= 6) return { color: "#7dd3fc", alpha: 0.02, pulse: 0.008, speed: 1.2, scan: 0.035 };
+  return { color: "#7dd3fc", alpha: 0.012, pulse: 0.004, speed: 0.8, scan: 0 };
+}
+
+function drawBase(ctx, map, camX, camY, viewW, viewH, time, cached = false) {
   const g = ctx.createLinearGradient(camX, camY, camX + viewW, camY + viewH);
   g.addColorStop(0, map.palette.dark);
   g.addColorStop(0.5, map.palette.base);
   g.addColorStop(1, "#050910");
   ctx.fillStyle = g;
   ctx.fillRect(camX, camY, viewW, viewH);
-  ctx.fillStyle = `rgba(125,211,252,${0.018 + Math.sin(time * 0.45) * 0.006})`;
+  ctx.fillStyle = `rgba(125,211,252,${cached ? 0.018 : 0.018 + Math.sin(time * 0.45) * 0.006})`;
   ctx.fillRect(camX, camY, viewW, viewH);
 }
 
@@ -286,6 +627,7 @@ function drawTiles(ctx, map, camX, camY, viewW, viewH, time) {
     if (!rectVisible(tile.x, tile.y, tile.w, tile.h, camX, camY, viewW, viewH, 80)) continue;
     ctx.fillStyle = tile.color;
     ctx.fillRect(tile.x, tile.y, tile.w, tile.h);
+    drawTileDepth(ctx, tile);
     if (tile.seam) drawTileSeam(ctx, tile);
     if (tile.panel) drawLabPanel(ctx, tile, time);
     if (tile.grate) drawTileGrate(ctx, tile);
@@ -294,6 +636,50 @@ function drawTiles(ctx, map, camX, camY, viewW, viewH, time) {
     if (tile.crack) drawCrack(ctx, tile);
     drawWear(ctx, tile);
     if (tile.glow) drawTileGlow(ctx, tile, time);
+  }
+}
+
+function drawTileDepth(ctx, tile) {
+  const depth = Math.min(10, Math.max(4, Math.min(tile.w, tile.h) * 0.075));
+  const top = ctx.createLinearGradient(tile.x, tile.y, tile.x, tile.y + depth * 2);
+  top.addColorStop(0, "rgba(255,255,255,0.085)");
+  top.addColorStop(1, "rgba(255,255,255,0)");
+  ctx.fillStyle = top;
+  ctx.fillRect(tile.x, tile.y, tile.w, depth * 2);
+
+  const left = ctx.createLinearGradient(tile.x, tile.y, tile.x + depth * 2, tile.y);
+  left.addColorStop(0, "rgba(255,255,255,0.04)");
+  left.addColorStop(1, "rgba(255,255,255,0)");
+  ctx.fillStyle = left;
+  ctx.fillRect(tile.x, tile.y, depth * 2, tile.h);
+
+  const bottom = ctx.createLinearGradient(tile.x, tile.y + tile.h - depth * 2, tile.x, tile.y + tile.h);
+  bottom.addColorStop(0, "rgba(0,0,0,0)");
+  bottom.addColorStop(1, "rgba(0,0,0,0.28)");
+  ctx.fillStyle = bottom;
+  ctx.fillRect(tile.x, tile.y + tile.h - depth * 2, tile.w, depth * 2);
+
+  ctx.fillStyle = "rgba(0,0,0,0.16)";
+  ctx.fillRect(tile.x + tile.w - depth, tile.y + depth * 0.5, depth, tile.h - depth * 0.5);
+
+  if (tile.material === "labComposite") {
+    ctx.strokeStyle = hexToRgba(tile.accent, 0.06);
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(tile.x + tile.w * 0.18, tile.y + tile.h * 0.32);
+    ctx.lineTo(tile.x + tile.w * 0.82, tile.y + tile.h * 0.32);
+    ctx.moveTo(tile.x + tile.w * 0.18, tile.y + tile.h * 0.68);
+    ctx.lineTo(tile.x + tile.w * 0.82, tile.y + tile.h * 0.68);
+    ctx.stroke();
+  } else if (tile.material === "accessPlate") {
+    ctx.fillStyle = "rgba(0,0,0,0.16)";
+    ctx.fillRect(tile.x + tile.w * 0.18, tile.y + tile.h * 0.18, tile.w * 0.64, tile.h * 0.64);
+    ctx.strokeStyle = "rgba(255,255,255,0.055)";
+    ctx.strokeRect(tile.x + tile.w * 0.2, tile.y + tile.h * 0.2, tile.w * 0.6, tile.h * 0.6);
+  } else if (tile.material === "sealedPanel") {
+    ctx.fillStyle = "rgba(255,255,255,0.035)";
+    ctx.fillRect(tile.x + tile.w * 0.12, tile.y + tile.h * 0.16, tile.w * 0.76, 2);
+    ctx.fillRect(tile.x + tile.w * 0.12, tile.y + tile.h * 0.82, tile.w * 0.76, 2);
   }
 }
 
@@ -311,8 +697,23 @@ function drawTileSeam(ctx, tile) {
 
 function drawLabPanel(ctx, tile, time) {
   const inset = Math.min(18, Math.max(8, Math.min(tile.w, tile.h) * 0.12));
-  ctx.fillStyle = tile.w > 130 || tile.h > 130 ? "rgba(255,255,255,0.025)" : "rgba(0,0,0,0.055)";
+  if (tile.material === "utilityGrate") return;
+  ctx.fillStyle = "rgba(0,0,0,0.13)";
+  ctx.fillRect(tile.x + inset + 2, tile.y + inset + 3, tile.w - inset * 2, tile.h - inset * 2);
+  ctx.fillStyle = tile.w > 130 || tile.h > 130 ? "rgba(255,255,255,0.03)" : "rgba(0,0,0,0.065)";
   ctx.fillRect(tile.x + inset, tile.y + inset, tile.w - inset * 2, tile.h - inset * 2);
+  ctx.strokeStyle = "rgba(255,255,255,0.09)";
+  ctx.beginPath();
+  ctx.moveTo(tile.x + inset, tile.y + tile.h - inset);
+  ctx.lineTo(tile.x + inset, tile.y + inset);
+  ctx.lineTo(tile.x + tile.w - inset, tile.y + inset);
+  ctx.stroke();
+  ctx.strokeStyle = "rgba(0,0,0,0.28)";
+  ctx.beginPath();
+  ctx.moveTo(tile.x + tile.w - inset, tile.y + inset);
+  ctx.lineTo(tile.x + tile.w - inset, tile.y + tile.h - inset);
+  ctx.lineTo(tile.x + inset, tile.y + tile.h - inset);
+  ctx.stroke();
   ctx.strokeStyle = "rgba(255,255,255,0.055)";
   ctx.lineWidth = 1;
   ctx.strokeRect(tile.x + inset, tile.y + inset, tile.w - inset * 2, tile.h - inset * 2);
@@ -332,8 +733,12 @@ function drawTileGrate(ctx, tile) {
   const y = tile.y + tile.h * 0.2;
   const w = tile.w * 0.64;
   const h = tile.h * 0.58;
-  ctx.fillStyle = "rgba(0,0,0,0.2)";
+  ctx.fillStyle = "rgba(0,0,0,0.34)";
   ctx.fillRect(x, y, w, h);
+  ctx.fillStyle = "rgba(255,255,255,0.035)";
+  ctx.fillRect(x + 2, y + 2, w - 4, 4);
+  ctx.fillStyle = "rgba(0,0,0,0.22)";
+  ctx.fillRect(x + 2, y + h - 5, w - 4, 3);
   ctx.strokeStyle = "rgba(255,255,255,0.07)";
   ctx.lineWidth = 1;
   for (let yy = y + 8; yy < y + h - 4; yy += 10) {
@@ -518,7 +923,7 @@ function drawScorchDecal(ctx, d) {
   ctx.fill();
 }
 
-function drawCableRuns(ctx, map, camX, camY, viewW, viewH, time) {
+function drawCableRuns(ctx, map, camX, camY, viewW, viewH, time, cached = false) {
   for (const c of map.cableRuns || []) {
     if (!rectVisible(c.x - c.length, c.y - c.length, c.length * 2, c.length * 2, camX, camY, viewW, viewH, 120)) continue;
     ctx.save();
@@ -535,10 +940,10 @@ function drawCableRuns(ctx, map, camX, camY, viewW, viewH, time) {
       ctx.lineTo(c.length / 2, 34);
     } else ctx.lineTo(c.length / 2, 0);
     ctx.stroke();
-    ctx.strokeStyle = hexToRgba(c.color, c.broken ? 0.1 : 0.2 + Math.max(0, Math.sin(time * 3 + c.phase)) * 0.2);
+    ctx.strokeStyle = hexToRgba(c.color, c.broken ? 0.1 : cached ? 0.22 : 0.2 + Math.max(0, Math.sin(time * 3 + c.phase)) * 0.2);
     ctx.lineWidth = c.broken ? 2 : 3;
     ctx.stroke();
-    if (c.broken && Math.sin(time * 18 + c.phase) > 0.78) {
+    if (!cached && c.broken && Math.sin(time * 18 + c.phase) > 0.78) {
       ctx.fillStyle = hexToRgba("#ffffff", 0.45);
       ctx.fillRect(-3, -3, 6, 6);
     }
@@ -570,50 +975,191 @@ function drawEnergyLines(ctx, map, camX, camY, viewW, viewH, time) {
 }
 
 function drawRoomBorders(ctx, map, camX, camY, viewW, viewH) {
-  ctx.strokeStyle = "rgba(255,255,255,0.075)";
-  ctx.lineWidth = 4;
   for (const room of map.rooms || []) {
     if (!rectVisible(room.x, room.y, room.w, room.h, camX, camY, viewW, viewH, 80)) continue;
+    const top = ctx.createLinearGradient(room.x, room.y, room.x, room.y + 48);
+    top.addColorStop(0, "rgba(255,255,255,0.07)");
+    top.addColorStop(1, "rgba(255,255,255,0)");
+    ctx.fillStyle = top;
+    ctx.fillRect(room.x, room.y, room.w, 48);
+    const bottom = ctx.createLinearGradient(room.x, room.y + room.h - 56, room.x, room.y + room.h);
+    bottom.addColorStop(0, "rgba(0,0,0,0)");
+    bottom.addColorStop(1, "rgba(0,0,0,0.22)");
+    ctx.fillStyle = bottom;
+    ctx.fillRect(room.x, room.y + room.h - 56, room.w, 56);
+    ctx.strokeStyle = "rgba(255,255,255,0.075)";
+    ctx.lineWidth = 4;
     ctx.strokeRect(room.x, room.y, room.w, room.h);
     ctx.strokeStyle = "rgba(0,0,0,0.28)";
     ctx.lineWidth = 2;
     ctx.strokeRect(room.x + 8, room.y + 8, room.w - 16, room.h - 16);
-    ctx.strokeStyle = "rgba(255,255,255,0.075)";
-    ctx.lineWidth = 4;
+    ctx.strokeStyle = "rgba(255,255,255,0.035)";
+    ctx.lineWidth = 1;
+    ctx.strokeRect(room.x - 6, room.y - 6, room.w + 12, room.h + 12);
   }
 }
 
-function drawProps(ctx, map, camX, camY, viewW, viewH, time) {
-  for (const prop of map.props || []) {
-    const pad = Math.max(110, prop.size * 3.2);
-    if (!rectVisible(prop.x - pad, prop.y - pad, pad * 2, pad * 2, camX, camY, viewW, viewH, 90)) continue;
+function drawRoomShadows(ctx, map, camX, camY, viewW, viewH) {
+  for (const room of map.rooms || []) {
+    if (!rectVisible(room.x - 48, room.y - 48, room.w + 96, room.h + 96, camX, camY, viewW, viewH, 80)) continue;
+    const wall = 34;
+    const alpha = room.zone === "reactor" ? 0.2 : 0.24;
+    ctx.fillStyle = `rgba(0,0,0,${alpha})`;
+    ctx.fillRect(room.x - wall, room.y - wall, room.w + wall * 2, wall);
+    ctx.fillRect(room.x - wall, room.y + room.h, room.w + wall * 2, wall);
+    ctx.fillRect(room.x - wall, room.y, wall, room.h);
+    ctx.fillRect(room.x + room.w, room.y, wall, room.h);
+    ctx.fillStyle = "rgba(255,255,255,0.025)";
+    ctx.fillRect(room.x - wall, room.y - wall, room.w + wall * 2, 4);
+    ctx.fillRect(room.x - wall, room.y - wall, 4, room.h + wall);
+    ctx.strokeStyle = "rgba(255,255,255,0.035)";
+    ctx.lineWidth = 10;
+    ctx.strokeRect(room.x - 5, room.y - 5, room.w + 10, room.h + 10);
+  }
+}
+
+function drawDoorways(ctx, map, camX, camY, viewW, viewH) {
+  for (const door of map.doors || []) {
+    const w = door.horizontal ? door.w : 42;
+    const h = door.horizontal ? 42 : door.w;
+    if (!rectVisible(door.x - w / 2, door.y - h / 2, w, h, camX, camY, viewW, viewH, 60)) continue;
     ctx.save();
-    ctx.translate(prop.x, prop.y);
-    ctx.rotate(prop.rot);
-    if (prop.kind === "wallLight") drawWallLight(ctx, prop, time);
-    else if (prop.kind === "reactorCore") drawReactorCore(ctx, prop, time);
-    else if (prop.kind === "specimenTank" || prop.kind === "cryoPod") drawTank(ctx, prop, time);
-    else if (prop.kind === "labBench") drawLabBench(ctx, prop, time);
-    else if (prop.kind === "serverCabinet") drawServerCabinet(ctx, prop, time);
-    else if (prop.kind === "hangingCable") drawHangingCable(ctx, prop, time);
-    else if (prop.kind === "brokenGlass") drawBrokenGlass(ctx, prop);
-    else if (prop.kind === "warningSign") drawWarningSign(ctx, prop, time);
-    else if (prop.kind === "bioCanister" || prop.kind === "coolantTank") drawCanister(ctx, prop, time);
-    else if (prop.kind === "ceilingFanShadow") drawCeilingFanShadow(ctx, prop, time);
-    else if (prop.kind === "containmentChamber" || prop.kind === "cryoArray") drawContainmentChamber(ctx, prop, time);
-    else if (prop.kind === "observationWindow") drawObservationWindow(ctx, prop, time);
-    else if (prop.kind === "largeGenerator") drawLargeGenerator(ctx, prop, time);
-    else if (prop.kind === "commandConsole") drawCommandConsole(ctx, prop, time);
-    else if (prop.kind === "serverWall") drawServerWall(ctx, prop, time);
-    else if (prop.kind === "cargoLift") drawCargoLift(ctx, prop, time);
-    else if (prop.kind === "deconGate") drawDeconGate(ctx, prop, time);
-    else if (prop.kind === "overheadLightRig") drawOverheadLightRig(ctx, prop, time);
-    else if (prop.kind === "terminal") drawTerminal(ctx, prop, time);
-    else if (prop.kind === "brokenRack" || prop.kind === "crateStack") drawStorageProp(ctx, prop);
-    else if (prop.kind === "ventPipe") drawVentPipe(ctx, prop, time);
-    else drawStorageProp(ctx, prop);
+    ctx.translate(door.x, door.y);
+    if (!door.horizontal) ctx.rotate(Math.PI / 2);
+    const color = door.zone === "bio" ? "#72ffb4" : door.zone === "cryo" ? "#7dd3fc" : door.zone === "control" ? "#ffd166" : "#9aa7b4";
+    ctx.fillStyle = "rgba(0,0,0,0.42)";
+    ctx.fillRect(-door.w / 2 + 8, -18, door.w, 48);
+    ctx.fillStyle = "rgba(255,255,255,0.045)";
+    ctx.fillRect(-door.w / 2, -26, door.w, 6);
+    ctx.fillStyle = "rgba(0,0,0,0.5)";
+    ctx.fillRect(-door.w / 2, 18, door.w, 8);
+    ctx.fillStyle = "rgba(12,20,28,0.92)";
+    ctx.fillRect(-door.w / 2 + 12, -16, door.w - 24, 32);
+    ctx.strokeStyle = hexToRgba(color, 0.28);
+    ctx.lineWidth = 3;
+    ctx.strokeRect(-door.w / 2 + 10, -18, door.w - 20, 36);
+    ctx.fillStyle = hexToRgba(color, 0.22);
+    ctx.fillRect(-door.w * 0.34, -3, door.w * 0.68, 6);
     ctx.restore();
   }
+}
+
+function drawStaticProps(ctx, map, camX, camY, viewW, viewH) {
+  const props = (map.props || []).filter((prop) => isStaticProp(prop)).sort(comparePropsForDraw);
+  for (const prop of props) drawPropIfVisible(ctx, prop, camX, camY, viewW, viewH, 0);
+}
+
+function drawDynamicProps(ctx, map, camX, camY, viewW, viewH, time) {
+  drawProps(ctx, map, camX, camY, viewW, viewH, time, true);
+}
+
+function isStaticProp(prop) {
+  return prop.kind === "brokenGlass" ||
+    prop.kind === "warningSign" ||
+    prop.kind === "ceilingFanShadow" ||
+    prop.kind === "cargoLift" ||
+    prop.kind === "observationWindow" ||
+    prop.kind === "brokenRack" ||
+    prop.kind === "crateStack" ||
+    prop.kind === "fallenMonitor" ||
+    prop.kind === "surgicalTray" ||
+    prop.kind === "hazardBarrel" ||
+    prop.kind === "looseCanister" ||
+    prop.kind === "brokenRobotArm" ||
+    prop.kind === "leakingPipeVent";
+}
+
+function drawProps(ctx, map, camX, camY, viewW, viewH, time, dynamicOnly = false) {
+  const props = (map.props || [])
+    .filter((prop) => !dynamicOnly || !isStaticProp(prop))
+    .sort(comparePropsForDraw);
+  for (const prop of props) {
+    if (dynamicOnly && isStaticProp(prop)) continue;
+    drawPropIfVisible(ctx, prop, camX, camY, viewW, viewH, time);
+  }
+}
+
+function drawPropIfVisible(ctx, prop, camX, camY, viewW, viewH, time) {
+  const pad = Math.max(110, prop.size * 3.2);
+  if (!rectVisible(prop.x - pad, prop.y - pad, pad * 2, pad * 2, camX, camY, viewW, viewH, 90)) return;
+  ctx.save();
+  ctx.translate(prop.x, prop.y);
+  ctx.rotate(prop.rot);
+  drawPropGroundShadow(ctx, prop);
+  drawPropBaseExtrusion(ctx, prop);
+  drawPropBody(ctx, prop, time);
+  drawPropRimLight(ctx, prop);
+  ctx.restore();
+}
+
+function drawPropBody(ctx, prop, time) {
+  if (prop.kind === "wallLight") drawWallLight(ctx, prop, time);
+  else if (prop.kind === "reactorCore") drawReactorCore(ctx, prop, time);
+  else if (prop.kind === "specimenTank" || prop.kind === "cryoPod") drawTank(ctx, prop, time);
+  else if (prop.kind === "labBench") drawLabBench(ctx, prop, time);
+  else if (prop.kind === "serverCabinet") drawServerCabinet(ctx, prop, time);
+  else if (prop.kind === "hangingCable") drawHangingCable(ctx, prop, time);
+  else if (prop.kind === "brokenGlass") drawBrokenGlass(ctx, prop);
+  else if (prop.kind === "warningSign") drawWarningSign(ctx, prop, time);
+  else if (prop.kind === "bioCanister" || prop.kind === "coolantTank") drawCanister(ctx, prop, time);
+  else if (prop.kind === "ceilingFanShadow") drawCeilingFanShadow(ctx, prop, time);
+  else if (prop.kind === "containmentChamber" || prop.kind === "cryoArray") drawContainmentChamber(ctx, prop, time);
+  else if (prop.kind === "observationWindow") drawObservationWindow(ctx, prop, time);
+  else if (prop.kind === "largeGenerator") drawLargeGenerator(ctx, prop, time);
+  else if (prop.kind === "commandConsole") drawCommandConsole(ctx, prop, time);
+  else if (prop.kind === "serverWall") drawServerWall(ctx, prop, time);
+  else if (prop.kind === "cargoLift") drawCargoLift(ctx, prop, time);
+  else if (prop.kind === "deconGate") drawDeconGate(ctx, prop, time);
+  else if (prop.kind === "overheadLightRig") drawOverheadLightRig(ctx, prop, time);
+  else if (prop.kind === "terminal") drawTerminal(ctx, prop, time);
+  else if (prop.kind === "brokenRack" || prop.kind === "crateStack") drawStorageProp(ctx, prop);
+  else if (prop.kind === "ventPipe") drawVentPipe(ctx, prop, time);
+  else if (prop.kind === "fallenMonitor") drawFallenMonitor(ctx, prop, time);
+  else if (prop.kind === "surgicalTray") drawSurgicalTray(ctx, prop);
+  else if (prop.kind === "hazardBarrel" || prop.kind === "looseCanister") drawLooseContainer(ctx, prop, time);
+  else if (prop.kind === "brokenRobotArm") drawBrokenRobotArm(ctx, prop, time);
+  else if (prop.kind === "leakingPipeVent") drawLeakingPipeVent(ctx, prop, time);
+  else if (prop.kind === "steamLeak") drawSteamLeak(ctx, prop, time);
+  else if (prop.kind === "swingingCable") drawSwingingCable(ctx, prop, time);
+  else if (prop.kind === "flickerBeacon") drawFlickerBeacon(ctx, prop, time);
+  else drawStorageProp(ctx, prop);
+}
+
+function drawPropGroundShadow(ctx, prop) {
+  if (prop.kind === "ceilingFanShadow") return;
+  const s = prop.size;
+  const h = prop.height ?? getPropHeight(prop);
+  const alpha = Math.min(0.34, 0.1 + h / Math.max(1, s) * 0.08);
+  ctx.fillStyle = `rgba(0,0,0,${alpha})`;
+  ctx.beginPath();
+  ctx.ellipse(s * 0.16, s * 0.34 + h * 0.06, s * 1.0, s * 0.34, 0, 0, TAU);
+  ctx.fill();
+}
+
+function drawPropBaseExtrusion(ctx, prop) {
+  if (!RECTANGULAR_PROP_KINDS.has(prop.kind)) return;
+  const dims = getPropFootprintSize(prop);
+  const depth = Math.min(14, Math.max(5, (prop.height ?? prop.size * 0.5) * 0.18));
+  ctx.fillStyle = "rgba(0,0,0,0.28)";
+  ctx.fillRect(-dims.w * 0.42, dims.h * 0.26, dims.w * 0.84, depth);
+  ctx.fillStyle = "rgba(255,255,255,0.035)";
+  ctx.fillRect(-dims.w * 0.42, -dims.h * 0.32, dims.w * 0.84, 3);
+}
+
+function drawPropRimLight(ctx, prop) {
+  if (!RECTANGULAR_PROP_KINDS.has(prop.kind)) return;
+  const dims = getPropFootprintSize(prop);
+  ctx.strokeStyle = "rgba(255,255,255,0.075)";
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(-dims.w * 0.38, -dims.h * 0.3);
+  ctx.lineTo(dims.w * 0.38, -dims.h * 0.3);
+  ctx.stroke();
+  ctx.strokeStyle = "rgba(0,0,0,0.22)";
+  ctx.beginPath();
+  ctx.moveTo(-dims.w * 0.38, dims.h * 0.32);
+  ctx.lineTo(dims.w * 0.38, dims.h * 0.32);
+  ctx.stroke();
 }
 
 function drawWallLight(ctx, prop, time) {
@@ -1036,6 +1582,151 @@ function drawVentPipe(ctx, prop, time) {
     ctx.fill();
   }
   ctx.lineCap = "butt";
+}
+
+function drawFallenMonitor(ctx, prop, time) {
+  const s = prop.size;
+  const flicker = Math.max(0, Math.sin(time * 7.5 + prop.phase));
+  ctx.fillStyle = "rgba(0,0,0,0.62)";
+  ctx.fillRect(-s * 1.05, -s * 0.48, s * 2.1, s * 0.96);
+  ctx.strokeStyle = "rgba(255,255,255,0.12)";
+  ctx.lineWidth = 2;
+  ctx.strokeRect(-s * 1.05, -s * 0.48, s * 2.1, s * 0.96);
+  ctx.fillStyle = hexToRgba(prop.color, 0.07 + flicker * 0.16);
+  ctx.fillRect(-s * 0.82, -s * 0.3, s * 1.42, s * 0.5);
+  ctx.strokeStyle = hexToRgba("#ffffff", 0.1);
+  ctx.beginPath();
+  ctx.moveTo(-s * 0.55, s * 0.32);
+  ctx.lineTo(-s * 0.18, s * 0.05);
+  ctx.lineTo(s * 0.16, s * 0.25);
+  ctx.stroke();
+  ctx.fillStyle = "rgba(100,116,139,0.75)";
+  ctx.fillRect(s * 0.58, s * 0.42, s * 0.55, 4);
+}
+
+function drawSurgicalTray(ctx, prop) {
+  const s = prop.size;
+  ctx.fillStyle = "rgba(0,0,0,0.42)";
+  ctx.fillRect(-s * 1.0, -s * 0.36, s * 2.0, s * 0.72);
+  ctx.strokeStyle = "rgba(217,251,255,0.18)";
+  ctx.lineWidth = 2;
+  ctx.strokeRect(-s * 1.0, -s * 0.36, s * 2.0, s * 0.72);
+  ctx.fillStyle = "rgba(217,251,255,0.11)";
+  ctx.fillRect(-s * 0.78, -s * 0.16, s * 0.44, 3);
+  ctx.fillRect(-s * 0.08, -s * 0.14, s * 0.64, 3);
+  ctx.fillStyle = "rgba(154,79,47,0.24)";
+  ctx.beginPath();
+  ctx.ellipse(s * 0.58, s * 0.12, s * 0.22, s * 0.08, 0, 0, TAU);
+  ctx.fill();
+}
+
+function drawLooseContainer(ctx, prop, time) {
+  const s = prop.size;
+  const pulse = prop.kind === "looseCanister" ? 0.08 + Math.max(0, Math.sin(time * 2 + prop.phase)) * 0.08 : 0;
+  if (prop.kind === "looseCanister") glow(ctx, 0, 0, s * 1.0, prop.color, pulse);
+  ctx.fillStyle = "rgba(0,0,0,0.58)";
+  ctx.fillRect(-s * 0.45, -s * 0.78, s * 0.9, s * 1.56);
+  ctx.strokeStyle = "rgba(255,255,255,0.14)";
+  ctx.lineWidth = 2;
+  ctx.strokeRect(-s * 0.45, -s * 0.78, s * 0.9, s * 1.56);
+  ctx.fillStyle = hexToRgba(prop.color, prop.kind === "hazardBarrel" ? 0.24 : 0.18 + pulse);
+  ctx.fillRect(-s * 0.32, -s * 0.42, s * 0.64, s * 0.34);
+  ctx.fillRect(-s * 0.32, s * 0.12, s * 0.64, s * 0.34);
+  if (prop.kind === "hazardBarrel") drawWarningBands(ctx, s * 0.38, s * 0.58, prop.color);
+}
+
+function drawBrokenRobotArm(ctx, prop, time) {
+  const s = prop.size;
+  const spark = Math.sin(time * 11 + prop.phase) > 0.82;
+  ctx.lineCap = "round";
+  ctx.strokeStyle = "rgba(0,0,0,0.62)";
+  ctx.lineWidth = s * 0.28;
+  ctx.beginPath();
+  ctx.moveTo(-s * 0.92, s * 0.28);
+  ctx.lineTo(-s * 0.28, -s * 0.1);
+  ctx.lineTo(s * 0.42, s * 0.18);
+  ctx.stroke();
+  ctx.strokeStyle = "rgba(154,166,182,0.8)";
+  ctx.lineWidth = s * 0.16;
+  ctx.stroke();
+  ctx.fillStyle = "rgba(0,0,0,0.58)";
+  ctx.beginPath();
+  ctx.arc(-s * 0.28, -s * 0.1, s * 0.26, 0, TAU);
+  ctx.fill();
+  ctx.strokeStyle = "rgba(255,255,255,0.16)";
+  ctx.stroke();
+  if (spark) {
+    ctx.strokeStyle = hexToRgba("#ff7a1a", 0.8);
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(s * 0.48, s * 0.16);
+    ctx.lineTo(s * 0.72, -s * 0.1);
+    ctx.moveTo(s * 0.42, s * 0.24);
+    ctx.lineTo(s * 0.68, s * 0.4);
+    ctx.stroke();
+  }
+  ctx.lineCap = "butt";
+}
+
+function drawLeakingPipeVent(ctx, prop, time) {
+  const s = prop.size;
+  drawVentPipe(ctx, prop, time);
+  const leak = 0.16 + Math.max(0, Math.sin(time * 1.8 + prop.phase)) * 0.08;
+  ctx.fillStyle = hexToRgba(prop.color, leak);
+  ctx.beginPath();
+  ctx.ellipse(s * 1.08, s * 0.18, s * 0.2, s * 0.48, 0.2, 0, TAU);
+  ctx.fill();
+}
+
+function drawSteamLeak(ctx, prop, time) {
+  const s = prop.size;
+  ctx.globalCompositeOperation = "screen";
+  for (let i = 0; i < 4; i++) {
+    const k = (time * 0.45 + prop.phase + i * 0.27) % 1;
+    const y = -s * (0.18 + k * 1.05);
+    const x = Math.sin(time * 1.2 + i + prop.phase) * s * 0.18;
+    ctx.fillStyle = hexToRgba(prop.color, (1 - k) * 0.055);
+    ctx.beginPath();
+    ctx.ellipse(x, y, s * (0.28 + k * 0.34), s * (0.12 + k * 0.18), 0, 0, TAU);
+    ctx.fill();
+  }
+  ctx.globalCompositeOperation = "source-over";
+  ctx.fillStyle = "rgba(0,0,0,0.42)";
+  ctx.fillRect(-s * 0.42, -s * 0.08, s * 0.84, s * 0.16);
+}
+
+function drawSwingingCable(ctx, prop, time) {
+  const s = prop.size;
+  const sway = Math.sin(time * 0.85 + prop.phase) * s * 0.18;
+  ctx.lineCap = "round";
+  ctx.strokeStyle = "rgba(0,0,0,0.68)";
+  ctx.lineWidth = 6;
+  ctx.beginPath();
+  ctx.moveTo(0, -s * 1.08);
+  ctx.bezierCurveTo(sway, -s * 0.45, -sway * 0.4, s * 0.16, sway * 0.25, s * 0.96);
+  ctx.stroke();
+  ctx.strokeStyle = hexToRgba(prop.color, 0.75);
+  ctx.lineWidth = 2.4;
+  ctx.stroke();
+  if (Math.sin(time * 13 + prop.phase) > 0.86) {
+    ctx.fillStyle = hexToRgba("#ff7a1a", 0.7);
+    ctx.fillRect(sway * 0.25 - 2, s * 0.85, 4, 4);
+  }
+  ctx.lineCap = "butt";
+}
+
+function drawFlickerBeacon(ctx, prop, time) {
+  const s = prop.size;
+  const flicker = Math.max(0.15, Math.sin(time * 8 + prop.phase));
+  glow(ctx, 0, 0, s * 1.9, prop.color, 0.08 * flicker);
+  ctx.fillStyle = "rgba(0,0,0,0.58)";
+  ctx.fillRect(-s * 0.42, -s * 0.42, s * 0.84, s * 0.84);
+  ctx.strokeStyle = "rgba(255,255,255,0.12)";
+  ctx.strokeRect(-s * 0.42, -s * 0.42, s * 0.84, s * 0.84);
+  ctx.fillStyle = hexToRgba(prop.color, 0.26 + flicker * 0.28);
+  ctx.beginPath();
+  ctx.arc(0, 0, s * 0.22, 0, TAU);
+  ctx.fill();
 }
 
 function drawFog(ctx, map, camX, camY, viewW, viewH, time) {

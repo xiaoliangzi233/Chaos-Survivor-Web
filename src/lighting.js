@@ -90,6 +90,10 @@ function addMapLights(lights, camera, viewport) {
     if (prop.kind === "rubble") continue;
     if (!worldVisible(prop.x, prop.y, 220, camera)) continue;
     const pulse = 0.75 + Math.sin(state.time * 2.2 + prop.phase) * 0.25;
+    const floorLayer = prop.layer === "floor";
+    const height = prop.height ?? prop.size * 0.7;
+    const heightRadiusMul = floorLayer ? 0.72 : 1 + Math.min(0.18, height / Math.max(1, prop.size) * 0.06);
+    const layerStrengthMul = floorLayer ? 0.52 : 1;
     const radiusMul =
       prop.kind === "reactorCore" ? 5.6 :
         prop.kind === "largeGenerator" ? 4.8 :
@@ -119,10 +123,10 @@ function addMapLights(lights, camera, viewport) {
     addWorldLight(lights, camera, viewport, {
       x: prop.x,
       y: prop.y,
-      radius: prop.size * radiusMul,
+      radius: prop.size * radiusMul * heightRadiusMul,
       color: prop.color,
-      strength: strengthBase * pulse,
-      core: 0.18,
+      strength: strengthBase * pulse * layerStrengthMul,
+      core: floorLayer ? 0.08 : 0.18,
     });
     count++;
   }

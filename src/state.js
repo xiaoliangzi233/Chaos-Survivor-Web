@@ -68,6 +68,8 @@ export function createPlayer() {
     invuln: 0,
     burnTimer: 0,
     burnDps: 0,
+    frostTimer: 0,
+    frostSlow: 0,
     damageScale: 1,
     dirX: 1,
     dirY: 0,

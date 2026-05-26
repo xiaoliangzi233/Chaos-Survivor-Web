@@ -17,8 +17,9 @@ export function updatePlayer(dt) {
     vy /= len;
     p.dirX = vx;
     p.dirY = vy;
-    p.x += vx * p.speed * dt;
-    p.y += vy * p.speed * dt;
+    const frostScale = 1 - Math.min(0.42, p.frostSlow || 0);
+    p.x += vx * p.speed * frostScale * dt;
+    p.y += vy * p.speed * frostScale * dt;
     p.trailTimer -= dt;
     if (p.trailTimer <= 0) {
       p.trailTimer = 0.055;
@@ -30,6 +31,10 @@ export function updatePlayer(dt) {
     p.hp -= (p.burnDps || 0) * dt;
     state.flash = Math.max(state.flash, 0.05);
     if (p.burnTimer <= 0) p.burnDps = 0;
+  }
+  if (p.frostTimer > 0) {
+    p.frostTimer = Math.max(0, p.frostTimer - dt);
+    if (p.frostTimer <= 0) p.frostSlow = 0;
   }
   const half = WORLD_SIZE / 2 - 60;
   p.x = clamp(p.x, -half, half);
@@ -262,10 +267,39 @@ function updateEnemyProjectiles(dt) {
         p.burnTimer = Math.max(p.burnTimer || 0, b.burnDuration);
         p.burnDps = Math.max(p.burnDps || 0, b.burnDps || 0);
       }
+      if (b.frostDuration > 0) {
+        p.frostTimer = Math.max(p.frostTimer || 0, b.frostDuration);
+        p.frostSlow = Math.max(p.frostSlow || 0, b.frostSlow || 0.18);
+      }
       burst(p.x, p.y, 8, b.color, 100);
       playSfx("hurt");
       world.enemyProjectiles.splice(i, 1);
-    } else if (b.life <= 0) world.enemyProjectiles.splice(i, 1);
+    } else if (b.life <= 0) {
+      if (b.splitOnExpire) splitEnemyProjectile(b);
+      world.enemyProjectiles.splice(i, 1);
+    }
+  }
+}
+
+function splitEnemyProjectile(b) {
+  if (b.shape !== "snowflake") return;
+  const base = Math.atan2(b.vy, b.vx);
+  for (const offset of [-0.62, 0.62]) {
+    const a = base + offset;
+    world.enemyProjectiles.push({
+      x: b.x,
+      y: b.y,
+      vx: Math.cos(a) * 145,
+      vy: Math.sin(a) * 145,
+      r: Math.max(3.5, b.r * 0.55),
+      color: b.color,
+      damage: b.damage * 0.45,
+      life: 1.8,
+      shape: "snowflake",
+      spin: Math.random() * TAU,
+      frostDuration: 0.55,
+      frostSlow: 0.14,
+    });
   }
 }
 
@@ -276,16 +310,25 @@ function updateHazards(dt) {
     h.life -= dt;
     if (h.kind === "ember_mine") updateEmberMine(h, dt);
     if (h.kind === "artillery_blast") updateArtilleryBlast(h, dt);
+    if (h.kind === "ice_spike" || h.kind === "ice_seal") updateIceHazard(h, dt);
     if (distSq(h.x, h.y, p.x, p.y) < ((h.triggerRadius || h.r) + p.r) ** 2 && h.kind === "ember_mine") h.triggered = true;
     const canDamage =
       !h.kind ||
       (h.kind === "ember_mine" && h.triggered) ||
       (h.kind === "artillery_blast" && h.exploding) ||
       h.kind === "gear_trap" ||
-      h.kind === "magma_crack";
+      h.kind === "magma_crack" ||
+      h.kind === "twin_arc_field" ||
+      h.kind === "frost_zone" ||
+      h.kind === "blizzard_core" ||
+      ((h.kind === "ice_spike" || h.kind === "ice_seal") && h.exploding);
     if (distSq(h.x, h.y, p.x, p.y) < (h.r + p.r) ** 2 && p.invuln <= 0 && canDamage) {
       p.hp -= h.damage;
       p.invuln = 0.35;
+      if (h.frostDuration > 0) {
+        p.frostTimer = Math.max(p.frostTimer || 0, h.frostDuration);
+        p.frostSlow = Math.max(p.frostSlow || 0, h.frostSlow || 0.18);
+      }
       playSfx("hurt");
       if (h.kind === "ember_mine") h.life = 0;
       if (h.kind === "artillery_blast") h.life = Math.min(h.life, 0.12);
@@ -318,6 +361,20 @@ function updateArtilleryBlast(h, dt) {
     state.shake = Math.max(state.shake, 5);
   }
   h.r = Math.min(h.finalRadius || h.r, h.r + dt * 190);
+}
+
+function updateIceHazard(h, dt) {
+  h.armTime = Math.max(0, (h.armTime || 0) - dt);
+  h.pulse = (h.pulse || 0) + dt;
+  if (h.armTime > 0) return;
+  if (!h.exploding) {
+    h.exploding = true;
+    h.life = Math.min(h.life, h.kind === "ice_seal" ? 0.34 : 0.28);
+    h.maxLife = Math.max(h.maxLife, 1.18);
+    burst(h.x, h.y, h.kind === "ice_seal" ? 14 : 10, h.color, 170);
+    state.shake = Math.max(state.shake, h.kind === "ice_seal" ? 5 : 3);
+  }
+  h.r = Math.min(h.kind === "ice_seal" ? 56 : 64, h.r + dt * 120);
 }
 
 function updateEnemyKnockback(e, dt) {

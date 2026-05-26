@@ -866,6 +866,14 @@ function drawHazards(ctx) {
       drawMagmaCrackHazard(ctx, h, alpha);
       continue;
     }
+    if (h.kind === "ice_spike" || h.kind === "ice_seal") {
+      drawIceHazard(ctx, h, alpha);
+      continue;
+    }
+    if (h.kind === "frost_zone" || h.kind === "blizzard_core") {
+      drawFrostZoneHazard(ctx, h, alpha);
+      continue;
+    }
     ctx.fillStyle = hexToRgba(h.color, alpha * 0.18);
     ctx.beginPath(); ctx.arc(h.x, h.y, h.r, 0, TAU); ctx.fill();
     ctx.strokeStyle = hexToRgba(h.color, alpha * 0.7);
@@ -930,6 +938,71 @@ function drawMiniGear(ctx, x, y, r, teeth, color, spin = state.time * 10) {
   ctx.beginPath();
   ctx.arc(0, 0, r * 0.32, 0, TAU);
   ctx.fill();
+  ctx.restore();
+}
+
+function drawIceHazard(ctx, h, alpha) {
+  const armed = (h.armTime || 0) <= 0;
+  const warn = Math.max(0, h.armTime || 0) / (h.kind === "ice_seal" ? 0.95 : 0.72);
+  ctx.save();
+  ctx.translate(h.x, h.y);
+  ctx.rotate(h.angle || h.spikeAngle || 0);
+  if (!armed) {
+    ctx.fillStyle = hexToRgba(h.color, 0.07 + (1 - warn) * 0.14);
+    ctx.beginPath();
+    ctx.arc(0, 0, h.r, 0, TAU);
+    ctx.fill();
+    ctx.strokeStyle = hexToRgba("#d9fbff", 0.42 + Math.sin(state.time * 18) * 0.1);
+    ctx.lineWidth = 2;
+    ctx.setLineDash([8, 7]);
+    ctx.beginPath();
+    ctx.arc(0, 0, h.r * (0.7 + (1 - warn) * 0.28), 0, TAU);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.strokeStyle = hexToRgba(h.color, 0.7);
+    for (let i = 0; i < 6; i++) {
+      const a = i / 6 * TAU;
+      ctx.beginPath();
+      ctx.moveTo(Math.cos(a) * h.r * 0.25, Math.sin(a) * h.r * 0.25);
+      ctx.lineTo(Math.cos(a) * h.r * 0.95, Math.sin(a) * h.r * 0.95);
+      ctx.stroke();
+    }
+  } else {
+    const k = Math.max(0, h.life / 0.34);
+    glow(ctx, 0, 0, h.r * 0.6, k * 0.45, h.color);
+    ctx.fillStyle = hexToRgba(h.color, k * 0.45);
+    ctx.strokeStyle = "#ffffff";
+    ctx.lineWidth = 1.8;
+    const count = h.kind === "ice_seal" ? 5 : 3;
+    for (let i = 0; i < count; i++) {
+      const x = (i - (count - 1) / 2) * h.r * 0.22;
+      ctx.beginPath();
+      ctx.moveTo(x, -h.r * 0.95);
+      ctx.lineTo(x + h.r * 0.24, h.r * 0.35);
+      ctx.lineTo(x - h.r * 0.24, h.r * 0.35);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+    }
+  }
+  ctx.restore();
+}
+
+function drawFrostZoneHazard(ctx, h, alpha) {
+  ctx.save();
+  ctx.translate(h.x, h.y);
+  const r = h.r * (1 + Math.sin(state.time * 5 + h.x) * 0.04);
+  ctx.fillStyle = hexToRgba(h.color, alpha * (h.kind === "blizzard_core" ? 0.1 : 0.18));
+  ctx.beginPath();
+  ctx.ellipse(0, 0, r * 1.25, r * 0.75, Math.sin(state.time + h.y) * 0.4, 0, TAU);
+  ctx.fill();
+  ctx.strokeStyle = hexToRgba("#d9fbff", alpha * 0.44);
+  ctx.lineWidth = 1.5;
+  for (let i = 0; i < 3; i++) {
+    ctx.beginPath();
+    ctx.arc(0, 0, r * (0.45 + i * 0.22), state.time * 0.8 + i, state.time * 0.8 + i + Math.PI);
+    ctx.stroke();
+  }
   ctx.restore();
 }
 
@@ -1029,6 +1102,10 @@ function drawBossBar(ctx) {
   const w = Math.min(620, viewport.width - 48);
   const x = (viewport.width - w) / 2;
   const y = 74;
+  if (b.shared?.members) {
+    drawTwinBossBar(ctx, b, x, y, w);
+    return;
+  }
   ctx.fillStyle = "rgba(6,9,18,0.86)";
   ctx.fillRect(x, y, w, 20);
   ctx.fillStyle = "rgba(255,255,255,0.08)";
@@ -1042,6 +1119,33 @@ function drawBossBar(ctx) {
   ctx.font = "13px sans-serif";
   ctx.textAlign = "center";
   ctx.fillText(`${b.name} · ${b.trait}`, viewport.width / 2, y + 34);
+}
+
+function drawTwinBossBar(ctx, b, x, y, w) {
+  const members = [...b.shared.members];
+  const crimson = members.find((e) => e.role === "crimson");
+  const azure = members.find((e) => e.role === "azure");
+  ctx.fillStyle = "rgba(6,9,18,0.88)";
+  ctx.fillRect(x, y, w, 32);
+  ctx.fillStyle = "rgba(255,255,255,0.08)";
+  ctx.fillRect(x + 4, y + 4, w - 8, 10);
+  ctx.fillRect(x + 4, y + 18, w - 8, 10);
+  if (crimson && !crimson.dead) {
+    ctx.fillStyle = "#ff4d6d";
+    ctx.fillRect(x + 4, y + 4, (w - 8) * Math.max(0, crimson.hp / crimson.maxHp), 10);
+  }
+  if (azure && !azure.dead) {
+    ctx.fillStyle = "#42e8ff";
+    ctx.fillRect(x + 4, y + 18, (w - 8) * Math.max(0, azure.hp / azure.maxHp), 10);
+  }
+  ctx.strokeStyle = b.shared.resonance ? "rgba(255,255,255,0.95)" : "rgba(255,255,255,0.78)";
+  ctx.lineWidth = 2;
+  ctx.strokeRect(x, y, w, 32);
+  ctx.fillStyle = "#f3f7ff";
+  ctx.font = "13px sans-serif";
+  ctx.textAlign = "center";
+  const tag = b.shared.resonance ? " · 双瞳共鸣" : b.enraged ? " · 单眼暴走" : "";
+  ctx.fillText(`裂渊双瞳${tag}`, viewport.width / 2, y + 47);
 }
 
 function inView(x, y, pad) {

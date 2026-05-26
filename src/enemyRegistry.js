@@ -40,6 +40,8 @@ import { StormTyrant } from "./enemies/storm_tyrant.js";
 import { VoidColossus } from "./enemies/void_colossus.js";
 import { StormRailDevourer } from "./enemies/storm_rail_devourer.js";
 import { DarkCrystalRift } from "./enemies/dark_crystal_rift.js";
+import { TwinAbyssalEyes } from "./enemies/twin_abyssal_eyes.js";
+import { PolarCrystalWraith } from "./enemies/polar_crystal_wraith.js";
 
 const classes = {
   zombie: Zombie,
@@ -79,6 +81,8 @@ const classes = {
   void_colossus: VoidColossus,
   storm_rail_devourer: StormRailDevourer,
   dark_crystal_rift: DarkCrystalRift,
+  twin_abyssal_eyes: TwinAbyssalEyes,
+  polar_crystal_wraith: PolarCrystalWraith,
 };
 
 export let enemyConfig = {};

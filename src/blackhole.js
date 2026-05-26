@@ -1,12 +1,12 @@
 import { TAU, WORLD_SIZE } from "./constants.js";
-import { state, world } from "./state.js";
+import { input, state, world } from "./state.js";
 import { clamp, distSq, hexToRgba } from "./utils.js";
 import { burst, particle, pulse } from "./effects.js";
 import { playSfx } from "./audio.js";
 
 const BASE_RADIUS = 94;
 const MAX_RADIUS = 184;
-const BASE_PULL = 360;
+const BASE_PULL = 285;
 const BASE_DAMAGE = 8;
 const BASE_LIFE = 7.2;
 const MAX_LIFE = 10.5;
@@ -42,7 +42,7 @@ export function summonOrEmpowerBlackhole(x, y, dirX, dirY, color = "#8d6bff") {
   const h = world.blackhole;
   h.level = Math.min(6, h.level + 1);
   h.r = Math.min(MAX_RADIUS, h.r + 18);
-  h.pull += 54;
+  h.pull += 38;
   h.damage += 3;
   h.life = Math.min(MAX_LIFE, h.life + 1.7);
   h.maxLife = Math.max(h.maxLife, h.life);
@@ -75,7 +75,7 @@ export function updateBlackhole(dt) {
   h.x = clamp(h.x, -half + h.r, half - h.r);
   h.y = clamp(h.y, -half + h.r, half - h.r);
 
-  pullBody(state.player, h, dt, 1.0, 1.55);
+  pullBody(state.player, h, dt, 1.0, 1.46);
   state.player.x = clamp(state.player.x, -half + state.player.r, half - state.player.r);
   state.player.y = clamp(state.player.y, -half + state.player.r, half - state.player.r);
 
@@ -98,9 +98,24 @@ function pullBody(body, h, dt, mul, rangeMul = 1.55) {
   if (d2 > range * range) return;
   const d = Math.max(1, Math.sqrt(d2));
   const falloff = 1 - d / range;
-  const pull = h.pull * (0.18 + falloff * falloff) * mul;
+  const escape = playerEscapeResistance(dx, dy, d);
+  const innerDamp = d < h.r * 0.48 ? 0.72 : 1;
+  const pull = h.pull * (0.1 + falloff * falloff * 0.82) * escape * innerDamp * mul;
   body.x += (dx / d) * pull * dt;
   body.y += (dy / d) * pull * dt;
+}
+
+function playerEscapeResistance(toHoleX, toHoleY, distance) {
+  let mx = (input.right ? 1 : 0) - (input.left ? 1 : 0) + input.vx;
+  let my = (input.down ? 1 : 0) - (input.up ? 1 : 0) + input.vy;
+  const m = Math.hypot(mx, my);
+  if (m <= 0.05) return 1;
+  mx /= m;
+  my /= m;
+  const awayX = -toHoleX / distance;
+  const awayY = -toHoleY / distance;
+  const awayIntent = Math.max(0, mx * awayX + my * awayY);
+  return 1 - awayIntent * 0.68;
 }
 
 function damagePlayerInBlackhole(h) {

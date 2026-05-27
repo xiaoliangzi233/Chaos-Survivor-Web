@@ -301,7 +301,7 @@ function enemyRole(entry) {
 }
 
 function weaponColor(id) {
-  return { arc: "#42e8ff", ice: "#9ff4ff", missile: "#ffb347", boomerang: "#ff65d8", drone: "#77ff8a", pulse: "#77ff8a", prism_railgun: "#7df9ff", void_singularity: "#8b5cf6", tesla_mine_chain: "#42e8ff", starfall_scepter: "#ffd166", phase_needler: "#b48cff" }[id] || "#42e8ff";
+  return { arc: "#42e8ff", ice: "#9ff4ff", missile: "#ffb347", boomerang: "#ff65d8", drone: "#77ff8a", pulse: "#77ff8a", prism_railgun: "#7df9ff", void_singularity: "#8b5cf6", tesla_mine_chain: "#42e8ff", starfall_scepter: "#ffd166", phase_needler: "#b48cff", echo_tuning_fork: "#7dfcff", rift_loom: "#9d7cff" }[id] || "#42e8ff";
 }
 
 function hexToRgba(hex, alpha) {

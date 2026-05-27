@@ -7,7 +7,7 @@ import { playSfx } from "../audio.js";
 import { addWeaponToInventory, QUALITY_INFO, QUALITY_ORDER, WEAPON_INFO } from "../economy/inventory.js";
 import { attackSpeedMultiplier, weaponProjectileBonus, weaponRangeBonus } from "./items.js";
 
-export const STARTER_WEAPONS = ["arc", "ice", "missile", "boomerang", "drone", "prism_railgun", "void_singularity", "tesla_mine_chain", "starfall_scepter", "phase_needler", "echo_tuning_fork"].map((id) => ({ id, ...WEAPON_INFO[id] }));
+export const STARTER_WEAPONS = ["arc", "ice", "missile", "boomerang", "drone", "prism_railgun", "void_singularity", "tesla_mine_chain", "starfall_scepter", "phase_needler", "echo_tuning_fork", "rift_loom"].map((id) => ({ id, ...WEAPON_INFO[id] }));
 
 export const UPGRADE_DEFS = [
   {
@@ -153,6 +153,7 @@ export function updateWeapons(dt) {
   updateStarfallScepterWeapon(dt);
   updatePhaseNeedlerWeapon(dt);
   updateEchoTuningForkWeapon(dt);
+  updateRiftLoomWeapon(dt);
   updateProjectiles(dt);
   updateWeaponFx(dt);
 }
@@ -613,13 +614,13 @@ function updatePrismRailgunWeapon(dt) {
   const w = state.weapons.prism_railgun;
   if (!tickWeapon(w, dt)) return;
   const p = state.player;
-  const target = nearestEnemy(p.x, p.y, w.range + weaponRangeBonus());
-  if (!target) return;
-
-  const base = Math.atan2(target.y - p.y, target.x - p.x);
   const count = Math.max(1, w.count || 1) + weaponProjectileBonus(w);
+  const targets = choosePrismRailTargets(w, count);
+  if (!targets.length) return;
   let fired = 0;
   for (let i = 0; i < count; i++) {
+    const target = targets[i % targets.length];
+    const base = Math.atan2(target.y - p.y, target.x - p.x);
     const quality = weaponQualityAt(w, i);
     const shot = weaponViewForQuality(w, quality);
     const rank = qualityRank(shot);
@@ -636,6 +637,29 @@ function updatePrismRailgunWeapon(dt) {
     addCameraShake(Math.min(7, 2.2 + fired * 0.5));
     playSfx("shoot");
   }
+}
+
+function choosePrismRailTargets(w, count) {
+  const p = state.player;
+  const range = w.range + weaponRangeBonus();
+  const candidates = [];
+  queryEnemies(p.x, p.y, range, candidates);
+  const enemies = candidates
+    .filter((e) => !e.dead)
+    .map((e) => ({ enemy: e, angle: Math.atan2(e.y - p.y, e.x - p.x), dist: Math.hypot(e.x - p.x, e.y - p.y) }))
+    .sort((a, b) => a.dist - b.dist);
+  if (!enemies.length) return [];
+  const selected = [];
+  const minAngle = enemies.length >= count ? 0.42 : 0.18;
+  for (const entry of enemies) {
+    if (selected.length >= count) break;
+    if (selected.every((chosen) => Math.abs(angleDiff(entry.angle, chosen.angle)) >= minAngle)) selected.push(entry);
+  }
+  for (const entry of enemies) {
+    if (selected.length >= count) break;
+    if (!selected.includes(entry)) selected.push(entry);
+  }
+  return selected.map((entry) => entry.enemy);
 }
 
 function firePrismRail(shot, base, angle, color, rank, damageScale, beamIndex, beamCount, secondary) {
@@ -1391,6 +1415,83 @@ function echoResonance(x, y, angle, range, coneAngle, damage, color, rank) {
   });
 }
 
+function updateRiftLoomWeapon(dt) {
+  const w = state.weapons.rift_loom;
+  if (!tickWeapon(w, dt)) return;
+  const anchor = chooseRiftLoomAnchor(w);
+  const slots = Math.max(1, w.count || 1);
+  const bonus = weaponProjectileBonus(w);
+  for (let slot = 0; slot < slots; slot++) {
+    const quality = weaponQualityAt(w, slot);
+    const shot = weaponViewForQuality(w, quality);
+    const rank = qualityRank(shot);
+    const color = qualityColor(shot, "#9d7cff");
+    const offset = (slot - (slots - 1) / 2) * 34;
+    spawnRiftLoom(anchor.x + Math.cos(anchor.angle + Math.PI / 2) * offset, anchor.y + Math.sin(anchor.angle + Math.PI / 2) * offset, w, shot, rank, color, false, slot);
+    for (let extra = 0; extra < bonus && slot === 0; extra++) {
+      const side = extra % 2 === 0 ? 1 : -1;
+      spawnRiftLoom(anchor.x + Math.cos(anchor.angle + side * 1.2) * 68, anchor.y + Math.sin(anchor.angle + side * 1.2) * 68, w, shot, rank, color, true, extra + 10);
+    }
+    if (rank >= 4) spawnRiftLoom(anchor.x, anchor.y, w, shot, rank, "#ffd166", true, slot + 30, 1.22, -1);
+  }
+  playSfx("shoot");
+}
+
+function chooseRiftLoomAnchor(w) {
+  const p = state.player;
+  const range = w.range + weaponRangeBonus();
+  const candidates = [];
+  queryEnemies(p.x, p.y, range, candidates);
+  let best = null;
+  let bestScore = -Infinity;
+  for (const e of candidates) {
+    if (e.dead) continue;
+    const nearby = [];
+    queryEnemies(e.x, e.y, 180, nearby);
+    const density = nearby.filter((other) => !other.dead).length;
+    const d = Math.hypot(e.x - p.x, e.y - p.y);
+    const score = density * 180 + Math.max(0, range - d) * 0.12;
+    if (score > bestScore) {
+      bestScore = score;
+      best = e;
+    }
+  }
+  if (best) return { x: best.x, y: best.y, angle: Math.atan2(best.y - p.y, best.x - p.x) };
+  const angle = Math.atan2(p.dirY, p.dirX);
+  return { x: p.x + Math.cos(angle) * Math.min(260, range * 0.45), y: p.y + Math.sin(angle) * Math.min(260, range * 0.45), angle };
+}
+
+function spawnRiftLoom(x, y, base, shot, rank, color, secondary, index, radiusScale = 1, spinDir = 1) {
+  const half = WORLD_SIZE / 2 - 50;
+  const anchors = base.anchors + (rank >= 1 ? 1 : 0);
+  const radius = (base.radius + rank * 10 + (rank >= 1 ? 14 : 0)) * (secondary ? 0.72 : 1) * radiusScale;
+  const life = base.life + rank * 0.04;
+  const damageScale = secondary ? 0.62 : 1;
+  world.weaponFx.push({
+    kind: "riftLoom",
+    x: clamp(x, -half, half),
+    y: clamp(y, -half, half),
+    radius,
+    baseRadius: radius,
+    anchors,
+    damage: weaponPower(shot, base.damage) * damageScale,
+    collapseDamage: weaponPower(shot, base.collapseDamage) * damageScale,
+    scarDamage: weaponPower(shot, base.scarDamage) * damageScale,
+    lineWidth: base.lineWidth + rank * 2.2,
+    color,
+    rank,
+    secondary,
+    spin: Math.random() * TAU,
+    spinSpeed: (2.1 + rank * 0.18) * spinDir,
+    life,
+    maxLife: life,
+    hitCooldowns: new Map(),
+    collapsed: false,
+    seed: Math.random() * 999 + index * 37,
+  });
+  pulse(x, y, radius * 0.52, color, 0.12);
+}
+
 function tickWeapon(w, dt) {
   if (!w || w.level <= 0) return false;
   w.timer -= dt;
@@ -1927,10 +2028,134 @@ function updateWeaponFx(dt) {
       }
       continue;
     }
+    if (fx.kind === "riftLoom") updateRiftLoomFx(fx, dt);
+    if (fx.kind === "riftScar") updateRiftScarDamage(fx, dt);
     if (fx.kind === "echoWave") updateEchoWaveDamage(fx, dt);
     if (fx.kind === "starScar") updateStarScarDamage(fx, dt);
     fx.life -= dt;
     if (fx.life <= 0) world.weaponFx.splice(i, 1);
+  }
+}
+
+function updateRiftLoomFx(fx, dt) {
+  fx.spin += fx.spinSpeed * dt;
+  const progress = clamp(1 - fx.life / Math.max(0.01, fx.maxLife), 0, 1);
+  fx.radius = fx.baseRadius * (1 - progress * 0.34);
+  for (const [enemy, cd] of fx.hitCooldowns) {
+    const next = cd - dt;
+    if (next <= 0 || enemy.dead) fx.hitCooldowns.delete(enemy);
+    else fx.hitCooldowns.set(enemy, next);
+  }
+  const points = riftLoomPoints(fx);
+  const segments = riftLoomSegments(points, fx.rank);
+  const hits = [];
+  queryEnemies(fx.x, fx.y, fx.baseRadius + 80, hits);
+  for (const e of hits) {
+    if (e.dead || fx.hitCooldowns.has(e)) continue;
+    let hit = null;
+    for (const seg of segments) {
+      const info = pointSegmentInfo(e.x, e.y, seg.x1, seg.y1, seg.x2, seg.y2);
+      if (info.t < -0.05 || info.t > 1.05 || info.distance > (e.r || 0) + fx.lineWidth) continue;
+      hit = info;
+      break;
+    }
+    if (!hit) continue;
+    fx.hitCooldowns.set(e, 0.18);
+    damageEnemy(e, fx.damage, hit.x, hit.y);
+    applyKnockback(e, e.x - fx.x, e.y - fx.y, e.boss ? 16 : 52);
+    burst(hit.x, hit.y, 4 + fx.rank, fx.color, 130);
+  }
+  if (!fx.collapsed && fx.life <= dt + 0.02) {
+    fx.collapsed = true;
+    collapseRiftLoom(fx);
+  }
+}
+
+function riftLoomPoints(fx) {
+  const points = [];
+  const wobble = Math.sin(state.time * 6 + (fx.seed || 0)) * 0.025;
+  for (let i = 0; i < fx.anchors; i++) {
+    const a = fx.spin + i * TAU / fx.anchors + wobble;
+    const pulseRadius = fx.radius * (0.92 + Math.sin(state.time * 5 + i + (fx.seed || 0)) * 0.035);
+    points.push({ x: fx.x + Math.cos(a) * pulseRadius, y: fx.y + Math.sin(a) * pulseRadius });
+  }
+  return points;
+}
+
+function riftLoomSegments(points, rank) {
+  const segments = [];
+  for (let i = 0; i < points.length; i++) {
+    const a = points[i];
+    const b = points[(i + 1) % points.length];
+    segments.push({ x1: a.x, y1: a.y, x2: b.x, y2: b.y });
+  }
+  if (rank >= 2 && points.length >= 4) {
+    for (let i = 0; i < points.length; i++) {
+      const a = points[i];
+      const b = points[(i + 2) % points.length];
+      segments.push({ x1: a.x, y1: a.y, x2: b.x, y2: b.y, diagonal: true });
+    }
+  }
+  return segments;
+}
+
+function collapseRiftLoom(fx) {
+  addCameraShake(fx.rank >= 4 ? 5.8 : 3.6);
+  const hits = [];
+  queryEnemies(fx.x, fx.y, fx.baseRadius * 0.82, hits);
+  for (const e of hits) {
+    if (e.dead) continue;
+    const d = Math.max(1, Math.hypot(e.x - fx.x, e.y - fx.y));
+    const falloff = clamp(1 - d / (fx.baseRadius * 0.82), 0.28, 1);
+    damageEnemy(e, fx.collapseDamage * falloff, fx.x, fx.y);
+    applyKnockback(e, e.x - fx.x, e.y - fx.y, e.boss ? 26 : 95 * falloff);
+  }
+  world.weaponFx.push({
+    kind: "riftCollapse",
+    x: fx.x,
+    y: fx.y,
+    radius: fx.baseRadius,
+    color: fx.color,
+    rank: fx.rank,
+    secondary: fx.secondary,
+    life: fx.rank >= 4 ? 0.46 : 0.36,
+    maxLife: fx.rank >= 4 ? 0.46 : 0.36,
+    seed: fx.seed || Math.random() * 999,
+  });
+  burst(fx.x, fx.y, fx.rank >= 4 ? 24 : 16, fx.color, fx.rank >= 4 ? 280 : 210);
+  if (fx.rank >= 3) {
+    const points = riftLoomPoints(fx);
+    world.weaponFx.push({
+      kind: "riftScar",
+      x: fx.x,
+      y: fx.y,
+      segments: riftLoomSegments(points, fx.rank),
+      damage: fx.scarDamage,
+      lineWidth: fx.lineWidth + 12,
+      color: fx.color,
+      rank: fx.rank,
+      life: 0.45,
+      maxLife: 0.45,
+      hitIds: new Set(),
+      seed: fx.seed || Math.random() * 999,
+    });
+  }
+  playSfx("explode");
+}
+
+function updateRiftScarDamage(fx, dt) {
+  const hits = [];
+  queryEnemies(fx.x, fx.y, Math.max(80, Math.hypot(fx.segments?.[0]?.x1 - fx.x || 0, fx.segments?.[0]?.y1 - fx.y || 0) + 90), hits);
+  for (const e of hits) {
+    if (e.dead || fx.hitIds?.has(e)) continue;
+    for (const seg of fx.segments || []) {
+      const info = pointSegmentInfo(e.x, e.y, seg.x1, seg.y1, seg.x2, seg.y2);
+      if (info.t < -0.05 || info.t > 1.05 || info.distance > (e.r || 0) + fx.lineWidth) continue;
+      fx.hitIds?.add(e);
+      damageEnemy(e, fx.damage || 0, info.x, info.y);
+      applyKnockback(e, e.x - fx.x, e.y - fx.y, e.boss ? 10 : 34);
+      break;
+    }
   }
 }
 

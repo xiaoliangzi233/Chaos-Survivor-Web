@@ -115,10 +115,11 @@ export function createWeapons() {
     pulse: { level: 0, timer: 2.4, cooldown: 2.7, damage: 80, radius: 132, quality: "common", qualityMult: 1 },
     prism_railgun: { level: 0, timer: 1.05, cooldown: 1.65, count: 1, damage: 76, range: 960, width: 13, hitLimit: 6, refractionRange: 155, quality: "common", qualityMult: 1 },
     void_singularity: { level: 0, timer: 1.35, cooldown: 2.85, count: 1, damage: 28, range: 820, speed: 185, radius: 26, pullRadius: 170, damageRadius: 82, collapseRadius: 132, pullStrength: 310, pulseInterval: 0.58, life: 3.1, quality: "common", qualityMult: 1 },
-    tesla_mine_chain: { level: 0, timer: 1.1, cooldown: 2.05, count: 1, damage: 48, range: 760, triggerRadius: 118, chainRange: 185, chainCount: 4, nodeLife: 5.2, armTime: 0.24, pulseCooldown: 0.62, fieldRadius: 108, quality: "common", qualityMult: 1 },
+    tesla_mine_chain: { level: 0, timer: 1.1, cooldown: 2.05, count: 1, damage: 34, range: 760, triggerRadius: 118, chainRange: 185, chainCount: 4, nodeLife: 5.2, armTime: 0.24, pulseCooldown: 0.62, fieldRadius: 108, quality: "common", qualityMult: 1 },
     starfall_scepter: { level: 0, timer: 1.6, cooldown: 2.65, count: 1, damage: 72, range: 1180, stars: 3, radius: 92, scarRadius: 86, scarDuration: 1.25, warningTime: 0.42, fallTime: 0.72, quality: "common", qualityMult: 1 },
-    phase_needler: { level: 0, timer: 0.9, cooldown: 1.18, count: 1, damage: 38, range: 780, speed: 1040, needles: 4, pierce: 3, phaseDelay: 0.42, phaseRadius: 74, phaseDamage: 56, quality: "common", qualityMult: 1 },
+    phase_needler: { level: 0, timer: 0.9, cooldown: 1.18, count: 1, damage: 38, range: 780, speed: 1040, needles: 2, pierce: 3, phaseDelay: 0.42, phaseRadius: 74, phaseDamage: 56, quality: "common", qualityMult: 1 },
     echo_tuning_fork: { level: 0, timer: 0.75, cooldown: 1.35, count: 1, damage: 54, range: 520, angle: Math.PI * 0.39, echoRadius: 118, echoDamage: 34, echoDuration: 0.55, resonanceDamage: 28, quality: "common", qualityMult: 1 },
+    rift_loom: { level: 0, timer: 1.25, cooldown: 2.2, count: 1, damage: 34, range: 760, anchors: 3, radius: 142, lineWidth: 18, life: 0.8, collapseDamage: 72, scarDamage: 28, quality: "common", qualityMult: 1 },
   };
 }
 

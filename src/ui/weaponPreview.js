@@ -52,7 +52,7 @@ export function drawWeaponPreview(ctx, canvas, weapon, t) {
   const cy = h / 2;
   if (!weapon) return;
   const rank = qualityRank(weapon);
-  const baseColor = { arc: "#42e8ff", ice: "#9ff4ff", missile: "#ffb347", boomerang: "#ff65d8", drone: "#77ff8a", pulse: "#77ff8a", prism_railgun: "#7df9ff", void_singularity: "#8b5cf6", tesla_mine_chain: "#42e8ff", starfall_scepter: "#ffd166", phase_needler: "#b48cff", echo_tuning_fork: "#7dfcff" }[weapon.id] || "#42e8ff";
+  const baseColor = { arc: "#42e8ff", ice: "#9ff4ff", missile: "#ffb347", boomerang: "#ff65d8", drone: "#77ff8a", pulse: "#77ff8a", prism_railgun: "#7df9ff", void_singularity: "#8b5cf6", tesla_mine_chain: "#42e8ff", starfall_scepter: "#ffd166", phase_needler: "#b48cff", echo_tuning_fork: "#7dfcff", rift_loom: "#9d7cff" }[weapon.id] || "#42e8ff";
   const color = qualityColor(weapon, baseColor);
   const scale = Math.min(1, Math.max(0.46, Math.min((w * 0.5 - 24) / 190, (h * 0.5 - 22) / 96)));
   ctx.save();
@@ -71,6 +71,7 @@ export function drawWeaponPreview(ctx, canvas, weapon, t) {
   else if (weapon.id === "starfall_scepter") drawStarfallScepter(ctx, 0, 0, t, rank, color);
   else if (weapon.id === "phase_needler") drawPhaseNeedler(ctx, 0, 0, t, rank, color);
   else if (weapon.id === "echo_tuning_fork") drawEchoTuningFork(ctx, 0, 0, t, rank, color);
+  else if (weapon.id === "rift_loom") drawRiftLoom(ctx, 0, 0, t, rank, color);
   ctx.restore();
 }
 
@@ -794,6 +795,107 @@ function previewEchoCone(ctx, x, y, angle, coneAngle, range, color, rank, alpha,
     ctx.arc(0, 0, range * 0.78, start + 0.08, end - 0.08);
     ctx.stroke();
   }
+  ctx.restore();
+}
+
+function drawRiftLoom(ctx, cx, cy, t, rank, color) {
+  const targets = [
+    { x: cx + 78, y: cy - 42 },
+    { x: cx + 126, y: cy + 4 },
+    { x: cx + 70, y: cy + 48 },
+  ];
+  for (const target of targets) drawDummy(ctx, target.x, target.y, color);
+  const cycle = (t % 2.1) / 2.1;
+  const center = { x: cx + 102, y: cy + 4 };
+  const spin = t * (1.8 + rank * 0.18);
+  const collapse = cycle > 0.72 ? Math.min(1, (cycle - 0.72) / 0.22) : 0;
+  const radius = (56 + rank * 4) * (1 - collapse * 0.48);
+  const anchors = 3 + (rank >= 1 ? 1 : 0);
+  const points = [];
+  for (let i = 0; i < anchors; i++) {
+    const a = spin + i * TAU / anchors;
+    points.push({ x: center.x + Math.cos(a) * radius, y: center.y + Math.sin(a) * radius });
+  }
+  previewRiftWeb(ctx, points, rank, color, t, 1 - collapse * 0.2);
+  for (const p of points) previewRiftAnchor(ctx, p.x, p.y, color, rank, t);
+  if (rank >= 4) {
+    const outer = [];
+    for (let i = 0; i < anchors; i++) {
+      const a = -spin * 0.75 + i * TAU / anchors + 0.25;
+      outer.push({ x: center.x + Math.cos(a) * radius * 1.22, y: center.y + Math.sin(a) * radius * 1.22 });
+    }
+    previewRiftWeb(ctx, outer, rank, "#ffd166", t + 2, 0.42);
+  }
+  if (cycle > 0.72) {
+    const k = Math.max(0, 1 - (cycle - 0.72) / 0.28);
+    ring(ctx, center.x, center.y, 20 + (1 - k) * 70, rank >= 4 ? "#ffd166" : color, 0.78 * k);
+    previewRiftCollapse(ctx, center.x, center.y, 64, rank >= 4 ? "#ffd166" : color, k, t);
+  }
+}
+
+function previewRiftWeb(ctx, points, rank, color, t, alpha) {
+  ctx.save();
+  ctx.globalCompositeOperation = "lighter";
+  ctx.lineCap = "round";
+  const segments = [];
+  for (let i = 0; i < points.length; i++) segments.push([points[i], points[(i + 1) % points.length], false]);
+  if (rank >= 2 && points.length >= 4) for (let i = 0; i < points.length; i++) segments.push([points[i], points[(i + 2) % points.length], true]);
+  for (let i = 0; i < segments.length; i++) {
+    const [a, b, diag] = segments[i];
+    ctx.strokeStyle = colorWithAlpha(color, alpha * (diag ? 0.24 : 0.34));
+    ctx.lineWidth = diag ? 5 : 8;
+    ctx.beginPath();
+    ctx.moveTo(a.x, a.y);
+    ctx.lineTo((a.x + b.x) / 2 + Math.sin(t * 8 + i) * 4, (a.y + b.y) / 2 + Math.cos(t * 7 + i) * 4);
+    ctx.lineTo(b.x, b.y);
+    ctx.stroke();
+    ctx.strokeStyle = colorWithAlpha("#ffffff", alpha * (diag ? 0.45 : 0.78));
+    ctx.lineWidth = diag ? 1.2 : 2;
+    ctx.stroke();
+  }
+  ctx.lineCap = "butt";
+  ctx.restore();
+}
+
+function previewRiftAnchor(ctx, x, y, color, rank, t) {
+  glow(ctx, x, y, 15 + rank * 2, color, 0.24);
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(t * 4);
+  ctx.fillStyle = colorWithAlpha("#ffffff", 0.9);
+  ctx.beginPath();
+  ctx.moveTo(0, -6);
+  ctx.lineTo(6, 0);
+  ctx.lineTo(0, 6);
+  ctx.lineTo(-6, 0);
+  ctx.closePath();
+  ctx.fill();
+  ctx.strokeStyle = rank >= 4 ? "#ffd166" : color;
+  ctx.lineWidth = 1.4;
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.arc(0, 0, 11, 0, Math.PI * 1.4);
+  ctx.stroke();
+  ctx.restore();
+}
+
+function previewRiftCollapse(ctx, x, y, radius, color, alpha, t) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(t * 6);
+  ctx.globalCompositeOperation = "lighter";
+  glow(ctx, 0, 0, radius * 0.5, color, alpha * 0.34);
+  ctx.lineCap = "round";
+  for (let i = 0; i < 8; i++) {
+    const a = i * TAU / 8;
+    ctx.strokeStyle = colorWithAlpha(i % 2 ? "#ffffff" : color, alpha * 0.76);
+    ctx.lineWidth = i % 2 ? 2 : 5;
+    ctx.beginPath();
+    ctx.moveTo(Math.cos(a) * 8, Math.sin(a) * 8);
+    ctx.lineTo(Math.cos(a + Math.sin(t + i) * 0.05) * radius, Math.sin(a + Math.sin(t + i) * 0.05) * radius);
+    ctx.stroke();
+  }
+  ctx.lineCap = "butt";
   ctx.restore();
 }
 

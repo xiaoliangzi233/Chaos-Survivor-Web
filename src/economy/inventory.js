@@ -84,6 +84,12 @@ export const WEAPON_INFO = {
     desc: "释放扇形声波压制近中距离敌人，命中后扩散回响波。",
     tags: ["扇形声波", "回响扩散", "持续压制"],
   },
+  rift_loom: {
+    icon: "⌘",
+    name: "裂隙织机",
+    desc: "投放空间锚点织出旋转裂隙线网，切割敌群并在收束时爆发。",
+    tags: ["空间线网", "几何切割", "区域封锁"],
+  },
 };
 
 export function addWeaponToInventory(id, quality = "common") {

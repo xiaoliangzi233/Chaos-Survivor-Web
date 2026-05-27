@@ -479,6 +479,12 @@ function drawWeaponFx(ctx) {
       drawEchoWaveFx(ctx, fx, k);
     } else if (fx.kind === "echoResonance") {
       drawEchoResonanceFx(ctx, fx, k);
+    } else if (fx.kind === "riftLoom") {
+      drawRiftLoomFx(ctx, fx, k);
+    } else if (fx.kind === "riftCollapse") {
+      drawRiftCollapseFx(ctx, fx, k);
+    } else if (fx.kind === "riftScar") {
+      drawRiftScarFx(ctx, fx, k);
     } else {
       ctx.strokeStyle = hexToRgba(fx.color, k);
       ctx.lineWidth = 2;
@@ -1842,6 +1848,114 @@ function drawEchoResonanceFx(ctx, fx, k) {
     strokePolyline(ctx, points);
   }
   glow(ctx, fx.x2, fx.y2, 42 + fx.rank * 7, k * 0.32, fx.rank >= 4 ? "#ffd166" : fx.color);
+  ctx.lineCap = "butt";
+  ctx.restore();
+}
+
+function drawRiftLoomFx(ctx, fx, k) {
+  const progress = 1 - k;
+  const points = [];
+  const radius = (fx.baseRadius || fx.radius) * (1 - progress * 0.34);
+  for (let i = 0; i < fx.anchors; i++) {
+    const a = (fx.spin || 0) + i * TAU / fx.anchors + Math.sin(state.time * 5 + i + (fx.seed || 0)) * 0.025;
+    const r = radius * (0.92 + Math.sin(state.time * 5 + i + (fx.seed || 0)) * 0.035);
+    points.push({ x: fx.x + Math.cos(a) * r, y: fx.y + Math.sin(a) * r });
+  }
+  ctx.save();
+  ctx.globalCompositeOperation = "lighter";
+  glow(ctx, fx.x, fx.y, radius * 0.58, k * 0.2, fx.color);
+  ctx.lineCap = "round";
+  drawRiftSegments(ctx, points, fx.rank || 0, fx.color, k, fx.seed || 0, fx.secondary);
+  for (let i = 0; i < points.length; i++) {
+    const p = points[i];
+    const pulse = 1 + Math.sin(state.time * 9 + i + (fx.seed || 0)) * 0.08;
+    glow(ctx, p.x, p.y, 18 * pulse, k * 0.36, fx.rank >= 4 ? "#ffd166" : fx.color);
+    ctx.fillStyle = hexToRgba("#ffffff", k * 0.92);
+    diamondAt(ctx, p.x, p.y, 5.5 * pulse);
+    ctx.strokeStyle = hexToRgba(fx.rank >= 4 ? "#ffd166" : fx.color, k * 0.9);
+    ctx.lineWidth = 1.4;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, 12 * pulse, state.time * 4, state.time * 4 + Math.PI * 1.35);
+    ctx.stroke();
+  }
+  ctx.strokeStyle = hexToRgba("#ffffff", k * 0.18);
+  ctx.lineWidth = 1;
+  ctx.setLineDash([6, 8]);
+  ctx.beginPath();
+  ctx.arc(fx.x, fx.y, radius * (0.88 + Math.sin(state.time * 4 + (fx.seed || 0)) * 0.025), 0, TAU);
+  ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.lineCap = "butt";
+  ctx.restore();
+}
+
+function drawRiftSegments(ctx, points, rank, color, k, seed, secondary) {
+  if (points.length < 2) return;
+  const segments = [];
+  for (let i = 0; i < points.length; i++) segments.push([points[i], points[(i + 1) % points.length], false]);
+  if (rank >= 2 && points.length >= 4) {
+    for (let i = 0; i < points.length; i++) segments.push([points[i], points[(i + 2) % points.length], true]);
+  }
+  for (let i = 0; i < segments.length; i++) {
+    const [a, b, diagonal] = segments[i];
+    const line = jaggedLine(a.x, a.y, b.x, b.y, diagonal ? 5 : 7, diagonal ? 5 : 8, seed + i * 17 + state.time * 95);
+    ctx.strokeStyle = hexToRgba(color, k * (secondary ? 0.2 : 0.28));
+    ctx.lineWidth = diagonal ? 6 : 9;
+    strokePolyline(ctx, line);
+    ctx.strokeStyle = hexToRgba("#ffffff", k * (diagonal ? 0.48 : 0.78));
+    ctx.lineWidth = diagonal ? 1.4 : 2.4;
+    strokePolyline(ctx, line);
+    ctx.strokeStyle = hexToRgba(rank >= 4 ? "#ffd166" : "#42e8ff", k * 0.64);
+    ctx.lineWidth = diagonal ? 0.8 : 1.2;
+    strokePolyline(ctx, line);
+  }
+}
+
+function drawRiftCollapseFx(ctx, fx, k) {
+  const progress = 1 - k;
+  const r = fx.radius * (0.18 + progress * 0.78);
+  ctx.save();
+  ctx.translate(fx.x, fx.y);
+  ctx.rotate((fx.seed || 0) + state.time * 5.5);
+  ctx.globalCompositeOperation = "lighter";
+  glow(ctx, 0, 0, fx.radius * 0.62, k * 0.5, fx.color);
+  const grad = ctx.createRadialGradient(0, 0, 2, 0, 0, Math.max(5, r));
+  grad.addColorStop(0, hexToRgba("#ffffff", k * 0.86));
+  grad.addColorStop(0.28, hexToRgba(fx.rank >= 4 ? "#ffd166" : fx.color, k * 0.44));
+  grad.addColorStop(0.72, hexToRgba("#42e8ff", k * 0.14));
+  grad.addColorStop(1, "rgba(0,0,0,0)");
+  ctx.fillStyle = grad;
+  ctx.beginPath();
+  ctx.arc(0, 0, r, 0, TAU);
+  ctx.fill();
+  ctx.lineCap = "round";
+  for (let i = 0; i < 8; i++) {
+    const a = i * TAU / 8;
+    ctx.strokeStyle = hexToRgba(i % 2 ? "#ffffff" : fx.color, k * 0.82);
+    ctx.lineWidth = i % 2 ? 2.8 * k : 5.5 * k;
+    ctx.beginPath();
+    ctx.moveTo(Math.cos(a) * r * 0.12, Math.sin(a) * r * 0.12);
+    ctx.lineTo(Math.cos(a + Math.sin(state.time + i) * 0.04) * fx.radius * 0.9, Math.sin(a + Math.sin(state.time + i) * 0.04) * fx.radius * 0.9);
+    ctx.stroke();
+  }
+  ctx.lineCap = "butt";
+  ctx.restore();
+}
+
+function drawRiftScarFx(ctx, fx, k) {
+  ctx.save();
+  ctx.globalCompositeOperation = "lighter";
+  ctx.lineCap = "round";
+  for (let i = 0; i < (fx.segments || []).length; i++) {
+    const seg = fx.segments[i];
+    const points = jaggedLine(seg.x1, seg.y1, seg.x2, seg.y2, 6, 7, (fx.seed || 0) + i * 23 + state.time * 70);
+    ctx.strokeStyle = hexToRgba(fx.color, k * 0.22);
+    ctx.lineWidth = 7;
+    strokePolyline(ctx, points);
+    ctx.strokeStyle = hexToRgba("#ffffff", k * 0.5);
+    ctx.lineWidth = 1.6;
+    strokePolyline(ctx, points);
+  }
   ctx.lineCap = "butt";
   ctx.restore();
 }

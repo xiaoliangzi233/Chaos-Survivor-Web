@@ -301,7 +301,7 @@ function enemyRole(entry) {
 }
 
 function weaponColor(id) {
-  return { arc: "#42e8ff", ice: "#9ff4ff", missile: "#ffb347", boomerang: "#ff65d8", drone: "#77ff8a", pulse: "#77ff8a" }[id] || "#42e8ff";
+  return { arc: "#42e8ff", ice: "#9ff4ff", missile: "#ffb347", boomerang: "#ff65d8", drone: "#77ff8a", pulse: "#77ff8a", prism_railgun: "#7df9ff" }[id] || "#42e8ff";
 }
 
 function hexToRgba(hex, alpha) {

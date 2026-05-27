@@ -418,6 +418,10 @@ function drawWeaponFx(ctx) {
       drawShockRingFx(ctx, fx, k);
     } else if (fx.kind === "frostZone") {
       drawFrostZoneFx(ctx, fx, k);
+    } else if (fx.kind === "prismRail") {
+      drawPrismRailFx(ctx, fx, k);
+    } else if (fx.kind === "prismImpact") {
+      drawPrismImpactFx(ctx, fx, k);
     } else if (fx.kind === "prismBurst") {
       drawPrismBurstFx(ctx, fx, k);
     } else if (fx.kind === "bladeBloom") {
@@ -827,6 +831,117 @@ function drawFrostZoneFx(ctx, fx, k) {
     ctx.fillStyle = hexToRgba("#ffffff", k * 0.62);
     ctx.fillRect(x - 1, y - 1, 2, 2);
   }
+}
+
+function drawPrismRailFx(ctx, fx, k) {
+  const dx = fx.x2 - fx.x1;
+  const dy = fx.y2 - fx.y1;
+  const len = Math.max(1, Math.hypot(dx, dy));
+  const ux = dx / len;
+  const uy = dy / len;
+  const nx = -uy;
+  const ny = ux;
+  const width = fx.width || 12;
+  ctx.save();
+  ctx.globalCompositeOperation = "lighter";
+  ctx.lineCap = "round";
+
+  const glowWidth = width * (fx.secondary ? 2.5 : 3.6) * k;
+  ctx.strokeStyle = hexToRgba(fx.color, k * (fx.secondary ? 0.2 : 0.32));
+  ctx.lineWidth = glowWidth;
+  ctx.beginPath();
+  ctx.moveTo(fx.x1, fx.y1);
+  ctx.lineTo(fx.x2, fx.y2);
+  ctx.stroke();
+
+  ctx.strokeStyle = hexToRgba("#ffffff", k * 0.95);
+  ctx.lineWidth = Math.max(2, width * 0.34) * k;
+  ctx.beginPath();
+  ctx.moveTo(fx.x1, fx.y1);
+  ctx.lineTo(fx.x2, fx.y2);
+  ctx.stroke();
+
+  ctx.strokeStyle = hexToRgba(fx.color, k * 0.88);
+  ctx.lineWidth = Math.max(1.4, width * 0.16);
+  for (const side of [-1, 1]) {
+    ctx.beginPath();
+    ctx.moveTo(fx.x1 + nx * width * side, fx.y1 + ny * width * side);
+    ctx.lineTo(fx.x2 + nx * width * side, fx.y2 + ny * width * side);
+    ctx.stroke();
+  }
+
+  const ticks = Math.min(12, Math.max(5, Math.floor(len / 120)));
+  ctx.strokeStyle = hexToRgba(fx.rank >= 4 ? "#ffd166" : "#ff65d8", k * 0.62);
+  ctx.lineWidth = 1.5;
+  for (let i = 0; i < ticks; i++) {
+    const t = ((i + state.time * 6 + (fx.seed || 0)) % ticks) / ticks;
+    const x = fx.x1 + dx * t;
+    const y = fx.y1 + dy * t;
+    ctx.beginPath();
+    ctx.moveTo(x - nx * width * 1.4 - ux * 8, y - ny * width * 1.4 - uy * 8);
+    ctx.lineTo(x + nx * width * 1.4 + ux * 8, y + ny * width * 1.4 + uy * 8);
+    ctx.stroke();
+  }
+
+  if (fx.rank >= 3) {
+    ctx.strokeStyle = hexToRgba("#b48cff", k * 0.42);
+    ctx.lineWidth = 1;
+    for (let i = 0; i < 7; i++) {
+      const t = (i + 0.5) / 7;
+      const x = fx.x1 + dx * t;
+      const y = fx.y1 + dy * t;
+      const size = width * (0.55 + (i % 2) * 0.25);
+      ctx.beginPath();
+      ctx.moveTo(x, y - size);
+      ctx.lineTo(x + size, y);
+      ctx.lineTo(x, y + size);
+      ctx.lineTo(x - size, y);
+      ctx.closePath();
+      ctx.stroke();
+    }
+  }
+
+  for (const impact of fx.impacts || []) {
+    glow(ctx, impact.x, impact.y, width * 1.4, k * 0.42, fx.color);
+    ctx.strokeStyle = hexToRgba("#ffffff", k * 0.82);
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.arc(impact.x, impact.y, width * (1.2 - k * 0.35), 0, TAU);
+    ctx.stroke();
+  }
+  ctx.lineCap = "butt";
+  ctx.restore();
+}
+
+function drawPrismImpactFx(ctx, fx, k) {
+  ctx.save();
+  ctx.translate(fx.x, fx.y);
+  ctx.rotate((fx.seed || 0) + state.time * 5);
+  ctx.globalCompositeOperation = "lighter";
+  const r = fx.radius * (1 - k * 0.18);
+  glow(ctx, 0, 0, r * 0.7, k * 0.48, fx.color);
+  ctx.strokeStyle = hexToRgba("#ffffff", k * 0.88);
+  ctx.lineWidth = 2.4 * k;
+  ctx.beginPath();
+  ctx.arc(0, 0, r * 0.55, 0, TAU);
+  ctx.stroke();
+  ctx.strokeStyle = hexToRgba(fx.color, k * 0.84);
+  ctx.lineWidth = 1.7;
+  for (let i = 0; i < 8; i++) {
+    const a = i * TAU / 8;
+    ctx.beginPath();
+    ctx.moveTo(Math.cos(a) * r * 0.22, Math.sin(a) * r * 0.22);
+    ctx.lineTo(Math.cos(a) * r, Math.sin(a) * r);
+    ctx.stroke();
+  }
+  if (fx.rank >= 2) {
+    ctx.strokeStyle = hexToRgba("#ff65d8", k * 0.58);
+    for (let i = 0; i < 4; i++) {
+      ctx.rotate(TAU / 4);
+      ctx.strokeRect(-r * 0.36, -r * 0.36, r * 0.72, r * 0.72);
+    }
+  }
+  ctx.restore();
 }
 
 function drawPrismBurstFx(ctx, fx, k) {

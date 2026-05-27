@@ -194,7 +194,7 @@ export function canPurchaseItem(itemId) {
   const item = ITEM_DEFS.find((entry) => entry.id === itemId);
   if (!item) return { ok: false, reason: "道具不存在" };
   if (item.unique && hasPurchasedUniqueItem(item.id)) return { ok: false, reason: "该道具只能购买一次" };
-  if (item.id === "split_shot" && !state.inventory?.weaponSlots.some((slot) => ["ice", "missile", "boomerang", "drone"].includes(slot.id))) return { ok: false, reason: "需要至少一把投射物武器" };
+  if (item.id === "split_shot" && !state.inventory?.weaponSlots.some((slot) => ["ice", "missile", "boomerang", "drone", "prism_railgun"].includes(slot.id))) return { ok: false, reason: "需要至少一把投射物武器" };
   return { ok: true };
 }
 
@@ -203,7 +203,7 @@ export function offerQualityForItem(item, rarity) {
 }
 
 function applySplitShot(player) {
-  const slots = (state.inventory?.weaponSlots || []).filter((slot) => ["ice", "missile", "boomerang", "drone"].includes(slot.id));
+  const slots = (state.inventory?.weaponSlots || []).filter((slot) => ["ice", "missile", "boomerang", "drone", "prism_railgun"].includes(slot.id));
   if (!slots.length) return;
   const slot = slots[Math.floor(Math.random() * slots.length)];
   slot.projectileBonus = (slot.projectileBonus || 0) + 1;

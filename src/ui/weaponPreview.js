@@ -52,7 +52,7 @@ export function drawWeaponPreview(ctx, canvas, weapon, t) {
   const cy = h / 2;
   if (!weapon) return;
   const rank = qualityRank(weapon);
-  const baseColor = { arc: "#42e8ff", ice: "#9ff4ff", missile: "#ffb347", boomerang: "#ff65d8", drone: "#77ff8a", pulse: "#77ff8a" }[weapon.id] || "#42e8ff";
+  const baseColor = { arc: "#42e8ff", ice: "#9ff4ff", missile: "#ffb347", boomerang: "#ff65d8", drone: "#77ff8a", pulse: "#77ff8a", prism_railgun: "#7df9ff" }[weapon.id] || "#42e8ff";
   const color = qualityColor(weapon, baseColor);
   const scale = Math.min(1, Math.max(0.46, Math.min((w * 0.5 - 24) / 190, (h * 0.5 - 22) / 96)));
   ctx.save();
@@ -65,6 +65,7 @@ export function drawWeaponPreview(ctx, canvas, weapon, t) {
   else if (weapon.id === "boomerang") drawBoomerang(ctx, 0, 0, t, rank, color);
   else if (weapon.id === "drone") drawDrones(ctx, 0, 0, t, rank, color);
   else if (weapon.id === "pulse") drawPulse(ctx, 0, 0, t, rank, color);
+  else if (weapon.id === "prism_railgun") drawPrismRailgun(ctx, 0, 0, t, rank, color);
   ctx.restore();
 }
 
@@ -230,6 +231,71 @@ function drawPulse(ctx, cx, cy, t, rank, color) {
   if (rank >= 4) {
     ring(ctx, cx, cy, r * 0.62, "#ffffff", 0.5);
     ring(ctx, cx, cy, r + 54, "#ffd166", 0.36);
+  }
+}
+
+function drawPrismRailgun(ctx, cx, cy, t, rank, color) {
+  const angle = -0.16 + Math.sin(t * 1.6) * 0.035;
+  const muzzleX = cx + Math.cos(angle) * 34;
+  const muzzleY = cy + Math.sin(angle) * 34;
+  const endX = cx + Math.cos(angle) * 170;
+  const endY = cy + Math.sin(angle) * 170;
+  const nx = -Math.sin(angle);
+  const ny = Math.cos(angle);
+  ring(ctx, muzzleX, muzzleY, 28 + Math.sin(t * 7) * 3, color, 0.72);
+  for (let i = 0; i < 3; i++) {
+    const r = 18 + i * 11 + Math.sin(t * 4 + i) * 2;
+    ctx.strokeStyle = colorWithAlpha(i === 1 ? "#ff65d8" : color, 0.42);
+    ctx.lineWidth = 1.4;
+    ctx.beginPath();
+    ctx.arc(muzzleX, muzzleY, r, t * (i + 1), t * (i + 1) + Math.PI * 1.2);
+    ctx.stroke();
+  }
+  ctx.lineCap = "round";
+  ctx.strokeStyle = colorWithAlpha(color, 0.24);
+  ctx.lineWidth = rank >= 3 ? 24 : 18;
+  ctx.beginPath();
+  ctx.moveTo(muzzleX, muzzleY);
+  ctx.lineTo(endX, endY);
+  ctx.stroke();
+  ctx.strokeStyle = "#ffffff";
+  ctx.lineWidth = rank >= 1 ? 6 : 4;
+  ctx.beginPath();
+  ctx.moveTo(muzzleX, muzzleY);
+  ctx.lineTo(endX, endY);
+  ctx.stroke();
+  ctx.strokeStyle = colorWithAlpha(rank >= 4 ? "#ffd166" : "#ff65d8", 0.72);
+  ctx.lineWidth = 1.6;
+  for (let i = 0; i < 5; i++) {
+    const k = ((i + t * 4) % 5) / 5;
+    const x = muzzleX + (endX - muzzleX) * k;
+    const y = muzzleY + (endY - muzzleY) * k;
+    ctx.beginPath();
+    ctx.moveTo(x - nx * 18, y - ny * 18);
+    ctx.lineTo(x + nx * 18, y + ny * 18);
+    ctx.stroke();
+  }
+  ctx.lineCap = "butt";
+  const targets = [
+    { x: cx + 82, y: cy - 18 },
+    { x: cx + 126, y: cy - 26 },
+    { x: cx + 148, y: cy + 18 },
+  ];
+  for (const target of targets) {
+    drawDummy(ctx, target.x, target.y, color);
+    ring(ctx, target.x, target.y, 17 + Math.sin(t * 8 + target.x) * 3, color, 0.45);
+  }
+  if (rank >= 2) {
+    lightning(ctx, targets[0].x, targets[0].y, targets[0].x + 38, targets[0].y - 34, t, "#ff65d8", 0.72);
+    lightning(ctx, targets[0].x, targets[0].y, targets[0].x + 44, targets[0].y + 28, t + 1, color, 0.6);
+  }
+  if (rank >= 4) {
+    ctx.strokeStyle = colorWithAlpha("#ffd166", 0.52);
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.moveTo(muzzleX + nx * 22, muzzleY + ny * 22);
+    ctx.lineTo(endX + nx * 22, endY + ny * 22);
+    ctx.stroke();
   }
 }
 

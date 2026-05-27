@@ -7,7 +7,7 @@ import { playSfx } from "../audio.js";
 import { addWeaponToInventory, QUALITY_INFO, QUALITY_ORDER, WEAPON_INFO } from "../economy/inventory.js";
 import { attackSpeedMultiplier, weaponProjectileBonus, weaponRangeBonus } from "./items.js";
 
-export const STARTER_WEAPONS = ["arc", "ice", "missile", "boomerang", "drone"].map((id) => ({ id, ...WEAPON_INFO[id] }));
+export const STARTER_WEAPONS = ["arc", "ice", "missile", "boomerang", "drone", "prism_railgun"].map((id) => ({ id, ...WEAPON_INFO[id] }));
 
 export const UPGRADE_DEFS = [
   {
@@ -146,6 +146,7 @@ export function updateWeapons(dt) {
   updateBoomerangWeapon(dt);
   updateDroneWeapon(dt);
   updatePulseWeapon(dt);
+  updatePrismRailgunWeapon(dt);
   updateProjectiles(dt);
   updateWeaponFx(dt);
 }
@@ -600,6 +601,143 @@ function updatePulseWeapon(dt) {
   pulse(state.player.x, state.player.y, radius, color, 0.34);
   world.weaponFx.push({ kind: doublePulse ? "doublePulse" : "pulse", x: state.player.x, y: state.player.y, radius, life: 0.36, maxLife: 0.36, color });
   playSfx("explode");
+}
+
+function updatePrismRailgunWeapon(dt) {
+  const w = state.weapons.prism_railgun;
+  if (!tickWeapon(w, dt)) return;
+  const p = state.player;
+  const target = nearestEnemy(p.x, p.y, w.range + weaponRangeBonus());
+  if (!target) return;
+
+  const base = Math.atan2(target.y - p.y, target.x - p.x);
+  const count = Math.max(1, w.count || 1) + weaponProjectileBonus(w);
+  let fired = 0;
+  for (let i = 0; i < count; i++) {
+    const quality = weaponQualityAt(w, i);
+    const shot = weaponViewForQuality(w, quality);
+    const rank = qualityRank(shot);
+    const color = qualityColor(shot, "#7df9ff");
+    const spread = (i - (count - 1) / 2) * 0.055;
+    firePrismRail(shot, w, base + spread, color, rank, 1, i, count, false);
+    fired++;
+    if (rank >= 4) {
+      firePrismRail(shot, w, base + spread * 0.45, color, rank, 0.46, i + 0.5, count, true);
+      fired++;
+    }
+  }
+  if (fired) {
+    addCameraShake(Math.min(7, 2.2 + fired * 0.5));
+    playSfx("shoot");
+  }
+}
+
+function firePrismRail(shot, base, angle, color, rank, damageScale, beamIndex, beamCount, secondary) {
+  const p = state.player;
+  const range = base.range + weaponRangeBonus();
+  const width = (base.width + (rank >= 1 ? 4 : 0) + rank * 1.2) * (secondary ? 0.68 : 1);
+  const nx = -Math.sin(angle);
+  const ny = Math.cos(angle);
+  const offset = (beamIndex - (beamCount - 1) / 2) * 12 + (secondary ? 26 : 0);
+  const x1 = p.x + Math.cos(angle) * 18 + nx * offset;
+  const y1 = p.y + Math.sin(angle) * 18 + ny * offset;
+  const x2 = x1 + Math.cos(angle) * range;
+  const y2 = y1 + Math.sin(angle) * range;
+  const candidates = [];
+  const nearby = [];
+  queryEnemies(p.x, p.y, range + 160, nearby);
+  for (const e of nearby) {
+    if (e.dead) continue;
+    const hit = pointSegmentInfo(e.x, e.y, x1, y1, x2, y2);
+    if (hit.t < 0 || hit.t > 1 || hit.distance > (e.r || 0) + width) continue;
+    candidates.push({ enemy: e, t: hit.t, x: hit.x, y: hit.y, distance: hit.distance });
+  }
+  candidates.sort((a, b) => a.t - b.t);
+
+  const hitLimit = base.hitLimit + (rank >= 1 ? 1 : 0);
+  const damage = weaponPower(shot, base.damage) * damageScale;
+  const hitRecords = candidates.slice(0, hitLimit);
+  const hitSet = new Set();
+  for (let i = 0; i < hitRecords.length; i++) {
+    const hit = hitRecords[i];
+    hitSet.add(hit.enemy);
+    const falloff = Math.max(0.72, 1 - i * 0.055);
+    damageEnemy(hit.enemy, damage * falloff, hit.x, hit.y);
+    applyKnockback(hit.enemy, Math.cos(angle), Math.sin(angle), secondary ? 62 : 118);
+    burst(hit.x, hit.y, secondary ? 5 : 8, color, secondary ? 120 : 180);
+  }
+
+  if (rank >= 2 && hitRecords[0]) prismRefraction(hitRecords[0], shot, base, color, hitSet, damage * 0.28);
+  if (rank >= 3) prismRiftDamage(x1, y1, x2, y2, width + 42, damage * 0.2, color, hitSet);
+
+  world.weaponFx.push({
+    kind: "prismRail",
+    x1, y1, x2, y2,
+    width,
+    color,
+    rank,
+    secondary,
+    impacts: hitRecords.map((hit) => ({ x: hit.x, y: hit.y })),
+    life: secondary ? 0.2 : 0.27,
+    maxLife: secondary ? 0.2 : 0.27,
+    seed: Math.random() * 999,
+  });
+  if (hitRecords.length) {
+    world.weaponFx.push({
+      kind: "prismImpact",
+      x: hitRecords[0].x,
+      y: hitRecords[0].y,
+      radius: 34 + rank * 5,
+      color,
+      rank,
+      life: 0.22,
+      maxLife: 0.22,
+      seed: Math.random() * 999,
+    });
+  }
+}
+
+function prismRefraction(sourceHit, shot, base, color, excluded, damage) {
+  const hits = [];
+  queryEnemies(sourceHit.x, sourceHit.y, base.refractionRange, hits);
+  const arcs = [];
+  let count = 0;
+  for (const e of hits) {
+    if (e.dead || excluded.has(e) || count >= 3) continue;
+    count++;
+    excluded.add(e);
+    damageEnemy(e, damage, sourceHit.x, sourceHit.y);
+    applyKnockback(e, e.x - sourceHit.x, e.y - sourceHit.y, 58);
+    arcs.push({ x1: sourceHit.x, y1: sourceHit.y, x2: e.x, y2: e.y, seed: Math.random() * 999 });
+  }
+  if (arcs.length) world.weaponFx.push({ kind: "arc", segments: arcs, life: 0.16, maxLife: 0.16, color });
+}
+
+function prismRiftDamage(x1, y1, x2, y2, width, damage, color, excluded) {
+  const p = state.player;
+  const hits = [];
+  queryEnemies(p.x, p.y, Math.hypot(x2 - x1, y2 - y1) + 120, hits);
+  let count = 0;
+  for (const e of hits) {
+    if (e.dead || excluded.has(e) || count >= 5) continue;
+    const hit = pointSegmentInfo(e.x, e.y, x1, y1, x2, y2);
+    if (hit.t < 0 || hit.t > 1 || hit.distance > (e.r || 0) + width) continue;
+    count++;
+    damageEnemy(e, damage, hit.x, hit.y);
+    applyKnockback(e, e.x - hit.x, e.y - hit.y, 46);
+  }
+  if (count) world.weaponFx.push({ kind: "shockRing", x: (x1 + x2) / 2, y: (y1 + y2) / 2, radius: Math.min(120, width * 1.65), life: 0.22, maxLife: 0.22, color });
+}
+
+function pointSegmentInfo(px, py, x1, y1, x2, y2) {
+  const dx = x2 - x1;
+  const dy = y2 - y1;
+  const len2 = dx * dx + dy * dy || 1;
+  const rawT = ((px - x1) * dx + (py - y1) * dy) / len2;
+  const t = clamp(rawT, 0, 1);
+  const x = x1 + dx * t;
+  const y = y1 + dy * t;
+  return { t: rawT, x, y, distance: Math.hypot(px - x, py - y) };
 }
 
 function tickWeapon(w, dt) {

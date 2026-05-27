@@ -48,6 +48,12 @@ export const WEAPON_INFO = {
     desc: "周期性范围爆发，击退周围敌人。",
     tags: ["范围爆发", "击退"],
   },
+  prism_railgun: {
+    icon: "⟐",
+    name: "棱镜轨道炮",
+    desc: "蓄能后发射贯穿战场的棱镜光束，沿直线撕开敌群并产生折射打击。",
+    tags: ["直线贯穿", "蓄能光束", "折射打击"],
+  },
 };
 
 export function addWeaponToInventory(id, quality = "common") {

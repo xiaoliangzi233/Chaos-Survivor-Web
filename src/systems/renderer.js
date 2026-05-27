@@ -787,7 +787,7 @@ function drawCoins(ctx) {
 
 function drawEnemyProjectiles(ctx) {
   for (const b of world.enemyProjectiles) {
-    if (b.shape === "snowflake") {
+    if (b.shape === "snowflake" || b.shape === "frostComet") {
       drawSnowflakeProjectile(ctx, b);
       continue;
     }
@@ -909,19 +909,43 @@ function drawFireballProjectile(ctx, b) {
   ctx.save();
   ctx.translate(b.x, b.y);
   ctx.rotate(angle);
-  glow(ctx, 0, 0, b.r * 2.4, 0.5, b.color);
-  ctx.fillStyle = "rgba(255,122,26,0.34)";
+  glow(ctx, 0, 0, b.r * 3.2, 0.62, "#ff4d1f");
+  glow(ctx, -b.r * 1.3, 0, b.r * 2.4, 0.36, "#ffd166");
+  ctx.fillStyle = "rgba(255,77,31,0.26)";
+  for (let i = 0; i < 3; i++) {
+    ctx.beginPath();
+    ctx.ellipse(-b.r * (1.3 + i * 0.52), Math.sin(state.time * 10 + i) * b.r * 0.18, b.r * (1.8 - i * 0.24), b.r * (0.72 - i * 0.08), 0, 0, TAU);
+    ctx.fill();
+  }
+  ctx.fillStyle = "rgba(255,122,26,0.5)";
   ctx.beginPath();
   ctx.ellipse(-b.r * 1.1, 0, b.r * 1.8, b.r * 0.78, 0, 0, TAU);
   ctx.fill();
-  ctx.fillStyle = b.color;
+  ctx.save();
+  ctx.rotate((b.spin || 0) + state.time * 8);
+  ctx.strokeStyle = "rgba(255,242,168,0.72)";
+  ctx.lineWidth = 1.4;
+  for (let i = 0; i < 4; i++) {
+    ctx.rotate(TAU / 4);
+    ctx.beginPath();
+    ctx.moveTo(-b.r * 0.2, 0);
+    ctx.lineTo(b.r * 1.8, 0);
+    ctx.stroke();
+  }
+  ctx.restore();
+  ctx.fillStyle = "#ff4d1f";
   ctx.beginPath();
   ctx.arc(0, 0, b.r * 1.05, 0, TAU);
   ctx.fill();
   ctx.fillStyle = "#fff2a8";
   ctx.beginPath();
-  ctx.arc(b.r * 0.26, -b.r * 0.15, b.r * 0.42, 0, TAU);
+  ctx.arc(b.r * 0.28, -b.r * 0.15, b.r * 0.5, 0, TAU);
   ctx.fill();
+  ctx.strokeStyle = "rgba(255,255,255,0.55)";
+  ctx.lineWidth = 1.2;
+  ctx.beginPath();
+  ctx.arc(0, 0, b.r * 1.25, -0.8, 1.2);
+  ctx.stroke();
   ctx.restore();
 }
 
@@ -963,12 +987,23 @@ function drawStormProjectile(ctx, b) {
 
 function drawSnowflakeProjectile(ctx, b) {
   const spin = (b.spin || 0) + state.time * 7;
+  const comet = b.shape === "frostComet";
   ctx.save();
   ctx.translate(b.x, b.y);
   ctx.rotate(spin);
-  glow(ctx, 0, 0, b.r * 1.5, 0.42, b.color);
+  glow(ctx, 0, 0, b.r * (comet ? 2.35 : 1.5), comet ? 0.58 : 0.42, comet ? "#b48cff" : b.color);
+  if (comet) {
+    const angle = Math.atan2(b.vy, b.vx) - spin;
+    ctx.save();
+    ctx.rotate(angle);
+    ctx.fillStyle = "rgba(180,140,255,0.28)";
+    ctx.beginPath();
+    ctx.ellipse(-b.r * 2.2, 0, b.r * 2.8, b.r * 0.72, 0, 0, TAU);
+    ctx.fill();
+    ctx.restore();
+  }
   ctx.strokeStyle = "#dffcff";
-  ctx.lineWidth = 1.6;
+  ctx.lineWidth = comet ? 2.2 : 1.6;
   ctx.lineCap = "round";
   for (let i = 0; i < 6; i++) {
     const a = i * TAU / 6;
@@ -992,8 +1027,15 @@ function drawSnowflakeProjectile(ctx, b) {
   }
   ctx.fillStyle = b.color;
   ctx.beginPath();
-  ctx.arc(0, 0, b.r * 0.62, 0, TAU);
+  ctx.arc(0, 0, b.r * (comet ? 0.78 : 0.62), 0, TAU);
   ctx.fill();
+  if (comet) {
+    ctx.strokeStyle = "rgba(180,140,255,0.8)";
+    ctx.lineWidth = 1.3;
+    ctx.beginPath();
+    ctx.arc(0, 0, b.r * 1.35, 0, TAU);
+    ctx.stroke();
+  }
   ctx.fillStyle = "#ffffff";
   ctx.fillRect(-1.4, -1.4, 2.8, 2.8);
   ctx.lineCap = "butt";

@@ -65,11 +65,12 @@ export class LaserEye extends BaseEnemy {
   damageLaser(dt) {
     const p = state.player;
     const dist = pointLineDistance(p.x, p.y, this.x, this.y, this.angle);
-    if (dist < p.r + 9) {
-      applyPlayerDamage(this.damage * 1.15 * dt, this);
+    const beamWidth = this.r * 0.5 + 10;
+    if (dist < p.r + beamWidth) {
+      const result = applyPlayerDamage(this.damage * 1.35 * dt, this);
       state.flash = Math.max(state.flash, 0.12);
       state.shake = Math.max(state.shake, 3);
-      if (Math.random() < dt * 18) burst(p.x, p.y, 2, this.color, 80);
+      if (result.damaged && Math.random() < dt * 24) burst(p.x, p.y, 3, this.color, 100);
     }
   }
 

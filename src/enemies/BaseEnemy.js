@@ -9,7 +9,11 @@ import { applyPlayerDamage } from "../systems/items.js";
 export class BaseEnemy {
   constructor(config, x, y) {
     Object.assign(this, config);
-    const scale = this.boss ? 1 : 1 + state.wave * 0.08;
+    const waveLevel = Math.max(0, (state.wave || 1) - 1);
+    const hpScale = this.boss ? 1 : 1 + waveLevel * 0.075;
+    const damageScale = this.boss ? 1 : 1 + waveLevel * 0.038;
+    const speedScale = this.boss ? 1 : Math.min(1.42, 1 + waveLevel * 0.012);
+    const defenseScale = this.boss ? 0 : waveLevel * 0.55 + Math.max(0, waveLevel - 8) * 0.35;
     const difficulty = currentDifficulty();
     const hpMul = this.boss ? difficulty.bossHp : difficulty.enemyHp;
     const damageMul = this.boss ? difficulty.bossDamage : difficulty.enemyDamage;
@@ -18,10 +22,11 @@ export class BaseEnemy {
     this.x = x;
     this.y = y;
     this.r = config.radius;
-    this.hp = config.hp * scale * (hpMul || 1);
+    this.hp = config.hp * hpScale * (hpMul || 1);
     this.maxHp = this.hp;
-    this.speed = config.speed * (speedMul || 1);
-    this.damage = config.damage * (damageMul || 1);
+    this.speed = config.speed * speedScale * (speedMul || 1);
+    this.damage = config.damage * damageScale * (damageMul || 1);
+    this.defense = this.boss ? config.defense || 0 : (config.defense || 0) + defenseScale;
     this.xp = config.xp;
     this.color = config.color;
     this.dead = false;
@@ -155,7 +160,9 @@ export class BaseEnemy {
 
   takeDamage(amount, x, y) {
     if (this.dead) return;
-    this.hp -= amount * (this.shielded ? 0.35 : 1) * state.player.damageScale;
+    const scaled = amount * (this.shielded ? 0.35 : 1) * state.player.damageScale;
+    const reduced = Math.max(1, scaled - (this.defense || 0));
+    this.hp -= reduced;
     this.flash = 1;
     burst(x, y, 3, this.color, 120);
     if (this.hp <= 0) this.kill();

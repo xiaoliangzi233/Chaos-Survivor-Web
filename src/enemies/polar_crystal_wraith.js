@@ -122,6 +122,7 @@ export class PolarCrystalWraith extends BaseEnemy {
       const rounds = this.phaseLevel >= 3 ? 7 : this.phaseLevel >= 2 ? 5 : 4;
       const count = this.phaseLevel >= 2 ? 12 : 6;
       const base = this.orbit + this.attackCount * (this.phaseLevel >= 2 ? 0.22 : Math.PI / 6);
+      pulse(this.x, this.y, this.r + 48, "#d9fbff", 0.12);
       for (let i = 0; i < count; i++) {
         const a = base + i / count * TAU;
         const gap = this.phaseLevel >= 3 && this.attackCount % 2 === 0 && i % 5 === 0;
@@ -279,6 +280,7 @@ export class PolarCrystalWraith extends BaseEnemy {
       spikeAngle: Math.random() * TAU,
     });
     pulse(x, y, 48, this.color, 0.26);
+    for (let i = 0; i < 5; i++) particle("mist", x + (Math.random() - 0.5) * 36, y + (Math.random() - 0.5) * 36, { color: "#d9fbff", life: 0.45, size: 10, alpha: 0.42, vy: -25 });
   }
 
   shootSnowflake(angle, speed, radius, damage, split = false, x = this.x, y = this.y) {
@@ -291,12 +293,13 @@ export class PolarCrystalWraith extends BaseEnemy {
       color: this.color,
       damage,
       life: 4.4,
-      shape: "snowflake",
+      shape: this.phaseLevel >= 3 && split ? "frostComet" : "snowflake",
       spin: Math.random() * TAU,
       frostDuration: split ? 1.2 : 0.8,
       frostSlow: split ? 0.24 : 0.18,
       splitOnExpire: split && this.phaseLevel >= 2,
     });
+    if (Math.random() < 0.7) particle("mist", x, y, { color: "#9ff4ff", life: 0.32, size: 8, alpha: 0.35 });
   }
 
   ringBurst(count, speed, damage) {
@@ -341,13 +344,30 @@ export class PolarCrystalWraith extends BaseEnemy {
     ctx.translate(Math.round(this.x), Math.round(this.y + Math.sin(this.anim * 1.35) * 6));
     drawDashTelegraph(ctx, this);
     drawAuroraMist(ctx, this);
+    drawFrostHalo(ctx, this);
     drawCrystalWings(ctx, this);
     drawOrbitRunes(ctx, this);
+    drawSpiritArms(ctx, this);
     drawWraithBody(ctx, this);
+    drawElfHead(ctx, this);
     drawIceCrown(ctx, this);
     drawCore(ctx, this);
     ctx.restore();
   }
+}
+
+function drawFrostHalo(ctx, e) {
+  ctx.save();
+  ctx.rotate(-e.orbit * 0.42);
+  ctx.scale(1, 0.42);
+  ctx.strokeStyle = e.phaseLevel >= 3 ? "rgba(180,140,255,0.62)" : "rgba(217,251,255,0.54)";
+  ctx.lineWidth = 2;
+  ctx.setLineDash([10, 8]);
+  ctx.beginPath();
+  ctx.arc(0, -e.r * 0.62, e.r * 1.18, 0, TAU);
+  ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.restore();
 }
 
 function drawDashTelegraph(ctx, e) {
@@ -437,6 +457,52 @@ function drawWraithBody(ctx, e) {
   ctx.fill();
   ctx.strokeStyle = edge;
   ctx.lineWidth = 3;
+  ctx.stroke();
+}
+
+function drawSpiritArms(ctx, e) {
+  const sway = Math.sin(e.anim * 1.9) * 5;
+  ctx.strokeStyle = e.flash > 0 ? "#ffffff" : "rgba(217,251,255,0.82)";
+  ctx.lineWidth = 4;
+  ctx.lineCap = "round";
+  for (const side of [-1, 1]) {
+    ctx.beginPath();
+    ctx.moveTo(side * e.r * 0.4, -e.r * 0.15);
+    ctx.quadraticCurveTo(side * e.r * 0.9, e.r * 0.05 + sway, side * e.r * 1.12, e.r * 0.38 - sway * 0.35);
+    ctx.stroke();
+    ctx.fillStyle = e.phaseLevel >= 3 ? "rgba(180,140,255,0.72)" : "rgba(159,244,255,0.72)";
+    diamond(ctx, side * e.r * 1.18, e.r * 0.4 - sway * 0.35, e.r * 0.1, e.r * 0.22);
+  }
+}
+
+function drawElfHead(ctx, e) {
+  const flash = e.flash > 0;
+  ctx.fillStyle = flash ? "#ffffff" : "#e9feff";
+  ctx.beginPath();
+  ctx.ellipse(0, -e.r * 0.62, e.r * 0.34, e.r * 0.42, 0, 0, TAU);
+  ctx.fill();
+  ctx.strokeStyle = flash ? "#ffffff" : "#7ee8ff";
+  ctx.lineWidth = 2;
+  ctx.stroke();
+
+  ctx.fillStyle = flash ? "#ffffff" : "rgba(217,251,255,0.86)";
+  for (const side of [-1, 1]) {
+    ctx.beginPath();
+    ctx.moveTo(side * e.r * 0.24, -e.r * 0.66);
+    ctx.lineTo(side * e.r * 0.68, -e.r * 0.78 + Math.sin(e.anim + side) * 2);
+    ctx.lineTo(side * e.r * 0.32, -e.r * 0.5);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+  }
+
+  ctx.strokeStyle = e.phaseLevel >= 3 ? "#b48cff" : "#55f0ff";
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(-e.r * 0.13, -e.r * 0.62);
+  ctx.lineTo(-e.r * 0.04, -e.r * 0.59);
+  ctx.moveTo(e.r * 0.13, -e.r * 0.62);
+  ctx.lineTo(e.r * 0.04, -e.r * 0.59);
   ctx.stroke();
 }
 

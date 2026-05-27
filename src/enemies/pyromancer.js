@@ -38,7 +38,7 @@ export class Pyromancer extends BaseEnemy {
       this.y += (dy / d * dir + dx / d * strafe) * this.speed * dt;
       if (this.cooldown <= 0 && d < 700) {
         this.aimTime = 0.55;
-        pulse(this.x, this.y, 34, this.color, 0.25);
+        pulse(this.x, this.y, 46, "#ffd166", 0.28);
       }
     }
 
@@ -64,9 +64,12 @@ export class Pyromancer extends BaseEnemy {
         burnDps: this.damage * 0.28,
         life: 4,
         shape: "fireball",
+        spin: Math.random() * TAU,
+        emberTrail: true,
       });
     }
-    burst(this.x, this.y, 8, this.color, 160);
+    burst(this.x, this.y, 14, "#ffd166", 210);
+    pulse(this.x, this.y, 56, this.color, 0.28);
   }
 
   draw(ctx) {
@@ -80,11 +83,28 @@ export class Pyromancer extends BaseEnemy {
     ctx.beginPath();
     ctx.ellipse(0, 15 * z, 17 * z, 5 * z, 0, 0, TAU);
     ctx.fill();
-    ctx.fillStyle = flash ? "#ffffff" : "#2b1208";
+
+    ctx.save();
+    ctx.globalAlpha = flash ? 0.9 : 0.42;
+    for (let i = 0; i < 5; i++) {
+      const a = this.anim * 0.45 + i / 5 * TAU;
+      ctx.strokeStyle = i % 2 ? "rgba(255,209,102,0.45)" : "rgba(255,77,109,0.35)";
+      ctx.lineWidth = 1.4 * z;
+      ctx.beginPath();
+      ctx.arc(0, -5 * z, (22 + i * 3) * z, a, a + 0.32);
+      ctx.stroke();
+    }
+    ctx.restore();
+
+    ctx.fillStyle = flash ? "#ffffff" : "#351005";
     ctx.beginPath();
-    ctx.roundRect(-10 * z, -10 * z, 20 * z, 25 * z, 5 * z);
+    ctx.roundRect(-11 * z, -8 * z, 22 * z, 26 * z, 6 * z);
     ctx.fill();
-    ctx.fillStyle = flash ? "#ffffff" : this.color;
+    ctx.strokeStyle = flash ? "#ffffff" : "#ffb347";
+    ctx.lineWidth = 2 * z;
+    ctx.stroke();
+
+    ctx.fillStyle = flash ? "#ffffff" : "#ff4d1f";
     ctx.beginPath();
     ctx.moveTo(0, -31 * z * flame);
     ctx.lineTo(12 * z, -12 * z);
@@ -93,6 +113,29 @@ export class Pyromancer extends BaseEnemy {
     ctx.lineTo(-12 * z, -12 * z);
     ctx.closePath();
     ctx.fill();
+    ctx.fillStyle = flash ? "#ffffff" : "#ffd166";
+    ctx.beginPath();
+    ctx.moveTo(0, -24 * z * flame);
+    ctx.lineTo(6 * z, -10 * z);
+    ctx.lineTo(2 * z, 4 * z);
+    ctx.lineTo(-4 * z, 4 * z);
+    ctx.lineTo(-7 * z, -10 * z);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.strokeStyle = "rgba(255,209,102,0.65)";
+    ctx.lineWidth = 2 * z;
+    for (const side of [-1, 1]) {
+      ctx.beginPath();
+      ctx.moveTo(side * 9 * z, 0);
+      ctx.quadraticCurveTo(side * 21 * z, -8 * z, side * 28 * z, -2 * z + Math.sin(this.anim * 1.8) * 3 * z);
+      ctx.stroke();
+      ctx.fillStyle = this.aimTime > 0 ? "#fff2a8" : this.color;
+      ctx.beginPath();
+      ctx.arc(side * 30 * z, -2 * z + Math.sin(this.anim * 1.8) * 3 * z, (this.aimTime > 0 ? 5 : 3) * z, 0, TAU);
+      ctx.fill();
+    }
+
     ctx.fillStyle = "#fff2a8";
     ctx.beginPath();
     ctx.arc(0, -8 * z, 5 * z, 0, TAU);
@@ -105,6 +148,10 @@ export class Pyromancer extends BaseEnemy {
       ctx.lineWidth = 2;
       ctx.beginPath();
       ctx.arc(0, -8 * z, 22 * z + Math.sin(this.anim * 8) * 3, 0, TAU);
+      ctx.stroke();
+      ctx.strokeStyle = "rgba(255,77,109,0.42)";
+      ctx.beginPath();
+      ctx.arc(0, -8 * z, 32 * z - Math.sin(this.anim * 9) * 4, 0, TAU);
       ctx.stroke();
     }
     ctx.restore();

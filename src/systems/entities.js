@@ -286,7 +286,7 @@ function updateEnemyProjectiles(dt) {
 }
 
 function splitEnemyProjectile(b) {
-  if (b.shape !== "snowflake") return;
+  if (b.shape !== "snowflake" && b.shape !== "frostComet") return;
   const base = Math.atan2(b.vy, b.vx);
   for (const offset of [-0.62, 0.62]) {
     const a = base + offset;

@@ -1,9 +1,10 @@
-import { TAU, WORLD_SIZE } from "../constants.js";
+﻿import { TAU, WORLD_SIZE } from "../constants.js";
 import { state, world } from "../state.js";
 import { clamp } from "../utils.js";
 import { burst, pulse, trail } from "../effects.js";
 import { summonOrEmpowerBlackhole } from "../blackhole.js";
 import { BaseEnemy } from "./BaseEnemy.js";
+import { applyPlayerDamage } from "../systems/items.js";
 
 export class BlackholeMage extends BaseEnemy {
   constructor(config, x, y) {
@@ -40,7 +41,7 @@ export class BlackholeMage extends BaseEnemy {
     this.y = clamp(this.y, -half + this.r, half - this.r);
 
     if (d < p.r + this.r && p.invuln <= 0) {
-      p.hp -= this.damage;
+      applyPlayerDamage(this.damage, this);
       p.invuln = 0.5;
       state.flash = 0.22;
       burst(p.x, p.y, 10, this.color, 120);

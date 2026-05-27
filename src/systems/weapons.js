@@ -5,6 +5,7 @@ import { applyKnockback, damageEnemy, nearestEnemy, queryEnemies } from "./entit
 import { burst, pulse, trail } from "../effects.js";
 import { playSfx } from "../audio.js";
 import { addWeaponToInventory, QUALITY_INFO, QUALITY_ORDER, WEAPON_INFO } from "../economy/inventory.js";
+import { attackSpeedMultiplier, projectileBonus, weaponRangeBonus } from "./items.js";
 
 export const STARTER_WEAPONS = ["arc", "ice", "missile", "boomerang", "drone"].map((id) => ({ id, ...WEAPON_INFO[id] }));
 
@@ -62,7 +63,7 @@ function updateArcWeapon(dt) {
   const w = state.weapons.arc;
   if (!tickWeapon(w, dt)) return;
   const p = state.player;
-  const first = nearestEnemy(p.x, p.y, w.range);
+  const first = nearestEnemy(p.x, p.y, w.range + weaponRangeBonus());
   if (!first) return;
 
   const rank = qualityRank(w);
@@ -86,7 +87,7 @@ function updateArcWeapon(dt) {
     if (rank >= 3 && i === 0) arcShockBurst(target, damage * 0.34, color);
     source = target;
     damage *= w.falloff;
-    target = nextChainTarget(source, w.chainRange, visited);
+    target = nextChainTarget(source, w.chainRange + weaponRangeBonus() * 0.35, visited);
   }
 
   if (rank >= 4 && segments.length) arcPrismBurst(source, damage * 0.52, color, visited);
@@ -162,9 +163,9 @@ function updateIceWeapon(dt) {
   if (!tickWeapon(w, dt)) return;
   const p = state.player;
   const rank = qualityRank(w);
-  const target = nearestEnemy(p.x, p.y, w.range);
+  const target = nearestEnemy(p.x, p.y, w.range + weaponRangeBonus());
   const base = target ? Math.atan2(target.y - p.y, target.x - p.x) : Math.atan2(p.dirY, p.dirX);
-  const count = w.count + (rank >= 1 ? 1 : 0);
+  const count = w.count + (rank >= 1 ? 1 : 0) + projectileBonus();
   for (let i = 0; i < count; i++) {
     const quality = weaponQualityAt(w, i);
     const shot = weaponViewForQuality(w, quality);
@@ -196,26 +197,29 @@ function updateMissileWeapon(dt) {
   const p = state.player;
   const rank = qualityRank(w);
   const color = qualityColor(w, "#ffb347");
-  const target = nearestEnemy(p.x, p.y, w.range);
+  const target = nearestEnemy(p.x, p.y, w.range + weaponRangeBonus());
   const base = target ? Math.atan2(target.y - p.y, target.x - p.x) : Math.atan2(p.dirY, p.dirX);
-  fireProjectile(base, w, {
-    shape: "missile",
-    variant: rank >= 4 ? "legendMissile" : rank >= 1 ? "burnMissile" : "missile",
-    quality: w.quality,
-    color,
-    tracking: true,
-    turnSpeed: w.turnSpeed,
-    pierce: 1,
-    radius: rank >= 1 ? 7 : 6,
-    life: 18,
-    noLifeExpire: true,
-    explodeRadius: w.explodeRadius + (rank >= 1 ? 12 : 0),
-    explodeDamage: w.explodeDamage,
-    knockback: 145,
-    splitOnHit: rank >= 2 ? 2 : 0,
-    secondaryBurst: rank >= 3 ? 1 : 0,
-    microMissiles: rank >= 4 ? 3 : 0,
-  });
+  const count = 1 + projectileBonus();
+  for (let i = 0; i < count; i++) {
+    fireProjectile(base + (i - (count - 1) / 2) * 0.18, w, {
+      shape: "missile",
+      variant: rank >= 4 ? "legendMissile" : rank >= 1 ? "burnMissile" : "missile",
+      quality: w.quality,
+      color,
+      tracking: true,
+      turnSpeed: w.turnSpeed,
+      pierce: 1,
+      radius: rank >= 1 ? 7 : 6,
+      life: 18,
+      noLifeExpire: true,
+      explodeRadius: w.explodeRadius + (rank >= 1 ? 12 : 0),
+      explodeDamage: w.explodeDamage,
+      knockback: 145,
+      splitOnHit: rank >= 2 ? 2 : 0,
+      secondaryBurst: rank >= 3 ? 1 : 0,
+      microMissiles: rank >= 4 ? 3 : 0,
+    });
+  }
   playSfx("shoot");
 }
 
@@ -223,14 +227,15 @@ function updateBoomerangWeapon(dt) {
   const w = state.weapons.boomerang;
   if (!tickWeapon(w, dt)) return;
   const p = state.player;
-  const target = nearestEnemy(p.x, p.y, w.range);
+  const target = nearestEnemy(p.x, p.y, w.range + weaponRangeBonus());
   const base = target ? Math.atan2(target.y - p.y, target.x - p.x) : Math.atan2(p.dirY, p.dirX);
-  for (let i = 0; i < w.count; i++) {
+  const count = w.count + projectileBonus();
+  for (let i = 0; i < count; i++) {
     const quality = weaponQualityAt(w, i);
     const shot = weaponViewForQuality(w, quality);
     const shotRank = qualityRank(shot);
     const color = qualityColor(shot, "#ff65d8");
-    fireProjectile(base + (i - (w.count - 1) / 2) * 0.34, w, {
+    fireProjectile(base + (i - (count - 1) / 2) * 0.34, w, {
       shape: "boomerang",
       variant: shotRank >= 1 ? "dualBoomerang" : "boomerang",
       quality,
@@ -264,7 +269,7 @@ function updateDroneWeapon(dt) {
     const orbitAngle = w.angle + (i / w.drones.length) * TAU;
     const orbitX = p.x + Math.cos(orbitAngle) * w.orbitRadius;
     const orbitY = p.y + Math.sin(orbitAngle) * w.orbitRadius;
-    const target = nearestEnemy(d.x, d.y, w.acquireRange);
+    const target = nearestEnemy(d.x, d.y, w.acquireRange + weaponRangeBonus());
     d.fireTimer = Math.max(0, d.fireTimer - dt);
     d.beamTimer = Math.max(0, (d.beamTimer || 0) - dt);
     d.anim += dt;
@@ -292,8 +297,9 @@ function updateDroneWeapon(dt) {
       const desiredX = target.x - Math.cos(orbitAngle) * 92;
       const desiredY = target.y - Math.sin(orbitAngle) * 92;
       moveDrone(d, desiredX, desiredY, dt, 520);
-      if (d.fireTimer <= 0 && distSq(d.x, d.y, target.x, target.y) <= w.attackRange * w.attackRange) {
-        d.fireTimer = w.fireCooldown;
+      const attackRange = w.attackRange + weaponRangeBonus();
+      if (d.fireTimer <= 0 && distSq(d.x, d.y, target.x, target.y) <= attackRange * attackRange) {
+        d.fireTimer = w.fireCooldown / attackSpeedMultiplier();
         d.energy = Math.max(0, d.energy - w.shotCost);
         const a = Math.atan2(target.y - d.y, target.x - d.x);
         if (d.qualityRank >= 4 && d.legendReady) {
@@ -375,38 +381,43 @@ function fireDroneBullet(x, y, angle, w, drone) {
   const quality = drone?.quality || w.quality || "common";
   const qualityMult = drone?.qualityMult || w.qualityMult || 1;
   const speed = w.bulletSpeed;
-  world.projectiles.push({
-    x,
-    y,
-    px: x,
-    py: y,
-    vx: Math.cos(angle) * speed,
-    vy: Math.sin(angle) * speed,
-    speed,
-    angle,
-    damage: w.bulletDamage * qualityMult,
-    pierce: 1,
-    r: 4,
-    life: 0.95,
-    maxLife: 0.95,
-    color,
-    shape: "droneBolt",
-    variant: rank >= 2 ? "homingDroneBolt" : "droneBolt",
-    quality,
-    tracking: rank >= 2,
-    turnSpeed: rank >= 2 ? 2.6 : 0,
-    returning: false,
-    returnAfter: 0,
-    returnSpeed: 1,
-    returnTimer: 0,
-    explodeRadius: 0,
-    explodeDamage: 0,
-    freezeDuration: 0,
-    knockback: 86,
-    hitIds: new Set(),
-    spin: Math.random() * TAU,
-    trailTimer: 0,
-  });
+  const count = 1 + projectileBonus();
+  for (let i = 0; i < count; i++) {
+    if (world.projectiles.length >= PROJECTILE_LIMIT) return;
+    const shotAngle = angle + (i - (count - 1) / 2) * 0.16;
+    world.projectiles.push({
+      x,
+      y,
+      px: x,
+      py: y,
+      vx: Math.cos(shotAngle) * speed,
+      vy: Math.sin(shotAngle) * speed,
+      speed,
+      angle: shotAngle,
+      damage: w.bulletDamage * qualityMult,
+      pierce: 1,
+      r: 4,
+      life: 0.95,
+      maxLife: 0.95,
+      color,
+      shape: "droneBolt",
+      variant: rank >= 2 ? "homingDroneBolt" : "droneBolt",
+      quality,
+      tracking: rank >= 2,
+      turnSpeed: rank >= 2 ? 2.6 : 0,
+      returning: false,
+      returnAfter: 0,
+      returnSpeed: 1,
+      returnTimer: 0,
+      explodeRadius: 0,
+      explodeDamage: 0,
+      freezeDuration: 0,
+      knockback: 86,
+      hitIds: new Set(),
+      spin: Math.random() * TAU,
+      trailTimer: 0,
+    });
+  }
 }
 
 function fireDroneBeam(drone, target, w, color, legendary) {
@@ -440,7 +451,7 @@ function updatePulseWeapon(dt) {
   if (!tickWeapon(w, dt)) return;
   const rank = qualityRank(w);
   const color = qualityColor(w, "#77ff8a");
-  const radius = w.radius + (rank >= 1 ? 18 : 0);
+  const radius = w.radius + (rank >= 1 ? 18 : 0) + weaponRangeBonus() * 0.25;
   const hits = [];
   queryEnemies(state.player.x, state.player.y, radius, hits);
   for (const e of hits) {
@@ -468,7 +479,7 @@ function tickWeapon(w, dt) {
   if (!w || w.level <= 0) return false;
   w.timer -= dt;
   if (w.timer > 0) return false;
-  w.timer += w.cooldown;
+  w.timer += w.cooldown / attackSpeedMultiplier();
   return true;
 }
 

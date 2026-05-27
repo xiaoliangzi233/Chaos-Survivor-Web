@@ -6,6 +6,7 @@ import { playSfx } from "../audio.js";
 import { isBossWave, randomEnemyForWave, spawnEnemyById, spawnWaveBoss } from "./enemyRegistry.js";
 import { updateBlackhole } from "../blackhole.js";
 import { difficultyMultiplier, currentDifficulty } from "../difficulty.js";
+import { applyPlayerDamage, coinDropMultiplier, modifyWeaponDamage, onWeaponHit, waveSpawnMultiplier } from "./items.js";
 
 export function updatePlayer(dt) {
   const p = state.player;
@@ -47,7 +48,7 @@ export function updateSpawning(dt) {
   if (isBossWave(state.wave)) return;
   const danger = state.wave / 20;
   const earlyMul = state.wave <= 3 ? 0.52 : state.wave <= 6 ? 0.68 : state.wave <= 9 ? 0.84 : 1;
-  state.spawnBudget += dt * (2.1 + danger * 10.5 + state.wave * 0.36) * earlyMul * difficultyMultiplier("spawnRate");
+  state.spawnBudget += dt * (2.1 + danger * 10.5 + state.wave * 0.36) * earlyMul * difficultyMultiplier("spawnRate") * waveSpawnMultiplier();
   const enemyLimit = currentDifficulty().enemyLimit || ENEMY_LIMIT;
   while (state.spawnBudget >= 1 && world.enemies.length < enemyLimit) {
     state.spawnBudget--;
@@ -78,7 +79,9 @@ export function updateEnemies(dt) {
 }
 
 export function damageEnemy(e, amount, x, y) {
-  e.takeDamage ? e.takeDamage(amount, x, y) : null;
+  if (!e?.takeDamage) return;
+  e.takeDamage(modifyWeaponDamage(amount), x, y);
+  onWeaponHit(e, x, y);
 }
 
 export function applyKnockback(e, dx, dy, force) {
@@ -117,7 +120,7 @@ export function dropCoin(x, y, amount) {
 export function coinAmountForEnemy(enemy) {
   if (!enemy || enemy.boss || enemy.elite || enemy.category !== "小怪") return 0;
   const amount = 1 + Math.floor(Math.random() * 3) + Math.floor((enemy.xp || 1) / 10) + Math.floor(state.wave / 7);
-  return Math.min(12, Math.max(1, Math.round(amount * difficultyMultiplier("coinGain"))));
+  return Math.min(24, Math.max(1, Math.round(amount * difficultyMultiplier("coinGain") * coinDropMultiplier())));
 }
 
 export function updateGems(dt) {
@@ -247,6 +250,7 @@ export function clearEnemies() {
   world.projectiles.length = 0;
   world.enemyProjectiles.length = 0;
   world.hazards.length = 0;
+  world.itemObjects.length = 0;
   world.blackhole = null;
   world.boss = null;
   world.grid.clear();
@@ -261,13 +265,13 @@ function updateEnemyProjectiles(dt) {
     b.y += b.vy * dt;
     b.life -= dt;
     if (circleHit(b.x, b.y, b.r, p.x, p.y, p.r) && p.invuln <= 0) {
-      p.hp -= b.damage;
+      const result = applyPlayerDamage(b.damage, b);
       p.invuln = 0.5;
-      if (b.burnDuration > 0) {
+      if (result.damaged && b.burnDuration > 0) {
         p.burnTimer = Math.max(p.burnTimer || 0, b.burnDuration);
         p.burnDps = Math.max(p.burnDps || 0, b.burnDps || 0);
       }
-      if (b.frostDuration > 0) {
+      if (result.damaged && b.frostDuration > 0) {
         p.frostTimer = Math.max(p.frostTimer || 0, b.frostDuration);
         p.frostSlow = Math.max(p.frostSlow || 0, b.frostSlow || 0.18);
       }
@@ -323,9 +327,9 @@ function updateHazards(dt) {
       h.kind === "blizzard_core" ||
       ((h.kind === "ice_spike" || h.kind === "ice_seal") && h.exploding);
     if (distSq(h.x, h.y, p.x, p.y) < (h.r + p.r) ** 2 && p.invuln <= 0 && canDamage) {
-      p.hp -= h.damage;
+      const result = applyPlayerDamage(h.damage, h);
       p.invuln = 0.35;
-      if (h.frostDuration > 0) {
+      if (result.damaged && h.frostDuration > 0) {
         p.frostTimer = Math.max(p.frostTimer || 0, h.frostDuration);
         p.frostSlow = Math.max(p.frostSlow || 0, h.frostSlow || 0.18);
       }

@@ -1,8 +1,9 @@
-import { TAU, WORLD_SIZE } from "../constants.js";
+﻿import { TAU, WORLD_SIZE } from "../constants.js";
 import { state } from "../state.js";
 import { burst } from "../effects.js";
 import { clamp } from "../utils.js";
 import { BaseEnemy } from "./BaseEnemy.js";
+import { applyPlayerDamage } from "../systems/items.js";
 
 export class Tank extends BaseEnemy {
   constructor(config, x, y) {
@@ -36,7 +37,7 @@ export class Tank extends BaseEnemy {
     this.x = clamp(this.x, -half + this.r, half - this.r);
     this.y = clamp(this.y, -half + this.r, half - this.r);
     if (d < p.r + this.r && p.invuln <= 0) {
-      p.hp -= this.damage;
+      applyPlayerDamage(this.damage, this);
       p.invuln = 0.55;
       state.shake = 11;
       state.flash = 0.28;

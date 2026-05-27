@@ -3,6 +3,7 @@ import { input, state, world } from "./state.js";
 import { clamp, distSq, hexToRgba } from "./utils.js";
 import { burst, particle, pulse } from "./effects.js";
 import { playSfx } from "./audio.js";
+import { applyPlayerDamage } from "./systems/items.js";
 
 const BASE_RADIUS = 94;
 const MAX_RADIUS = 184;
@@ -125,7 +126,7 @@ function damagePlayerInBlackhole(h) {
   const d = Math.sqrt(d2);
   const inner = d < h.r * 0.48;
   const damage = h.damage * (inner ? 0.46 : 0.26);
-  p.hp -= damage;
+  applyPlayerDamage(damage, h);
   state.flash = Math.max(state.flash, inner ? 0.2 : 0.12);
   state.shake = Math.max(state.shake, inner ? 8 : 4);
   playSfx("hurt");

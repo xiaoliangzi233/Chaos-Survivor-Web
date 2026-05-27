@@ -1,9 +1,10 @@
-import { TAU, WORLD_SIZE } from "../constants.js";
+﻿import { TAU, WORLD_SIZE } from "../constants.js";
 import { state, world } from "../state.js";
 import { burst, particle, pulse, trail } from "../effects.js";
 import { playSfx } from "../audio.js";
 import { clamp, distSq } from "../utils.js";
 import { BaseEnemy } from "./BaseEnemy.js";
+import { applyPlayerDamage } from "../systems/items.js";
 
 const SEGMENT_COUNT = 24;
 const SEGMENT_GAP = 28;
@@ -251,7 +252,7 @@ export class StormRailDevourer extends BaseEnemy {
 
   hitPlayer(mult) {
     const p = state.player;
-    p.hp -= this.damage * mult;
+    applyPlayerDamage(this.damage * mult, this);
     p.invuln = 0.5;
     state.shake = Math.max(state.shake, this.mode === "rail_charge" ? 14 : 8);
     state.flash = Math.max(state.flash, 0.22);
@@ -323,7 +324,7 @@ export class StormRailDevourer extends BaseEnemy {
       const b = this.segments[i + 1];
       if (!a || !b) continue;
       if (pointLineDistance(p.x, p.y, a.x, a.y, b.x, b.y) < p.r + 10 && p.invuln <= 0) {
-        p.hp -= this.damage * 0.45;
+        applyPlayerDamage(this.damage * 0.45, this);
         p.invuln = 0.32;
         state.flash = Math.max(state.flash, 0.16);
         state.shake = Math.max(state.shake, 6);

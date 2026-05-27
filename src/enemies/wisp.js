@@ -1,8 +1,9 @@
-import { TAU, WORLD_SIZE } from "../constants.js";
+﻿import { TAU, WORLD_SIZE } from "../constants.js";
 import { state, world } from "../state.js";
 import { burst, pulse, trail } from "../effects.js";
 import { clamp } from "../utils.js";
 import { BaseEnemy } from "./BaseEnemy.js";
+import { applyPlayerDamage } from "../systems/items.js";
 
 export class Wisp extends BaseEnemy {
   constructor(config, x, y) {
@@ -66,7 +67,7 @@ export class Wisp extends BaseEnemy {
     }
 
     if (d < p.r + this.r && p.invuln <= 0) {
-      p.hp -= this.damage;
+      applyPlayerDamage(this.damage, this);
       p.invuln = 0.55;
       state.shake = 6;
       state.flash = 0.22;

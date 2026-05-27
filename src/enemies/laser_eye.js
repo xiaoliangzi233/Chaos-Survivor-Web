@@ -1,8 +1,9 @@
-import { TAU, WORLD_SIZE } from "../constants.js";
+﻿import { TAU, WORLD_SIZE } from "../constants.js";
 import { state } from "../state.js";
 import { burst, pulse } from "../effects.js";
 import { clamp } from "../utils.js";
 import { BaseEnemy } from "./BaseEnemy.js";
+import { applyPlayerDamage } from "../systems/items.js";
 
 export class LaserEye extends BaseEnemy {
   constructor(config, x, y) {
@@ -65,7 +66,7 @@ export class LaserEye extends BaseEnemy {
     const p = state.player;
     const dist = pointLineDistance(p.x, p.y, this.x, this.y, this.angle);
     if (dist < p.r + 9) {
-      p.hp -= this.damage * 1.15 * dt;
+      applyPlayerDamage(this.damage * 1.15 * dt, this);
       state.flash = Math.max(state.flash, 0.12);
       state.shake = Math.max(state.shake, 3);
       if (Math.random() < dt * 18) burst(p.x, p.y, 2, this.color, 80);

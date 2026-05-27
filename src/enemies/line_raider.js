@@ -1,8 +1,9 @@
-import { TAU, WORLD_SIZE } from "../constants.js";
+﻿import { TAU, WORLD_SIZE } from "../constants.js";
 import { state } from "../state.js";
 import { burst, particle, pulse } from "../effects.js";
 import { clamp } from "../utils.js";
 import { BaseEnemy } from "./BaseEnemy.js";
+import { applyPlayerDamage } from "../systems/items.js";
 
 const MAP_HALF = WORLD_SIZE / 2;
 const DASH_SPEED = 760;
@@ -90,7 +91,7 @@ export class LineRaider extends BaseEnemy {
     if (this.hitPlayer || p.invuln > 0) return;
     const dist = segmentDistance(p.x, p.y, prevX, prevY, this.x, this.y);
     if (dist < p.r + this.r * 0.72) {
-      p.hp -= this.damage;
+      applyPlayerDamage(this.damage, this);
       p.invuln = 0.62;
       state.shake = Math.max(state.shake, 9);
       state.flash = Math.max(state.flash, 0.22);

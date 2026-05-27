@@ -1,9 +1,10 @@
-import { TAU, WORLD_SIZE } from "../constants.js";
+﻿import { TAU, WORLD_SIZE } from "../constants.js";
 import { state, world } from "../state.js";
 import { burst, particle, pulse, trail } from "../effects.js";
 import { playSfx } from "../audio.js";
 import { clamp } from "../utils.js";
 import { BaseEnemy } from "./BaseEnemy.js";
+import { applyPlayerDamage } from "../systems/items.js";
 
 const MODES = ["snowflake_barrage", "ice_spike_field", "crystal_dash", "frost_orbit", "blizzard_core"];
 
@@ -58,7 +59,7 @@ export class PolarCrystalWraith extends BaseEnemy {
     this.y = clamp(this.y, -half + this.r, half - this.r);
 
     if (d < p.r + this.r && p.invuln <= 0) {
-      p.hp -= this.damage;
+      applyPlayerDamage(this.damage, this);
       p.invuln = 0.6;
       p.frostTimer = Math.max(p.frostTimer || 0, 1.1);
       p.frostSlow = Math.max(p.frostSlow || 0, 0.25);

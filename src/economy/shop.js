@@ -1,5 +1,6 @@
 import { state } from "../state.js";
 import { addWeaponToInventory, canFuseWeapons, QUALITY_INFO, QUALITY_ORDER, recomputeAllWeapons, WEAPON_INFO } from "./inventory.js";
+import { applyItemPurchase, ITEM_DEFS, itemSellPriceById, weightedQuality } from "../systems/items.js";
 import { playSfx } from "../audio.js";
 
 const SHOP_SLOTS = 4;
@@ -11,85 +12,6 @@ const RARITY_WEIGHTS = [
   ["rare", 11],
   ["epic", 4.5],
   ["legendary", 1.5],
-];
-
-const ITEM_POOL = [
-  {
-    id: "medkit",
-    icon: "+",
-    name: "急救凝胶",
-    category: "道具",
-    rarity: "common",
-    quantity: 1,
-    maxPurchases: 2,
-    basePrice: 10,
-    desc: "立即恢复 45 点生命。",
-    apply: () => {
-      state.player.hp = Math.min(state.player.maxHp, state.player.hp + 45);
-      recordItem("medkit", "急救凝胶", "+", 1, "购买过的战场治疗补给。");
-    },
-  },
-  {
-    id: "vital_core",
-    icon: "H",
-    name: "生命核心",
-    category: "道具",
-    rarity: "uncommon",
-    quantity: 1,
-    maxPurchases: 2,
-    basePrice: 18,
-    desc: "最大生命提高 16，并恢复 24 点生命。",
-    apply: () => {
-      state.player.maxHp += 16;
-      state.player.hp = Math.min(state.player.maxHp, state.player.hp + 24);
-      recordItem("vital_core", "生命核心", "H", 1, "最大生命提高。");
-    },
-  },
-  {
-    id: "phase_boots",
-    icon: ">",
-    name: "相位步靴",
-    category: "道具",
-    rarity: "uncommon",
-    quantity: 1,
-    maxPurchases: 2,
-    basePrice: 20,
-    desc: "移动速度提高 12。",
-    apply: () => {
-      state.player.speed += 12;
-      recordItem("phase_boots", "相位步靴", ">", 1, "移动速度提高。");
-    },
-  },
-  {
-    id: "magnet_ring",
-    icon: "O",
-    name: "磁吸星环",
-    category: "道具",
-    rarity: "rare",
-    quantity: 1,
-    maxPurchases: 2,
-    basePrice: 24,
-    desc: "拾取范围提高 18。",
-    apply: () => {
-      state.player.magnet += 18;
-      recordItem("magnet_ring", "磁吸星环", "O", 1, "拾取范围提高。");
-    },
-  },
-  {
-    id: "damage_chip",
-    icon: "*",
-    name: "裂解芯片",
-    category: "道具",
-    rarity: "rare",
-    quantity: 1,
-    maxPurchases: 2,
-    basePrice: 32,
-    desc: "所有武器伤害倍率提高 8%。",
-    apply: () => {
-      state.player.damageScale += 0.08;
-      recordItem("damage_chip", "裂解芯片", "*", 1, "所有武器伤害倍率提高。");
-    },
-  },
 ];
 
 export function createShopState() {
@@ -146,7 +68,7 @@ export function purchaseOffer(uid) {
   }
   state.gold -= offer.price;
   if (offer.category === "武器") buyWeapon(offer);
-  else offer.apply?.(offer);
+  else applyItemPurchase(offer);
   offer.purchaseCount++;
   if (isSoldOut(offer)) offer.locked = false;
   playSfx("buy");
@@ -197,8 +119,7 @@ export function weaponSellPrice(slot) {
 }
 
 export function itemSellPrice(item) {
-  const template = ITEM_POOL.find((entry) => entry.id === item?.id);
-  return Math.max(2, Math.floor((template?.basePrice || 10) * 0.35));
+  return itemSellPriceById(item?.itemId || item?.id, item?.quality || "common");
 }
 
 export function canFuseShopWeapon(weaponId, quality) {
@@ -227,7 +148,7 @@ function createOffer() {
 
 function createWeaponOffer() {
   const weaponId = weightedWeaponId();
-  const rarity = weightedChoice(RARITY_WEIGHTS);
+  const rarity = weightedQuality(RARITY_WEIGHTS);
   const info = WEAPON_INFO[weaponId];
   const rank = QUALITY_ORDER.indexOf(rarity);
   return {
@@ -248,23 +169,24 @@ function createWeaponOffer() {
 }
 
 function createItemOffer() {
-  const template = weightedChoice(ITEM_POOL.map((item) => [item, itemWeight(item)]));
-  const rarity = template.rarity;
+  const template = weightedChoice(ITEM_DEFS.map((item) => [item, itemWeight(item)]));
+  const rarity = weightedQuality(RARITY_WEIGHTS);
   const rank = QUALITY_ORDER.indexOf(rarity);
+  const quality = QUALITY_INFO[rarity] || QUALITY_INFO.common;
   return {
     uid: state.shop.nextOfferUid++,
     id: template.id,
+    itemId: template.id,
     icon: template.icon,
-    name: template.name,
+    name: `${quality.name}${template.name}`,
     rarity,
-    category: template.category,
-    price: Math.floor(template.basePrice + state.wave * (1.5 + rank * 0.8)),
-    maxPurchases: template.maxPurchases,
+    category: "道具",
+    price: Math.floor((template.basePrice + state.wave * (1.5 + rank * 0.8)) * (QUALITY_INFO[rarity]?.mult || 1)),
+    maxPurchases: 1,
     purchaseCount: 0,
-    quantity: template.quantity,
+    quantity: 1,
     locked: false,
     desc: template.desc,
-    apply: template.apply,
   };
 }
 
@@ -274,8 +196,9 @@ function weightedWeaponId() {
 }
 
 function itemWeight(item) {
-  const rank = QUALITY_ORDER.indexOf(item.rarity);
-  return Math.max(1, 8 - rank * 1.6);
+  const lateGame = state.wave >= 6 ? 1.15 : 1;
+  const expensive = item.basePrice >= 34 ? 0.82 : 1;
+  return Math.max(0.5, lateGame * expensive);
 }
 
 function weightedChoice(entries) {
@@ -306,12 +229,4 @@ function canAcceptWeapon(weaponId, quality) {
   const inv = state.inventory;
   if (!inv) return false;
   return inv.weaponSlots.length < 6 || canFuseShopWeapon(weaponId, quality);
-}
-
-function recordItem(id, name, icon, qty, desc) {
-  const inv = state.inventory;
-  if (!inv) return;
-  const existing = inv.items.find((item) => item.id === id);
-  if (existing) existing.qty += qty;
-  else inv.items.push({ id, name, icon, qty, desc });
 }

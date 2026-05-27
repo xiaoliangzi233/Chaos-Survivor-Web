@@ -1,9 +1,10 @@
-import { TAU, WORLD_SIZE } from "../constants.js";
+﻿import { TAU, WORLD_SIZE } from "../constants.js";
 import { state } from "../state.js";
 import { burst, pulse, trail } from "../effects.js";
 import { clamp } from "../utils.js";
 import { playSfx } from "../audio.js";
 import { BaseEnemy } from "./BaseEnemy.js";
+import { applyPlayerDamage } from "../systems/items.js";
 
 export class SlimeEnemy extends BaseEnemy {
   constructor(config, x, y, profile) {
@@ -56,7 +57,7 @@ export class SlimeEnemy extends BaseEnemy {
     this.y = clamp(this.y, -half + this.r, half - this.r);
 
     if (d < p.r + this.r && p.invuln <= 0) {
-      p.hp -= this.damage;
+      applyPlayerDamage(this.damage, this);
       p.invuln = 0.55;
       state.shake = this.profile.shake;
       state.flash = 0.24;

@@ -1,8 +1,9 @@
-import { WORLD_SIZE } from "../constants.js";
+﻿import { WORLD_SIZE } from "../constants.js";
 import { state } from "../state.js";
 import { burst, pulse, trail } from "../effects.js";
 import { clamp } from "../utils.js";
 import { BaseEnemy } from "./BaseEnemy.js";
+import { applyPlayerDamage } from "../systems/items.js";
 
 const DASH_TRIGGER_RANGE = 330;
 const DASH_SPEED = 760;
@@ -85,7 +86,7 @@ export class Lancer extends BaseEnemy {
     const hitDy = p.y - this.y;
     const hitDist = Math.hypot(hitDx, hitDy);
     if (hitDist < p.r + this.r + (this.attackState === "dashing" ? 14 : 0) && p.invuln <= 0) {
-      p.hp -= this.attackState === "dashing" ? this.damage * 1.35 : this.damage;
+      applyPlayerDamage(this.attackState === "dashing" ? this.damage * 1.35 : this.damage, this);
       p.invuln = 0.55;
       state.shake = this.attackState === "dashing" ? 11 : 7;
       state.flash = 0.26;

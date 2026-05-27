@@ -1,9 +1,10 @@
-import { TAU, WORLD_SIZE } from "../constants.js";
+﻿import { TAU, WORLD_SIZE } from "../constants.js";
 import { state, world } from "../state.js";
 import { burst, particle, pulse, trail } from "../effects.js";
 import { playSfx } from "../audio.js";
 import { clamp, distSq } from "../utils.js";
 import { BaseEnemy } from "./BaseEnemy.js";
+import { applyPlayerDamage } from "../systems/items.js";
 
 const TETHER_RANGE = 920;
 const RESONANCE_HP = 0.4;
@@ -64,7 +65,7 @@ export class TwinAbyssalEyes extends BaseEnemy {
     this.y = clamp(this.y, -half + this.r, half - this.r);
 
     if (d < p.r + this.r && p.invuln <= 0) {
-      p.hp -= this.damage;
+      applyPlayerDamage(this.damage, this);
       p.invuln = 0.58;
       state.shake = 10;
       state.flash = 0.22;
@@ -316,7 +317,7 @@ export class TwinAbyssalEyes extends BaseEnemy {
     if (forward < 0 || forward > 980) return;
     const dist = Math.abs(dx * -vy + dy * vx);
     if (dist < p.r + width) {
-      p.hp -= this.damage * (this.enraged ? 1.55 : 1.15) * dt;
+      applyPlayerDamage(this.damage * (this.enraged ? 1.55 : 1.15) * dt, this);
       state.flash = Math.max(state.flash, 0.1);
       state.shake = Math.max(state.shake, 3);
       if (Math.random() < dt * 16) burst(p.x, p.y, 2, this.color, 80);

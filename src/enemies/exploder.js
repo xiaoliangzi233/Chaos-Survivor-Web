@@ -1,9 +1,10 @@
-import { TAU, WORLD_SIZE } from "../constants.js";
+﻿import { TAU, WORLD_SIZE } from "../constants.js";
 import { state } from "../state.js";
 import { burst, pulse } from "../effects.js";
 import { playSfx } from "../audio.js";
 import { clamp, distSq } from "../utils.js";
 import { BaseEnemy } from "./BaseEnemy.js";
+import { applyPlayerDamage } from "../systems/items.js";
 
 const ARM_RANGE = 92;
 const EXPLODE_RADIUS = 92;
@@ -50,7 +51,7 @@ export class Exploder extends BaseEnemy {
   explode() {
     const p = state.player;
     if (distSq(this.x, this.y, p.x, p.y) < (EXPLODE_RADIUS + p.r) ** 2 && p.invuln <= 0) {
-      p.hp -= this.damage;
+      applyPlayerDamage(this.damage, this);
       p.invuln = 0.52;
       state.flash = 0.38;
       state.shake = 14;

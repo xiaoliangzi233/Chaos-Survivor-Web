@@ -1,8 +1,9 @@
-import { TAU, WORLD_SIZE } from "../constants.js";
+﻿import { TAU, WORLD_SIZE } from "../constants.js";
 import { state } from "../state.js";
 import { burst, pulse, trail } from "../effects.js";
 import { clamp } from "../utils.js";
 import { BaseEnemy } from "./BaseEnemy.js";
+import { applyPlayerDamage } from "../systems/items.js";
 
 const SEGMENT_COUNT = 7;
 const SEGMENT_GAP = 17;
@@ -130,7 +131,7 @@ export class MechWorm extends BaseEnemy {
 
   hitPlayer(mult) {
     const p = state.player;
-    p.hp -= this.damage * mult;
+    applyPlayerDamage(this.damage * mult, this);
     p.invuln = 0.48;
     state.shake = this.state === "strike" ? 10 : 6;
     state.flash = 0.24;

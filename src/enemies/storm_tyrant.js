@@ -1,9 +1,10 @@
-import { TAU, WORLD_SIZE } from "../constants.js";
+﻿import { TAU, WORLD_SIZE } from "../constants.js";
 import { state, world } from "../state.js";
 import { burst, pulse, trail } from "../effects.js";
 import { clamp } from "../utils.js";
 import { playSfx } from "../audio.js";
 import { BaseEnemy } from "./BaseEnemy.js";
+import { applyPlayerDamage } from "../systems/items.js";
 
 const MODES = ["fan", "ring", "dash", "summon"];
 
@@ -55,7 +56,7 @@ export class StormTyrant extends BaseEnemy {
     this.y = clamp(this.y, -half + this.r, half - this.r);
 
     if (d < p.r + this.r && p.invuln <= 0) {
-      p.hp -= this.damage;
+      applyPlayerDamage(this.damage, this);
       p.invuln = 0.65;
       state.shake = 14;
       state.flash = 0.32;
@@ -284,7 +285,7 @@ class StormShard {
       world.enemyProjectiles.push({ x: this.x, y: this.y, vx: Math.cos(a) * 160, vy: Math.sin(a) * 160, r: 4, color: this.color, damage: this.damage, life: 3.2, shape: "stormOrb", spin: Math.random() * TAU });
     }
     if (d < p.r + this.r && p.invuln <= 0) {
-      p.hp -= this.damage;
+      applyPlayerDamage(this.damage, this);
       p.invuln = 0.45;
       playSfx("hurt");
     }

@@ -1,9 +1,10 @@
-import { TAU, WORLD_SIZE } from "../constants.js";
+﻿import { TAU, WORLD_SIZE } from "../constants.js";
 import { state, world } from "../state.js";
 import { clamp, distSq } from "../utils.js";
 import { burst, pulse } from "../effects.js";
 import { playSfx } from "../audio.js";
 import { currentDifficulty } from "../difficulty.js";
+import { applyPlayerDamage } from "../systems/items.js";
 
 export class BaseEnemy {
   constructor(config, x, y) {
@@ -54,7 +55,7 @@ export class BaseEnemy {
     this.y = clamp(this.y, -half + this.r, half - this.r);
 
     if (d < p.r + this.r && p.invuln <= 0) {
-      p.hp -= this.damage;
+      applyPlayerDamage(this.damage, this);
       p.invuln = 0.55;
       state.shake = 8;
       state.flash = 0.28;

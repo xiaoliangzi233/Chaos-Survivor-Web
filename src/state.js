@@ -34,6 +34,7 @@ export const world = {
   projectiles: [],
   enemyProjectiles: [],
   hazards: [],
+  itemObjects: [],
   gems: [],
   coins: [],
   particles: [],
@@ -65,6 +66,26 @@ export function createPlayer() {
     xp: 0,
     xpNeed: 24,
     magnet: 92,
+    dodge: 0,
+    defense: 0,
+    luck: 0,
+    critChance: 0,
+    regen: 0,
+    attackRangeBonus: 0,
+    attackSpeedBonus: 0,
+    projectileBonus: 0,
+    splitDamagePenalty: 0,
+    bleedDps: 0,
+    bleedDuration: 0,
+    waveShields: 0,
+    currentWaveShields: 0,
+    nextWaveSpawnBonus: 0,
+    activeWaveSpawnBonus: 0,
+    turretCount: 0,
+    landminePacks: 0,
+    coinDropBonus: 0,
+    goldLossOnHit: 0,
+    starCloak: 0,
     invuln: 0,
     burnTimer: 0,
     burnDps: 0,
@@ -102,6 +123,7 @@ export function resetRun(map) {
   world.projectiles.length = 0;
   world.enemyProjectiles.length = 0;
   world.hazards.length = 0;
+  world.itemObjects.length = 0;
   world.gems.length = 0;
   world.coins.length = 0;
   world.particles.length = 0;

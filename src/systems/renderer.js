@@ -72,6 +72,7 @@ export function render(ctx) {
   drawPlayer(ctx);
   drawEnemyProjectiles(ctx);
   drawHazards(ctx);
+  drawItemObjects(ctx);
   drawBlackhole(ctx);
   drawEffects(ctx);
   drawWeaponFx(ctx);
@@ -231,6 +232,12 @@ function drawWeaponFx(ctx) {
       drawBladeBloomFx(ctx, fx, k);
     } else if (fx.kind === "droneBeam") {
       drawDroneBeamFx(ctx, fx, k);
+    } else if (fx.kind === "turretBeam") {
+      drawTurretBeamFx(ctx, fx, k);
+    } else if (fx.kind === "itemMineBlast") {
+      drawItemMineBlastFx(ctx, fx, k);
+    } else if (fx.kind === "starImpact") {
+      drawStarImpactFx(ctx, fx, k);
     } else {
       ctx.strokeStyle = hexToRgba(fx.color, k);
       ctx.lineWidth = 2;
@@ -428,6 +435,89 @@ function drawDrone(ctx, x, y, t, attacking, energy = 1, maxEnergy = 1, color = "
   ctx.restore();
 }
 
+function drawAllyTurret(ctx, turret) {
+  const t = state.time + (turret.t || 0);
+  ctx.save();
+  ctx.translate(turret.x, turret.y);
+  ctx.rotate(turret.targetAngle || 0);
+  glow(ctx, 0, 0, 32, 0.34, "#42e8ff");
+  ctx.fillStyle = "rgba(3,8,18,0.86)";
+  ctx.beginPath();
+  ctx.roundRect(-17, -14, 34, 28, 7);
+  ctx.fill();
+  ctx.strokeStyle = "#42e8ff";
+  ctx.lineWidth = 2;
+  ctx.stroke();
+  ctx.fillStyle = "#dffcff";
+  ctx.fillRect(5, -5, 24, 10);
+  ctx.fillStyle = "#42e8ff";
+  ctx.fillRect(22, -3, 8, 6);
+  ctx.rotate(-turret.targetAngle || 0);
+  ctx.strokeStyle = hexToRgba("#42e8ff", 0.28 + Math.sin(t * 6) * 0.08);
+  ctx.setLineDash([8, 8]);
+  ctx.beginPath();
+  ctx.arc(0, 0, 28, 0, TAU);
+  ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.restore();
+}
+
+function drawAllyMine(ctx, mine) {
+  const armed = !mine.triggered;
+  const blink = 0.55 + Math.sin(state.time * 8 + mine.t) * 0.22;
+  ctx.save();
+  ctx.translate(mine.x, mine.y);
+  glow(ctx, 0, 0, armed ? 20 : 70, armed ? 0.18 : 0.55, "#ff7a2f");
+  ctx.fillStyle = armed ? "rgba(26,10,4,0.9)" : "rgba(255,122,47,0.2)";
+  ctx.beginPath();
+  ctx.arc(0, 0, armed ? 13 : mine.radius * 0.5, 0, TAU);
+  ctx.fill();
+  ctx.strokeStyle = hexToRgba(armed ? "#ffd166" : "#ffffff", armed ? blink : 0.8);
+  ctx.lineWidth = armed ? 2 : 4;
+  ctx.beginPath();
+  ctx.arc(0, 0, armed ? 17 : mine.radius * 0.82, 0, TAU);
+  ctx.stroke();
+  if (armed) {
+    ctx.fillStyle = "#ffd166";
+    ctx.beginPath();
+    ctx.arc(0, 0, 4, 0, TAU);
+    ctx.fill();
+    ctx.strokeStyle = hexToRgba("#ff7a2f", 0.62);
+    for (let i = 0; i < 6; i++) {
+      const a = i * TAU / 6 + state.time;
+      ctx.beginPath();
+      ctx.moveTo(Math.cos(a) * 6, Math.sin(a) * 6);
+      ctx.lineTo(Math.cos(a) * 16, Math.sin(a) * 16);
+      ctx.stroke();
+    }
+  }
+  ctx.restore();
+}
+
+function drawFallingStar(ctx, starObj) {
+  if ((starObj.delay || 0) > 0) return;
+  ctx.save();
+  ctx.translate(starObj.x, starObj.y);
+  ctx.rotate(state.time * 8 + starObj.x * 0.01);
+  glow(ctx, 0, 0, 34, 0.48, "#ffd166");
+  ctx.fillStyle = "#ffd166";
+  ctx.beginPath();
+  for (let i = 0; i < 10; i++) {
+    const a = i * TAU / 10 - Math.PI / 2;
+    const r = i % 2 ? 5 : 14;
+    const x = Math.cos(a) * r;
+    const y = Math.sin(a) * r;
+    if (i === 0) ctx.moveTo(x, y);
+    else ctx.lineTo(x, y);
+  }
+  ctx.closePath();
+  ctx.fill();
+  ctx.strokeStyle = "#fff3b0";
+  ctx.lineWidth = 2;
+  ctx.stroke();
+  ctx.restore();
+}
+
 function drawArcFx(ctx, fx, k) {
   ctx.lineCap = "round";
   for (const seg of fx.segments) {
@@ -593,6 +683,60 @@ function drawDroneBeamFx(ctx, fx, k) {
   ctx.lineCap = "butt";
 }
 
+function drawTurretBeamFx(ctx, fx, k) {
+  const points = jaggedLine(fx.x1, fx.y1, fx.x2, fx.y2, 5, 5, state.time * 160 + fx.x1);
+  ctx.lineCap = "round";
+  ctx.strokeStyle = hexToRgba("#ffffff", k);
+  ctx.lineWidth = 4 * k;
+  strokePolyline(ctx, points);
+  ctx.strokeStyle = hexToRgba(fx.color, k * 0.85);
+  ctx.lineWidth = 2;
+  strokePolyline(ctx, points);
+  glow(ctx, fx.x2, fx.y2, 18, k * 0.32, fx.color);
+  ctx.lineCap = "butt";
+}
+
+function drawItemMineBlastFx(ctx, fx, k) {
+  const r = fx.radius * (1 - k);
+  glow(ctx, fx.x, fx.y, r * 0.55, k * 0.5, fx.color);
+  ctx.strokeStyle = hexToRgba("#fff3b0", k);
+  ctx.lineWidth = 4 * k;
+  ctx.beginPath();
+  ctx.arc(fx.x, fx.y, r, 0, TAU);
+  ctx.stroke();
+  ctx.strokeStyle = hexToRgba(fx.color, k * 0.82);
+  ctx.lineWidth = 2;
+  for (let i = 0; i < 14; i++) {
+    const a = i * TAU / 14 + fx.seed;
+    ctx.beginPath();
+    ctx.moveTo(fx.x + Math.cos(a) * r * 0.28, fx.y + Math.sin(a) * r * 0.28);
+    ctx.lineTo(fx.x + Math.cos(a) * r * 1.08, fx.y + Math.sin(a) * r * 1.08);
+    ctx.stroke();
+  }
+}
+
+function drawStarImpactFx(ctx, fx, k) {
+  const r = fx.radius * (1 - k);
+  glow(ctx, fx.x, fx.y, r * 0.44, k * 0.45, fx.color);
+  ctx.save();
+  ctx.translate(fx.x, fx.y);
+  ctx.rotate(state.time * 5);
+  ctx.strokeStyle = hexToRgba("#fff3b0", k);
+  ctx.lineWidth = 3 * k;
+  for (let i = 0; i < 8; i++) {
+    ctx.rotate(TAU / 8);
+    ctx.beginPath();
+    ctx.moveTo(r * 0.12, 0);
+    ctx.lineTo(r, 0);
+    ctx.stroke();
+  }
+  ctx.restore();
+  ctx.strokeStyle = hexToRgba(fx.color, k * 0.82);
+  ctx.beginPath();
+  ctx.arc(fx.x, fx.y, r * 0.58, 0, TAU);
+  ctx.stroke();
+}
+
 function jaggedLine(x1, y1, x2, y2, steps, amp, seed) {
   const points = [];
   const dx = x2 - x1;
@@ -665,6 +809,15 @@ function drawEnemyProjectiles(ctx) {
     }
     ctx.fillStyle = b.color; ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, TAU); ctx.fill();
     ctx.fillStyle = "#fff"; ctx.fillRect(b.x - 1, b.y - 1, 2, 2);
+  }
+}
+
+function drawItemObjects(ctx) {
+  for (const obj of world.itemObjects) {
+    if (!inView(obj.x, obj.y, 120)) continue;
+    if (obj.kind === "turret") drawAllyTurret(ctx, obj);
+    else if (obj.kind === "landmine") drawAllyMine(ctx, obj);
+    else if (obj.kind === "fallingStar") drawFallingStar(ctx, obj);
   }
 }
 

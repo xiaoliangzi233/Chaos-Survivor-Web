@@ -52,7 +52,7 @@ export function drawWeaponPreview(ctx, canvas, weapon, t) {
   const cy = h / 2;
   if (!weapon) return;
   const rank = qualityRank(weapon);
-  const baseColor = { arc: "#42e8ff", ice: "#9ff4ff", missile: "#ffb347", boomerang: "#ff65d8", drone: "#77ff8a", pulse: "#77ff8a", prism_railgun: "#7df9ff" }[weapon.id] || "#42e8ff";
+  const baseColor = { arc: "#42e8ff", ice: "#9ff4ff", missile: "#ffb347", boomerang: "#ff65d8", drone: "#77ff8a", pulse: "#77ff8a", prism_railgun: "#7df9ff", void_singularity: "#8b5cf6" }[weapon.id] || "#42e8ff";
   const color = qualityColor(weapon, baseColor);
   const scale = Math.min(1, Math.max(0.46, Math.min((w * 0.5 - 24) / 190, (h * 0.5 - 22) / 96)));
   ctx.save();
@@ -66,6 +66,7 @@ export function drawWeaponPreview(ctx, canvas, weapon, t) {
   else if (weapon.id === "drone") drawDrones(ctx, 0, 0, t, rank, color);
   else if (weapon.id === "pulse") drawPulse(ctx, 0, 0, t, rank, color);
   else if (weapon.id === "prism_railgun") drawPrismRailgun(ctx, 0, 0, t, rank, color);
+  else if (weapon.id === "void_singularity") drawVoidSingularity(ctx, 0, 0, t, rank, color);
   ctx.restore();
 }
 
@@ -297,6 +298,100 @@ function drawPrismRailgun(ctx, cx, cy, t, rank, color) {
     ctx.lineTo(endX + nx * 22, endY + ny * 22);
     ctx.stroke();
   }
+}
+
+function drawVoidSingularity(ctx, cx, cy, t, rank, color) {
+  const bx = cx + 92 + Math.sin(t * 1.4) * 10;
+  const by = cy - 8 + Math.cos(t * 1.1) * 8;
+  drawPreviewBlackHole(ctx, bx, by, 32 + rank * 3, 94 + rank * 10, t, rank, color);
+  const targets = [
+    { x: cx + 150, y: cy - 44, phase: 0 },
+    { x: cx + 132, y: cy + 38, phase: 1.7 },
+    { x: cx + 42, y: cy + 54, phase: 3.1 },
+  ];
+  for (const target of targets) {
+    const dx = bx - target.x;
+    const dy = by - target.y;
+    const pull = 0.18 + Math.sin(t * 2.2 + target.phase) * 0.04;
+    const x = target.x + dx * pull;
+    const y = target.y + dy * pull;
+    ctx.strokeStyle = colorWithAlpha(color, 0.24);
+    ctx.lineWidth = 1;
+    ctx.setLineDash([4, 6]);
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    ctx.quadraticCurveTo((x + bx) / 2 + Math.sin(t * 5 + target.phase) * 10, (y + by) / 2, bx, by);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    drawDummy(ctx, x, y, color);
+  }
+  const collapseT = (t % 3.2) / 3.2;
+  if (collapseT > 0.78) {
+    const k = (collapseT - 0.78) / 0.22;
+    ring(ctx, bx, by, 38 + k * 72, rank >= 4 ? "#ffd166" : color, 0.75 * (1 - k));
+    ring(ctx, bx, by, 20 + k * 44, "#ffffff", 0.42 * (1 - k));
+  }
+}
+
+function drawPreviewBlackHole(ctx, x, y, core, diskR, t, rank, color) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.globalCompositeOperation = "lighter";
+  glow(ctx, 0, 0, diskR * 0.45, color, 0.28 + rank * 0.04);
+  ctx.save();
+  ctx.rotate(t * 1.8);
+  ctx.scale(1, 0.42);
+  const disk = ctx.createRadialGradient(0, 0, core * 0.4, 0, 0, diskR);
+  disk.addColorStop(0, "rgba(0,0,0,0)");
+  disk.addColorStop(0.42, colorWithAlpha("#ffffff", 0.15));
+  disk.addColorStop(0.58, colorWithAlpha(color, 0.48));
+  disk.addColorStop(0.78, colorWithAlpha(rank >= 4 ? "#ffd166" : "#ff65d8", 0.3));
+  disk.addColorStop(1, "rgba(0,0,0,0)");
+  ctx.fillStyle = disk;
+  ctx.beginPath();
+  ctx.arc(0, 0, diskR, 0, TAU);
+  ctx.fill();
+  ctx.strokeStyle = colorWithAlpha(rank >= 4 ? "#ffd166" : color, 0.72);
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.arc(0, 0, diskR * 0.56, t * 2, t * 2 + Math.PI * 1.45);
+  ctx.stroke();
+  if (rank >= 4) {
+    ctx.rotate(-t * 2.8);
+    ctx.strokeStyle = colorWithAlpha("#ffd166", 0.46);
+    ctx.beginPath();
+    ctx.arc(0, 0, diskR * 0.84, 0, Math.PI * 1.6);
+    ctx.stroke();
+  }
+  ctx.restore();
+  ctx.strokeStyle = colorWithAlpha(color, 0.32);
+  ctx.setLineDash([8, 8]);
+  ctx.beginPath();
+  ctx.arc(0, 0, diskR * 0.82, 0, TAU);
+  ctx.stroke();
+  ctx.setLineDash([]);
+  for (let i = 0; i < 10; i++) {
+    const a = t * (i % 2 ? -1.2 : 1.5) + i * TAU / 10;
+    const r = core * (1.65 + (i % 3) * 0.35);
+    ctx.fillStyle = colorWithAlpha(i % 2 ? "#ffffff" : color, 0.32 + (i % 3) * 0.1);
+    ctx.fillRect(Math.cos(a) * r - 2, Math.sin(a) * r - 2, 4, 4);
+  }
+  const event = ctx.createRadialGradient(0, 0, 1, 0, 0, core * 1.7);
+  event.addColorStop(0, "rgba(0,0,0,1)");
+  event.addColorStop(0.54, "rgba(0,0,0,0.98)");
+  event.addColorStop(0.72, colorWithAlpha("#ffffff", 0.82));
+  event.addColorStop(0.88, colorWithAlpha(color, 0.86));
+  event.addColorStop(1, "rgba(0,0,0,0)");
+  ctx.fillStyle = event;
+  ctx.beginPath();
+  ctx.arc(0, 0, core * 1.7, 0, TAU);
+  ctx.fill();
+  ctx.globalCompositeOperation = "source-over";
+  ctx.fillStyle = "#02020a";
+  ctx.beginPath();
+  ctx.arc(0, 0, core, 0, TAU);
+  ctx.fill();
+  ctx.restore();
 }
 
 function drawDummy(ctx, x, y, color) {

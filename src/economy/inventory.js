@@ -54,6 +54,12 @@ export const WEAPON_INFO = {
     desc: "蓄能后发射贯穿战场的棱镜光束，沿直线撕开敌群并产生折射打击。",
     tags: ["直线贯穿", "蓄能光束", "折射打击"],
   },
+  void_singularity: {
+    icon: "◉",
+    name: "虚空奇点",
+    desc: "发射缓慢移动的黑洞核心，吸附敌人并在寿命结束时坍缩爆发。",
+    tags: ["引力吸附", "持续伤害", "坍缩爆发"],
+  },
 };
 
 export function addWeaponToInventory(id, quality = "common") {

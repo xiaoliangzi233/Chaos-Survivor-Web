@@ -114,6 +114,7 @@ export function createWeapons() {
     drone: { level: 0, angle: 0, count: 0, orbitRadius: 82, acquireRange: 650, attackRange: 500, fireCooldown: 0.34, bulletDamage: 33, bulletSpeed: 610, batteryMax: 150, shotCost: 20, rechargeRate: 46, drones: [], quality: "common", qualityMult: 1 },
     pulse: { level: 0, timer: 2.4, cooldown: 2.7, damage: 80, radius: 132, quality: "common", qualityMult: 1 },
     prism_railgun: { level: 0, timer: 1.05, cooldown: 1.65, count: 1, damage: 76, range: 960, width: 13, hitLimit: 6, refractionRange: 155, quality: "common", qualityMult: 1 },
+    void_singularity: { level: 0, timer: 1.35, cooldown: 2.85, count: 1, damage: 28, range: 820, speed: 185, radius: 26, pullRadius: 170, damageRadius: 82, collapseRadius: 132, pullStrength: 310, pulseInterval: 0.58, life: 3.1, quality: "common", qualityMult: 1 },
   };
 }
 

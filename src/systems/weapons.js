@@ -7,7 +7,7 @@ import { playSfx } from "../audio.js";
 import { addWeaponToInventory, QUALITY_INFO, QUALITY_ORDER, WEAPON_INFO } from "../economy/inventory.js";
 import { attackSpeedMultiplier, weaponProjectileBonus, weaponRangeBonus } from "./items.js";
 
-export const STARTER_WEAPONS = ["arc", "ice", "missile", "boomerang", "drone", "prism_railgun"].map((id) => ({ id, ...WEAPON_INFO[id] }));
+export const STARTER_WEAPONS = ["arc", "ice", "missile", "boomerang", "drone", "prism_railgun", "void_singularity"].map((id) => ({ id, ...WEAPON_INFO[id] }));
 
 export const UPGRADE_DEFS = [
   {
@@ -147,6 +147,7 @@ export function updateWeapons(dt) {
   updateDroneWeapon(dt);
   updatePulseWeapon(dt);
   updatePrismRailgunWeapon(dt);
+  updateVoidSingularityWeapon(dt);
   updateProjectiles(dt);
   updateWeaponFx(dt);
 }
@@ -740,6 +741,71 @@ function pointSegmentInfo(px, py, x1, y1, x2, y2) {
   return { t: rawT, x, y, distance: Math.hypot(px - x, py - y) };
 }
 
+function updateVoidSingularityWeapon(dt) {
+  const w = state.weapons.void_singularity;
+  if (!tickWeapon(w, dt)) return;
+  const p = state.player;
+  const target = nearestEnemy(p.x, p.y, w.range + weaponRangeBonus());
+  if (!target) return;
+
+  const base = Math.atan2(target.y - p.y, target.x - p.x);
+  const count = Math.max(1, w.count || 1) + weaponProjectileBonus(w);
+  for (let i = 0; i < count; i++) {
+    const quality = weaponQualityAt(w, i);
+    const shot = weaponViewForQuality(w, quality);
+    const rank = qualityRank(shot);
+    const color = qualityColor(shot, "#8b5cf6");
+    const spread = (i - (count - 1) / 2) * 0.2;
+    fireSingularity(base + spread, w, shot, rank, color, i);
+  }
+  playSfx("shoot");
+}
+
+function fireSingularity(angle, base, shot, rank, color, index) {
+  if (world.projectiles.length >= PROJECTILE_LIMIT) return;
+  const p = state.player;
+  const speed = base.speed * (rank >= 4 ? 0.92 : 1);
+  const x = p.x + Math.cos(angle) * 22;
+  const y = p.y + Math.sin(angle) * 22;
+  world.projectiles.push({
+    x,
+    y,
+    px: p.x,
+    py: p.y,
+    vx: Math.cos(angle) * speed,
+    vy: Math.sin(angle) * speed,
+    speed,
+    angle,
+    damage: weaponPower(shot, base.damage),
+    pierce: 999,
+    r: base.radius + rank * 2,
+    life: base.life + rank * 0.18,
+    maxLife: base.life + rank * 0.18,
+    color,
+    shape: "singularity",
+    variant: rank >= 4 ? "legendSingularity" : rank >= 3 ? "voidRift" : "singularity",
+    quality: shot.quality || "common",
+    qualityRank: rank,
+    tracking: false,
+    returning: false,
+    pullRadius: base.pullRadius + (rank >= 1 ? 28 : 0) + rank * 8 + weaponRangeBonus() * 0.12,
+    damageRadius: base.damageRadius + rank * 7,
+    collapseRadius: base.collapseRadius + (rank >= 3 ? 28 : 0) + rank * 5,
+    pullStrength: base.pullStrength * (1 + rank * 0.12),
+    pulseInterval: Math.max(0.34, base.pulseInterval - rank * 0.045),
+    pulseTimer: base.pulseInterval * 0.55,
+    collapseDamage: weaponPower(shot, base.damage) * (2.1 + rank * 0.26),
+    noLifeExpire: true,
+    knockback: 0,
+    hitIds: new Set(),
+    spin: Math.random() * TAU,
+    trailTimer: 0,
+    seed: Math.random() * 999 + index * 31,
+    secondCollapse: rank >= 4,
+  });
+  pulse(x, y, base.pullRadius * 0.38, color, 0.16);
+}
+
 function tickWeapon(w, dt) {
   if (!w || w.level <= 0) return false;
   w.timer -= dt;
@@ -803,6 +869,10 @@ function updateProjectiles(dt) {
   const hits = [];
   for (let i = world.projectiles.length - 1; i >= 0; i--) {
     const b = world.projectiles[i];
+    if (b.shape === "singularity") {
+      updateSingularityProjectile(b, i, dt);
+      continue;
+    }
     b.px = b.x;
     b.py = b.y;
     steer(b, dt);
@@ -857,6 +927,129 @@ function updateProjectiles(dt) {
     const expired = !b.noLifeExpire && b.life <= 0;
     if (expired || b.pierce <= 0 || Math.abs(b.x) > half || Math.abs(b.y) > half) world.projectiles.splice(i, 1);
   }
+}
+
+function updateSingularityProjectile(b, index, dt) {
+  b.px = b.x;
+  b.py = b.y;
+  b.life -= dt;
+  b.spin += dt * (3.6 + b.qualityRank * 0.35);
+  b.x += b.vx * dt;
+  b.y += b.vy * dt;
+  b.vx *= Math.pow(0.985, dt * 60);
+  b.vy *= Math.pow(0.985, dt * 60);
+  b.trailTimer -= dt;
+  if (b.trailTimer <= 0) {
+    b.trailTimer = 0.045;
+    trail(b.x, b.y, b.px, b.py, b.color, 7);
+  }
+
+  const hits = [];
+  queryEnemies(b.x, b.y, b.pullRadius, hits);
+  let affected = 0;
+  for (const e of hits) {
+    if (e.dead) continue;
+    const dx = b.x - e.x;
+    const dy = b.y - e.y;
+    const dist = Math.max(1, Math.hypot(dx, dy));
+    const pullT = clamp(1 - dist / b.pullRadius, 0, 1);
+    const bossPullScale = e.boss ? 0.08 : 1;
+    const pull = b.pullStrength * pullT * pullT * bossPullScale * dt;
+    e.x += (dx / dist) * pull;
+    e.y += (dy / dist) * pull;
+    if (dist < b.damageRadius + e.r) {
+      const damageScale = 0.35 + pullT * 0.9;
+      damageEnemy(e, b.damage * damageScale * dt, b.x, b.y);
+      if (!e.boss) applyKnockback(e, dx, dy, -22 * pullT);
+      affected++;
+    }
+  }
+
+  b.pulseTimer -= dt;
+  if (b.pulseTimer <= 0) {
+    b.pulseTimer += b.pulseInterval;
+    singularityPulse(b, hits);
+  }
+
+  if (affected && Math.random() < dt * 8) burst(b.x, b.y, 2, b.color, 90);
+
+  const half = WORLD_SIZE / 2 + 240;
+  if (b.life <= 0 || Math.abs(b.x) > half || Math.abs(b.y) > half) {
+    collapseSingularity(b);
+    world.projectiles.splice(index, 1);
+  }
+}
+
+function singularityPulse(b, cachedHits = null) {
+  const radius = b.damageRadius + (b.qualityRank >= 2 ? 32 : 12);
+  const hits = cachedHits || [];
+  if (!cachedHits) queryEnemies(b.x, b.y, radius, hits);
+  for (const e of hits) {
+    if (e.dead || distSq(b.x, b.y, e.x, e.y) > (radius + e.r) ** 2) continue;
+    damageEnemy(e, b.damage * (b.qualityRank >= 4 ? 0.62 : 0.42), b.x, b.y);
+    const dx = b.x - e.x;
+    const dy = b.y - e.y;
+    if (!e.boss) applyKnockback(e, dx, dy, -64);
+  }
+  world.weaponFx.push({
+    kind: "voidPulse",
+    x: b.x,
+    y: b.y,
+    radius,
+    color: b.color,
+    rank: b.qualityRank,
+    life: 0.34,
+    maxLife: 0.34,
+    seed: b.seed,
+  });
+}
+
+function collapseSingularity(b) {
+  const hits = [];
+  queryEnemies(b.x, b.y, b.collapseRadius, hits);
+  for (const e of hits) {
+    if (e.dead) continue;
+    const dx = e.x - b.x;
+    const dy = e.y - b.y;
+    const d = Math.max(1, Math.hypot(dx, dy));
+    const falloff = clamp(1 - d / b.collapseRadius, 0.22, 1);
+    damageEnemy(e, b.collapseDamage * falloff, b.x, b.y);
+    applyKnockback(e, dx, dy, (e.boss ? 42 : 155) * falloff);
+  }
+  addCameraShake(Math.min(9, 3.2 + b.collapseRadius / 55));
+  burst(b.x, b.y, 24 + b.qualityRank * 5, b.color, 230);
+  pulse(b.x, b.y, b.collapseRadius, b.color, 0.38);
+  world.weaponFx.push({
+    kind: "voidCollapse",
+    x: b.x,
+    y: b.y,
+    radius: b.collapseRadius,
+    color: b.color,
+    rank: b.qualityRank,
+    life: 0.5,
+    maxLife: 0.5,
+    seed: b.seed,
+  });
+  if (b.secondCollapse) {
+    world.weaponFx.push({
+      kind: "voidPulse",
+      x: b.x,
+      y: b.y,
+      radius: b.collapseRadius * 0.62,
+      color: "#ffd166",
+      rank: b.qualityRank,
+      life: 0.42,
+      maxLife: 0.42,
+      seed: b.seed + 17,
+    });
+    const outer = [];
+    queryEnemies(b.x, b.y, b.collapseRadius * 0.62, outer);
+    for (const e of outer) {
+      if (e.dead) continue;
+      damageEnemy(e, b.collapseDamage * 0.36, b.x, b.y);
+    }
+  }
+  playSfx("explode");
 }
 
 function iceRingBurst(b) {

@@ -364,6 +364,10 @@ function drawPlayerMouth(ctx, mood) {
 function drawProjectiles(ctx) {
   for (const b of world.projectiles) {
     if (!inView(b.x, b.y, 60)) continue;
+    if (b.shape === "singularity") {
+      drawSingularityProjectile(ctx, b);
+      continue;
+    }
     const boosted = b.quality === "epic" || b.quality === "legendary";
     const tail = b.shape === "missile" ? (boosted ? 82 : 64) : b.shape === "droneBolt" ? (boosted ? 38 : 28) : 48;
     const tx = b.x - Math.cos(b.angle) * tail;
@@ -422,6 +426,10 @@ function drawWeaponFx(ctx) {
       drawPrismRailFx(ctx, fx, k);
     } else if (fx.kind === "prismImpact") {
       drawPrismImpactFx(ctx, fx, k);
+    } else if (fx.kind === "voidPulse") {
+      drawVoidPulseFx(ctx, fx, k);
+    } else if (fx.kind === "voidCollapse") {
+      drawVoidCollapseFx(ctx, fx, k);
     } else if (fx.kind === "prismBurst") {
       drawPrismBurstFx(ctx, fx, k);
     } else if (fx.kind === "bladeBloom") {
@@ -576,6 +584,85 @@ function drawDroneBolt(ctx, b) {
     ctx.arc(0, 0, r * 1.8, -0.9, 0.9);
     ctx.stroke();
   }
+}
+
+function drawSingularityProjectile(ctx, b) {
+  const rank = b.qualityRank || 0;
+  const coreR = b.r * (0.92 + Math.sin(state.time * 8 + b.seed) * 0.05);
+  const horizon = b.damageRadius || b.r * 3;
+  const diskR = b.pullRadius * 0.58;
+  ctx.save();
+  ctx.translate(b.x, b.y);
+  ctx.globalCompositeOperation = "lighter";
+
+  glow(ctx, 0, 0, diskR * 0.56, 0.22 + rank * 0.035, b.color);
+  ctx.save();
+  ctx.rotate(b.spin * 0.35);
+  ctx.scale(1, 0.42);
+  const disk = ctx.createRadialGradient(0, 0, coreR * 0.5, 0, 0, diskR);
+  disk.addColorStop(0, "rgba(0,0,0,0)");
+  disk.addColorStop(0.34, hexToRgba("#ffffff", 0.12));
+  disk.addColorStop(0.52, hexToRgba(b.color, 0.42));
+  disk.addColorStop(0.72, hexToRgba(rank >= 4 ? "#ffd166" : "#ff65d8", 0.26));
+  disk.addColorStop(1, "rgba(0,0,0,0)");
+  ctx.fillStyle = disk;
+  ctx.beginPath();
+  ctx.arc(0, 0, diskR, 0, TAU);
+  ctx.fill();
+  ctx.strokeStyle = hexToRgba(rank >= 4 ? "#ffd166" : b.color, 0.72);
+  ctx.lineWidth = 2.4;
+  ctx.beginPath();
+  ctx.arc(0, 0, diskR * 0.54, b.spin, b.spin + Math.PI * 1.35);
+  ctx.stroke();
+  if (rank >= 4) {
+    ctx.rotate(-b.spin * 0.72);
+    ctx.strokeStyle = hexToRgba("#ffd166", 0.46);
+    ctx.lineWidth = 1.4;
+    ctx.beginPath();
+    ctx.arc(0, 0, diskR * 0.82, 0, Math.PI * 1.55);
+    ctx.stroke();
+  }
+  ctx.restore();
+
+  ctx.strokeStyle = hexToRgba(b.color, 0.18);
+  ctx.lineWidth = 1.2;
+  ctx.setLineDash([10, 9]);
+  ctx.beginPath();
+  ctx.arc(0, 0, b.pullRadius * (0.82 + Math.sin(state.time * 2 + b.seed) * 0.03), 0, TAU);
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  for (let i = 0; i < 12; i++) {
+    const a = b.spin * (i % 2 ? -0.55 : 0.72) + i * TAU / 12;
+    const r = horizon * (0.78 + (i % 3) * 0.22);
+    const size = 2 + (i % 3);
+    ctx.fillStyle = hexToRgba(i % 2 ? "#ffffff" : b.color, 0.32 + (i % 3) * 0.1);
+    ctx.fillRect(Math.cos(a) * r - size / 2, Math.sin(a) * r - size / 2, size, size);
+  }
+
+  const event = ctx.createRadialGradient(0, 0, 1, 0, 0, coreR * 1.75);
+  event.addColorStop(0, "rgba(0,0,0,1)");
+  event.addColorStop(0.52, "rgba(0,0,0,0.95)");
+  event.addColorStop(0.7, hexToRgba("#ffffff", 0.84));
+  event.addColorStop(0.84, hexToRgba(b.color, 0.88));
+  event.addColorStop(1, "rgba(0,0,0,0)");
+  ctx.fillStyle = event;
+  ctx.beginPath();
+  ctx.arc(0, 0, coreR * 1.75, 0, TAU);
+  ctx.fill();
+
+  ctx.globalCompositeOperation = "source-over";
+  ctx.fillStyle = "#02020a";
+  ctx.beginPath();
+  ctx.arc(0, 0, coreR, 0, TAU);
+  ctx.fill();
+  ctx.globalCompositeOperation = "lighter";
+  ctx.strokeStyle = hexToRgba("#ffffff", 0.58);
+  ctx.lineWidth = 1.2;
+  ctx.beginPath();
+  ctx.arc(0, 0, coreR * 1.18, -b.spin, -b.spin + Math.PI * 1.2);
+  ctx.stroke();
+  ctx.restore();
 }
 
 function drawDrone(ctx, x, y, t, attacking, energy = 1, maxEnergy = 1, color = "#77ff8a", quality = "common") {
@@ -939,6 +1026,84 @@ function drawPrismImpactFx(ctx, fx, k) {
     for (let i = 0; i < 4; i++) {
       ctx.rotate(TAU / 4);
       ctx.strokeRect(-r * 0.36, -r * 0.36, r * 0.72, r * 0.72);
+    }
+  }
+  ctx.restore();
+}
+
+function drawVoidPulseFx(ctx, fx, k) {
+  const progress = 1 - k;
+  const r = fx.radius * (0.28 + progress * 0.82);
+  ctx.save();
+  ctx.translate(fx.x, fx.y);
+  ctx.globalCompositeOperation = "lighter";
+  glow(ctx, 0, 0, r * 0.42, k * 0.34, fx.color);
+  ctx.strokeStyle = hexToRgba("#ffffff", k * 0.58);
+  ctx.lineWidth = 2.2;
+  ctx.beginPath();
+  ctx.arc(0, 0, r * 0.62, 0, TAU);
+  ctx.stroke();
+  ctx.strokeStyle = hexToRgba(fx.color, k * 0.86);
+  ctx.lineWidth = 2.8;
+  ctx.setLineDash([12, 9]);
+  ctx.beginPath();
+  ctx.arc(0, 0, r, (fx.seed || 0) + state.time * 2.2, (fx.seed || 0) + state.time * 2.2 + Math.PI * 1.7);
+  ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.strokeStyle = hexToRgba(fx.rank >= 4 ? "#ffd166" : "#ff65d8", k * 0.48);
+  ctx.lineWidth = 1.3;
+  for (let i = 0; i < 9; i++) {
+    const a = i * TAU / 9 - state.time * 1.6;
+    ctx.beginPath();
+    ctx.moveTo(Math.cos(a) * r * 0.48, Math.sin(a) * r * 0.48);
+    ctx.lineTo(Math.cos(a + 0.08) * r * 0.94, Math.sin(a + 0.08) * r * 0.94);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+function drawVoidCollapseFx(ctx, fx, k) {
+  const progress = 1 - k;
+  const r = fx.radius * progress;
+  ctx.save();
+  ctx.translate(fx.x, fx.y);
+  ctx.rotate((fx.seed || 0) + state.time * 2.5);
+  ctx.globalCompositeOperation = "lighter";
+  glow(ctx, 0, 0, fx.radius * 0.56, k * 0.5, fx.color);
+  const blast = ctx.createRadialGradient(0, 0, 4, 0, 0, Math.max(4, r));
+  blast.addColorStop(0, hexToRgba("#ffffff", k * 0.72));
+  blast.addColorStop(0.22, hexToRgba(fx.color, k * 0.5));
+  blast.addColorStop(0.62, hexToRgba("#14001f", k * 0.28));
+  blast.addColorStop(1, "rgba(0,0,0,0)");
+  ctx.fillStyle = blast;
+  ctx.beginPath();
+  ctx.arc(0, 0, r, 0, TAU);
+  ctx.fill();
+  ctx.strokeStyle = hexToRgba("#ffffff", k * 0.9);
+  ctx.lineWidth = 4 * k;
+  ctx.beginPath();
+  ctx.arc(0, 0, r * 0.72, 0, TAU);
+  ctx.stroke();
+  ctx.strokeStyle = hexToRgba(fx.rank >= 4 ? "#ffd166" : "#b48cff", k * 0.76);
+  ctx.lineWidth = 2;
+  for (let i = 0; i < 14; i++) {
+    const a = i * TAU / 14;
+    const bend = a + Math.sin(state.time + i) * 0.08;
+    const inner = r * (0.18 + (i % 2) * 0.12);
+    const outer = r * (0.8 + (i % 3) * 0.08);
+    ctx.beginPath();
+    ctx.moveTo(Math.cos(a) * inner, Math.sin(a) * inner);
+    ctx.lineTo(Math.cos(bend) * outer, Math.sin(bend) * outer);
+    ctx.stroke();
+  }
+  if (fx.rank >= 3) {
+    ctx.strokeStyle = hexToRgba("#ff65d8", k * 0.52);
+    ctx.lineWidth = 1.2;
+    for (let i = 0; i < 3; i++) {
+      ctx.rotate(TAU / 3);
+      ctx.beginPath();
+      ctx.ellipse(0, 0, r * 0.92, r * 0.28, 0, 0, TAU);
+      ctx.stroke();
     }
   }
   ctx.restore();

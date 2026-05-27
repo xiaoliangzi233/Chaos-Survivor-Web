@@ -3,11 +3,13 @@ import { state, world } from "../state.js";
 import { distSq, clamp } from "../utils.js";
 import { burst, pulse, trail } from "../effects.js";
 import { playSfx } from "../audio.js";
-import { QUALITY_INFO, QUALITY_ORDER } from "../economy/inventory.js";
+import { QUALITY_INFO, QUALITY_ORDER, recomputeAllWeapons } from "../economy/inventory.js";
 
 const QUALITY_VALUES = {
+  heart_container: [5, 10, 20, 35, 50],
   healing_potion: [20, 30, 50, 80, 120],
-  healing_aura: [1, 3, 5, 10, 15],
+  healing_aura: [1, 2, 3, 4, 5],
+  airburst: [30, 25, 20, 15, 10],
 };
 
 const QUALITY_SCALE = {
@@ -19,34 +21,40 @@ const QUALITY_SCALE = {
 };
 
 export const ITEM_DEFS = [
-  { id: "heart_container", icon: "♡", name: "心之容器", basePrice: 22, desc: "最大生命值 +20。", apply: ({ player }) => { player.maxHp += 20; player.hp = Math.min(player.maxHp, player.hp + 20); } },
-  { id: "healing_potion", icon: "✚", name: "治疗药水", basePrice: 12, desc: "立即恢复生命值，品质越高恢复越多。", apply: ({ player, quality }) => { player.hp = Math.min(player.maxHp, player.hp + qualityValue("healing_potion", quality)); } },
-  { id: "shackles", icon: "⌁", name: "脚镣", basePrice: 20, desc: "移动速度降低，攻击范围提高。", apply: ({ player, scale }) => { player.speed -= 12; player.attackRangeBonus += Math.round(80 * scale); } },
-  { id: "dodge_cloak", icon: "◒", name: "闪避斗篷", basePrice: 24, desc: "闪避率 +5%，最大生命值 -20。", apply: ({ player }) => { player.dodge = clamp(player.dodge + 0.05, 0, 0.7); player.maxHp = Math.max(30, player.maxHp - 20); player.hp = Math.min(player.hp, player.maxHp); } },
-  { id: "bait", icon: "※", name: "诱饵", basePrice: 16, desc: "下一波敌人增加 50%。", apply: ({ player }) => { player.nextWaveSpawnBonus += 0.5; } },
-  { id: "magnet", icon: "◎", name: "磁铁", basePrice: 18, desc: "金币和经验吸收范围提高。", apply: ({ player, scale }) => { player.magnet += Math.round(32 * scale); } },
-  { id: "speed_boots", icon: "»", name: "速度靴", basePrice: 20, desc: "移动速度提高。", apply: ({ player, scale }) => { player.speed += Math.round(18 * scale); } },
-  { id: "rapid_cord", icon: "⟲", name: "速射索", basePrice: 28, desc: "攻击速度提高。", apply: ({ player, scale }) => { player.attackSpeedBonus += 0.12 * scale; } },
-  { id: "fang", icon: "⋏", name: "尖牙", basePrice: 30, desc: "攻击会让敌人流血，持续掉血。", apply: ({ player, scale }) => { player.bleedDps += 7 * scale; player.bleedDuration = Math.max(player.bleedDuration, 2.8); } },
-  { id: "split_shot", icon: "≋", name: "分裂弹", basePrice: 34, desc: "投射物 +1，但武器伤害降低 15%。无人机也会增加额外投射物。", apply: ({ player }) => { player.projectileBonus += 1; player.splitDamagePenalty += 0.15; } },
-  { id: "lucky_clover", icon: "♣", name: "幸运草", basePrice: 26, desc: "幸运值提高，商店更容易出现高品质商品。", apply: ({ player, scale }) => { player.luck += Math.round(10 * scale); } },
-  { id: "gloves", icon: "▣", name: "拳套", basePrice: 24, desc: "暴击率提高。", apply: ({ player, scale }) => { player.critChance = clamp(player.critChance + 0.07 * scale, 0, 0.7); } },
-  { id: "knife", icon: "†", name: "小刀", basePrice: 25, desc: "攻击伤害提高。", apply: ({ player, scale }) => { player.damageScale += 0.08 * scale; } },
-  { id: "healing_aura", icon: "✺", name: "治愈光环", basePrice: 32, desc: "每秒生命回复提高，品质越高回复越强。", apply: ({ player, quality }) => { player.regen += qualityValue("healing_aura", quality); } },
-  { id: "tardigrade", icon: "⬡", name: "水熊虫", basePrice: 30, desc: "每波免疫一次攻击伤害，可叠加次数。", apply: ({ player }) => { player.waveShields += 1; player.currentWaveShields += 1; } },
-  { id: "heavy_armor", icon: "▰", name: "重甲", basePrice: 28, desc: "防御值提高，移动速度降低。", apply: ({ player, scale }) => { player.defense += Math.round(8 * scale); player.speed -= 10; } },
-  { id: "turret", icon: "♜", name: "炮塔", basePrice: 38, desc: "每波随机部署一座自动炮塔。", apply: ({ player }) => { player.turretCount += 1; } },
-  { id: "thief_mark", icon: "¢", name: "窃贼印记", basePrice: 24, desc: "敌人金币掉落 +20%，但被攻击时会扣除金币。", apply: ({ player }) => { player.coinDropBonus += 0.2; player.goldLossOnHit += 0.06; } },
-  { id: "star_cloak", icon: "✦", name: "星星斗篷", basePrice: 36, desc: "被攻击时召唤星雨反击敌人。", apply: ({ player }) => { player.starCloak += 1; } },
-  { id: "landmine", icon: "◈", name: "地雷", basePrice: 32, desc: "每波随机生成 3 个地雷，可叠加。", apply: ({ player }) => { player.landminePacks += 1; } },
+  { id: "heart_container", icon: "♡", name: "心之容器", basePrice: 22, desc: "最大生命值 +5/10/20/35/50。", apply: ({ player, quality }) => { const value = qualityValue("heart_container", quality); player.maxHp += value; player.hp = Math.min(player.maxHp, player.hp + value); } },
+  { id: "healing_potion", icon: "✚", name: "治疗药水", basePrice: 12, desc: "立即恢复 20/30/50/80/120 点生命。", apply: ({ player, quality }) => { player.hp = Math.min(player.maxHp, player.hp + qualityValue("healing_potion", quality)); } },
+  { id: "shackles", icon: "⌁", name: "脚镣", basePrice: 20, singleQuality: true, desc: "移动速度 -12，攻击范围 +80。", apply: ({ player }) => { player.speed -= 12; player.attackRangeBonus += 80; } },
+  { id: "dodge_cloak", icon: "◒", name: "闪避斗篷", basePrice: 24, singleQuality: true, desc: "闪避率 +5%，最大生命值 -20。", apply: ({ player }) => { player.dodge = clamp(player.dodge + 0.05, 0, 0.7); player.maxHp = Math.max(30, player.maxHp - 20); player.hp = Math.min(player.hp, player.maxHp); } },
+  { id: "bait", icon: "※", name: "诱饵", basePrice: 16, singleQuality: true, desc: "下一波敌人数量 +50%。", apply: ({ player }) => { player.nextWaveSpawnBonus += 0.5; } },
+  { id: "magnet", icon: "◎", name: "磁铁", basePrice: 18, singleQuality: true, desc: "金币和经验吸收范围 +32。", apply: ({ player }) => { player.magnet += 32; } },
+  { id: "speed_boots", icon: "»", name: "速度靴", basePrice: 20, singleQuality: true, desc: "移动速度 +18。", apply: ({ player }) => { player.speed += 18; } },
+  { id: "rapid_cord", icon: "⟲", name: "速射索", basePrice: 28, singleQuality: true, desc: "攻击速度 +12%。", apply: ({ player }) => { player.attackSpeedBonus += 0.12; } },
+  { id: "fang", icon: "⋏", name: "尖牙", basePrice: 30, singleQuality: true, desc: "攻击附加 7 DPS 流血，持续 2.8 秒。", apply: ({ player }) => { player.bleedDps += 7; player.bleedDuration = Math.max(player.bleedDuration, 2.8); } },
+  { id: "split_shot", icon: "≋", name: "分裂弹", basePrice: 34, singleQuality: true, desc: "随机强化一个武器槽：该武器投射物 +1，该武器伤害 -20%。", apply: ({ player }) => applySplitShot(player) },
+  { id: "lucky_clover", icon: "♣", name: "幸运草", basePrice: 26, singleQuality: true, desc: "幸运值 +10，商店更容易出现高品质商品。", apply: ({ player }) => { player.luck += 10; } },
+  { id: "gloves", icon: "▣", name: "拳套", basePrice: 24, singleQuality: true, desc: "暴击率 +7%。", apply: ({ player }) => { player.critChance = clamp(player.critChance + 0.07, 0, 0.7); } },
+  { id: "knife", icon: "†", name: "小刀", basePrice: 25, desc: "攻击伤害 +8%/10%/12%/14%/18%。", apply: ({ player, scale }) => { player.damageScale += 0.08 * scale; } },
+  { id: "healing_aura", icon: "✺", name: "治愈光环", basePrice: 32, desc: "每秒生命回复 +1/2/3/4/5。", apply: ({ player, quality }) => { player.regen += qualityValue("healing_aura", quality); } },
+  { id: "tardigrade", icon: "⬡", name: "水熊虫", basePrice: 30, singleQuality: true, desc: "每波免疫 1 次攻击伤害，可叠加次数。", apply: ({ player }) => { player.waveShields += 1; player.currentWaveShields += 1; } },
+  { id: "heavy_armor", icon: "▰", name: "重甲", basePrice: 28, singleQuality: true, desc: "防御 +8，移动速度 -10。", apply: ({ player }) => { player.defense += 8; player.speed -= 10; } },
+  { id: "turret", icon: "♜", name: "炮塔", basePrice: 38, singleQuality: true, desc: "每波在玩家当前位置附近部署 1 座自动炮塔。", apply: ({ player }) => { player.turretCount += 1; } },
+  { id: "thief_mark", icon: "¢", name: "窃贼印记", basePrice: 24, singleQuality: true, unique: true, desc: "只能购买 1 个。敌人金币掉落 +20%，被攻击时损失当前金币 6%。", apply: ({ player }) => { player.coinDropBonus += 0.2; player.goldLossOnHit += 0.06; } },
+  { id: "star_cloak", icon: "✦", name: "星星斗篷", basePrice: 36, singleQuality: true, unique: true, desc: "只能购买 1 个。被攻击时召唤 8 颗星雨反击敌人。", apply: ({ player }) => { player.starCloak = 1; } },
+  { id: "landmine", icon: "◈", name: "地雷", basePrice: 32, singleQuality: true, desc: "每波随机生成 3 个地雷，可叠加。", apply: ({ player }) => { player.landminePacks += 1; } },
+  { id: "airburst", icon: "✹", name: "空爆弹", basePrice: 40, unique: true, desc: "不可叠加。每隔 30/25/20/15/10 秒清空玩家附近敌方投射物。", apply: ({ player, quality }) => { player.airburstInterval = qualityValue("airburst", quality); player.airburstTimer = player.airburstInterval; } },
 ];
 
 export function applyItemPurchase(offer) {
   const item = ITEM_DEFS.find((entry) => entry.id === offer.itemId || entry.id === offer.id);
   if (!item || !state.player) return;
-  const quality = offer.rarity || "common";
+  if (item.unique && hasPurchasedUniqueItem(item.id)) return;
+  const quality = item.singleQuality ? "common" : offer.rarity || "common";
   const scale = qualityScale(quality);
   item.apply?.({ player: state.player, quality, scale });
+  if (item.unique) {
+    state.player.purchasedUniqueItems ||= {};
+    state.player.purchasedUniqueItems[item.id] = true;
+  }
   recordItem(item, quality, offer.quantity || 1);
   pulse(state.player.x, state.player.y, 54, QUALITY_INFO[quality]?.color || "#77ff8a", 0.32);
 }
@@ -55,6 +63,7 @@ export function updateItems(dt) {
   const p = state.player;
   if (!p) return;
   if (p.regen > 0 && p.hp > 0) p.hp = Math.min(p.maxHp, p.hp + p.regen * dt);
+  updateAirburst(p, dt);
   updateBleeds(dt);
   updateItemObjects(dt);
 }
@@ -97,9 +106,9 @@ export function applyPlayerDamage(amount, source = {}) {
   return { damaged: true, amount: reduced };
 }
 
-export function modifyWeaponDamage(amount) {
+export function modifyWeaponDamage(amount, weapon = null) {
   const p = state.player;
-  const penalty = Math.min(0.75, p?.splitDamagePenalty || 0);
+  const penalty = Math.min(0.75, weapon?.splitDamagePenalty || p?.splitDamagePenalty || 0);
   const crit = Math.random() < clamp(p?.critChance || 0, 0, 0.7) ? 1.85 : 1;
   return amount * Math.max(0.25, 1 - penalty) * crit;
 }
@@ -114,6 +123,10 @@ export function attackSpeedMultiplier() {
 
 export function projectileBonus() {
   return state.player?.projectileBonus || 0;
+}
+
+export function weaponProjectileBonus(weapon) {
+  return (weapon?.projectileBonus || 0) + projectileBonus();
 }
 
 export function onWeaponHit(enemy, x, y) {
@@ -155,6 +168,69 @@ export function itemSellPriceById(id, quality = "common") {
   const baseId = id?.replace(/_(common|uncommon|rare|epic|legendary)$/, "");
   const item = ITEM_DEFS.find((entry) => entry.id === baseId);
   return Math.max(2, Math.floor((item?.basePrice || 10) * qualityScale(quality) * 0.35));
+}
+
+export function itemDescription(item, quality = "common") {
+  if (!item) return "";
+  if (item.id === "split_shot") return item.desc;
+  if (item.id === "heart_container") return `最大生命值 +${qualityValue("heart_container", quality)}。`;
+  if (item.id === "healing_potion") return `立即恢复 ${qualityValue("healing_potion", quality)} 点生命。`;
+  if (item.id === "healing_aura") return `每秒生命回复 +${qualityValue("healing_aura", quality)}。`;
+  if (item.id === "knife") return `攻击伤害 +${Math.round(8 * qualityScale(quality))}%。`;
+  if (item.id === "airburst") return `不可叠加。每隔 ${qualityValue("airburst", quality)} 秒清空玩家附近敌方投射物。`;
+  return item.desc;
+}
+
+export function hasInventoryItem(itemId) {
+  return Boolean(state.inventory?.items.some((entry) => entry.itemId === itemId || entry.id === itemId || entry.id?.startsWith(`${itemId}_`)));
+}
+
+export function hasPurchasedUniqueItem(itemId) {
+  return Boolean(state.player?.purchasedUniqueItems?.[itemId] || hasInventoryItem(itemId));
+}
+
+export function canPurchaseItem(itemId) {
+  const item = ITEM_DEFS.find((entry) => entry.id === itemId);
+  if (!item) return { ok: false, reason: "道具不存在" };
+  if (item.unique && hasPurchasedUniqueItem(item.id)) return { ok: false, reason: "该道具只能购买一次" };
+  if (item.id === "split_shot" && !state.inventory?.weaponSlots.some((slot) => ["ice", "missile", "boomerang", "drone"].includes(slot.id))) return { ok: false, reason: "需要至少一把投射物武器" };
+  return { ok: true };
+}
+
+export function offerQualityForItem(item, rarity) {
+  return item?.singleQuality ? "common" : rarity || "common";
+}
+
+function applySplitShot(player) {
+  const slots = (state.inventory?.weaponSlots || []).filter((slot) => ["ice", "missile", "boomerang", "drone"].includes(slot.id));
+  if (!slots.length) return;
+  const slot = slots[Math.floor(Math.random() * slots.length)];
+  slot.projectileBonus = (slot.projectileBonus || 0) + 1;
+  slot.splitDamagePenalty = Math.max(slot.splitDamagePenalty || 0, 0.2);
+  player.projectileBonus = 0;
+  player.splitDamagePenalty = 0;
+  recomputeAllWeapons();
+}
+
+function updateAirburst(p, dt) {
+  if (!p.airburstInterval) return;
+  p.airburstTimer = Math.max(0, (p.airburstTimer || p.airburstInterval) - dt);
+  if (p.airburstTimer > 0) return;
+  p.airburstTimer += p.airburstInterval;
+  const radius = Math.max(320, p.magnet * 2.2);
+  let cleared = 0;
+  for (let i = world.enemyProjectiles.length - 1; i >= 0; i--) {
+    const b = world.enemyProjectiles[i];
+    if (distSq(p.x, p.y, b.x, b.y) > radius * radius) continue;
+    world.enemyProjectiles.splice(i, 1);
+    cleared++;
+    if (cleared <= 18) burst(b.x, b.y, 5, "#9ff4ff", 110);
+  }
+  if (!cleared) return;
+  pulse(p.x, p.y, radius, "#9ff4ff", 0.28);
+  world.weaponFx.push({ kind: "shockRing", x: p.x, y: p.y, radius, life: 0.35, maxLife: 0.35, color: "#9ff4ff" });
+  state.shake = Math.max(state.shake, 4);
+  playSfx("select");
 }
 
 function updateBleeds(dt) {
@@ -255,7 +331,7 @@ export function updateFallingStar(star, dt) {
 
 function spawnTurret() {
   const p = state.player;
-  const pos = randomArenaPosition();
+  const pos = randomNearPlayerPosition(90, 220);
   world.itemObjects.push({
     kind: "turret",
     x: pos.x,
@@ -294,6 +370,20 @@ function randomArenaPosition() {
   return { x: (p?.x || 0) + 220, y: p?.y || 0 };
 }
 
+function randomNearPlayerPosition(minDist = 80, maxDist = 220) {
+  const p = state.player;
+  if (!p) return randomArenaPosition();
+  const half = WORLD_SIZE / 2 - 120;
+  for (let i = 0; i < 12; i++) {
+    const angle = Math.random() * TAU;
+    const dist = minDist + Math.random() * (maxDist - minDist);
+    const x = clamp(p.x + Math.cos(angle) * dist, -half, half);
+    const y = clamp(p.y + Math.sin(angle) * dist, -half, half);
+    return { x, y };
+  }
+  return { x: clamp(p.x + maxDist, -half, half), y: p.y };
+}
+
 function nearestWorldEnemy(x, y, range) {
   let best = null;
   let bestD = range * range;
@@ -314,8 +404,8 @@ function recordItem(item, quality, qty) {
   const id = `${item.id}_${quality}`;
   const existing = inv.items.find((entry) => entry.id === id);
   const qualityInfo = QUALITY_INFO[quality] || QUALITY_INFO.common;
-  if (existing) existing.qty += qty;
-  else inv.items.push({ id, itemId: item.id, quality, name: `${qualityInfo.name}${item.name}`, icon: item.icon, qty, desc: item.desc });
+  if (existing) existing.qty = item.unique ? 1 : existing.qty + qty;
+  else inv.items.push({ id, itemId: item.id, quality, name: item.singleQuality ? item.name : `${qualityInfo.name}${item.name}`, icon: item.icon, qty: item.unique ? 1 : qty, desc: itemDescription(item, quality) });
 }
 
 function qualityValue(id, quality) {

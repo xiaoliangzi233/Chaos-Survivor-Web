@@ -5,7 +5,7 @@ import { applyKnockback, damageEnemy, nearestEnemy, queryEnemies } from "./entit
 import { burst, pulse, trail } from "../effects.js";
 import { playSfx } from "../audio.js";
 import { addWeaponToInventory, QUALITY_INFO, QUALITY_ORDER, WEAPON_INFO } from "../economy/inventory.js";
-import { attackSpeedMultiplier, projectileBonus, weaponRangeBonus } from "./items.js";
+import { attackSpeedMultiplier, weaponProjectileBonus, weaponRangeBonus } from "./items.js";
 
 export const STARTER_WEAPONS = ["arc", "ice", "missile", "boomerang", "drone"].map((id) => ({ id, ...WEAPON_INFO[id] }));
 
@@ -47,7 +47,11 @@ function qualityColorOf(quality, fallback = "#42e8ff") {
 }
 
 function weaponPower(w, value) {
-  return value * (w.qualityMult || 1);
+  return value * (w.qualityMult || 1) * weaponSplitDamageMultiplier(w);
+}
+
+function weaponSplitDamageMultiplier(w) {
+  return Math.max(0.25, 1 - Math.min(0.75, w?.splitDamagePenalty || 0));
 }
 
 function weaponQualityAt(w, index) {
@@ -166,7 +170,7 @@ function updateIceWeapon(dt) {
   const rank = qualityRank(w);
   const target = nearestEnemy(p.x, p.y, w.range + weaponRangeBonus());
   const base = target ? Math.atan2(target.y - p.y, target.x - p.x) : Math.atan2(p.dirY, p.dirX);
-  const count = w.count + (rank >= 1 ? 1 : 0) + projectileBonus();
+  const count = w.count + (rank >= 1 ? 1 : 0) + weaponProjectileBonus(w);
   for (let i = 0; i < count; i++) {
     const quality = weaponQualityAt(w, i);
     const shot = weaponViewForQuality(w, quality);
@@ -200,7 +204,7 @@ function updateMissileWeapon(dt) {
   const color = qualityColor(w, "#ffb347");
   const target = nearestEnemy(p.x, p.y, w.range + weaponRangeBonus());
   const base = target ? Math.atan2(target.y - p.y, target.x - p.x) : Math.atan2(p.dirY, p.dirX);
-  const count = 1 + projectileBonus();
+  const count = 1 + weaponProjectileBonus(w);
   for (let i = 0; i < count; i++) {
     fireProjectile(base + (i - (count - 1) / 2) * 0.18, w, {
       shape: "missile",
@@ -230,7 +234,7 @@ function updateBoomerangWeapon(dt) {
   const p = state.player;
   const target = nearestEnemy(p.x, p.y, w.range + weaponRangeBonus());
   const base = target ? Math.atan2(target.y - p.y, target.x - p.x) : Math.atan2(p.dirY, p.dirX);
-  const count = w.count + projectileBonus();
+  const count = w.count + weaponProjectileBonus(w);
   for (let i = 0; i < count; i++) {
     const quality = weaponQualityAt(w, i);
     const shot = weaponViewForQuality(w, quality);
@@ -382,7 +386,7 @@ function fireDroneBullet(x, y, angle, w, drone) {
   const quality = drone?.quality || w.quality || "common";
   const qualityMult = drone?.qualityMult || w.qualityMult || 1;
   const speed = w.bulletSpeed;
-  const count = 1 + projectileBonus();
+  const count = 1 + weaponProjectileBonus(w);
   for (let i = 0; i < count; i++) {
     if (world.projectiles.length >= PROJECTILE_LIMIT) return;
     const shotAngle = angle + (i - (count - 1) / 2) * 0.16;
@@ -395,7 +399,7 @@ function fireDroneBullet(x, y, angle, w, drone) {
       vy: Math.sin(shotAngle) * speed,
       speed,
       angle: shotAngle,
-      damage: w.bulletDamage * qualityMult,
+      damage: w.bulletDamage * qualityMult * weaponSplitDamageMultiplier(w),
       pierce: 1,
       r: 4,
       life: 0.95,
@@ -422,7 +426,7 @@ function fireDroneBullet(x, y, angle, w, drone) {
 }
 
 function fireDroneBeam(drone, target, w, color, legendary) {
-  const damage = w.bulletDamage * (drone.qualityMult || w.qualityMult || 1) * (legendary ? 3.4 : 1.45);
+  const damage = w.bulletDamage * (drone.qualityMult || w.qualityMult || 1) * weaponSplitDamageMultiplier(w) * (legendary ? 3.4 : 1.45);
   damageEnemy(target, damage, drone.x, drone.y);
   applyKnockback(target, target.x - drone.x, target.y - drone.y, legendary ? 180 : 95);
   addCameraShake(legendary ? 3.4 : 1.4);

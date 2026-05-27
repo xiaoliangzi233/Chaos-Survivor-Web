@@ -113,6 +113,8 @@ export function recomputeAllWeapons() {
     weapon.qualityMult = 1;
     weapon.slotCount = 0;
     weapon.slotQualities = [];
+    weapon.projectileBonus = 0;
+    weapon.splitDamagePenalty = 0;
     if ("count" in weapon) weapon.count = 0;
   }
   for (const slot of state.inventory.weaponSlots) applyWeaponSlot(slot);
@@ -126,6 +128,8 @@ export function applyWeaponSlot(slot) {
   weapon.slotCount = (weapon.slotCount || 0) + 1;
   weapon.slotQualities ||= [];
   weapon.slotQualities.push(slot.quality);
+  weapon.projectileBonus = (weapon.projectileBonus || 0) + (slot.projectileBonus || 0);
+  weapon.splitDamagePenalty = Math.max(weapon.splitDamagePenalty || 0, slot.splitDamagePenalty || 0);
   weapon.level += Math.max(1, slot.level + qualityLevel);
   if (qualityLevel >= currentQualityLevel) weapon.quality = slot.quality;
   weapon.qualityMult = Math.max(weapon.qualityMult || 1, QUALITY_INFO[slot.quality].mult);

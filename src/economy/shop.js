@@ -1,6 +1,6 @@
 import { state } from "../state.js";
 import { addWeaponToInventory, canFuseWeapons, QUALITY_INFO, QUALITY_ORDER, recomputeAllWeapons, WEAPON_INFO } from "./inventory.js";
-import { applyItemPurchase, ITEM_DEFS, itemSellPriceById, weightedQuality } from "../systems/items.js";
+import { applyItemPurchase, canPurchaseItem, hasPurchasedUniqueItem, ITEM_DEFS, itemDescription, itemSellPriceById, offerQualityForItem, weightedQuality } from "../systems/items.js";
 import { playSfx } from "../audio.js";
 
 const SHOP_SLOTS = 4;
@@ -83,6 +83,10 @@ export function refreshCost() {
 export function purchaseDisabledReason(offer) {
   if (!offer) return "商品不存在";
   if (isSoldOut(offer)) return "商品已售罄";
+  if (offer.category === "道具") {
+    const check = canPurchaseItem(offer.itemId || offer.id);
+    if (!check.ok) return check.reason;
+  }
   if (state.gold < offer.price) return "金币不足";
   if (offer.category === "武器" && !canAcceptWeapon(offer.weaponId, offer.rarity)) return "武器槽已满，且无法合成";
   return "";
@@ -169,8 +173,9 @@ function createWeaponOffer() {
 }
 
 function createItemOffer() {
-  const template = weightedChoice(ITEM_DEFS.map((item) => [item, itemWeight(item)]));
-  const rarity = weightedQuality(RARITY_WEIGHTS);
+  const candidates = ITEM_DEFS.filter((item) => (!item.unique || !hasPurchasedUniqueItem(item.id)) && canPurchaseItem(item.id).ok);
+  const template = weightedChoice((candidates.length ? candidates : ITEM_DEFS).map((item) => [item, itemWeight(item)]));
+  const rarity = offerQualityForItem(template, weightedQuality(RARITY_WEIGHTS));
   const rank = QUALITY_ORDER.indexOf(rarity);
   const quality = QUALITY_INFO[rarity] || QUALITY_INFO.common;
   return {
@@ -178,7 +183,7 @@ function createItemOffer() {
     id: template.id,
     itemId: template.id,
     icon: template.icon,
-    name: `${quality.name}${template.name}`,
+    name: template.singleQuality ? template.name : `${quality.name}${template.name}`,
     rarity,
     category: "道具",
     price: Math.floor((template.basePrice + state.wave * (1.5 + rank * 0.8)) * (QUALITY_INFO[rarity]?.mult || 1)),
@@ -186,7 +191,7 @@ function createItemOffer() {
     purchaseCount: 0,
     quantity: 1,
     locked: false,
-    desc: template.desc,
+    desc: itemDescription(template, rarity),
   };
 }
 

@@ -473,6 +473,12 @@ function drawWeaponFx(ctx) {
       drawPhaseNeedleBurstFx(ctx, fx, k);
     } else if (fx.kind === "phaseNeedleRift") {
       drawPhaseNeedleRiftFx(ctx, fx, k);
+    } else if (fx.kind === "echoCone") {
+      drawEchoConeFx(ctx, fx, k);
+    } else if (fx.kind === "echoWave") {
+      drawEchoWaveFx(ctx, fx, k);
+    } else if (fx.kind === "echoResonance") {
+      drawEchoResonanceFx(ctx, fx, k);
     } else {
       ctx.strokeStyle = hexToRgba(fx.color, k);
       ctx.lineWidth = 2;
@@ -1736,6 +1742,106 @@ function drawPhaseNeedleRiftFx(ctx, fx, k) {
     strokePolyline(ctx, points);
   }
   glow(ctx, fx.x, fx.y, fx.radius * 0.36, k * 0.26, fx.color);
+  ctx.lineCap = "butt";
+  ctx.restore();
+}
+
+function drawEchoConeFx(ctx, fx, k) {
+  const progress = 1 - k;
+  const start = fx.angle - fx.coneAngle / 2;
+  const end = fx.angle + fx.coneAngle / 2;
+  ctx.save();
+  ctx.translate(fx.x, fx.y);
+  ctx.globalCompositeOperation = "lighter";
+  glow(ctx, 0, 0, fx.range * 0.28, k * 0.08, fx.color);
+  for (let band = 0; band < 4; band++) {
+    const radius = fx.range * (0.26 + band * 0.22 + progress * 0.18);
+    const alpha = k * (0.2 - band * 0.025);
+    ctx.fillStyle = hexToRgba(band % 2 ? "#ffffff" : fx.color, alpha);
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.arc(0, 0, radius, start, end);
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = hexToRgba(band % 2 ? "#ffffff" : fx.color, alpha * 2.6);
+    ctx.lineWidth = fx.secondary ? 1.3 : 1.8;
+    ctx.beginPath();
+    ctx.arc(0, 0, radius, start, end);
+    ctx.stroke();
+  }
+  ctx.strokeStyle = hexToRgba("#ffffff", k * 0.58);
+  ctx.lineWidth = 2.4 * k;
+  for (const a of [start, fx.angle, end]) {
+    ctx.beginPath();
+    ctx.moveTo(Math.cos(a) * 22, Math.sin(a) * 22);
+    ctx.lineTo(Math.cos(a) * fx.range * (0.95 + progress * 0.04), Math.sin(a) * fx.range * (0.95 + progress * 0.04));
+    ctx.stroke();
+  }
+  ctx.strokeStyle = hexToRgba(fx.rank >= 4 ? "#ffd166" : fx.color, k * 0.78);
+  ctx.lineWidth = fx.rank >= 4 ? 2.2 : 1.4;
+  for (let i = 0; i < 7; i++) {
+    const t = i / 6;
+    const a = start + fx.coneAngle * t + Math.sin(state.time * 8 + i + (fx.seed || 0)) * 0.012;
+    const r1 = fx.range * (0.18 + progress * 0.12);
+    const r2 = fx.range * (0.82 + Math.sin(i + state.time * 5) * 0.025);
+    ctx.beginPath();
+    ctx.moveTo(Math.cos(a) * r1, Math.sin(a) * r1);
+    ctx.lineTo(Math.cos(a) * r2, Math.sin(a) * r2);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+function drawEchoWaveFx(ctx, fx, k) {
+  const progress = 1 - k;
+  const r = fx.radius * (0.16 + progress * 0.92);
+  ctx.save();
+  ctx.translate(fx.x, fx.y);
+  ctx.rotate((fx.seed || 0) + state.time * 1.8);
+  ctx.globalCompositeOperation = "lighter";
+  glow(ctx, 0, 0, r * 0.42, k * 0.26, fx.color);
+  ctx.strokeStyle = hexToRgba("#ffffff", k * 0.72);
+  ctx.lineWidth = fx.secondary ? 1.6 : 2.4;
+  ctx.beginPath();
+  ctx.arc(0, 0, r, 0, TAU);
+  ctx.stroke();
+  ctx.strokeStyle = hexToRgba(fx.color, k * 0.86);
+  ctx.lineWidth = 1.2;
+  for (let i = 0; i < 3; i++) {
+    ctx.beginPath();
+    ctx.arc(0, 0, r * (0.72 + i * 0.14), Math.sin(state.time + i), TAU - Math.cos(state.time + i));
+    ctx.stroke();
+  }
+  ctx.fillStyle = hexToRgba(fx.rank >= 4 ? "#ffd166" : fx.color, k * 0.65);
+  for (let i = 0; i < 10; i++) {
+    const a = i * TAU / 10 + state.time * (i % 2 ? -1.1 : 1.4);
+    const pr = r * (0.74 + (i % 3) * 0.09);
+    const s = 2 + (i % 3);
+    ctx.fillRect(Math.cos(a) * pr - s / 2, Math.sin(a) * pr - s / 2, s, s);
+  }
+  ctx.restore();
+}
+
+function drawEchoResonanceFx(ctx, fx, k) {
+  ctx.save();
+  ctx.globalCompositeOperation = "lighter";
+  ctx.lineCap = "round";
+  const side = fx.angle + Math.PI / 2;
+  for (let i = -2; i <= 2; i++) {
+    const offset = i * 16;
+    const x1 = fx.x + Math.cos(side) * offset;
+    const y1 = fx.y + Math.sin(side) * offset;
+    const x2 = fx.x2 + Math.cos(side) * offset * 0.35;
+    const y2 = fx.y2 + Math.sin(side) * offset * 0.35;
+    const points = jaggedLine(x1, y1, x2, y2, 8, 7 + Math.abs(i) * 1.2, (fx.seed || 0) + i * 31 + state.time * 110);
+    ctx.strokeStyle = hexToRgba(fx.color, k * 0.2);
+    ctx.lineWidth = fx.rank >= 4 ? 10 : 7;
+    strokePolyline(ctx, points);
+    ctx.strokeStyle = hexToRgba("#ffffff", k * 0.76);
+    ctx.lineWidth = Math.max(1, (3 - Math.abs(i) * 0.42) * k);
+    strokePolyline(ctx, points);
+  }
+  glow(ctx, fx.x2, fx.y2, 42 + fx.rank * 7, k * 0.32, fx.rank >= 4 ? "#ffd166" : fx.color);
   ctx.lineCap = "butt";
   ctx.restore();
 }

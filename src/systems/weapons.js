@@ -7,7 +7,7 @@ import { playSfx } from "../audio.js";
 import { addWeaponToInventory, QUALITY_INFO, QUALITY_ORDER, WEAPON_INFO } from "../economy/inventory.js";
 import { attackSpeedMultiplier, weaponProjectileBonus, weaponRangeBonus } from "./items.js";
 
-export const STARTER_WEAPONS = ["arc", "ice", "missile", "boomerang", "drone", "prism_railgun", "void_singularity", "tesla_mine_chain", "starfall_scepter", "phase_needler"].map((id) => ({ id, ...WEAPON_INFO[id] }));
+export const STARTER_WEAPONS = ["arc", "ice", "missile", "boomerang", "drone", "prism_railgun", "void_singularity", "tesla_mine_chain", "starfall_scepter", "phase_needler", "echo_tuning_fork"].map((id) => ({ id, ...WEAPON_INFO[id] }));
 
 export const UPGRADE_DEFS = [
   {
@@ -152,6 +152,7 @@ export function updateWeapons(dt) {
   updateTeslaNodes(dt);
   updateStarfallScepterWeapon(dt);
   updatePhaseNeedlerWeapon(dt);
+  updateEchoTuningForkWeapon(dt);
   updateProjectiles(dt);
   updateWeaponFx(dt);
 }
@@ -1240,6 +1241,156 @@ function firePhaseNeedle(angle, base, shot, rank, color, index, volleyId, major)
   pulse(sx, sy, major ? 26 : 18, color, 0.12);
 }
 
+function updateEchoTuningForkWeapon(dt) {
+  const w = state.weapons.echo_tuning_fork;
+  if (!tickWeapon(w, dt)) return;
+  const p = state.player;
+  const target = chooseEchoTarget(w);
+  const baseAngle = target ? Math.atan2(target.y - p.y, target.x - p.x) : Math.atan2(p.dirY, p.dirX);
+  const slots = Math.max(1, w.count || 1);
+  const bonus = weaponProjectileBonus(w);
+  let fired = 0;
+  for (let slot = 0; slot < slots; slot++) {
+    const quality = weaponQualityAt(w, slot);
+    const shot = weaponViewForQuality(w, quality);
+    const rank = qualityRank(shot);
+    const color = qualityColor(shot, "#7dfcff");
+    fireEchoCone(baseAngle + (slot - (slots - 1) / 2) * 0.12, w, shot, rank, color, false, slot);
+    fired++;
+    for (let extra = 0; extra < bonus && slot === 0; extra++) {
+      const side = extra % 2 === 0 ? 1 : -1;
+      fireEchoCone(baseAngle + side * (0.18 + Math.floor(extra / 2) * 0.1), w, shot, rank, color, true, extra + 10);
+      fired++;
+    }
+    if (rank >= 4) {
+      fireEchoCone(baseAngle, w, shot, rank, "#ffd166", true, slot + 30, 0.62, 1.2);
+      fired++;
+    }
+  }
+  if (fired) playSfx("shoot");
+}
+
+function chooseEchoTarget(w) {
+  const p = state.player;
+  const range = w.range + weaponRangeBonus();
+  const candidates = [];
+  queryEnemies(p.x, p.y, range, candidates);
+  let best = null;
+  let bestScore = -Infinity;
+  for (const e of candidates) {
+    if (e.dead) continue;
+    const nearby = [];
+    queryEnemies(e.x, e.y, 150, nearby);
+    const density = nearby.filter((other) => !other.dead).length;
+    const d = Math.hypot(e.x - p.x, e.y - p.y);
+    const score = density * 130 + Math.max(0, range - d) * 0.18;
+    if (score > bestScore) {
+      bestScore = score;
+      best = e;
+    }
+  }
+  return best || nearestEnemy(p.x, p.y, range);
+}
+
+function fireEchoCone(angle, base, shot, rank, color, secondary, index, damageScale = 1, angleScale = 1) {
+  const p = state.player;
+  const range = (base.range + weaponRangeBonus() + (rank >= 1 ? 42 : 0) + rank * 8) * (secondary ? 0.92 : 1);
+  const coneAngle = (base.angle + (rank >= 1 ? 0.08 : 0) + rank * 0.018) * angleScale;
+  const damage = weaponPower(shot, base.damage) * damageScale * (secondary ? 0.72 : 1);
+  const echoDamage = weaponPower(shot, base.echoDamage) * damageScale * (secondary ? 0.7 : 1);
+  const hits = [];
+  const hitPoints = [];
+  queryEnemies(p.x, p.y, range + 70, hits);
+  for (const e of hits) {
+    if (e.dead) continue;
+    const dx = e.x - p.x;
+    const dy = e.y - p.y;
+    const d = Math.max(1, Math.hypot(dx, dy));
+    const diff = Math.abs(angleDiff(Math.atan2(dy, dx), angle));
+    if (d > range + (e.r || 0) || diff > coneAngle / 2) continue;
+    const centerBias = 1 - diff / Math.max(0.01, coneAngle / 2);
+    const falloff = clamp(1 - d / range, 0.28, 1);
+    damageEnemy(e, damage * (0.74 + centerBias * 0.26) * falloff, p.x, p.y);
+    applyKnockback(e, Math.cos(angle) + dx / d * 0.35, Math.sin(angle) + dy / d * 0.35, e.boss ? 26 : 82);
+    burst(e.x, e.y, rank >= 2 ? 7 : 5, color, 145);
+    hitPoints.push({ x: e.x, y: e.y, d });
+  }
+
+  world.weaponFx.push({
+    kind: "echoCone",
+    x: p.x,
+    y: p.y,
+    angle,
+    coneAngle,
+    range,
+    color,
+    rank,
+    secondary,
+    life: secondary ? 0.28 : 0.34,
+    maxLife: secondary ? 0.28 : 0.34,
+    seed: Math.random() * 999 + index * 17,
+  });
+
+  for (let i = 0; i < hitPoints.length; i++) {
+    const hit = hitPoints[i];
+    spawnEchoWave(hit.x, hit.y, base, rank, color, echoDamage, i, secondary ? 0.08 : 0, secondary);
+    if (rank >= 2) spawnEchoWave(hit.x, hit.y, base, rank, color, echoDamage * 0.58, i + 11, 0.13, true);
+  }
+  if (rank >= 3 && hitPoints.length >= 3) echoResonance(p.x, p.y, angle, range, coneAngle, weaponPower(shot, base.resonanceDamage), color, rank);
+  if (hitPoints.length) addCameraShake(Math.min(5.5, 1.1 + hitPoints.length * 0.22 + rank * 0.2));
+}
+
+function spawnEchoWave(x, y, base, rank, color, damage, index, delay, secondary) {
+  world.weaponFx.push({
+    kind: "echoWave",
+    x,
+    y,
+    radius: (base.echoRadius + (rank >= 1 ? 18 : 0) + rank * 7) * (secondary ? 0.82 : 1),
+    damage,
+    color,
+    rank,
+    secondary,
+    delay,
+    life: base.echoDuration + rank * 0.035,
+    maxLife: base.echoDuration + rank * 0.035,
+    hitIds: new Set(),
+    seed: Math.random() * 999 + index * 29,
+  });
+}
+
+function echoResonance(x, y, angle, range, coneAngle, damage, color, rank) {
+  const x2 = x + Math.cos(angle) * range;
+  const y2 = y + Math.sin(angle) * range;
+  const hits = [];
+  queryEnemies(x, y, range + 80, hits);
+  let count = 0;
+  for (const e of hits) {
+    if (e.dead || count >= 8) continue;
+    const dx = e.x - x;
+    const dy = e.y - y;
+    const d = Math.max(1, Math.hypot(dx, dy));
+    const diff = Math.abs(angleDiff(Math.atan2(dy, dx), angle));
+    if (d > range || diff > coneAngle * 0.22) continue;
+    count++;
+    damageEnemy(e, damage * (rank >= 4 ? 1.32 : 1), x2, y2);
+    applyKnockback(e, Math.cos(angle), Math.sin(angle), e.boss ? 18 : 64);
+  }
+  world.weaponFx.push({
+    kind: "echoResonance",
+    x,
+    y,
+    x2,
+    y2,
+    angle,
+    range,
+    color,
+    rank,
+    life: rank >= 4 ? 0.36 : 0.28,
+    maxLife: rank >= 4 ? 0.36 : 0.28,
+    seed: Math.random() * 999,
+  });
+}
+
 function tickWeapon(w, dt) {
   if (!w || w.level <= 0) return false;
   w.timer -= dt;
@@ -1776,9 +1927,28 @@ function updateWeaponFx(dt) {
       }
       continue;
     }
+    if (fx.kind === "echoWave") updateEchoWaveDamage(fx, dt);
     if (fx.kind === "starScar") updateStarScarDamage(fx, dt);
     fx.life -= dt;
     if (fx.life <= 0) world.weaponFx.splice(i, 1);
+  }
+}
+
+function updateEchoWaveDamage(fx, dt) {
+  const progress = clamp(1 - fx.life / Math.max(0.01, fx.maxLife), 0, 1);
+  const currentRadius = fx.radius * (0.16 + progress * 0.92);
+  const band = 22 + (fx.rank || 0) * 3;
+  const hits = [];
+  queryEnemies(fx.x, fx.y, currentRadius + band + 48, hits);
+  for (const e of hits) {
+    if (e.dead || fx.hitIds?.has(e)) continue;
+    const d = Math.max(1, Math.hypot(e.x - fx.x, e.y - fx.y));
+    if (Math.abs(d - currentRadius) > band + (e.r || 0)) continue;
+    fx.hitIds?.add(e);
+    const falloff = clamp(1 - d / Math.max(1, fx.radius + band), 0.25, 1);
+    damageEnemy(e, (fx.damage || 0) * falloff, fx.x, fx.y);
+    applyKnockback(e, e.x - fx.x, e.y - fx.y, e.boss ? 12 : 42);
+    burst(e.x, e.y, 4 + (fx.rank || 0), fx.color, 110);
   }
 }
 

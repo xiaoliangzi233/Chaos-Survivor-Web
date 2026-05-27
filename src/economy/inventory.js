@@ -78,6 +78,12 @@ export const WEAPON_INFO = {
     desc: "发射高速穿刺针束，命中后植入延迟爆裂的相位标记。",
     tags: ["高速穿刺", "延迟爆裂", "中距贯穿"],
   },
+  echo_tuning_fork: {
+    icon: "♮",
+    name: "回声音叉",
+    desc: "释放扇形声波压制近中距离敌人，命中后扩散回响波。",
+    tags: ["扇形声波", "回响扩散", "持续压制"],
+  },
 };
 
 export function addWeaponToInventory(id, quality = "common") {

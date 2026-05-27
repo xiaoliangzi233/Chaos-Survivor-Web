@@ -52,7 +52,7 @@ export function drawWeaponPreview(ctx, canvas, weapon, t) {
   const cy = h / 2;
   if (!weapon) return;
   const rank = qualityRank(weapon);
-  const baseColor = { arc: "#42e8ff", ice: "#9ff4ff", missile: "#ffb347", boomerang: "#ff65d8", drone: "#77ff8a", pulse: "#77ff8a", prism_railgun: "#7df9ff", void_singularity: "#8b5cf6", tesla_mine_chain: "#42e8ff", starfall_scepter: "#ffd166", phase_needler: "#b48cff" }[weapon.id] || "#42e8ff";
+  const baseColor = { arc: "#42e8ff", ice: "#9ff4ff", missile: "#ffb347", boomerang: "#ff65d8", drone: "#77ff8a", pulse: "#77ff8a", prism_railgun: "#7df9ff", void_singularity: "#8b5cf6", tesla_mine_chain: "#42e8ff", starfall_scepter: "#ffd166", phase_needler: "#b48cff", echo_tuning_fork: "#7dfcff" }[weapon.id] || "#42e8ff";
   const color = qualityColor(weapon, baseColor);
   const scale = Math.min(1, Math.max(0.46, Math.min((w * 0.5 - 24) / 190, (h * 0.5 - 22) / 96)));
   ctx.save();
@@ -70,6 +70,7 @@ export function drawWeaponPreview(ctx, canvas, weapon, t) {
   else if (weapon.id === "tesla_mine_chain") drawTeslaMineChain(ctx, 0, 0, t, rank, color);
   else if (weapon.id === "starfall_scepter") drawStarfallScepter(ctx, 0, 0, t, rank, color);
   else if (weapon.id === "phase_needler") drawPhaseNeedler(ctx, 0, 0, t, rank, color);
+  else if (weapon.id === "echo_tuning_fork") drawEchoTuningFork(ctx, 0, 0, t, rank, color);
   ctx.restore();
 }
 
@@ -665,6 +666,132 @@ function previewPhaseRift(ctx, x, y, color, major, t) {
     ctx.stroke();
     ctx.strokeStyle = colorWithAlpha("#ffffff", 0.7);
     ctx.lineWidth = major ? 2.4 : 1.8;
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+function drawEchoTuningFork(ctx, cx, cy, t, rank, color) {
+  const targets = [
+    { x: cx + 86, y: cy - 38, p: 0.1 },
+    { x: cx + 128, y: cy + 0, p: 0.55 },
+    { x: cx + 74, y: cy + 42, p: 0.9 },
+  ];
+  for (const target of targets) drawDummy(ctx, target.x, target.y, color);
+  drawPreviewTuningFork(ctx, cx + 18, cy, t, rank, color);
+
+  const cycle = (t % 1.75) / 1.75;
+  const coneProgress = Math.min(1, cycle / 0.48);
+  previewEchoCone(ctx, cx + 12, cy, 0, Math.PI * (0.36 + rank * 0.018), 160 * (0.2 + coneProgress * 0.82), color, rank, 1 - coneProgress * 0.25, t);
+
+  if (rank >= 4 && cycle > 0.18) {
+    previewEchoCone(ctx, cx + 12, cy, 0, Math.PI * 0.54, 145 * Math.min(1, (cycle - 0.18) / 0.45), "#ffd166", rank, 0.36, t + 1.8);
+  }
+
+  if (cycle > 0.38) {
+    const wave = Math.min(1, (cycle - 0.38) / 0.5);
+    for (let i = 0; i < targets.length; i++) {
+      const target = targets[i];
+      ring(ctx, target.x, target.y, 18 + wave * (48 + rank * 5), i === 0 && rank >= 4 ? "#ffd166" : color, 0.72 * Math.max(0, 1 - wave));
+      if (rank >= 2 && cycle > 0.56) ring(ctx, target.x, target.y, 12 + Math.min(1, (cycle - 0.56) / 0.42) * 38, color, 0.34 * Math.max(0, 1 - wave * 0.6));
+    }
+  }
+
+  if (rank >= 3 && cycle > 0.66) {
+    const k = Math.max(0, 1 - (cycle - 0.66) / 0.3);
+    ctx.save();
+    ctx.globalCompositeOperation = "lighter";
+    ctx.lineCap = "round";
+    for (let i = -2; i <= 2; i++) {
+      const y = cy + i * 12;
+      ctx.strokeStyle = colorWithAlpha(i === 0 && rank >= 4 ? "#ffd166" : color, 0.26 * k);
+      ctx.lineWidth = 7 - Math.abs(i);
+      ctx.beginPath();
+      ctx.moveTo(cx + 22, y);
+      ctx.lineTo(cx + 162, y + Math.sin(t * 11 + i) * 5);
+      ctx.stroke();
+      ctx.strokeStyle = colorWithAlpha("#ffffff", 0.58 * k);
+      ctx.lineWidth = 1.4;
+      ctx.stroke();
+    }
+    ctx.lineCap = "butt";
+    ctx.restore();
+  }
+}
+
+function drawPreviewTuningFork(ctx, x, y, t, rank, color) {
+  ctx.save();
+  ctx.translate(x, y + Math.sin(t * 12) * 1.3);
+  ctx.rotate(Math.sin(t * 18) * 0.025);
+  glow(ctx, 0, 0, 24 + rank * 3, color, 0.22);
+  ctx.strokeStyle = colorWithAlpha("#ffffff", 0.86);
+  ctx.lineWidth = 4;
+  ctx.lineCap = "round";
+  ctx.beginPath();
+  ctx.moveTo(-10, -28);
+  ctx.lineTo(-10, -5);
+  ctx.quadraticCurveTo(-10, 4, 0, 9);
+  ctx.quadraticCurveTo(10, 4, 10, -5);
+  ctx.lineTo(10, -28);
+  ctx.moveTo(0, 9);
+  ctx.lineTo(0, 36);
+  ctx.stroke();
+  ctx.strokeStyle = rank >= 4 ? "#ffd166" : color;
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(-15, -30);
+  ctx.lineTo(-6, -30);
+  ctx.moveTo(6, -30);
+  ctx.lineTo(15, -30);
+  ctx.moveTo(-7, 24);
+  ctx.lineTo(7, 24);
+  ctx.stroke();
+  ctx.lineWidth = 1.1;
+  for (let i = 0; i < 3; i++) {
+    const r = 18 + i * 9 + Math.sin(t * 8 + i) * 2;
+    ctx.strokeStyle = colorWithAlpha(color, 0.3 - i * 0.06);
+    ctx.beginPath();
+    ctx.arc(0, -10, r, -0.55, 0.55);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+function previewEchoCone(ctx, x, y, angle, coneAngle, range, color, rank, alpha, t) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(angle);
+  ctx.globalCompositeOperation = "lighter";
+  const start = -coneAngle / 2;
+  const end = coneAngle / 2;
+  for (let i = 0; i < 4; i++) {
+    const r = range * (0.35 + i * 0.2);
+    ctx.fillStyle = colorWithAlpha(i % 2 ? "#ffffff" : color, alpha * (0.07 + i * 0.015));
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.arc(0, 0, r, start, end);
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = colorWithAlpha(color, alpha * (0.32 - i * 0.04));
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.arc(0, 0, r, start, end);
+    ctx.stroke();
+  }
+  ctx.strokeStyle = colorWithAlpha("#ffffff", alpha * 0.46);
+  ctx.lineWidth = 1.5;
+  for (let i = 0; i < 7; i++) {
+    const a = start + (coneAngle * i) / 6 + Math.sin(t * 8 + i) * 0.012;
+    ctx.beginPath();
+    ctx.moveTo(Math.cos(a) * 18, Math.sin(a) * 18);
+    ctx.lineTo(Math.cos(a) * range, Math.sin(a) * range);
+    ctx.stroke();
+  }
+  if (rank >= 3) {
+    ctx.strokeStyle = colorWithAlpha(rank >= 4 ? "#ffd166" : color, alpha * 0.5);
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(0, 0, range * 0.78, start + 0.08, end - 0.08);
     ctx.stroke();
   }
   ctx.restore();

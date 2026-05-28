@@ -75,6 +75,7 @@ enemy-config-editor.cmd
 - 自动读取 `src/config/enemy-config.json`
 - 可视化编辑敌人基础信息、战斗数值、波次勾选规则、难度限制
 - 波次和难度都通过勾选/下拉选择，导出时自动转换成游戏读取的 JSON 字段
+- 支持“默认波次”和“每个难度独立波次”，用于同一敌人在不同难度中使用不同出现波次
 - 左侧敌人列表支持搜索、筛选、分页和序号跳转
 - 支持新增、复制、删除、恢复单个敌人
 - 支持导入 JSON、复制 JSON、下载 JSON
@@ -82,7 +83,7 @@ enemy-config-editor.cmd
 
 浏览器通常不能静默改写本地项目文件。若“保存到文件”不可用，请下载或复制生成的 JSON，再覆盖 `src/config/enemy-config.json`。
 
-![敌人配置编辑器](assets/screenshots/enemy-config-editor-v2.png)
+![敌人配置编辑器](assets/screenshots/enemy-config-editor-v3.png)
 
 ---
 
@@ -298,6 +299,7 @@ docker compose up -d --build
 - `bossWave`
 - `bossWaves`
 - `bossWaveRanges`
+- `difficultyWaves`
 
 支持的规则写法：
 
@@ -312,7 +314,46 @@ docker compose up -d --build
 3. 只要命中任一“包含规则”就可出现
 4. 若命中 `excludeWaves`，则强制不出现
 
-### 5.4 难度过滤规则
+### 5.4 不同难度的独立波次
+
+如果同一个敌人在不同难度中出现波次不同，可以使用 `difficultyWaves`。
+
+`difficultyWaves` 的键名是难度 id，值是该难度自己的波次规则。该字段只覆盖指定难度；没有配置的难度继续使用外层默认波次规则。
+
+示例：
+
+```json
+{
+  "zombie": {
+    "name": "僵尸",
+    "category": "小怪",
+    "waves": [1, 20],
+    "difficultyWaves": {
+      "ember": { "waves": [1, 12] },
+      "neon": { "waves": [1, 20] },
+      "overclock": { "spawnWaves": [1, 2, 3, 8, 9, 10] },
+      "apocalypse": { "waves": [1, 20], "excludeWaves": [5, 10, 15] }
+    }
+  }
+}
+```
+
+Boss 也支持该字段：
+
+```json
+{
+  "storm_tyrant": {
+    "boss": true,
+    "bossWave": 5,
+    "difficultyWaves": {
+      "ember": { "bossWave": 6 },
+      "overclock": { "bossWaves": [5, 9] }
+    }
+  }
+}
+```
+
+### 5.5 难度过滤规则
 
 可选字段：
 
@@ -327,7 +368,7 @@ docker compose up -d --build
 - 指定白名单：`"difficulties": ["neon", "overclock"]`
 - 指定黑名单：`"excludeDifficulties": ["ember"]`
 
-### 5.5 小怪配置示例
+### 5.6 小怪配置示例
 
 ```json
 {
@@ -349,7 +390,7 @@ docker compose up -d --build
 }
 ```
 
-### 5.6 Boss 配置示例
+### 5.7 Boss 配置示例
 
 ```json
 {
@@ -372,7 +413,7 @@ docker compose up -d --build
 }
 ```
 
-### 5.7 新增敌人的最小接入清单
+### 5.8 新增敌人的最小接入清单
 
 1. 在 `src/enemies/` 新增 `<id>.js` 类文件。
 2. 在 `src/systems/enemyRegistry.js` 的 `classes` 注册该 id。

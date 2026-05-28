@@ -32,6 +32,7 @@ const state = {
   filter: "all",
   query: "",
   page: 1,
+  waveScope: "default",
   dirty: false
 };
 
@@ -64,6 +65,7 @@ const dom = {
   summarySpeed: document.getElementById("summarySpeed"),
   summaryWave: document.getElementById("summaryWave"),
   wavePicker: document.getElementById("wavePicker"),
+  waveScopeTabs: document.getElementById("waveScopeTabs"),
   difficultyPicker: document.getElementById("difficultyPicker"),
   selectAllWavesButton: document.getElementById("selectAllWavesButton"),
   clearWavesButton: document.getElementById("clearWavesButton"),
@@ -77,6 +79,7 @@ init();
 async function init() {
   bindEvents();
   await Promise.all([loadDifficulties(), loadConfig()]);
+  renderWaveScopeTabs();
   renderDifficultyControls();
   renderAll();
 }
@@ -210,19 +213,20 @@ function renderEnemyList() {
     return;
   }
 
-  for (const [id, enemy] of visible) {
+  visible.forEach(([id, enemy], visibleIndex) => {
     const button = document.createElement("button");
     button.type = "button";
     button.className = `enemy-card${id === state.selectedId ? " active" : ""}`;
     button.style.setProperty("--enemy-color", enemy.color || "#42e8ff");
     button.innerHTML = `
+      <small>#${String(start + visibleIndex + 1).padStart(3, "0")}</small>
       <strong>${escapeHtml(enemy.name || id)}</strong>
       <span>${escapeHtml(id)} · ${escapeHtml(enemy.behavior || "unknown")}</span>
       <em>${enemy.boss ? "Boss" : "小怪"} · ${waveSummary(enemy)}</em>
     `;
     button.addEventListener("click", () => selectEnemy(id));
     dom.enemyList.appendChild(button);
-  }
+  });
 }
 
 function filteredEntries() {
@@ -292,7 +296,10 @@ function readEnemyFromForm() {
     return { ok: false, error: "ID 只能使用小写字母、数字和下划线。" };
   }
 
-  const enemy = {};
+  const previous = state.config[state.selectedId] || {};
+  const enemy = clone(previous);
+  for (const field of [...TEXT_FIELDS, ...NUMBER_FIELDS, ...DIFFICULTY_FIELDS]) delete enemy[field];
+  delete enemy.boss;
   for (const field of TEXT_FIELDS) {
     const value = form.elements[field]?.value?.trim();
     if (value) enemy[field] = value;
@@ -324,32 +331,74 @@ function renderWaveControls() {
   }
 }
 
+function renderWaveScopeTabs() {
+  const scopes = [{ id: "default", label: "默认波次", sub: "通用" }]
+    .concat(state.difficulties.map((difficulty) => ({ id: difficulty.id, label: difficulty.name, sub: difficulty.id })));
+  dom.waveScopeTabs.innerHTML = "";
+  for (const scope of scopes) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = `wave-scope-button${scope.id === state.waveScope ? " active" : ""}`;
+    button.dataset.scope = scope.id;
+    button.innerHTML = `<strong>${escapeHtml(scope.label)}</strong><span>${escapeHtml(scope.sub)}</span>`;
+    button.addEventListener("click", () => {
+      state.waveScope = scope.id;
+      renderWaveScopeTabs();
+      setWaveControlsFromEnemy(currentEnemy() || {});
+      updatePreviewFromForm();
+    });
+    dom.waveScopeTabs.appendChild(button);
+  }
+}
+
 function setWaveControlsFromEnemy(enemy) {
-  const included = wavesFromEnemy(enemy, false);
-  const excluded = wavesFromRule(enemy.excludeWaves);
+  const rules = waveRulesForCurrentScope(enemy);
+  const included = wavesFromEnemyRules(enemy, rules, false);
+  const excluded = wavesFromRule(rules.excludeWaves);
   dom.wavePicker.querySelectorAll("input[data-wave-kind]").forEach((input) => {
     const wave = Number(input.dataset.wave);
     input.checked = input.dataset.waveKind === "include" ? included.has(wave) : excluded.has(wave);
   });
 }
 
+function waveRulesForCurrentScope(enemy) {
+  if (state.waveScope === "default") return enemy;
+  const scoped = enemy.difficultyWaves?.[state.waveScope]
+    || enemy.difficultyWaveRules?.[state.waveScope]
+    || enemy.waveRulesByDifficulty?.[state.waveScope];
+  return scoped || enemy;
+}
+
 function applyWaveSelection(enemy) {
-  for (const field of RULE_FIELDS) delete enemy[field];
+  if (state.waveScope === "default") {
+    for (const field of RULE_FIELDS) delete enemy[field];
+    writeWaveSelectionTo(enemy, enemy);
+    return;
+  }
+
+  enemy.difficultyWaves ||= {};
+  const scopedRules = {};
+  writeWaveSelectionTo(enemy, scopedRules);
+  enemy.difficultyWaves[state.waveScope] = scopedRules;
+}
+
+function writeWaveSelectionTo(enemy, target) {
+  for (const field of RULE_FIELDS) delete target[field];
   const included = checkedWaves("include");
   const excluded = checkedWaves("exclude");
   for (const wave of excluded) included.delete(wave);
 
   if (enemy.boss) {
-    if (included.size === 1) enemy.bossWave = Array.from(included)[0];
-    else if (included.size > 1) enemy.bossWaves = Array.from(included).sort((a, b) => a - b);
+    if (included.size === 1) target.bossWave = Array.from(included)[0];
+    else if (included.size > 1) target.bossWaves = Array.from(included).sort((a, b) => a - b);
   } else if (included.size) {
     const list = Array.from(included).sort((a, b) => a - b);
     const range = continuousRange(list);
-    if (range) enemy.waves = range;
-    else enemy.spawnWaves = list;
+    if (range) target.waves = range;
+    else target.spawnWaves = list;
   }
 
-  if (excluded.size) enemy.excludeWaves = Array.from(excluded).sort((a, b) => a - b);
+  if (excluded.size) target.excludeWaves = Array.from(excluded).sort((a, b) => a - b);
 }
 
 function checkedWaves(kind) {
@@ -454,7 +503,7 @@ function renderPreview(id, enemy) {
   dom.summaryHp.textContent = enemy.hp ?? "-";
   dom.summaryDamage.textContent = enemy.damage ?? "-";
   dom.summarySpeed.textContent = enemy.speed ?? "-";
-  dom.summaryWave.textContent = waveSummary(enemy);
+  dom.summaryWave.textContent = waveSummaryForScope(enemy);
 }
 
 function setValidation(issues) {
@@ -626,18 +675,26 @@ function maxWaveCount() {
   let max = BASE_WAVE_COUNT;
   for (const enemy of Object.values(state.config)) {
     const waves = new Set([...wavesFromEnemy(enemy, false), ...wavesFromRule(enemy.excludeWaves)]);
+    for (const scoped of Object.values(enemy.difficultyWaves || {})) {
+      for (const wave of wavesFromEnemyRules(enemy, scoped, true)) waves.add(wave);
+      for (const wave of wavesFromRule(scoped.excludeWaves)) waves.add(wave);
+    }
     for (const wave of waves) max = Math.max(max, wave);
   }
   return max;
 }
 
 function wavesFromEnemy(enemy, includeExcluded) {
+  return wavesFromEnemyRules(enemy, enemy, includeExcluded);
+}
+
+function wavesFromEnemyRules(enemy, ruleSet, includeExcluded) {
   const rules = enemy.boss
-    ? [enemy.bossWave, enemy.bossWaves, enemy.bossWaveRanges, enemy.waves, enemy.waveRanges, enemy.spawnWaves]
-    : [enemy.waves, enemy.waveRanges, enemy.spawnWaves];
+    ? [ruleSet.bossWave, ruleSet.bossWaves, ruleSet.bossWaveRanges, ruleSet.waves, ruleSet.waveRanges, ruleSet.spawnWaves]
+    : [ruleSet.waves, ruleSet.waveRanges, ruleSet.spawnWaves];
   const waves = new Set();
   for (const rule of rules) for (const wave of wavesFromRule(rule)) waves.add(wave);
-  if (!includeExcluded) for (const wave of wavesFromRule(enemy.excludeWaves)) waves.delete(wave);
+  if (!includeExcluded) for (const wave of wavesFromRule(ruleSet.excludeWaves)) waves.delete(wave);
   return waves;
 }
 
@@ -675,6 +732,16 @@ function continuousRange(list) {
 
 function waveSummary(enemy) {
   const waves = Array.from(wavesFromEnemy(enemy, false)).sort((a, b) => a - b);
+  return formatWaveList(waves);
+}
+
+function waveSummaryForScope(enemy) {
+  const rules = waveRulesForCurrentScope(enemy);
+  const waves = Array.from(wavesFromEnemyRules(enemy, rules, false)).sort((a, b) => a - b);
+  return formatWaveList(waves);
+}
+
+function formatWaveList(waves) {
   if (!waves.length) return "-";
   const range = continuousRange(waves);
   return range ? `${range[0]}-${range[1]}` : waves.join(",");

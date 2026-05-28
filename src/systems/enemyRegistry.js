@@ -150,17 +150,25 @@ function randomSpawnPosition(radius) {
 }
 
 function isEnemyAvailableFor(entry, wave, difficultyId = state.difficultyId || currentDifficulty()?.id) {
-  return isWaveAllowed(entry, wave) && isDifficultyAllowed(entry, difficultyId);
+  return isWaveAllowed(entry, wave, difficultyId) && isDifficultyAllowed(entry, difficultyId);
 }
 
-function isWaveAllowed(entry, wave) {
+function isWaveAllowed(entry, wave, difficultyId) {
+  const difficultyRules = entry.difficultyWaves || entry.difficultyWaveRules || entry.waveRulesByDifficulty;
+  if (difficultyId && Object.prototype.hasOwnProperty.call(difficultyRules || {}, difficultyId)) {
+    return isWaveRuleSetAllowed(entry, difficultyRules[difficultyId] || {}, wave, false);
+  }
+  return isWaveRuleSetAllowed(entry, entry, wave, true);
+}
+
+function isWaveRuleSetAllowed(entry, rules, wave, allowDefaultNormal) {
   const waveRules = entry.boss
-    ? [entry.bossWave, entry.bossWaves, entry.bossWaveRanges, entry.waves, entry.waveRanges, entry.spawnWaves]
-    : [entry.waves, entry.waveRanges, entry.spawnWaves];
+    ? [rules.bossWave, rules.bossWaves, rules.bossWaveRanges, rules.waves, rules.waveRanges, rules.spawnWaves]
+    : [rules.waves, rules.waveRanges, rules.spawnWaves];
   const hasRule = waveRules.some((rule) => rule != null);
-  const allowed = hasRule ? waveRules.some((rule) => matchesWaveRule(rule, wave)) : !entry.boss;
+  const allowed = hasRule ? waveRules.some((rule) => matchesWaveRule(rule, wave)) : allowDefaultNormal && !entry.boss;
   if (!allowed) return false;
-  return !matchesWaveRule(entry.excludeWaves, wave);
+  return !matchesWaveRule(rules.excludeWaves, wave);
 }
 
 function matchesWaveRule(rule, wave) {

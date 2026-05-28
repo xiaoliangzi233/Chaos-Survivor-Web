@@ -76,7 +76,7 @@ export let enemyConfig = {};
 
 export async function setupEnemyRegistry() {
   if (!Object.keys(enemyConfig).length) {
-    const response = await fetch(new URL("../config/enemy-config.json", import.meta.url));
+    const response = await fetch(new URL("../config/enemy-config.json", import.meta.url), { cache: "no-store" });
     const config = await response.json();
     enemyConfig = Object.fromEntries(Object.entries(config).map(([id, data]) => [id, { id, ...data }]));
   }

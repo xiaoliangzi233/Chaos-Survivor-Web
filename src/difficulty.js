@@ -24,7 +24,7 @@ const fallbackDifficulty = {
 
 export async function setupDifficultyConfig() {
   if (difficultyOrder.length) return;
-  const response = await fetch(new URL("./config/difficulty-config.json", import.meta.url));
+  const response = await fetch(new URL("./config/difficulty-config.json", import.meta.url), { cache: "no-store" });
   const config = await response.json();
   difficultyConfig = Object.fromEntries(Object.entries(config).map(([id, data]) => [id, { id, ...data }]));
   difficultyOrder = Object.keys(config);

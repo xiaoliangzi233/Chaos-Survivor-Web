@@ -37,6 +37,7 @@ $url = "http://127.0.0.1:$finalPort$normalizedPath"
 Write-Host "Project Root : $projectRoot"
 Write-Host "Python       : $($launcher.Command) $($launcher.Args -join ' ')"
 Write-Host "Serving URL  : $url"
+Write-Host "Cache        : disabled for local development"
 
 if ($finalPort -ne $Port) {
   Write-Host "Note: Port $Port is in use, switched automatically to $finalPort."
@@ -48,6 +49,11 @@ if (-not $NoBrowser) {
 
 $args = @()
 $args += $launcher.Args
-$args += @("-m", "http.server", "$finalPort", "--bind", "127.0.0.1")
+$noCacheServer = Join-Path $projectRoot "scripts/no_cache_server.py"
+if (Test-Path $noCacheServer) {
+  $args += @($noCacheServer, "$finalPort", "--bind", "127.0.0.1")
+} else {
+  $args += @("-m", "http.server", "$finalPort", "--bind", "127.0.0.1")
+}
 
 & $launcher.Command @args

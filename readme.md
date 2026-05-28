@@ -11,12 +11,12 @@
 
 ## 2. 本地运行
 
-### 2.1 传统方式
+### 2.1 推荐方式：无缓存本地启动
 
 在项目根目录执行：
 
 ```powershell
-python -m http.server 5000 --bind 127.0.0.1
+.\start.cmd
 ```
 
 浏览器访问：
@@ -24,6 +24,22 @@ python -m http.server 5000 --bind 127.0.0.1
 ```text
 http://127.0.0.1:5000/
 ```
+
+`start.cmd` 会通过 `scripts/no_cache_server.py` 启动本地静态服务，并为所有资源返回：
+
+```http
+Cache-Control: no-store, no-cache, must-revalidate, max-age=0
+```
+
+这样每次刷新页面都会重新从本地服务器读取最新的 HTML、JS、CSS、JSON 和图片资源，不需要打开浏览器控制台禁用缓存。
+
+如果需要手动启动同一个无缓存服务，也可以执行：
+
+```powershell
+python .\scripts\no_cache_server.py 5000 --bind 127.0.0.1
+```
+
+不再推荐直接使用 `python -m http.server` 作为日常开发启动方式，因为它会返回 `Last-Modified` / `304 Not Modified`，容易让非技术用户误以为代码没有更新。
 
 ### 2.2 一键启动脚本（新增）
 
@@ -38,6 +54,7 @@ http://127.0.0.1:5000/
 - 默认端口 `5000`
 - 若端口被占用，自动向后寻找可用端口
 - 默认自动打开浏览器
+- 默认禁用浏览器缓存，确保刷新时读取最新资源
 
 用法示例：
 
@@ -68,7 +85,7 @@ http://127.0.0.1:5000/tools/enemy-config-editor.html
 enemy-config-editor.cmd
 ```
 
-如果手动访问 URL，建议先用 `start.cmd` 或 `python -m http.server 5000 --bind 127.0.0.1` 启动本地服务；双击 `enemy-config-editor.cmd` 会自动启动服务并打开该页面。
+如果手动访问 URL，建议先用 `start.cmd` 启动本地无缓存服务；双击 `enemy-config-editor.cmd` 会自动启动服务并打开该页面。
 
 编辑器能力：
 
@@ -146,14 +163,22 @@ server {
 
     root C:/www/survivor;
     index index.html;
+    if_modified_since off;
+    etag off;
 
     location / {
         try_files $uri $uri/ /index.html;
+        expires off;
+        add_header Cache-Control "no-store, no-cache, must-revalidate, max-age=0" always;
+        add_header Pragma "no-cache" always;
+        add_header Expires "0" always;
     }
 
     location ~* \.(js|mjs|css|png|jpg|jpeg|gif|ico|svg|webp|mp3|wav|ogg|json)$ {
-        expires 7d;
-        add_header Cache-Control "public, max-age=604800";
+        expires off;
+        add_header Cache-Control "no-store, no-cache, must-revalidate, max-age=0" always;
+        add_header Pragma "no-cache" always;
+        add_header Expires "0" always;
         try_files $uri =404;
     }
 }
@@ -191,6 +216,18 @@ docker compose up -d --build
 ```
 
 3. 访问：`http://127.0.0.1:5000/`
+
+### 3.4 缓存策略说明
+
+本项目没有构建工具，也没有给 JS/CSS 文件名自动生成 hash。为了避免部署后用户继续读取旧代码，内置 Nginx 配置默认对所有静态资源禁用强缓存：
+
+```http
+Cache-Control: no-store, no-cache, must-revalidate, max-age=0
+```
+
+同时配置了 `if_modified_since off` 和 `etag off`，避免浏览器用条件请求命中 `304 Not Modified`。
+
+如果后续引入构建流程，并让文件名带版本 hash（例如 `game.abcd1234.js`），才建议把图片、音乐、带 hash 的 JS/CSS 改回长缓存。
 
 ---
 

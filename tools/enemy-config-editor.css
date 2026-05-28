@@ -375,7 +375,8 @@ label > span {
 }
 
 .wave-actions,
-.difficulty-toolbar {
+.difficulty-toolbar,
+.weight-actions {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
@@ -422,9 +423,48 @@ label > span {
 }
 
 .wave-actions button,
-.difficulty-toolbar button {
+.difficulty-toolbar button,
+.weight-actions button {
   min-height: 32px;
   padding: 6px 10px;
+}
+
+.weight-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin-bottom: 12px;
+}
+
+.weight-scope-tabs {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.weight-matrix {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(5, minmax(112px, 1fr));
+}
+
+.weight-cell {
+  align-items: center;
+  background:
+    linear-gradient(135deg, rgba(255, 209, 102, 0.1), transparent 54%),
+    rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(255, 209, 102, 0.18);
+  display: grid;
+  gap: 7px;
+  grid-template-columns: 28px minmax(0, 1fr);
+  padding: 8px;
+}
+
+.weight-cell span {
+  color: var(--amber);
+  font-size: 12px;
+}
+
+.weight-cell input {
+  padding: 7px;
 }
 
 .wave-picker-head,
@@ -707,6 +747,10 @@ label {
     grid-template-columns: repeat(4, minmax(112px, 1fr));
   }
 
+  .weight-matrix {
+    grid-template-columns: repeat(4, minmax(112px, 1fr));
+  }
+
   .wave-scope-tabs {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
@@ -737,12 +781,17 @@ label {
   .form-grid,
   .stat-grid,
   .rules-grid,
+  .weight-grid,
   .difficulty-picker,
   .enemy-list {
     grid-template-columns: 1fr;
   }
 
   .wave-picker {
+    grid-template-columns: repeat(2, minmax(112px, 1fr));
+  }
+
+  .weight-matrix {
     grid-template-columns: repeat(2, minmax(112px, 1fr));
   }
 

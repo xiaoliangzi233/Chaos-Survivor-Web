@@ -33,6 +33,7 @@ const state = {
   query: "",
   page: 1,
   waveScope: "default",
+  weightScope: "",
   dirty: false
 };
 
@@ -66,12 +67,17 @@ const dom = {
   summaryWave: document.getElementById("summaryWave"),
   wavePicker: document.getElementById("wavePicker"),
   waveScopeTabs: document.getElementById("waveScopeTabs"),
+  weightScopeTabs: document.getElementById("weightScopeTabs"),
+  weightMatrix: document.getElementById("weightMatrix"),
+  difficultyWeightInput: document.getElementById("difficultyWeightInput"),
   difficultyPicker: document.getElementById("difficultyPicker"),
   selectAllWavesButton: document.getElementById("selectAllWavesButton"),
   clearWavesButton: document.getElementById("clearWavesButton"),
   clearExcludeWavesButton: document.getElementById("clearExcludeWavesButton"),
   selectAllDifficultiesButton: document.getElementById("selectAllDifficultiesButton"),
-  clearDifficultiesButton: document.getElementById("clearDifficultiesButton")
+  clearDifficultiesButton: document.getElementById("clearDifficultiesButton"),
+  fillWeightButton: document.getElementById("fillWeightButton"),
+  clearWaveWeightsButton: document.getElementById("clearWaveWeightsButton")
 };
 
 init();
@@ -80,6 +86,9 @@ async function init() {
   bindEvents();
   await Promise.all([loadDifficulties(), loadConfig()]);
   renderWaveScopeTabs();
+  state.weightScope = state.difficulties[0]?.id || "";
+  renderWeightScopeTabs();
+  renderWeightMatrix();
   renderDifficultyControls();
   renderAll();
 }
@@ -130,6 +139,8 @@ function bindEvents() {
   dom.clearExcludeWavesButton.addEventListener("click", () => setWaveChecks("exclude", false));
   dom.selectAllDifficultiesButton.addEventListener("click", () => setDifficultyChecks(true));
   dom.clearDifficultiesButton.addEventListener("click", () => setDifficultyChecks(false));
+  dom.fillWeightButton.addEventListener("click", fillVisibleWaveWeights);
+  dom.clearWaveWeightsButton.addEventListener("click", clearVisibleWaveWeights);
 
   dom.addEnemyButton.addEventListener("click", addEnemy);
   dom.duplicateButton.addEventListener("click", duplicateEnemy);
@@ -183,6 +194,7 @@ function setConfig(config, status, shouldRender = true) {
   dom.statusText.textContent = status;
   renderBehaviorOptions();
   renderWaveControls();
+  renderWeightMatrix();
   if (shouldRender) renderAll();
 }
 
@@ -261,6 +273,7 @@ function fillFormFromSelected() {
   form.elements.boss.checked = Boolean(enemy.boss);
   setWaveControlsFromEnemy(enemy);
   setDifficultyControlsFromEnemy(enemy);
+  setWeightControlsFromEnemy(enemy);
 }
 
 function applyForm() {
@@ -298,7 +311,7 @@ function readEnemyFromForm() {
 
   const previous = state.config[state.selectedId] || {};
   const enemy = clone(previous);
-  for (const field of [...TEXT_FIELDS, ...NUMBER_FIELDS, ...DIFFICULTY_FIELDS]) delete enemy[field];
+  for (const field of [...TEXT_FIELDS, ...NUMBER_FIELDS, ...DIFFICULTY_FIELDS, "spawnWeight", "weight"]) delete enemy[field];
   delete enemy.boss;
   for (const field of TEXT_FIELDS) {
     const value = form.elements[field]?.value?.trim();
@@ -313,6 +326,7 @@ function readEnemyFromForm() {
   if (form.elements.boss.checked) enemy.boss = true;
   applyWaveSelection(enemy);
   applyDifficultySelection(enemy);
+  applyWeightSelection(enemy);
   return { ok: true, id, enemy };
 }
 
@@ -348,6 +362,38 @@ function renderWaveScopeTabs() {
       updatePreviewFromForm();
     });
     dom.waveScopeTabs.appendChild(button);
+  }
+}
+
+function renderWeightScopeTabs() {
+  dom.weightScopeTabs.innerHTML = "";
+  for (const difficulty of state.difficulties) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = `wave-scope-button${difficulty.id === state.weightScope ? " active" : ""}`;
+    button.dataset.scope = difficulty.id;
+    button.innerHTML = `<strong>${escapeHtml(difficulty.name)}</strong><span>${escapeHtml(difficulty.id)}</span>`;
+    button.addEventListener("click", () => {
+      state.weightScope = difficulty.id;
+      renderWeightScopeTabs();
+      setWeightControlsFromEnemy(currentEnemy() || {});
+      updatePreviewFromForm();
+    });
+    dom.weightScopeTabs.appendChild(button);
+  }
+}
+
+function renderWeightMatrix() {
+  dom.weightMatrix.innerHTML = "";
+  const count = maxWaveCount();
+  for (let wave = 1; wave <= count; wave += 1) {
+    const label = document.createElement("label");
+    label.className = "weight-cell";
+    label.innerHTML = `
+      <span>${wave}</span>
+      <input type="number" min="0" step="0.1" data-weight-wave="${wave}" placeholder="继承" />
+    `;
+    dom.weightMatrix.appendChild(label);
   }
 }
 
@@ -462,6 +508,60 @@ function applyDifficultySelection(enemy) {
   if (maxDifficulty) enemy.maxDifficulty = maxDifficulty;
 }
 
+function setWeightControlsFromEnemy(enemy) {
+  dom.enemyForm.elements.spawnWeight.value = enemy.spawnWeight ?? enemy.weight ?? "";
+  const difficultyWeight = enemy.difficultyWeights?.[state.weightScope] ?? enemy.spawnWeightsByDifficulty?.[state.weightScope] ?? "";
+  dom.difficultyWeightInput.value = difficultyWeight;
+  const waveWeights = enemy.difficultyWaveWeights?.[state.weightScope] || enemy.waveWeightsByDifficulty?.[state.weightScope] || {};
+  dom.weightMatrix.querySelectorAll("input[data-weight-wave]").forEach((input) => {
+    input.value = waveWeights[input.dataset.weightWave] ?? "";
+  });
+}
+
+function applyWeightSelection(enemy) {
+  const base = dom.enemyForm.elements.spawnWeight.value;
+  if (base !== "") enemy.spawnWeight = Number(base);
+  else delete enemy.spawnWeight;
+
+  const difficultyWeight = dom.difficultyWeightInput.value;
+  if (state.weightScope && difficultyWeight !== "") {
+    enemy.difficultyWeights ||= {};
+    enemy.difficultyWeights[state.weightScope] = Number(difficultyWeight);
+  } else if (state.weightScope && enemy.difficultyWeights) {
+    delete enemy.difficultyWeights[state.weightScope];
+    if (!Object.keys(enemy.difficultyWeights).length) delete enemy.difficultyWeights;
+  }
+
+  if (state.weightScope) {
+    const entries = {};
+    dom.weightMatrix.querySelectorAll("input[data-weight-wave]").forEach((input) => {
+      if (input.value !== "") entries[input.dataset.weightWave] = Number(input.value);
+    });
+    if (Object.keys(entries).length) {
+      enemy.difficultyWaveWeights ||= {};
+      enemy.difficultyWaveWeights[state.weightScope] = entries;
+    } else if (enemy.difficultyWaveWeights) {
+      delete enemy.difficultyWaveWeights[state.weightScope];
+      if (!Object.keys(enemy.difficultyWaveWeights).length) delete enemy.difficultyWaveWeights;
+    }
+  }
+}
+
+function fillVisibleWaveWeights() {
+  const value = dom.difficultyWeightInput.value || dom.enemyForm.elements.spawnWeight.value || "1";
+  dom.weightMatrix.querySelectorAll("input[data-weight-wave]").forEach((input) => {
+    input.value = value;
+  });
+  updatePreviewFromForm();
+}
+
+function clearVisibleWaveWeights() {
+  dom.weightMatrix.querySelectorAll("input[data-weight-wave]").forEach((input) => {
+    input.value = "";
+  });
+  updatePreviewFromForm();
+}
+
 function difficultyAllowSet(enemy) {
   const all = new Set(state.difficulties.map((item) => item.id));
   const include = enemy.difficulties ?? enemy.difficultyIds ?? enemy.difficulty;
@@ -534,6 +634,8 @@ function validateEnemy(id, enemy) {
   if (!enemy.boss && !hasNormalWave) issues.push({ type: "warn", text: "小怪没有勾选出现波次，普通刷怪不会选到它。" });
   if (enemy.boss && enemy.category !== "Boss") issues.push({ type: "warn", text: "boss 为 true 时，category 建议设置为 Boss。" });
   if (Array.isArray(enemy.difficulties) && !enemy.difficulties.length) issues.push({ type: "warn", text: "没有勾选任何难度，该敌人不会在任何难度出现。" });
+  const baseWeight = enemy.spawnWeight ?? enemy.weight;
+  if (baseWeight != null && (!Number.isFinite(Number(baseWeight)) || Number(baseWeight) < 0)) issues.push({ type: "error", text: "默认权重必须是大于等于 0 的数字。" });
   return issues;
 }
 

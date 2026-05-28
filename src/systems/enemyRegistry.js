@@ -117,8 +117,19 @@ export function availableEnemyIdsForWave(wave) {
 }
 
 export function randomEnemyForWave(wave) {
-  const ids = availableEnemyIdsForWave(wave);
-  return ids[Math.floor(Math.random() * ids.length)] || "zombie";
+  const difficultyId = state.difficultyId || currentDifficulty()?.id;
+  const entries = Object.values(enemyConfig).filter((entry) => !entry.boss && isEnemyAvailableFor(entry, wave, difficultyId));
+  const weighted = entries
+    .map((entry) => ({ id: entry.id, weight: spawnWeightFor(entry, wave, difficultyId) }))
+    .filter((entry) => entry.weight > 0);
+  const totalWeight = weighted.reduce((sum, entry) => sum + entry.weight, 0);
+  if (totalWeight <= 0) return null;
+  let roll = Math.random() * totalWeight;
+  for (const entry of weighted) {
+    roll -= entry.weight;
+    if (roll <= 0) return entry.id;
+  }
+  return weighted[weighted.length - 1]?.id || "zombie";
 }
 
 export function decorativeEnemyIds() {
@@ -192,6 +203,17 @@ function isDifficultyAllowed(entry, difficultyId) {
   if (entry.minDifficulty && currentIndex >= 0 && minIndex >= 0 && currentIndex < minIndex) return false;
   if (entry.maxDifficulty && currentIndex >= 0 && maxIndex >= 0 && currentIndex > maxIndex) return false;
   return true;
+}
+
+function spawnWeightFor(entry, wave, difficultyId) {
+  const byDifficultyWave = entry.difficultyWaveWeights || entry.waveWeightsByDifficulty;
+  const exact = byDifficultyWave?.[difficultyId]?.[wave];
+  if (Number.isFinite(Number(exact))) return Math.max(0, Number(exact));
+  const byDifficulty = entry.difficultyWeights || entry.spawnWeightsByDifficulty;
+  const difficultyWeight = byDifficulty?.[difficultyId];
+  if (Number.isFinite(Number(difficultyWeight))) return Math.max(0, Number(difficultyWeight));
+  const baseWeight = entry.spawnWeight ?? entry.weight;
+  return Number.isFinite(Number(baseWeight)) ? Math.max(0, Number(baseWeight)) : 1;
 }
 
 function toList(value) {

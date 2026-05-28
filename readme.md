@@ -76,6 +76,7 @@ enemy-config-editor.cmd
 - 可视化编辑敌人基础信息、战斗数值、波次勾选规则、难度限制
 - 波次和难度都通过勾选/下拉选择，导出时自动转换成游戏读取的 JSON 字段
 - 支持“默认波次”和“每个难度独立波次”，用于同一敌人在不同难度中使用不同出现波次
+- 支持默认权重、每个难度权重、每个难度每个波次权重，用于控制不同敌人的出现频率
 - 左侧敌人列表支持搜索、筛选、分页和序号跳转
 - 支持新增、复制、删除、恢复单个敌人
 - 支持导入 JSON、复制 JSON、下载 JSON
@@ -83,7 +84,7 @@ enemy-config-editor.cmd
 
 浏览器通常不能静默改写本地项目文件。若“保存到文件”不可用，请下载或复制生成的 JSON，再覆盖 `src/config/enemy-config.json`。
 
-![敌人配置编辑器](assets/screenshots/enemy-config-editor-v3.png)
+![敌人配置编辑器](assets/screenshots/enemy-config-editor-v4.png)
 
 ---
 
@@ -285,6 +286,9 @@ docker compose up -d --build
 - `color`：主题色（渲染/特效色）
 - `behavior`：行为类型（驱动 AI 逻辑）
 - `boss`：是否 Boss（`true`/`false`）
+- `spawnWeight`：默认刷怪权重，默认值为 `1`
+- `difficultyWeights`：不同难度的基础权重
+- `difficultyWaveWeights`：不同难度、不同波次的精细权重
 
 说明：最终战斗数值会叠加波次成长和难度倍率，不是只用基础值。
 
@@ -368,7 +372,44 @@ Boss 也支持该字段：
 - 指定白名单：`"difficulties": ["neon", "overclock"]`
 - 指定黑名单：`"excludeDifficulties": ["ember"]`
 
-### 5.6 小怪配置示例
+### 5.6 出现权重规则
+
+普通小怪会按权重随机刷出。权重越高，出现频率越高；权重为 `0` 表示当前条件下不会被随机刷出。
+
+优先级从高到低：
+
+1. `difficultyWaveWeights[当前难度][当前波次]`
+2. `difficultyWeights[当前难度]`
+3. `spawnWeight`
+4. 默认 `1`
+
+示例：
+
+```json
+{
+  "zombie": {
+    "spawnWeight": 1,
+    "difficultyWeights": {
+      "ember": 2,
+      "neon": 1,
+      "overclock": 0.7
+    },
+    "difficultyWaveWeights": {
+      "overclock": {
+        "1": 3,
+        "2": 2,
+        "10": 0
+      },
+      "apocalypse": {
+        "1": 0.5,
+        "15": 4
+      }
+    }
+  }
+}
+```
+
+### 5.7 小怪配置示例
 
 ```json
 {
@@ -390,7 +431,7 @@ Boss 也支持该字段：
 }
 ```
 
-### 5.7 Boss 配置示例
+### 5.8 Boss 配置示例
 
 ```json
 {
@@ -413,7 +454,7 @@ Boss 也支持该字段：
 }
 ```
 
-### 5.8 新增敌人的最小接入清单
+### 5.9 新增敌人的最小接入清单
 
 1. 在 `src/enemies/` 新增 `<id>.js` 类文件。
 2. 在 `src/systems/enemyRegistry.js` 的 `classes` 注册该 id。

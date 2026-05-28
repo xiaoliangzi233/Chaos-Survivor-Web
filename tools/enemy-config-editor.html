@@ -170,6 +170,30 @@
               </div>
             </section>
 
+            <section class="panel">
+              <div class="section-title">
+                <span>05</span>
+                <h2>出现权重</h2>
+              </div>
+              <p class="hint">权重越高越容易被随机刷出。默认 1，填 0 表示该敌人在对应难度或波次不会随机出现。</p>
+              <div class="weight-grid">
+                <label>
+                  <span>默认权重</span>
+                  <input name="spawnWeight" type="number" min="0" step="0.1" placeholder="1" />
+                </label>
+                <label>
+                  <span>当前难度基础权重</span>
+                  <input id="difficultyWeightInput" type="number" min="0" step="0.1" placeholder="继承默认权重" />
+                </label>
+              </div>
+              <div id="weightScopeTabs" class="wave-scope-tabs weight-scope-tabs" aria-label="权重配置难度"></div>
+              <div class="weight-actions">
+                <button id="fillWeightButton" type="button">批量填入当前值</button>
+                <button id="clearWaveWeightsButton" type="button">清空波次权重</button>
+              </div>
+              <div id="weightMatrix" class="weight-matrix" aria-label="每波权重"></div>
+            </section>
+
             <section class="form-actions">
               <button id="duplicateButton" type="button">复制当前敌人</button>
               <button id="deleteButton" type="button" class="danger-button">删除当前敌人</button>

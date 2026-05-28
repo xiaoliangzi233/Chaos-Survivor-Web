@@ -234,22 +234,55 @@
     "tip": "看到聚火动作时横向移动，避免被扇形火球封住。"
   },
   "laser_eye": {
+    "difficultyWaves": {
+      "singularity": {
+        "waves": [
+          16,
+          19
+        ]
+      },
+      "apocalypse": {
+        "spawnWaves": [
+          13,
+          14,
+          16,
+          17,
+          18,
+          19
+        ]
+      },
+      "void_crown": {
+        "spawnWaves": [
+          9,
+          11,
+          12,
+          13,
+          14,
+          16,
+          17,
+          18,
+          19
+        ]
+      }
+    },
     "name": "凝视之眼",
     "category": "小怪",
     "trait": "瞄准激光",
-    "waves": [
-      6,
-      20
-    ],
+    "behavior": "laser_eye",
+    "color": "#ff4d6d",
+    "desc": "会瞄准玩家并发射持续激光束，瞄准期间有明显预警线。",
+    "tip": "预警线出现后立刻横移，也可以趁蓄力时优先击杀。",
     "hp": 64,
     "speed": 54,
     "damage": 22,
     "xp": 15,
     "radius": 15,
-    "color": "#ff4d6d",
-    "behavior": "laser_eye",
-    "desc": "会瞄准玩家并发射持续激光束，瞄准期间有明显预警线。",
-    "tip": "预警线出现后立刻横移，也可以趁蓄力时优先击杀。"
+    "difficulties": [
+      "singularity",
+      "apocalypse",
+      "void_crown"
+    ],
+    "spawnWeight": 0.3
   },
   "razorbat": {
     "name": "刃翼蝠",

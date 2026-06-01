@@ -11,6 +11,7 @@ const SEGMENT_COUNT = 42;
 const SEGMENT_GAP = 26;
 const NODE_STEP = 4;
 const BODY_RADIUS_SCALE = 0.58;
+const MAX_BODY_BEND = 0.58;
 const PHASE2_HP = 0.66;
 const PHASE3_HP = 0.32;
 const NET_LENGTH = 3600;
@@ -34,6 +35,7 @@ export class StormRailDevourer extends BaseEnemy {
     this.bodyDamageEnabled = true;
     this.bodyAlpha = 1;
     this.heading = 0;
+    this.visualHeading = 0;
     this.fireTimer = 0;
     this.modeShotTimer = 0;
     this.dashWindup = 0;
@@ -69,6 +71,7 @@ export class StormRailDevourer extends BaseEnemy {
       this.y = half - this.r;
     }
     this.heading = Math.atan2(p.y - this.y, p.x - this.x);
+    this.visualHeading = this.heading;
     for (let i = 0; i < SEGMENT_COUNT; i++) {
       this.segments.push({
         x: this.x - Math.cos(this.heading) * (i + 1) * this.segmentGap,
@@ -87,6 +90,8 @@ export class StormRailDevourer extends BaseEnemy {
     const dx = p.x - this.x;
     const dy = p.y - this.y;
     const d = Math.max(1, Math.hypot(dx, dy));
+    const prevX = this.x;
+    const prevY = this.y;
     const oldPhase = this.phaseLevel;
     this.phaseLevel = this.hp <= this.maxHp * PHASE3_HP ? 3 : this.hp <= this.maxHp * PHASE2_HP ? 2 : 1;
     this.anim += dt * (4.4 + this.phaseLevel * 1.2);
@@ -118,6 +123,7 @@ export class StormRailDevourer extends BaseEnemy {
     this.recordPath();
     this.updateSegments();
     this.damagePlayer();
+    this.updateVisualHeading(dt, prevX, prevY);
     if (this.modeTimer <= 0) this.nextMode();
   }
 
@@ -140,7 +146,9 @@ export class StormRailDevourer extends BaseEnemy {
     this.bodyAlpha = 1;
     if (this.dashWindup > 0) {
       this.dashWindup -= dt;
-      this.heading += angleDiff(Math.atan2(dy, dx), this.heading) * Math.min(1, dt * 5);
+      this.turnToward(Math.atan2(dy, dx), dt, 9.5);
+      if (this.dashWindup <= 0) this.heading = Math.atan2(state.player.y - this.y, state.player.x - this.x);
+      this.visualHeading = this.heading;
       return;
     }
     if (this.dashTime > 0) {
@@ -163,7 +171,8 @@ export class StormRailDevourer extends BaseEnemy {
         this.dashLoops--;
         this.dashWindup = this.phaseLevel >= 3 ? 0.08 : 0.16;
         this.dashTime = this.phaseLevel >= 3 ? 0.5 : 0.42;
-        this.heading = Math.atan2(dy, dx);
+        this.turnToward(Math.atan2(state.player.y - this.y, state.player.x - this.x), dt, 18);
+        this.visualHeading = this.heading;
       }
     }
   }
@@ -303,6 +312,7 @@ export class StormRailDevourer extends BaseEnemy {
       this.dashTime = this.phaseLevel >= 3 ? 0.52 : 0.42;
       this.dashCoast = 0;
       this.heading = Math.atan2(state.player.y - this.y, state.player.x - this.x);
+      this.visualHeading = this.heading;
       pulse(this.x, this.y, 96, this.phaseColor(), 0.28);
     }
     if (mode === "portal_dash") {
@@ -337,19 +347,17 @@ export class StormRailDevourer extends BaseEnemy {
     let leadX = this.x;
     let leadY = this.y;
     let leadAngle = this.heading;
+    const maxBend = this.mode === "coil" ? 0.74 : this.mode === "dash" || this.mode === "portal_dash" ? 0.5 : MAX_BODY_BEND;
     for (let i = 0; i < this.segments.length; i++) {
       const seg = this.segments[i];
-      let angle = Math.atan2(leadY - seg.y, leadX - seg.x);
-      const pathTarget = this.path[Math.min(this.path.length - 1, Math.round((i + 1) * this.segmentGap))];
-      if (pathTarget) {
-        const pathAngle = Math.atan2(leadY - pathTarget.y, leadX - pathTarget.x);
-        angle += angleDiff(pathAngle, angle) * 0.42;
-      } else {
-        angle = leadAngle;
-      }
+      const pathTarget = this.samplePath((i + 1) * this.segmentGap);
+      const pathFront = this.samplePath(i * this.segmentGap);
+      let angle = pathTarget ? Math.atan2((pathFront?.y ?? leadY) - pathTarget.y, (pathFront?.x ?? leadX) - pathTarget.x) : Math.atan2(leadY - seg.y, leadX - seg.x);
+      const bend = angleDiff(angle, leadAngle);
+      if (Math.abs(bend) > maxBend) angle = leadAngle + Math.sign(bend) * maxBend;
       const targetX = leadX - Math.cos(angle) * this.segmentGap;
       const targetY = leadY - Math.sin(angle) * this.segmentGap;
-      const follow = this.mode === "dash" || this.mode === "portal_dash" ? 0.9 : 0.76;
+      const follow = this.mode === "dash" || this.mode === "portal_dash" ? 1 : 0.92;
       seg.x += (targetX - seg.x) * follow;
       seg.y += (targetY - seg.y) * follow;
       seg.angle = angle;
@@ -358,6 +366,71 @@ export class StormRailDevourer extends BaseEnemy {
       leadY = seg.y;
       leadAngle = angle;
     }
+    this.relaxSegmentOverlaps();
+  }
+
+  samplePath(distance) {
+    if (!this.path.length) return null;
+    if (distance <= 0) return this.path[0];
+    let traveled = 0;
+    for (let i = 1; i < this.path.length; i++) {
+      const a = this.path[i - 1];
+      const b = this.path[i];
+      const span = Math.hypot(a.x - b.x, a.y - b.y);
+      if (span <= 0.001) continue;
+      if (traveled + span >= distance) {
+        const t = (distance - traveled) / span;
+        return { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t };
+      }
+      traveled += span;
+    }
+    return this.path[this.path.length - 1];
+  }
+
+  relaxSegmentOverlaps() {
+    const points = [{ x: this.x, y: this.y, r: this.r, fixed: true }, ...this.segments.map((seg) => ({ x: seg.x, y: seg.y, r: this.segmentRadius(seg), seg }))];
+    for (let i = 0; i < points.length; i++) {
+      for (let j = i + 3; j < points.length; j++) {
+        const a = points[i];
+        const b = points[j];
+        const dx = b.x - a.x;
+        const dy = b.y - a.y;
+        const d = Math.max(0.001, Math.hypot(dx, dy));
+        const min = (a.r + b.r) * 0.72;
+        if (d >= min) continue;
+        const push = (min - d) * 0.5;
+        const nx = dx / d;
+        const ny = dy / d;
+        if (!a.fixed && a.seg) {
+          a.seg.x -= nx * push;
+          a.seg.y -= ny * push;
+          a.x = a.seg.x;
+          a.y = a.seg.y;
+        }
+        if (!b.fixed && b.seg) {
+          b.seg.x += nx * push;
+          b.seg.y += ny * push;
+          b.x = b.seg.x;
+          b.y = b.seg.y;
+        }
+      }
+    }
+  }
+
+  turnToward(target, dt, rate) {
+    this.heading += angleDiff(target, this.heading) * Math.min(1, dt * rate);
+  }
+
+  updateVisualHeading(dt, prevX, prevY) {
+    if (this.mode === "dash" || this.mode === "portal_dash" || this.dashWindup > 0) {
+      this.visualHeading = this.heading;
+      return;
+    }
+    const moveX = this.x - prevX;
+    const moveY = this.y - prevY;
+    const moved = Math.hypot(moveX, moveY);
+    const target = moved > 0.8 ? Math.atan2(moveY, moveX) : this.heading;
+    this.visualHeading += angleDiff(target, this.visualHeading) * Math.min(1, dt * 8);
   }
 
   hitTest(x, y, r = 0) {
@@ -601,7 +674,7 @@ export class StormRailDevourer extends BaseEnemy {
     if (this.mode !== "dash" || this.dashWindup <= 0) return;
     ctx.save();
     ctx.translate(this.x, this.y);
-    ctx.rotate(this.heading);
+    ctx.rotate(this.visualHeading);
     ctx.globalCompositeOperation = "lighter";
     ctx.strokeStyle = colorWithAlpha(this.phaseColor(), 0.65);
     ctx.lineWidth = 3;
@@ -681,7 +754,7 @@ export class StormRailDevourer extends BaseEnemy {
     const color = this.phaseColor();
     ctx.save();
     ctx.translate(this.x, this.y);
-    ctx.rotate(this.heading);
+    ctx.rotate(this.visualHeading);
     ctx.fillStyle = this.flash > 0 ? "#ffffff" : "#111827";
     ctx.beginPath();
     ctx.moveTo(this.r * 1.72, 0);

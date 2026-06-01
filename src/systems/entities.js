@@ -7,9 +7,17 @@ import { isBossWave, randomEnemyForWave, spawnEnemyById, spawnWaveBoss } from ".
 import { updateBlackhole } from "../blackhole.js";
 import { difficultyMultiplier, currentDifficulty } from "../difficulty.js";
 import { applyPlayerDamage, coinDropMultiplier, modifyWeaponDamage, onWeaponHit, waveSpawnMultiplier } from "./items.js";
+export { applyFrostMark } from "./statusEffects.js";
+import { applyFrostMark } from "./statusEffects.js";
 
 export function updatePlayer(dt) {
   const p = state.player;
+  if (p.frozenTimer > 0) {
+    p.frozenTimer = Math.max(0, p.frozenTimer - dt);
+    p.frostTimer = Math.max(0, p.frostTimer - dt);
+    p.invuln = Math.max(0, p.invuln - dt);
+    return;
+  }
   let vx = (input.right ? 1 : 0) - (input.left ? 1 : 0) + input.vx;
   let vy = (input.down ? 1 : 0) - (input.up ? 1 : 0) + input.vy;
   const len = Math.hypot(vx, vy);
@@ -36,6 +44,10 @@ export function updatePlayer(dt) {
   if (p.frostTimer > 0) {
     p.frostTimer = Math.max(0, p.frostTimer - dt);
     if (p.frostTimer <= 0) p.frostSlow = 0;
+  }
+  if (p.frostMarkTimer > 0) {
+    p.frostMarkTimer = Math.max(0, p.frostMarkTimer - dt);
+    if (p.frostMarkTimer <= 0) p.frostMarks = 0;
   }
   const half = WORLD_SIZE / 2 - 60;
   p.x = clamp(p.x, -half, half);
@@ -272,8 +284,11 @@ function updateEnemyProjectiles(dt) {
         p.burnDps = Math.max(p.burnDps || 0, b.burnDps || 0);
       }
       if (result.damaged && b.frostDuration > 0) {
-        p.frostTimer = Math.max(p.frostTimer || 0, b.frostDuration);
-        p.frostSlow = Math.max(p.frostSlow || 0, b.frostSlow || 0.18);
+        if (b.frostMarks) applyFrostMark(p, { duration: b.frostDuration, slow: b.frostSlow || 0.18, freezeDuration: b.freezeDuration || 5 });
+        else {
+          p.frostTimer = Math.max(p.frostTimer || 0, b.frostDuration);
+          p.frostSlow = Math.max(p.frostSlow || 0, b.frostSlow || 0.18);
+        }
       }
       burst(p.x, p.y, 8, b.color, 100);
       playSfx("hurt");
@@ -301,8 +316,11 @@ function splitEnemyProjectile(b) {
       life: 1.8,
       shape: "snowflake",
       spin: Math.random() * TAU,
-      frostDuration: 0.55,
-      frostSlow: 0.14,
+      frostDuration: b.frostMarks ? b.frostDuration : 0.55,
+      frostSlow: b.frostMarks ? b.frostSlow : 0.14,
+      frostMarks: Boolean(b.frostMarks),
+      freezeDuration: b.freezeDuration || 5,
+      bossProjectile: Boolean(b.bossProjectile),
     });
   }
 }
@@ -330,8 +348,11 @@ function updateHazards(dt) {
       const result = applyPlayerDamage(h.damage, h);
       p.invuln = 0.35;
       if (result.damaged && h.frostDuration > 0) {
-        p.frostTimer = Math.max(p.frostTimer || 0, h.frostDuration);
-        p.frostSlow = Math.max(p.frostSlow || 0, h.frostSlow || 0.18);
+        if (h.frostMarks) applyFrostMark(p, { duration: h.frostDuration, slow: h.frostSlow || 0.18, freezeDuration: h.freezeDuration || 5 });
+        else {
+          p.frostTimer = Math.max(p.frostTimer || 0, h.frostDuration);
+          p.frostSlow = Math.max(p.frostSlow || 0, h.frostSlow || 0.18);
+        }
       }
       playSfx("hurt");
       if (h.kind === "ember_mine") h.life = 0;

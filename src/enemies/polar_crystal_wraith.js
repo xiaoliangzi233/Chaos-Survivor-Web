@@ -5,6 +5,7 @@ import { playSfx } from "../audio.js";
 import { clamp } from "../utils.js";
 import { BaseEnemy } from "./BaseEnemy.js";
 import { applyPlayerDamage } from "../systems/items.js";
+import { applyFrostMark } from "../systems/statusEffects.js";
 
 const MODES = ["snowflake_barrage", "ice_spike_field", "crystal_dash", "frost_orbit", "blizzard_core"];
 
@@ -61,8 +62,7 @@ export class PolarCrystalWraith extends BaseEnemy {
     if (d < p.r + this.r && p.invuln <= 0) {
       applyPlayerDamage(this.damage, this);
       p.invuln = 0.6;
-      p.frostTimer = Math.max(p.frostTimer || 0, 1.1);
-      p.frostSlow = Math.max(p.frostSlow || 0, 0.25);
+      applyFrostMark(p, { duration: 10, slow: 0.28, freezeDuration: 5 });
       state.shake = 10;
       state.flash = 0.18;
       burst(p.x, p.y, 16, this.color, 150);
@@ -215,8 +215,10 @@ export class PolarCrystalWraith extends BaseEnemy {
       damage: this.damage * 0.08,
       life: 0.22,
       maxLife: 0.22,
-      frostDuration: 0.35,
-      frostSlow: 0.16,
+      frostDuration: 10,
+      frostSlow: 0.28,
+      frostMarks: true,
+      freezeDuration: 5,
     });
     if (this.blizzardTimer <= 0) {
       this.blizzardTimer = this.phaseLevel >= 3 ? 0.18 : 0.28;
@@ -250,8 +252,10 @@ export class PolarCrystalWraith extends BaseEnemy {
           maxLife: 1.55,
           armTime: 0.95,
           angle: a,
-          frostDuration: 1.1,
+          frostDuration: 10,
           frostSlow: 0.28,
+          frostMarks: true,
+          freezeDuration: 5,
         });
       }
       playSfx("wave");
@@ -275,8 +279,10 @@ export class PolarCrystalWraith extends BaseEnemy {
       life: 1.18,
       maxLife: 1.18,
       armTime: 0.72,
-      frostDuration: 1.1,
+      frostDuration: 10,
       frostSlow: 0.28,
+      frostMarks: true,
+      freezeDuration: 5,
       spikeAngle: Math.random() * TAU,
     });
     pulse(x, y, 48, this.color, 0.26);
@@ -295,8 +301,10 @@ export class PolarCrystalWraith extends BaseEnemy {
       life: 4.4,
       shape: this.phaseLevel >= 3 && split ? "frostComet" : "snowflake",
       spin: Math.random() * TAU,
-      frostDuration: split ? 1.2 : 0.8,
-      frostSlow: split ? 0.24 : 0.18,
+      frostDuration: 10,
+      frostSlow: split ? 0.28 : 0.24,
+      frostMarks: true,
+      freezeDuration: 5,
       splitOnExpire: split && this.phaseLevel >= 2,
       bossProjectile: true,
     });
@@ -308,7 +316,7 @@ export class PolarCrystalWraith extends BaseEnemy {
   }
 
   dropFrostShard() {
-    world.hazards.push({ kind: "frost_zone", x: this.x, y: this.y, r: 34, color: this.color, damage: this.damage * 0.16, life: 1.15, maxLife: 1.15, frostDuration: 0.7, frostSlow: 0.22 });
+    world.hazards.push({ kind: "frost_zone", x: this.x, y: this.y, r: 34, color: this.color, damage: this.damage * 0.16, life: 1.15, maxLife: 1.15, frostDuration: 10, frostSlow: 0.28, frostMarks: true, freezeDuration: 5 });
   }
 
   phaseShift() {

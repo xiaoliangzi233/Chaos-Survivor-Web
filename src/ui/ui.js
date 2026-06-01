@@ -1,5 +1,5 @@
 import { TOTAL_WAVES } from "../constants.js";
-import { state } from "../state.js";
+import { state, world } from "../state.js";
 import { choice, formatTime } from "../utils.js";
 import { bestSummaryText, difficultyCards } from "../difficulty.js";
 import {
@@ -99,7 +99,7 @@ export function updateHud(fps) {
   ui.xpBar.parentElement?.style.setProperty("--value", xpRatio);
   ui.hpText.textContent = `${hp}`;
   ui.levelText.textContent = `Lv.${p.level}`;
-  ui.timerText.textContent = state.bossWaveActive ? "BOSS" : formatTime(state.waveTimeLeft);
+  ui.timerText.textContent = state.bossWaveActive ? (world.boss?.name || "BOSS") : formatTime(state.waveTimeLeft);
   ui.wavePanel?.classList.toggle("boss-active", state.bossWaveActive);
   ui.waveText.textContent = `第 ${state.wave}/${TOTAL_WAVES} 波`;
   renderChip(ui.killText, "×", "击败", state.kills);

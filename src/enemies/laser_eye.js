@@ -1,5 +1,5 @@
 ﻿import { TAU, WORLD_SIZE } from "../constants.js";
-import { state } from "../state.js";
+import { state, world } from "../state.js";
 import { burst, pulse } from "../effects.js";
 import { clamp } from "../utils.js";
 import { BaseEnemy } from "./BaseEnemy.js";
@@ -15,6 +15,7 @@ export class LaserEye extends BaseEnemy {
     this.fireTime = 0;
     this.angle = 0;
     this.cooldown = 1.4 + Math.random();
+    this.nextAttack = "beam";
   }
 
   update(dt) {
@@ -52,9 +53,16 @@ export class LaserEye extends BaseEnemy {
       this.x += (dx / d * dir + -dy / d * strafe) * this.speed * dt;
       this.y += (dy / d * dir + dx / d * strafe) * this.speed * dt;
       if (this.cooldown <= 0 && d < 820) {
+        if (this.nextAttack === "shards") {
+          this.fireLaserShardVolley(Math.atan2(dy, dx));
+          this.nextAttack = "beam";
+          this.cooldown = 2.1;
+          return;
+        }
         this.state = "aim";
         this.aimTime = 0.75;
         this.angle = Math.atan2(dy, dx);
+        this.nextAttack = "shards";
       }
     }
 
@@ -77,6 +85,28 @@ export class LaserEye extends BaseEnemy {
         if (Math.random() < dt * 24) burst(p.x, p.y, 3, this.color, 100);
       }
     }
+  }
+
+  fireLaserShardVolley(angle) {
+    this.angle = angle;
+    for (let i = 0; i < 3; i++) {
+      const a = angle + (i - 1) * 0.09;
+      world.enemyProjectiles.push({
+        x: this.x + Math.cos(a) * (this.r + 12),
+        y: this.y + Math.sin(a) * (this.r + 12),
+        vx: Math.cos(a) * 420,
+        vy: Math.sin(a) * 420,
+        r: 5,
+        color: this.color,
+        damage: this.damage * 0.56,
+        life: 2.2,
+        shape: "laserShard",
+        long: true,
+        spin: Math.random() * TAU,
+      });
+    }
+    pulse(this.x, this.y, 38, this.color, 0.18);
+    playSfx("shoot");
   }
 
   draw(ctx) {

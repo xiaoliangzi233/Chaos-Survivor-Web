@@ -1,9 +1,10 @@
 ﻿import { TAU, WORLD_SIZE } from "../constants.js";
-import { state } from "../state.js";
+import { state, world } from "../state.js";
 import { burst } from "../effects.js";
 import { clamp } from "../utils.js";
 import { BaseEnemy } from "./BaseEnemy.js";
 import { applyPlayerDamage } from "../systems/items.js";
+import { playSfx } from "../audio.js";
 
 export class Tank extends BaseEnemy {
   constructor(config, x, y) {
@@ -12,6 +13,8 @@ export class Tank extends BaseEnemy {
     this.armor = 0.42;
     this.stance = 0;
     this.stanceCooldown = 1.4 + Math.random();
+    this.cooldown = 0.8;
+    this.attackRange = 560;
     this.knockbackResistance = Math.max(this.knockbackResistance, 0.82);
   }
 
@@ -24,6 +27,7 @@ export class Tank extends BaseEnemy {
     this.flash = Math.max(0, this.flash - dt * 8);
     this.hitTimer = Math.max(0, this.hitTimer - dt);
     this.flip = dx < 0 ? -1 : 1;
+    this.cooldown -= dt;
     this.stanceCooldown -= dt;
     if (this.stanceCooldown <= 0) {
       this.stance = 1.15;
@@ -31,6 +35,7 @@ export class Tank extends BaseEnemy {
     }
     this.stance = Math.max(0, this.stance - dt);
     const speedMul = this.stance > 0 ? 0.45 : 0.9;
+    if (this.stance <= 0 && this.cooldown <= 0 && d < this.attackRange) this.fireBurst(Math.atan2(dy, dx));
     this.x += (dx / d) * this.speed * speedMul * dt;
     this.y += (dy / d) * this.speed * speedMul * dt;
     const half = WORLD_SIZE / 2;
@@ -46,9 +51,31 @@ export class Tank extends BaseEnemy {
   }
 
   takeDamage(amount, x, y, options = {}) {
-    const reduction = this.stance > 0 ? 0.28 : this.armor;
+    const reduction = this.stance > 0 ? 0.9 : this.armor;
     super.takeDamage(amount * (1 - reduction), x, y, options);
     if (!options.statusEffect && Math.random() < 0.6) burst(x, y, 2, "#ffd166", 160);
+  }
+
+  fireBurst(angle) {
+    this.cooldown = 2.35;
+    const baseSpeed = 250;
+    for (let i = 0; i < 4; i++) {
+      const a = angle + (i - 1.5) * 0.075;
+      world.enemyProjectiles.push({
+        x: this.x + Math.cos(a) * (this.r + 8),
+        y: this.y + Math.sin(a) * (this.r + 8),
+        vx: Math.cos(a) * (baseSpeed + i * 18),
+        vy: Math.sin(a) * (baseSpeed + i * 18),
+        r: 5.2,
+        color: "#ffd166",
+        damage: this.damage * 0.42,
+        life: 3.2,
+        shape: "gunnerShot",
+        source: "tank_burst",
+        spin: Math.random() * TAU,
+      });
+    }
+    playSfx("shoot");
   }
 
   draw(ctx) {

@@ -24,7 +24,8 @@ export function bossHudLayout(view, boss) {
       y: view.height - barHeight,
       w: view.width,
       h: barHeight,
-      showText: false,
+      showText: true,
+      text: boss?.maxHp ? `${Math.ceil(Math.max(0, boss.hp || 0))} / ${Math.ceil(boss.maxHp)}` : "",
     },
   };
 }
@@ -2071,7 +2072,7 @@ function drawEnemyProjectiles(ctx) {
       drawStormProjectile(ctx, b);
       continue;
     }
-    if (b.shape === "pylonBolt" || b.shape === "gunnerShot") {
+    if (b.shape === "pylonBolt" || b.shape === "gunnerShot" || b.shape === "laserShard") {
       drawEnemyBolt(ctx, b);
       continue;
     }
@@ -2157,7 +2158,7 @@ function drawEnemyBolt(ctx, b) {
   ctx.save();
   ctx.translate(b.x, b.y);
   ctx.rotate(angle);
-  const long = b.shape === "pylonBolt";
+  const long = b.shape === "pylonBolt" || b.shape === "laserShard" || b.long;
   const pulse = 0.78 + Math.sin(state.time * 18 + (b.spin || 0)) * 0.22;
   ctx.globalCompositeOperation = "lighter";
   if (enemyProjectileHasHalo(b)) glow(ctx, -b.r * 1.4, 0, b.r * (long ? 3.6 : 2.2), long ? 0.72 : 0.34, b.color);
@@ -2717,6 +2718,18 @@ function drawBossBar(ctx) {
   ctx.strokeStyle = "rgba(255,209,102,0.9)";
   ctx.lineWidth = 2;
   ctx.strokeRect(x + 1, y + 1, w - 2, 26);
+  drawBossHpText(ctx, layout.bar.text, y + 20, 14);
+}
+
+function drawBossHpText(ctx, text, y, size = 12) {
+  if (!text) return;
+  ctx.fillStyle = "#f3f7ff";
+  ctx.font = `${size}px ${CANVAS_PIXEL_FONT}`;
+  ctx.textAlign = "center";
+  ctx.shadowColor = "rgba(0,0,0,0.7)";
+  ctx.shadowBlur = 4;
+  ctx.fillText(text, viewport.width / 2, y);
+  ctx.shadowBlur = 0;
 }
 
 function drawBossDirectionIndicator(ctx) {
@@ -2772,6 +2785,7 @@ function drawTwinBossBar(ctx, b, x, y, w) {
     ctx.strokeStyle = "rgba(255,209,102,0.85)";
     ctx.lineWidth = 2;
     ctx.strokeRect(x + 1, y + 11, w - 2, 26);
+    drawBossHpText(ctx, `${Math.ceil(Math.max(0, solo.hp))} / ${Math.ceil(solo.maxHp)}`, y + 30, 14);
     return;
   }
   ctx.fillStyle = "rgba(6,9,18,0.9)";
@@ -2796,6 +2810,9 @@ function drawTwinBossBar(ctx, b, x, y, w) {
   ctx.strokeStyle = b.shared.resonance ? "rgba(255,255,255,0.95)" : "rgba(255,209,102,0.85)";
   ctx.lineWidth = 2;
   ctx.strokeRect(x + 1, y + 1, w - 2, 36);
+  const leftHp = crimson && !crimson.dead ? `${Math.ceil(crimson.hp)}/${Math.ceil(crimson.maxHp)}` : "绯裂已毁";
+  const rightHp = azure && !azure.dead ? `${Math.ceil(azure.hp)}/${Math.ceil(azure.maxHp)}` : "苍雷已毁";
+  drawBossHpText(ctx, `${leftHp}    ${rightHp}`, y + 27, 12);
 }
 function drawBossTitle(ctx, text, x, y, w) {
   ctx.save();

@@ -273,6 +273,8 @@ export function drawEffects(ctx) {
       ctx.fillRect(p.x - p.size / 2, p.y - p.size / 2, p.size, p.size);
     } else if (p.kind === "mote") {
       drawMote(ctx, p, alpha);
+    } else if (p.kind === "healPlus") {
+      drawHealPlus(ctx, p, alpha);
     } else if (p.kind === "ember") {
       drawEmber(ctx, p, alpha);
     } else if (p.kind === "mist") {
@@ -284,6 +286,27 @@ export function drawEffects(ctx) {
       ctx.fillRect(Math.round(p.x), Math.round(p.y), p.size, p.size);
     }
   }
+}
+
+function drawHealPlus(ctx, p, alpha) {
+  const a = alpha * p.alpha;
+  const s = Math.max(5, p.size);
+  ctx.save();
+  ctx.translate(Math.round(p.x), Math.round(p.y));
+  ctx.globalCompositeOperation = "lighter";
+  ctx.strokeStyle = hexToRgba(p.color, a * 0.9);
+  ctx.lineWidth = Math.max(2, s * 0.24);
+  ctx.lineCap = "square";
+  ctx.beginPath();
+  ctx.moveTo(-s * 0.55, 0);
+  ctx.lineTo(s * 0.55, 0);
+  ctx.moveTo(0, -s * 0.55);
+  ctx.lineTo(0, s * 0.55);
+  ctx.stroke();
+  ctx.strokeStyle = hexToRgba("#ffffff", a * 0.62);
+  ctx.lineWidth = 1;
+  ctx.strokeRect(-s * 0.72, -s * 0.72, s * 1.44, s * 1.44);
+  ctx.restore();
 }
 
 function drawMote(ctx, p, alpha) {

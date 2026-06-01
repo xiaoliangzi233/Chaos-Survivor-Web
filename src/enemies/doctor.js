@@ -1,6 +1,6 @@
 import { TAU, WORLD_SIZE } from "../constants.js";
 import { state, world } from "../state.js";
-import { burst, particle, pulse, trail } from "../effects.js";
+import { burst, particle, pulse } from "../effects.js";
 import { playSfx } from "../audio.js";
 import { clamp, distSq } from "../utils.js";
 import { BaseEnemy } from "./BaseEnemy.js";
@@ -14,6 +14,7 @@ export class Doctor extends BaseEnemy {
     this.behavior = "doctor";
     this.cooldown = 0.8;
     this.healTarget = null;
+    this.healTargets = [];
     this.channel = 0;
     this.knockbackResistance = Math.max(this.knockbackResistance, 0.24);
   }
@@ -29,17 +30,24 @@ export class Doctor extends BaseEnemy {
     this.cooldown -= dt;
     this.flip = dx < 0 ? -1 : 1;
 
-    this.healTarget = this.findHealTarget();
-    if (this.healTarget && this.cooldown <= 0) this.channel = 0.9;
-    if (this.channel > 0 && this.healTarget && !this.healTarget.dead) {
+    this.healTargets = this.findHealTargets();
+    this.healTarget = null;
+    if (this.healTargets.length && this.cooldown <= 0) {
+      this.channel = 0.9;
+      for (const target of this.healTargets) particle("healPlus", target.x, target.y - target.r - 8, { color: "#72ffb4", life: 0.42, size: 9, alpha: 0.9, vy: -18 });
+    }
+    if (this.channel > 0 && this.healTargets.length) {
       this.channel -= dt;
-      this.healTarget.hp = Math.min(this.healTarget.maxHp, this.healTarget.hp + (28 + state.wave * 2) * dt);
-      this.healTarget.flash = Math.max(this.healTarget.flash, 0.22);
-      trail(this.x, this.y, this.healTarget.x, this.healTarget.y, "#72ffb4", 3);
-      if (Math.random() < dt * 9) particle("mote", this.healTarget.x, this.healTarget.y, { color: "#72ffb4", life: 0.38, size: 3, alpha: 0.8 });
+      const healRate = 20 + state.wave * 1.8;
+      for (const target of this.healTargets) {
+        if (target.dead || target.hp >= target.maxHp) continue;
+        target.hp = Math.min(target.maxHp, target.hp + healRate * dt);
+        target.flash = Math.max(target.flash || 0, 0.22);
+        if (Math.random() < dt * 14) particle("healPlus", target.x, target.y - target.r - 8, { color: "#72ffb4", life: 0.42, size: 9, alpha: 0.9, vy: -18 });
+      }
       if (this.channel <= 0) {
         this.cooldown = 2.4;
-        pulse(this.healTarget.x, this.healTarget.y, 42, "#72ffb4", 0.22);
+        pulse(this.x, this.y, HEAL_RANGE, "#72ffb4", 0.18);
         playSfx("level");
       }
       this.moveRelative(dx, dy, d, dt, d < KEEP_DISTANCE ? -0.75 : 0.15);
@@ -59,20 +67,15 @@ export class Doctor extends BaseEnemy {
     this.y += (dy / d * dir + dx / d * strafe) * this.speed * dt;
   }
 
-  findHealTarget() {
-    let best = null;
-    let bestRatio = 0.98;
+  findHealTargets() {
+    const targets = [];
     const range2 = HEAL_RANGE * HEAL_RANGE;
     for (const e of world.enemies) {
       if (e === this || e.dead || e.boss || e.hp >= e.maxHp) continue;
       if (distSq(this.x, this.y, e.x, e.y) > range2) continue;
-      const ratio = e.hp / Math.max(1, e.maxHp);
-      if (ratio < bestRatio) {
-        bestRatio = ratio;
-        best = e;
-      }
+      targets.push(e);
     }
-    return best;
+    return targets;
   }
 
   draw(ctx) {
@@ -107,12 +110,11 @@ export class Doctor extends BaseEnemy {
       ctx.arc(side * 25 * z, -2 * z, 3 * z, 0, TAU);
       ctx.fill();
     }
-    if (this.healTarget && this.channel > 0) {
-      ctx.strokeStyle = "rgba(114,255,180,0.72)";
-      ctx.lineWidth = 2;
+    if (this.channel > 0 && this.healTargets.length) {
+      ctx.strokeStyle = "rgba(114,255,180,0.34)";
+      ctx.lineWidth = 1.6;
       ctx.beginPath();
-      ctx.moveTo(0, 0);
-      ctx.lineTo(this.healTarget.x - this.x, this.healTarget.y - this.y);
+      ctx.arc(0, 0, HEAL_RANGE, 0, TAU);
       ctx.stroke();
     }
     ctx.restore();

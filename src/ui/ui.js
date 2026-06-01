@@ -199,15 +199,12 @@ export function showRunSetup({ weapons, onConfirm, onBack }) {
   function renderWeaponList() {
     ui.loadoutWeaponList.innerHTML = "";
     weapons.forEach((item, index) => {
-      const info = WEAPON_INFO[item.id] || item;
       const button = document.createElement("button");
       button.type = "button";
       button.className = `loadout-weapon-card terminal-card${selectedWeapon?.id === item.id ? " selected" : ""}`;
       button.innerHTML = `
         <i>${item.icon}</i>
-        <strong>${item.name}</strong>
-        <p>${item.desc}</p>
-        <small>${(info.tags || []).join(" · ")}</small>`;
+        <strong>${item.name}</strong>`;
       button.addEventListener("click", () => {
         weaponIndex = index;
         selectedWeapon = item;

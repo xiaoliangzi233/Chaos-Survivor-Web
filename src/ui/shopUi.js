@@ -1,7 +1,6 @@
 import { createInventory, state } from "../state.js";
-import { canFuseWeapons, QUALITY_INFO, WEAPON_INFO } from "../economy/inventory.js";
+import { canFuseWeapons, findFuseCandidate, fuseWeaponSlots, QUALITY_INFO, WEAPON_INFO } from "../economy/inventory.js";
 import {
-  canFuseShopWeapon,
   isSoldOut,
   prepareShopOffers,
   purchaseDisabledReason,
@@ -26,9 +25,10 @@ const text = {
   buy: "\u8d2d\u4e70",
   bought: "\u8d2d\u4e70\u6210\u529f\u3002",
   quantity: "\u6570\u91cf",
-  fullFuse: "\u6b66\u5668\u69fd\u5df2\u6ee1\uff1a\u8d2d\u4e70\u540e\u5c06\u81ea\u52a8\u5408\u6210",
+  directFuse: "\u8d2d\u4e70\u540e\u76f4\u63a5\u5408\u6210",
   fuseNow: "\u76f4\u63a5\u5408\u6210",
-  fuseHint: "\u4e0e\u80cc\u5305\u4e2d\u540c\u7c7b\u540c\u54c1\u8d28\u6b66\u5668\u5408\u6210",
+  fuseHint: "\u5728\u6b66\u5668\u69fd\u4e2d\u9009\u62e9\u53ef\u5408\u6210\u7684\u6b66\u5668",
+  fuseSuccess: "\u6b66\u5668\u5408\u6210\u6210\u529f\u3002",
   weaponSlots: "\u6b66\u5668\u69fd",
   emptySlot: "\u7a7a\u69fd\u4f4d",
   unknownWeapon: "\u672a\u77e5\u6b66\u5668",
@@ -96,7 +96,6 @@ function renderOffer(offer) {
   const reason = purchaseDisabledReason(offer);
   const isWeapon = offer.category === "\u6b66\u5668";
   const fuseTarget = isWeapon ? shopFuseTarget(offer) : null;
-  const canFuseOnFull = isWeapon && state.inventory?.weaponSlots.length >= 6 && canFuseShopWeapon(offer.weaponId, offer.rarity);
   const card = document.createElement("article");
   card.className = `shop-card${soldOut ? " sold-out" : ""}`;
   card.style.setProperty("--quality", quality.color);
@@ -119,19 +118,7 @@ function renderOffer(offer) {
   buy.title = reason;
   buy.addEventListener("click", () => {
     const result = purchaseOffer(offer.uid);
-    renderShop(result.ok ? text.bought : result.reason);
-  });
-
-  const fuse = document.createElement("button");
-  fuse.type = "button";
-  fuse.className = "secondary shop-fuse";
-  fuse.textContent = text.fuseNow;
-  fuse.disabled = soldOut || !fuseTarget || state.gold < offer.price;
-  fuse.title = fuseTarget ? text.fuseHint : "\u9700\u8981\u540c\u7c7b\u540c\u54c1\u8d28\u6b66\u5668";
-  fuse.addEventListener("click", () => {
-    const target = shopFuseTarget(offer);
-    const result = purchaseOffer(offer.uid, { fuseWeaponUid: target?.uid });
-    renderShop(result.ok ? text.fuseHint : result.reason);
+    renderShop(result.ok ? (fuseTarget ? text.fuseSuccess : text.bought) : result.reason);
   });
 
   card.innerHTML = `
@@ -147,13 +134,12 @@ function renderOffer(offer) {
       <span>${text.quantity} x${offer.quantity}</span>
       <span>${offer.purchaseCount}/${offer.maxPurchases}</span>
       <span>${offer.price} ${text.coin}</span>
-      ${canFuseOnFull ? `<span>${text.fullFuse}</span>` : ""}
+      ${fuseTarget ? `<span>${text.directFuse}</span>` : ""}
     </div>
   `;
   const actions = document.createElement("div");
   actions.className = "shop-card-actions";
   actions.append(lock, buy);
-  if (isWeapon) actions.append(fuse);
   card.appendChild(actions);
   return card;
 }
@@ -194,6 +180,20 @@ function renderShopWeaponSlots(container, weaponSlots) {
     row.innerHTML = `
       <i style="color:${quality.color}">${info.icon}</i>
       <span><strong>${info.name}</strong><small style="color:${quality.color}">${quality.name}</small></span>`;
+    const material = findFuseCandidate(slot);
+    if (material) {
+      const fuse = document.createElement("button");
+      fuse.type = "button";
+      fuse.className = "shop-slot-fuse";
+      fuse.textContent = text.fuseNow;
+      fuse.title = text.fuseHint;
+      fuse.addEventListener("click", () => {
+        const currentMaterial = findFuseCandidate(slot);
+        const result = currentMaterial && fuseWeaponSlots(slot.uid, currentMaterial.uid);
+        renderShop(result ? text.fuseSuccess : text.fuseHint);
+      });
+      row.appendChild(fuse);
+    }
     container.appendChild(row);
   }
 }

@@ -233,15 +233,17 @@ function buyWeapon(offer, options = {}) {
     recomputeAllWeapons();
     return target;
   }
-  if (inv.weaponSlots.length < 6) return addWeaponToInventory(offer.weaponId, offer.rarity);
   const incoming = { uid: -1, id: offer.weaponId, quality: offer.rarity };
   const target = inv.weaponSlots.find((slot) => canFuseWeapons(slot, incoming).ok);
-  if (!target) return null;
-  const nextQuality = canFuseWeapons(target, incoming).nextQuality;
-  target.quality = nextQuality;
-  inv.selectedWeaponUid = target.uid;
-  recomputeAllWeapons();
-  return target;
+  if (target) {
+    const nextQuality = canFuseWeapons(target, incoming).nextQuality;
+    target.quality = nextQuality;
+    inv.selectedWeaponUid = target.uid;
+    recomputeAllWeapons();
+    return target;
+  }
+  if (inv.weaponSlots.length < 6) return addWeaponToInventory(offer.weaponId, offer.rarity);
+  return null;
 }
 
 function canFuseOfferIntoSlot(offer, uid) {

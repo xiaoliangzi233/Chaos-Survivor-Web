@@ -4399,3 +4399,146 @@ h2 {
     width: 100%;
   }
 }
+
+.loadout-difficulty-list,
+.loadout-weapon-list {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(66, 232, 255, 0.86) rgba(2, 8, 18, 0.9);
+}
+
+.loadout-difficulty-list::-webkit-scrollbar,
+.loadout-weapon-list::-webkit-scrollbar {
+  width: 10px;
+}
+
+.loadout-difficulty-list::-webkit-scrollbar-track,
+.loadout-weapon-list::-webkit-scrollbar-track {
+  border-left: 1px solid rgba(66, 232, 255, 0.16);
+  background:
+    repeating-linear-gradient(180deg, rgba(66, 232, 255, 0.08) 0 3px, transparent 3px 7px),
+    rgba(2, 8, 18, 0.88);
+}
+
+.loadout-difficulty-list::-webkit-scrollbar-thumb,
+.loadout-weapon-list::-webkit-scrollbar-thumb {
+  border: 2px solid rgba(2, 8, 18, 0.9);
+  background: linear-gradient(180deg, rgba(66, 232, 255, 0.92), rgba(255, 209, 102, 0.76));
+  box-shadow: 0 0 10px rgba(66, 232, 255, 0.34);
+}
+
+.loadout-difficulty-list {
+  max-height: clamp(248px, 48vh, 340px);
+}
+
+.loadout-weapon-card {
+  min-height: 56px;
+  grid-template-columns: 42px minmax(0, 1fr);
+}
+
+.loadout-weapon-card strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.shop-card-actions {
+  grid-template-columns: 1fr 1.25fr;
+}
+
+.shop-slot-fuse {
+  border-color: rgba(255, 209, 102, 0.62) !important;
+  background:
+    linear-gradient(135deg, rgba(255, 209, 102, 0.2), rgba(66, 232, 255, 0.08)),
+    rgba(3, 8, 16, 0.72) !important;
+}
+
+@media (max-width: 900px) {
+  .shop-panel,
+  .inventory-panel,
+  .loadout-panel {
+    width: calc(100vw - 16px);
+    max-height: calc(100vh - 16px);
+  }
+
+  .shop-main,
+  .shop-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .shop-action-buttons {
+    grid-column: 1;
+  }
+
+  .shop-slot-row {
+    grid-template-columns: 34px minmax(0, 1fr);
+  }
+
+  .shop-slot-fuse {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 760px) {
+  .quick-actions {
+    display: block;
+    inset: 0;
+    right: auto;
+    bottom: auto;
+    pointer-events: none;
+  }
+
+  .quick-actions button {
+    position: absolute;
+    pointer-events: auto;
+    min-width: 48px;
+    height: 48px;
+    border-radius: 3px;
+    background:
+      linear-gradient(135deg, rgba(66, 232, 255, 0.16), rgba(255, 209, 102, 0.06)),
+      rgba(3, 8, 16, 0.86);
+  }
+
+  #pauseButton {
+    left: max(10px, env(safe-area-inset-left));
+    top: max(10px, env(safe-area-inset-top));
+    width: 58px;
+    font-size: 0;
+  }
+
+  #pauseButton::before {
+    content: "菜单";
+    font-size: 12px;
+    font-weight: 900;
+  }
+
+  #inventoryButton {
+    right: max(10px, env(safe-area-inset-right));
+    bottom: max(10px, env(safe-area-inset-bottom));
+    width: 58px;
+    font-size: 12px;
+    font-weight: 900;
+  }
+
+  #muteButton {
+    right: max(76px, calc(env(safe-area-inset-right) + 76px));
+    bottom: max(10px, env(safe-area-inset-bottom));
+  }
+}
+
+@media (max-width: 820px) {
+  .loadout-difficulty-list {
+    max-height: 158px;
+  }
+
+  .loadout-weapon-list {
+    max-height: 162px;
+  }
+
+  .loadout-difficulty-card {
+    min-height: 0;
+  }
+
+  .loadout-weapon-card {
+    min-height: 54px;
+  }
+}

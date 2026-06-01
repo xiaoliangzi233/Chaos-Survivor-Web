@@ -443,6 +443,7 @@
     "radius": 20,
     "color": "#42e8ff",
     "behavior": "pylon",
+    "spawnWeight": 0.18,
     "desc": "移动慢但射程远，会持续向玩家压制。",
     "tip": "尽快贴近处理，拖得越久场面越乱。"
   },

@@ -158,13 +158,15 @@ export class BaseEnemy {
     }
   }
 
-  takeDamage(amount, x, y) {
+  takeDamage(amount, x, y, options = {}) {
     if (this.dead) return;
     const scaled = amount * (this.shielded ? 0.35 : 1) * state.player.damageScale;
     const reduced = Math.max(1, scaled - (this.defense || 0));
     this.hp -= reduced;
-    this.flash = 1;
-    burst(x, y, 3, this.color, 120);
+    if (!options.statusEffect) {
+      this.flash = 1;
+      burst(x, y, 3, this.color, 120);
+    }
     if (this.hp <= 0) this.kill();
   }
 

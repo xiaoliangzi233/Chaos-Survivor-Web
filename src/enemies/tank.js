@@ -45,10 +45,10 @@ export class Tank extends BaseEnemy {
     }
   }
 
-  takeDamage(amount, x, y) {
+  takeDamage(amount, x, y, options = {}) {
     const reduction = this.stance > 0 ? 0.28 : this.armor;
-    super.takeDamage(amount * (1 - reduction), x, y);
-    if (Math.random() < 0.6) burst(x, y, 2, "#ffd166", 160);
+    super.takeDamage(amount * (1 - reduction), x, y, options);
+    if (!options.statusEffect && Math.random() < 0.6) burst(x, y, 2, "#ffd166", 160);
   }
 
   draw(ctx) {

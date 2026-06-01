@@ -350,11 +350,13 @@ export class TwinAbyssalEyes extends BaseEnemy {
     });
   }
 
-  takeDamage(amount, x, y) {
+  takeDamage(amount, x, y, options = {}) {
     if (this.dead) return;
     this.hp -= amount * state.player.damageScale;
-    this.flash = 1;
-    burst(x, y, 4, this.color, 120);
+    if (!options.statusEffect) {
+      this.flash = 1;
+      burst(x, y, 4, this.color, 120);
+    }
     if (this.hp <= 0) this.kill();
   }
 

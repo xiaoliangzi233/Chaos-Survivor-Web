@@ -260,11 +260,11 @@ export class StormRailDevourer extends BaseEnemy {
     playSfx("hurt");
   }
 
-  takeDamage(amount, x, y) {
+  takeDamage(amount, x, y, options = {}) {
     const headHit = distSq(x, y, this.x, this.y) < (this.r * 1.4) ** 2;
-    super.takeDamage(amount * (headHit ? 1.15 : 1), x, y);
+    super.takeDamage(amount * (headHit ? 1.15 : 1), x, y, options);
     const nearest = this.nearestSegment(x, y);
-    if (nearest) nearest.heat = 1;
+    if (nearest && !options.statusEffect) nearest.heat = 1;
   }
 
   nearestSegment(x, y) {

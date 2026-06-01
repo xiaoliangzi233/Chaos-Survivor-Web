@@ -100,11 +100,11 @@ export class LineRaider extends BaseEnemy {
     }
   }
 
-  takeDamage(amount, x, y) {
+  takeDamage(amount, x, y, options = {}) {
     if (this.state === "dash" || this.state === "warn") {
       amount *= this.state === "dash" ? 0.05 : 0.35;
     }
-    super.takeDamage(amount, x, y);
+    super.takeDamage(amount, x, y, options);
   }
 
   draw(ctx) {

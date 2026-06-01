@@ -214,9 +214,9 @@ export class StormTyrant extends BaseEnemy {
     });
   }
 
-  takeDamage(amount, x, y) {
+  takeDamage(amount, x, y, options = {}) {
     const wasPhase2 = this.phase2;
-    super.takeDamage(amount, x, y);
+    super.takeDamage(amount, x, y, options);
     if (!wasPhase2 && this.hp > 0 && this.hp < this.maxHp * 0.45) {
       this.phasePulse = 1;
       burst(this.x, this.y, 34, "#b48cff", 260);
@@ -291,10 +291,12 @@ class StormShard {
     }
   }
 
-  takeDamage(amount, x, y) {
+  takeDamage(amount, x, y, options = {}) {
     this.hp -= amount * state.player.damageScale;
-    this.flash = 1;
-    burst(x, y, 4, this.color, 120);
+    if (!options.statusEffect) {
+      this.flash = 1;
+      burst(x, y, 4, this.color, 120);
+    }
     if (this.hp <= 0) this.kill();
   }
 

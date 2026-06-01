@@ -1,7 +1,7 @@
 import { WORLD_SIZE, TAU } from "../constants.js";
 import { state, world } from "../state.js";
 import { distSq, clamp } from "../utils.js";
-import { burst, pulse, trail } from "../effects.js";
+import { burst, particle, pulse, trail } from "../effects.js";
 import { playSfx } from "../audio.js";
 import { QUALITY_INFO, QUALITY_ORDER, recomputeAllWeapons } from "../economy/inventory.js";
 import { recordCodexEntry } from "./codex.js";
@@ -238,9 +238,27 @@ function updateBleeds(dt) {
   for (const e of [...world.enemies]) {
     if (!e.bleedTimer || e.dead) continue;
     e.bleedTimer = Math.max(0, e.bleedTimer - dt);
-    e.takeDamage?.((e.bleedDps || 0) * dt, e.x, e.y);
-    if (Math.random() < dt * 5) trail(e.x, e.y, e.x + (Math.random() - 0.5) * 18, e.y + (Math.random() - 0.5) * 18, "#ff4d6d", 4);
+    e.takeDamage?.((e.bleedDps || 0) * dt, e.x, e.y, { statusEffect: "bleed" });
+    spawnBleedParticles(e, dt);
     if (e.bleedTimer <= 0) e.bleedDps = 0;
+  }
+}
+
+function spawnBleedParticles(e, dt) {
+  if (Math.random() < dt * 6) {
+    const ox = (Math.random() - 0.5) * e.r * 1.4;
+    const oy = (Math.random() - 0.5) * e.r * 1.2;
+    trail(e.x + ox, e.y + oy, e.x + ox + (Math.random() - 0.5) * 18, e.y + oy + 8 + Math.random() * 14, "#ff4d6d", 4);
+  }
+  if (Math.random() < dt * 4) {
+    particle("spark", e.x + (Math.random() - 0.5) * e.r, e.y + (Math.random() - 0.45) * e.r, {
+      vx: (Math.random() - 0.5) * 34,
+      vy: 24 + Math.random() * 42,
+      life: 0.22 + Math.random() * 0.18,
+      size: 2 + Math.random() * 2,
+      color: "#ff4d6d",
+      alpha: 0.88,
+    });
   }
 }
 

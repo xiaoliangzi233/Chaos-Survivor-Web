@@ -269,7 +269,10 @@ export function clearEnemies() {
   world.projectiles.length = 0;
   world.enemyProjectiles.length = 0;
   world.hazards.length = 0;
-  world.itemObjects.length = 0;
+  for (let i = world.itemObjects.length - 1; i >= 0; i--) {
+    const kind = world.itemObjects[i]?.kind;
+    if (kind !== "easter_signature" && kind !== "easter_terminal") world.itemObjects.splice(i, 1);
+  }
   world.blackhole = null;
   world.boss = null;
   world.grid.clear();

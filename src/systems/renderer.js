@@ -6,6 +6,7 @@ import { drawEffects } from "../effects.js";
 import { renderLighting } from "./lighting.js";
 import { drawBlackhole } from "../blackhole.js";
 import { createDecorativeEnemy, decorativeEnemyIds } from "./enemyRegistry.js";
+import { drawEasterEggObject, drawEasterEggToast } from "./easterEggs.js";
 
 export const viewport = { width: 1, height: 1, dpr: 1 };
 
@@ -148,6 +149,7 @@ export function render(ctx) {
     ctx.fillStyle = `rgba(255,77,109,${state.flash * 0.18})`;
     ctx.fillRect(0, 0, viewport.width, viewport.height);
   }
+  drawEasterEggToast(ctx, viewport);
 }
 
 function renderMenuScene(ctx) {
@@ -2098,6 +2100,7 @@ function drawItemObjects(ctx) {
     else if (obj.kind === "fallingStar") drawFallingStar(ctx, obj);
     else if (obj.kind === "tesla_node") drawTeslaNode(ctx, obj);
     else if (obj.kind === "storm_portal") drawStormPortal(ctx, obj);
+    else if (obj.kind === "easter_signature" || obj.kind === "easter_terminal") drawEasterEggObject(ctx, obj);
   }
 }
 

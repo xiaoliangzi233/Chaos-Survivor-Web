@@ -5,6 +5,7 @@ import { burst, pulse } from "../effects.js";
 import { playSfx } from "../audio.js";
 import { currentDifficulty } from "../difficulty.js";
 import { applyPlayerDamage } from "../systems/items.js";
+import { maybeTriggerBossSignature } from "../systems/easterEggs.js";
 
 export class BaseEnemy {
   constructor(config, x, y) {
@@ -173,6 +174,7 @@ export class BaseEnemy {
   kill() {
     this.dead = true;
     state.kills++;
+    if (this.boss) maybeTriggerBossSignature(this);
     if (this.boss && world.boss === this) world.boss = null;
     burst(this.x, this.y, this.boss ? 48 : 12, this.color, this.boss ? 240 : 140);
     playSfx(this.boss ? "explode" : "hit");

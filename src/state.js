@@ -24,6 +24,7 @@ export const state = {
   inventory: null,
   initialWeaponId: null,
   shop: null,
+  easterEggs: null,
   difficultyId: "ember",
   difficulty: null,
   difficultyProgress: null,
@@ -134,6 +135,21 @@ export function createInventory() {
   };
 }
 
+export function createEasterEggState() {
+  return {
+    keyBuffer: "",
+    triggered: {},
+    toast: null,
+    neonOverloadTimer: 0,
+    magnetBoostTimer: 0,
+    wave13Seen: false,
+    bossSignatureCooldown: 0,
+    centerStillTimer: 0,
+    wave13PulseTimer: 0,
+    baseMagnet: null,
+  };
+}
+
 export function resetRun(map) {
   world.enemies.length = 0;
   world.projectiles.length = 0;
@@ -171,5 +187,6 @@ export function resetRun(map) {
   state.inventory = createInventory();
   state.initialWeaponId = null;
   state.shop = null;
+  state.easterEggs = createEasterEggState();
   state.difficultyId = state.difficultyId || "ember";
 }

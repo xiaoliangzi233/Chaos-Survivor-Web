@@ -1,6 +1,7 @@
 import { input, state } from "../state.js";
 import { ui } from "../ui/ui.js";
 import { setMuted, isMuted, nextMusicTrack } from "../audio.js";
+import { handleEasterEggKey } from "./easterEggs.js";
 
 export function bindInput({ start, restart, togglePause, resume, returnToMenu }) {
   const keys = new Map([
@@ -12,6 +13,7 @@ export function bindInput({ start, restart, togglePause, resume, returnToMenu })
 
   function handleKeyDown(event) {
     if (event.__survivorHandled) return;
+    handleEasterEggKey(event);
     const action = keys.get(event.code);
     if (action) {
       input[action] = true;

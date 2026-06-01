@@ -24,6 +24,7 @@ import { isBossWave, setupEnemyRegistry } from "../systems/enemyRegistry.js";
 import { updatePlayer, updateSpawning, updateEnemies, rebuildGrid, updateGems, updateCoins, collectAllExperience, collectAllCoins, clearEnemies } from "../systems/entities.js";
 import { updateWeapons, STARTER_WEAPONS, UPGRADE_DEFS, activateWeapon } from "../systems/weapons.js";
 import { consumeNextWaveSpawnBonus, startWaveItems, updateItems } from "../systems/items.js";
+import { updateEasterEggs } from "../systems/easterEggs.js";
 import { createShopState } from "../economy/shop.js";
 import * as effects from "../effects.js";
 import { resizeCanvas, updateCamera, render } from "../systems/renderer.js";
@@ -222,6 +223,7 @@ export async function bootGame() {
     state.flash = Math.max(0, state.flash - dt * 3);
     updateItems(dt);
     updatePlayer(dt);
+    updateEasterEggs(dt);
     if (bossWave || state.waveTimeLeft > 0) updateSpawning(dt);
     updateEnemies(dt);
     rebuildGrid();

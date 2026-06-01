@@ -5,6 +5,7 @@ import { playSfx } from "../audio.js";
 import { clamp, distSq } from "../utils.js";
 import { BaseEnemy } from "./BaseEnemy.js";
 import { applyPlayerDamage } from "../systems/items.js";
+import { maybeTriggerBossSignature } from "../systems/easterEggs.js";
 
 const TETHER_RANGE = 920;
 const RESONANCE_HP = 0.4;
@@ -380,6 +381,7 @@ export class TwinAbyssalEyes extends BaseEnemy {
       pulse(other.x, other.y, 130, other.color, 0.36);
       return;
     }
+    maybeTriggerBossSignature(this);
     world.boss = null;
     if (!this.shared.rewardDropped) {
       this.shared.rewardDropped = true;

@@ -2,19 +2,21 @@ let muted = false;
 let audio = null;
 let proceduralTimer = null;
 let musicGain = null;
+let musicCompressor = null;
 let proceduralPaused = false;
 let musicStep = 0;
 let musicSection = 0;
 let nextMusicTime = 0;
 const lastPlayed = new Map();
-const MUSIC_BPM = 138;
+const MUSIC_BPM = 152;
 const MUSIC_STEP_MS = Math.round(60000 / MUSIC_BPM / 2);
 const MUSIC_STEP_SECONDS = MUSIC_STEP_MS / 1000;
-const MUSIC_MASTER_GAIN = 0.11;
-const MUSIC_LOOKAHEAD_STEPS = 4;
-const MUSIC_SCALE = [55, 65.41, 73.42, 82.41, 98, 110, 130.81, 146.83];
-const LEAD_PATTERN = [12, 14, 15, 10, 12, 17, 15, 14, 12, 10, 8, 10, 12, 15, 17, 19];
-const BASS_PATTERN = [0, 0, 3, 0, 5, 5, 3, 0, 0, 0, 3, 0, 6, 5, 3, 0];
+const MUSIC_MASTER_GAIN = 0.19;
+const MUSIC_LOOKAHEAD_STEPS = 6;
+const MUSIC_SCALE = [55, 65.41, 73.42, 82.41, 98, 110, 130.81, 146.83, 164.81, 196];
+const LEAD_PATTERN = [12, 14, 15, 17, 19, 17, 15, 14, 12, 10, 8, 10, 12, 15, 17, 22];
+const BASS_PATTERN = [0, 0, 3, 0, 5, 0, 6, 5, 0, 0, 3, 5, 6, 5, 3, 0];
+const ARP_PATTERN = [0, 3, 5, 8, 7, 5, 3, 5, 0, 3, 6, 8, 9, 8, 6, 3];
 
 export function setMuted(value) {
   muted = value;
@@ -110,8 +112,19 @@ function startProceduralMusic() {
   try {
     const ctx = ensureAudio();
     musicGain ||= ctx.createGain();
+    musicCompressor ||= ctx.createDynamicsCompressor();
+    musicCompressor.threshold.value = -18;
+    musicCompressor.knee.value = 18;
+    musicCompressor.ratio.value = 5;
+    musicCompressor.attack.value = 0.008;
+    musicCompressor.release.value = 0.16;
     musicGain.gain.value = MUSIC_MASTER_GAIN;
-    musicGain.connect(ctx.destination);
+    try {
+      musicGain.disconnect();
+      musicCompressor.disconnect();
+    } catch {}
+    musicGain.connect(musicCompressor);
+    musicCompressor.connect(ctx.destination);
     nextMusicTime = ctx.currentTime + 0.035;
     const schedule = () => {
       if (muted) return;
@@ -154,22 +167,32 @@ function playMusicNote(freq, duration, type, gainValue, delay = 0, at = null) {
 function scheduleMusicStep(step, at = null) {
   const beat = step % 16;
   const phrase = Math.floor(step / 16) % 4;
-  if (beat === 0 || beat === 8 || beat === 11) playMusicKick(beat === 0 ? 1 : 0.72, at);
-  if (beat === 4 || beat === 12) playMusicSnare(phrase > 1 ? 0.78 : 0.62, at);
-  if (beat % 2 === 1 || (phrase > 0 && beat % 4 === 2)) playMusicHat(beat % 4 === 3 ? 0.034 : 0.022, at);
-  if (beat % 2 === 0) {
+  const heavyKick = beat === 0 || beat === 8;
+  if (heavyKick || beat === 3 || beat === 6 || beat === 10 || beat === 14) playMusicKick(heavyKick ? 1.2 : 0.78, at);
+  if (beat === 4 || beat === 12) playMusicSnare(phrase > 1 ? 1.05 : 0.9, at);
+  if ((phrase > 1 && beat === 7) || beat === 15) playMusicSnare(0.32, at);
+  playMusicHat(beat % 4 === 0 ? 0.026 : beat % 2 === 1 ? 0.04 : 0.032, 0, at);
+  if (phrase > 0 && beat % 2 === 0) playMusicHat(0.018, MUSIC_STEP_SECONDS * 0.48, at);
+  if (beat % 2 === 0 || phrase >= 2) {
     const bass = MUSIC_SCALE[BASS_PATTERN[beat] % MUSIC_SCALE.length] * (phrase === 3 && beat > 10 ? 2 : 1);
-    playMusicNote(bass, 0.22, "sawtooth", 0.032, 0, at);
+    playMusicNote(bass, phrase >= 2 ? 0.17 : 0.24, "sawtooth", phrase >= 2 ? 0.052 : 0.044, 0, at);
+    if (beat === 0 || beat === 8) playMusicNote(bass * 0.5, 0.34, "sine", 0.05, 0, at);
   }
   if (beat % 4 === 0) {
     const root = MUSIC_SCALE[(phrase * 2) % MUSIC_SCALE.length];
-    playMusicNote(root * 2, 1.65, "triangle", 0.022, 0, at);
-    playMusicNote(root * 3, 1.4, "sine", 0.014, 0.03, at);
+    playMusicNote(root * 2, 1.85, "triangle", 0.032, 0, at);
+    playMusicNote(root * 3, 1.55, "sine", 0.02, 0.03, at);
+    playMusicNote(root * 4, 0.72, "triangle", 0.012, 0.08, at);
+  }
+  if (beat % 2 === 1 || phrase >= 2) {
+    const arp = MUSIC_SCALE[ARP_PATTERN[(beat + phrase * 4) % ARP_PATTERN.length] % MUSIC_SCALE.length];
+    playMusicNote(arp * 4, 0.09, "triangle", phrase >= 2 ? 0.022 : 0.015, 0.01, at);
   }
   if ((phrase > 0 && beat % 2 === 0) || phrase === 3) {
     const degree = LEAD_PATTERN[(beat + phrase * 3) % LEAD_PATTERN.length] % MUSIC_SCALE.length;
     const octave = LEAD_PATTERN[(beat + phrase * 3) % LEAD_PATTERN.length] > 11 ? 4 : 3;
-    playMusicNote(MUSIC_SCALE[degree] * octave, phrase === 3 ? 0.14 : 0.2, "square", phrase === 3 ? 0.018 : 0.013, 0.02, at);
+    playMusicNote(MUSIC_SCALE[degree] * octave, phrase === 3 ? 0.14 : 0.2, "square", phrase === 3 ? 0.026 : 0.019, 0.02, at);
+    if (phrase >= 2 && beat % 4 === 2) playMusicNote(MUSIC_SCALE[degree] * octave * 1.5, 0.1, "triangle", 0.014, 0.08, at);
   }
 }
 
@@ -195,13 +218,13 @@ function playMusicSnare(power, at = null) {
   playMusicNote(185, 0.06, "triangle", 0.016 * power, 0, at);
 }
 
-function playMusicHat(gainValue, at = null) {
-  playMusicNoise({ d: 0.035, g: gainValue * 1.4, filter: 7200, type: "highpass" }, at);
+function playMusicHat(gainValue, delay = 0, at = null) {
+  playMusicNoise({ d: 0.035, g: gainValue * 1.4, filter: 7200, type: "highpass", delay }, at);
 }
 
 function playMusicNoise(spec, at = null) {
   const ctx = ensureAudio();
-  const start = at ?? ctx.currentTime;
+  const start = (at ?? ctx.currentTime) + (spec.delay || 0);
   const length = Math.max(1, Math.floor(ctx.sampleRate * spec.d));
   const buffer = ctx.createBuffer(1, length, ctx.sampleRate);
   const data = buffer.getChannelData(0);

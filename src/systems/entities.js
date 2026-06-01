@@ -301,6 +301,26 @@ function updateEnemyProjectiles(dt) {
 }
 
 function splitEnemyProjectile(b) {
+  if (b.shape === "voidFireball") {
+    const count = 8;
+    for (let i = 0; i < count; i++) {
+      const a = i / count * TAU;
+      world.enemyProjectiles.push({
+        x: b.x,
+        y: b.y,
+        vx: Math.cos(a) * 190,
+        vy: Math.sin(a) * 190,
+        r: Math.max(3.5, b.r * 0.48),
+        color: b.color || "#b48cff",
+        damage: b.damage * 0.42,
+        life: 1.45,
+        shape: "voidFireball",
+        spin: Math.random() * TAU,
+        bossProjectile: Boolean(b.bossProjectile),
+      });
+    }
+    return;
+  }
   if (b.shape !== "snowflake" && b.shape !== "frostComet") return;
   const base = Math.atan2(b.vy, b.vx);
   for (const offset of [-0.62, 0.62]) {
@@ -331,6 +351,7 @@ function updateHazards(dt) {
     const h = world.hazards[i];
     h.life -= dt;
     if (h.kind === "ember_mine") updateEmberMine(h, dt);
+    if (h.kind === "storm_laser_net" && h.armTime > 0) h.armTime = Math.max(0, h.armTime - dt);
     if (h.kind === "artillery_blast") updateArtilleryBlast(h, dt);
     if (h.kind === "ice_spike" || h.kind === "ice_seal") updateIceHazard(h, dt);
     if (distSq(h.x, h.y, p.x, p.y) < ((h.triggerRadius || h.r) + p.r) ** 2 && h.kind === "ember_mine") h.triggered = true;
@@ -341,10 +362,14 @@ function updateHazards(dt) {
       h.kind === "gear_trap" ||
       h.kind === "magma_crack" ||
       h.kind === "twin_arc_field" ||
+      (h.kind === "storm_laser_net" && (h.armTime || 0) <= 0) ||
       h.kind === "frost_zone" ||
       h.kind === "blizzard_core" ||
       ((h.kind === "ice_spike" || h.kind === "ice_seal") && h.exploding);
-    if (distSq(h.x, h.y, p.x, p.y) < (h.r + p.r) ** 2 && p.invuln <= 0 && canDamage) {
+    const hit = h.kind === "storm_laser_net"
+      ? pointLineDistance(p.x, p.y, h.x, h.y, h.angle || 0, h.length || 1200) < p.r + (h.width || 18)
+      : distSq(h.x, h.y, p.x, p.y) < (h.r + p.r) ** 2;
+    if (hit && p.invuln <= 0 && canDamage) {
       const result = applyPlayerDamage(h.damage, h);
       p.invuln = 0.35;
       if (result.damaged && h.frostDuration > 0) {
@@ -360,6 +385,17 @@ function updateHazards(dt) {
     }
     if (h.life <= 0) world.hazards.splice(i, 1);
   }
+}
+
+function pointLineDistance(px, py, x, y, angle, length) {
+  const vx = Math.cos(angle);
+  const vy = Math.sin(angle);
+  const dx = px - x;
+  const dy = py - y;
+  const forward = dx * vx + dy * vy;
+  const half = length / 2;
+  if (forward < -half || forward > half) return Infinity;
+  return Math.abs(dx * -vy + dy * vx);
 }
 
 function updateEmberMine(h, dt) {

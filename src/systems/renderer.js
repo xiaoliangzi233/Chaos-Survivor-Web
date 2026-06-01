@@ -323,24 +323,6 @@ function drawPlayer(ctx) {
   ctx.fillStyle = "#ffbd8a";
   ctx.beginPath(); ctx.arc(-13, 2, 5, 0, TAU); ctx.fill();
   ctx.beginPath(); ctx.arc(13, 2, 5, 0, TAU); ctx.fill();
-  ctx.fillStyle = "#242033";
-  ctx.beginPath();
-  ctx.arc(0, -11, 21, Math.PI * 1.04, Math.PI * 1.96);
-  ctx.lineTo(18, -3);
-  ctx.quadraticCurveTo(0, -12, -18, -3);
-  ctx.closePath();
-  ctx.fill();
-  ctx.strokeStyle = "#42e8ff";
-  ctx.lineWidth = 1.4;
-  ctx.beginPath();
-  ctx.moveTo(-17, -10);
-  ctx.quadraticCurveTo(0, -24 - breathe * 1.2, 17, -10);
-  ctx.stroke();
-  for (const side of [-1, 1]) {
-    const a = state.time * 2.4 + side;
-    ctx.fillStyle = side < 0 ? "#42e8ff" : "#ffd166";
-    ctx.fillRect(side * (19 + Math.cos(a) * 1.2) - 2, -16 + Math.sin(a) * 1.6, 4, 4);
-  }
   ctx.strokeStyle = low ? "#ff4d6d" : "#42e8ff";
   ctx.lineWidth = 1.2;
   for (const side of [-1, 1]) {

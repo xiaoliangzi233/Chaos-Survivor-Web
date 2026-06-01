@@ -42,7 +42,6 @@ export class Doctor extends BaseEnemy {
       for (const target of this.healTargets) {
         if (target.dead || target.hp >= target.maxHp) continue;
         target.hp = Math.min(target.maxHp, target.hp + healRate * dt);
-        target.flash = Math.max(target.flash || 0, 0.22);
         if (Math.random() < dt * 14) particle("healPlus", target.x, target.y - target.r - 8, { color: "#72ffb4", life: 0.42, size: 9, alpha: 0.9, vy: -18 });
       }
       if (this.channel <= 0) {

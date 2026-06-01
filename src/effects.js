@@ -27,6 +27,8 @@ export function particle(kind, x, y, options = {}) {
     angle: options.angle ?? 0,
     length: options.length ?? 10,
     seed: options.seed ?? Math.random() * 999,
+    text: options.text ?? "",
+    critical: Boolean(options.critical),
     ambient: Boolean(options.ambient),
     t: 0,
   });
@@ -52,6 +54,20 @@ export function pulse(x, y, radius, color, life = 0.26) {
 
 export function trail(x, y, px, py, color, size = 5) {
   particle("trail", x, y, { px, py, color, size, life: 0.18 });
+}
+
+export function spawnDamageText(amount, target, options = {}) {
+  const critical = Boolean(options.critical);
+  particle("damageText", target?.x ?? options.x ?? 0, (target?.y ?? options.y ?? 0) - (target?.r ?? 12) - 8, {
+    vx: (Math.random() - 0.5) * 14,
+    vy: -34 - Math.random() * 18,
+    life: critical ? 0.72 : 0.58,
+    size: critical ? 18 : 14,
+    color: critical ? "#ff4d6d" : "#fff3b0",
+    alpha: 1,
+    text: String(Math.max(1, Math.round(amount))),
+    critical,
+  });
 }
 
 export function dust(x, y, vx, vy) {
@@ -275,6 +291,8 @@ export function drawEffects(ctx) {
       drawMote(ctx, p, alpha);
     } else if (p.kind === "healPlus") {
       drawHealPlus(ctx, p, alpha);
+    } else if (p.kind === "damageText") {
+      drawDamageText(ctx, p, alpha);
     } else if (p.kind === "ember") {
       drawEmber(ctx, p, alpha);
     } else if (p.kind === "mist") {
@@ -286,6 +304,25 @@ export function drawEffects(ctx) {
       ctx.fillRect(Math.round(p.x), Math.round(p.y), p.size, p.size);
     }
   }
+}
+
+function drawDamageText(ctx, p, alpha) {
+  const a = alpha * p.alpha;
+  const s = Math.max(12, p.size);
+  ctx.save();
+  ctx.translate(Math.round(p.x), Math.round(p.y));
+  ctx.globalCompositeOperation = "lighter";
+  ctx.font = `${s}px "Zpix", "Fusion Pixel 12px Monospaced SC", "Cubic 11", "Press Start 2P", "Courier New", monospace`;
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.lineWidth = p.critical ? 4 : 3;
+  ctx.strokeStyle = `rgba(3,8,16,${a * 0.88})`;
+  ctx.strokeText(p.text, 0, 0);
+  ctx.fillStyle = hexToRgba(p.color, a);
+  ctx.fillText(p.text, 0, 0);
+  ctx.fillStyle = hexToRgba("#ffffff", a * (p.critical ? 0.9 : 0.54));
+  ctx.fillRect(-s * 0.22, -s * 0.52, Math.max(2, s * 0.18), 2);
+  ctx.restore();
 }
 
 function drawHealPlus(ctx, p, alpha) {

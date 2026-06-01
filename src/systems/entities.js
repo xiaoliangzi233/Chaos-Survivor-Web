@@ -6,7 +6,8 @@ import { playSfx } from "../audio.js";
 import { isBossWave, randomEnemyForWave, spawnEnemyById, spawnWaveBoss } from "./enemyRegistry.js";
 import { updateBlackhole } from "../blackhole.js";
 import { difficultyMultiplier, currentDifficulty } from "../difficulty.js";
-import { applyPlayerDamage, coinDropMultiplier, modifyWeaponDamage, onWeaponHit, waveSpawnMultiplier } from "./items.js";
+import { applyPlayerDamage, coinDropMultiplier, onWeaponHit, rollWeaponDamage, waveSpawnMultiplier } from "./items.js";
+import { spawnDamageText } from "../effects.js";
 export { applyFrostMark } from "./statusEffects.js";
 import { applyFrostMark } from "./statusEffects.js";
 
@@ -99,7 +100,11 @@ export function updateEnemies(dt) {
 
 export function damageEnemy(e, amount, x, y) {
   if (!e?.takeDamage) return;
-  e.takeDamage(modifyWeaponDamage(amount), x, y);
+  const roll = rollWeaponDamage(amount);
+  e.takeDamage(roll.amount, x, y, {
+    critical: roll.critical,
+    damageText: spawnDamageText,
+  });
   onWeaponHit(e, x, y);
 }
 

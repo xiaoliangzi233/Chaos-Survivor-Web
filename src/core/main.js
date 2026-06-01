@@ -22,7 +22,7 @@ import { closeCodex, initCodexUi } from "../ui/codexUi.js";
 import { closeShop, initShopUi, openShop } from "../ui/shopUi.js";
 import { isBossWave, setupEnemyRegistry } from "../systems/enemyRegistry.js";
 import { updatePlayer, updateSpawning, updateEnemies, rebuildGrid, updateGems, updateCoins, collectAllExperience, collectAllCoins, clearEnemies } from "../systems/entities.js";
-import { updateWeapons, STARTER_WEAPONS, UPGRADE_DEFS, activateWeapon } from "../systems/weapons.js";
+import { updateWeapons, STARTER_WEAPONS, UPGRADE_DEFS, activateWeapon, refreshStarterWeapons } from "../systems/weapons.js";
 import { consumeNextWaveSpawnBonus, startWaveItems, updateItems } from "../systems/items.js";
 import { updateEasterEggs } from "../systems/easterEggs.js";
 import { createShopState } from "../economy/shop.js";
@@ -31,6 +31,7 @@ import { resizeCanvas, updateCamera, render } from "../systems/renderer.js";
 import { playSfx, startMusic, stopMusic, pauseMusic, resumeMusic } from "../audio.js";
 import { CAMERA_ZOOM } from "../constants.js";
 import { loadDifficultyProgress, recordDifficultyVictory, selectDifficulty, setupDifficultyConfig } from "../difficulty.js";
+import { loadEditableGameData } from "../config/editableGameData.js";
 
 const LEVEL_CHOICE_REFRESH_COST = 10;
 
@@ -40,6 +41,8 @@ export async function bootGame() {
   initCodexUi();
   initShopUi({ continueToNextWave: finishWaveTransition });
   await loadGameConfig();
+  await loadEditableGameData();
+  refreshStarterWeapons();
   await setupDifficultyConfig();
   loadDifficultyProgress();
   await setupEnemyRegistry();

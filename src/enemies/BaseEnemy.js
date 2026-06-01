@@ -1,7 +1,7 @@
 ﻿import { TAU, WORLD_SIZE } from "../constants.js";
 import { state, world } from "../state.js";
 import { clamp, distSq } from "../utils.js";
-import { burst, pulse } from "../effects.js";
+import { burst, pulse, spawnDamageText } from "../effects.js";
 import { playSfx } from "../audio.js";
 import { currentDifficulty } from "../difficulty.js";
 import { applyPlayerDamage } from "../systems/items.js";
@@ -164,6 +164,8 @@ export class BaseEnemy {
     const scaled = amount * (this.shielded ? 0.35 : 1) * state.player.damageScale;
     const reduced = Math.max(1, scaled - (this.defense || 0));
     this.hp -= reduced;
+    const damageText = options.damageText || (!options.statusEffect ? spawnDamageText : null);
+    damageText?.(reduced, this, options);
     if (!options.statusEffect) {
       this.flash = 1;
       burst(x, y, 3, this.color, 120);

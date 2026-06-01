@@ -150,8 +150,14 @@ function drawLungeTelegraph(ctx, e) {
 
 function drawDashAfterimage(ctx) {
   for (let i = 4; i >= 1; i--) {
-    ctx.fillStyle = `rgba(255,159,110,${0.055 * i})`;
-    ctx.fillRect(-34 - i * 7, -25 + i, 23, 46 - i * 2);
+    ctx.fillStyle = `rgba(255,159,110,${0.045 * i})`;
+    ctx.beginPath();
+    ctx.moveTo(-42 - i * 8, -22 + i);
+    ctx.lineTo(-16 - i * 5, -14);
+    ctx.lineTo(-13 - i * 5, 16);
+    ctx.lineTo(-48 - i * 8, 24 - i);
+    ctx.closePath();
+    ctx.fill();
   }
 }
 
@@ -183,21 +189,30 @@ function drawLegs(ctx, z, walk, run, charge, dash) {
 
 function drawCloak(ctx, z, flash, charge, dash, run) {
   const cloak = flash ? "#ffffff" : "#2a2035";
+  const lining = flash ? "#ffffff" : "#111827";
   const scarf = flash ? "#ffffff" : "#ff9f6e";
   ctx.fillStyle = cloak;
   ctx.beginPath();
-  ctx.moveTo(-11 * z, -15 * z);
-  ctx.lineTo(10 * z, -14 * z);
-  ctx.lineTo(14 * z, 11 * z + Math.abs(run) * 1.5 * z);
-  ctx.lineTo(4 * z, 16 * z);
-  ctx.lineTo(-8 * z, 13 * z + (dash ? 4 * z : 0));
-  ctx.lineTo((-14 - Math.abs(run) * 2) * z, 8 * z);
+  ctx.moveTo(-12 * z, -16 * z);
+  ctx.lineTo(9 * z, -15 * z);
+  ctx.lineTo(16 * z, 8 * z + Math.abs(run) * 1.5 * z);
+  ctx.lineTo(5 * z, 18 * z);
+  ctx.lineTo(-9 * z, 14 * z + (dash ? 5 * z : 0));
+  ctx.lineTo((-18 - Math.abs(run) * 2) * z, 6 * z);
   ctx.closePath();
   ctx.fill();
-  ctx.fillStyle = flash ? "#ffffff" : "#141827";
+  ctx.fillStyle = lining;
   ctx.fillRect(-7 * z, -9 * z, 15 * z, 18 * z);
+  ctx.fillStyle = flash ? "#ffffff" : "rgba(180,140,255,0.38)";
+  ctx.fillRect(-4 * z, -8 * z, 4 * z, 16 * z);
   ctx.fillStyle = scarf;
   ctx.fillRect(-8 * z, -14 * z, 18 * z, 4 * z);
+  ctx.beginPath();
+  ctx.moveTo(-8 * z, -13 * z);
+  ctx.lineTo((-30 - (dash ? 18 : 0)) * z, (-16 + Math.sin(run) * 3) * z);
+  ctx.lineTo((-17 - (dash ? 10 : 0)) * z, -7 * z);
+  ctx.closePath();
+  ctx.fill();
   if (charge || dash) {
     ctx.fillStyle = flash ? "#ffffff" : "rgba(255,159,110,0.8)";
     ctx.fillRect(-17 * z, -11 * z, 10 * z, 4 * z);
@@ -227,40 +242,57 @@ function drawKnifeArm(ctx, z, flash, charge, dash) {
   ctx.strokeStyle = "#7dd3fc";
   ctx.lineWidth = 1.2;
   ctx.stroke();
+  if (dash) {
+    ctx.strokeStyle = "rgba(255,255,255,0.72)";
+    ctx.lineWidth = 1.4;
+    ctx.beginPath();
+    ctx.moveTo((reach + 8) * z, (y - 5) * z);
+    ctx.lineTo((reach + 34) * z, (y - 10) * z);
+    ctx.stroke();
+  }
 }
 
 function drawOffhand(ctx, z, flash, walk, dash) {
   ctx.fillStyle = flash ? "#ffffff" : "#232a44";
   ctx.fillRect(-15 * z, -4 * z + walk * (dash ? 0.4 : 2) * z, 9 * z, 5 * z);
-  ctx.fillStyle = flash ? "#ffffff" : "#ffcf8a";
-  ctx.fillRect(-18 * z, -3 * z + walk * (dash ? 0.4 : 2) * z, 4 * z, 4 * z);
+  ctx.fillStyle = flash ? "#ffffff" : "#eaf7ff";
+  ctx.beginPath();
+  ctx.moveTo(-31 * z, (-2 + walk * (dash ? 0.4 : 2)) * z);
+  ctx.lineTo(-17 * z, (-7 + walk * (dash ? 0.4 : 2)) * z);
+  ctx.lineTo(-18 * z, (3 + walk * (dash ? 0.4 : 2)) * z);
+  ctx.closePath();
+  ctx.fill();
+  ctx.strokeStyle = "#ffcf8a";
+  ctx.lineWidth = 1;
+  ctx.stroke();
 }
 
 function drawHead(ctx, z, flash, charge, run) {
   ctx.save();
   ctx.translate(0, Math.abs(run) * -0.7 * z);
-  ctx.fillStyle = flash ? "#ffffff" : "#171c2b";
+  ctx.fillStyle = flash ? "#ffffff" : "#151926";
   ctx.beginPath();
-  ctx.moveTo(-9 * z, -30 * z);
-  ctx.lineTo(9 * z, -29 * z);
-  ctx.lineTo(12 * z, -18 * z);
+  ctx.moveTo(-2 * z, -34 * z);
+  ctx.lineTo(12 * z, -27 * z);
+  ctx.lineTo(13 * z, -18 * z);
   ctx.lineTo(5 * z, -11 * z);
-  ctx.lineTo(-7 * z, -12 * z);
-  ctx.lineTo(-12 * z, -20 * z);
+  ctx.lineTo(-8 * z, -12 * z);
+  ctx.lineTo(-13 * z, -20 * z);
+  ctx.lineTo(-10 * z, -29 * z);
   ctx.closePath();
   ctx.fill();
 
-  ctx.fillStyle = flash ? "#ffffff" : "#ff9f6e";
-  ctx.fillRect(-8 * z, -20 * z, 17 * z, 5 * z);
-  ctx.fillStyle = "#111827";
-  ctx.fillRect(-6 * z, -19 * z, 5 * z, 2 * z);
-  ctx.fillRect(4 * z, -19 * z, 5 * z, 2 * z);
+  ctx.fillStyle = flash ? "#ffffff" : "#ffcf8a";
+  ctx.fillRect(-8 * z, -21 * z, 18 * z, 4 * z);
+  ctx.fillStyle = "#060912";
+  ctx.fillRect(-7 * z, -20 * z, 6 * z, 2 * z);
+  ctx.fillRect(4 * z, -20 * z, 6 * z, 2 * z);
   if (charge) {
     ctx.fillStyle = "#fff4d2";
-    ctx.fillRect(5 * z, -20 * z, 3 * z, 1.5 * z);
+    ctx.fillRect(5 * z, -21 * z, 4 * z, 1.5 * z);
   }
 
-  ctx.strokeStyle = "rgba(255,207,138,0.7)";
+  ctx.strokeStyle = "rgba(255,207,138,0.82)";
   ctx.lineWidth = 1.5;
   ctx.stroke();
   ctx.restore();
@@ -277,5 +309,12 @@ function drawBladeGlint(ctx, charge, dash) {
   if (charge) {
     ctx.fillStyle = "rgba(255,244,210,0.8)";
     ctx.fillRect(41, -13, 3, 3);
+  }
+  if (dash) {
+    ctx.strokeStyle = "rgba(255,159,110,0.5)";
+    ctx.lineWidth = 5;
+    ctx.beginPath();
+    ctx.arc(25, -3, 28, -0.5, 0.42);
+    ctx.stroke();
   }
 }

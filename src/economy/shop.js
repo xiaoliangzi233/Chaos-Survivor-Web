@@ -54,7 +54,7 @@ export function toggleOfferLock(uid) {
   return true;
 }
 
-export function purchaseOffer(uid) {
+export function purchaseOffer(uid, options = {}) {
   const offer = findOffer(uid);
   if (!offer || isSoldOut(offer)) return { ok: false, reason: "商品已售罄" };
   const disabled = purchaseDisabledReason(offer);
@@ -66,8 +66,12 @@ export function purchaseOffer(uid) {
     playSfx("deny");
     return { ok: false, reason: "金币不足" };
   }
+  if (offer.category === "武器" && options.fuseWeaponUid && !canFuseOfferIntoSlot(offer, options.fuseWeaponUid)) {
+    playSfx("deny");
+    return { ok: false, reason: "无法合成该武器" };
+  }
   state.gold -= offer.price;
-  if (offer.category === "武器") buyWeapon(offer);
+  if (offer.category === "武器") buyWeapon(offer, options);
   else applyItemPurchase(offer);
   offer.purchaseCount++;
   if (isSoldOut(offer)) offer.locked = false;
@@ -216,9 +220,19 @@ function weightedChoice(entries) {
   return entries[entries.length - 1][0];
 }
 
-function buyWeapon(offer) {
+function buyWeapon(offer, options = {}) {
   const inv = state.inventory;
   if (!inv) return null;
+  if (options.fuseWeaponUid) {
+    const target = inv.weaponSlots.find((slot) => slot.uid === options.fuseWeaponUid);
+    const incoming = { uid: -1, id: offer.weaponId, quality: offer.rarity };
+    const check = canFuseWeapons(target, incoming);
+    if (!check.ok) return null;
+    target.quality = check.nextQuality;
+    inv.selectedWeaponUid = target.uid;
+    recomputeAllWeapons();
+    return target;
+  }
   if (inv.weaponSlots.length < 6) return addWeaponToInventory(offer.weaponId, offer.rarity);
   const incoming = { uid: -1, id: offer.weaponId, quality: offer.rarity };
   const target = inv.weaponSlots.find((slot) => canFuseWeapons(slot, incoming).ok);
@@ -228,6 +242,12 @@ function buyWeapon(offer) {
   inv.selectedWeaponUid = target.uid;
   recomputeAllWeapons();
   return target;
+}
+
+function canFuseOfferIntoSlot(offer, uid) {
+  const target = state.inventory?.weaponSlots.find((slot) => slot.uid === uid);
+  const incoming = { uid: -1, id: offer.weaponId, quality: offer.rarity };
+  return canFuseWeapons(target, incoming).ok;
 }
 
 function canAcceptWeapon(weaponId, quality) {

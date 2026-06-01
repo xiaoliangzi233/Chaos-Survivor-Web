@@ -7,7 +7,14 @@ import { playSfx } from "../audio.js";
 import { addWeaponToInventory, QUALITY_INFO, QUALITY_ORDER, WEAPON_INFO } from "../economy/inventory.js";
 import { attackSpeedMultiplier, weaponProjectileBonus, weaponRangeBonus } from "./items.js";
 
-export const STARTER_WEAPONS = ["arc", "ice", "missile", "boomerang", "drone", "prism_railgun", "void_singularity", "tesla_mine_chain", "starfall_scepter", "phase_needler", "echo_tuning_fork", "rift_loom"].map((id) => ({ id, ...WEAPON_INFO[id] }));
+const STARTER_WEAPON_IDS = ["arc", "ice", "missile", "boomerang", "drone", "prism_railgun", "void_singularity", "tesla_mine_chain", "starfall_scepter", "phase_needler", "echo_tuning_fork", "rift_loom"];
+
+export const STARTER_WEAPONS = [];
+export function refreshStarterWeapons() {
+  STARTER_WEAPONS.length = 0;
+  STARTER_WEAPONS.push(...STARTER_WEAPON_IDS.map((id) => ({ id, ...WEAPON_INFO[id] })));
+}
+refreshStarterWeapons();
 
 export const UPGRADE_DEFS = [
   {

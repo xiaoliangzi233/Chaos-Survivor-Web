@@ -1,5 +1,5 @@
 import { createInventory, state } from "../state.js";
-import { QUALITY_INFO, WEAPON_INFO } from "../economy/inventory.js";
+import { canFuseWeapons, QUALITY_INFO, WEAPON_INFO } from "../economy/inventory.js";
 import {
   canFuseShopWeapon,
   isSoldOut,
@@ -27,6 +27,8 @@ const text = {
   bought: "\u8d2d\u4e70\u6210\u529f\u3002",
   quantity: "\u6570\u91cf",
   fullFuse: "\u6b66\u5668\u69fd\u5df2\u6ee1\uff1a\u8d2d\u4e70\u540e\u5c06\u81ea\u52a8\u5408\u6210",
+  fuseNow: "\u76f4\u63a5\u5408\u6210",
+  fuseHint: "\u4e0e\u80cc\u5305\u4e2d\u540c\u7c7b\u540c\u54c1\u8d28\u6b66\u5668\u5408\u6210",
   weaponSlots: "\u6b66\u5668\u69fd",
   emptySlot: "\u7a7a\u69fd\u4f4d",
   unknownWeapon: "\u672a\u77e5\u6b66\u5668",
@@ -93,6 +95,7 @@ function renderOffer(offer) {
   const soldOut = isSoldOut(offer);
   const reason = purchaseDisabledReason(offer);
   const isWeapon = offer.category === "\u6b66\u5668";
+  const fuseTarget = isWeapon ? shopFuseTarget(offer) : null;
   const canFuseOnFull = isWeapon && state.inventory?.weaponSlots.length >= 6 && canFuseShopWeapon(offer.weaponId, offer.rarity);
   const card = document.createElement("article");
   card.className = `shop-card${soldOut ? " sold-out" : ""}`;
@@ -119,6 +122,18 @@ function renderOffer(offer) {
     renderShop(result.ok ? text.bought : result.reason);
   });
 
+  const fuse = document.createElement("button");
+  fuse.type = "button";
+  fuse.className = "secondary shop-fuse";
+  fuse.textContent = text.fuseNow;
+  fuse.disabled = soldOut || !fuseTarget || state.gold < offer.price;
+  fuse.title = fuseTarget ? text.fuseHint : "\u9700\u8981\u540c\u7c7b\u540c\u54c1\u8d28\u6b66\u5668";
+  fuse.addEventListener("click", () => {
+    const target = shopFuseTarget(offer);
+    const result = purchaseOffer(offer.uid, { fuseWeaponUid: target?.uid });
+    renderShop(result.ok ? text.fuseHint : result.reason);
+  });
+
   card.innerHTML = `
     <div class="shop-card-top">
       <i>${offer.icon}</i>
@@ -138,8 +153,14 @@ function renderOffer(offer) {
   const actions = document.createElement("div");
   actions.className = "shop-card-actions";
   actions.append(lock, buy);
+  if (isWeapon) actions.append(fuse);
   card.appendChild(actions);
   return card;
+}
+
+function shopFuseTarget(offer) {
+  const incoming = { uid: -1, id: offer.weaponId, quality: offer.rarity };
+  return state.inventory?.weaponSlots.find((slot) => canFuseWeapons(slot, incoming).ok) || null;
 }
 
 function renderShopInventory() {

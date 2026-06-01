@@ -6,7 +6,7 @@ import { BaseEnemy } from "./BaseEnemy.js";
 import { applyPlayerDamage } from "../systems/items.js";
 
 const BASE_SEGMENT_COUNT = 8;
-const BASE_SEGMENT_GAP = 22;
+const BASE_SEGMENT_GAP = 12;
 const STRIKE_RANGE = 360;
 const DIFFICULTY_RANK = { ember: 0, neon: 1, overclock: 2, apocalypse: 3 };
 
@@ -27,7 +27,7 @@ export class MechWorm extends BaseEnemy {
     this.trailTimer = 0;
     this.coastTime = 0;
     this.difficultyRank = DIFFICULTY_RANK[state.difficulty?.id || state.difficultyId] ?? 1;
-    this.segmentGap = BASE_SEGMENT_GAP + this.difficultyRank * 3;
+    this.segmentGap = BASE_SEGMENT_GAP + this.difficultyRank * 0.75;
     this.segmentCount = BASE_SEGMENT_COUNT + Math.floor(this.difficultyRank / 2);
     this.coastTurnRate = 0.95 + this.difficultyRank * 0.42;
     this.path = [];
@@ -194,7 +194,7 @@ function drawWormShadow(ctx, e) {
 }
 
 function drawSegment(ctx, e, seg, i, flash) {
-  const r = e.r * (0.78 - i * 0.035);
+  const r = e.r * Math.max(0.58, 0.82 - i * 0.018);
   const core = flash ? "#ffffff" : i % 2 ? "#2c1740" : "#341a4f";
   const accent = flash ? "#ffffff" : e.color;
   ctx.save();
@@ -202,7 +202,7 @@ function drawSegment(ctx, e, seg, i, flash) {
   ctx.rotate(seg.angle);
   ctx.fillStyle = core;
   ctx.beginPath();
-  ctx.roundRect(-r * 0.82, -r * 0.58, r * 1.64, r * 1.16, 5);
+  ctx.roundRect(-r * 0.92, -r * 0.62, r * 1.84, r * 1.24, 5);
   ctx.fill();
   ctx.strokeStyle = accent;
   ctx.lineWidth = 1.5;

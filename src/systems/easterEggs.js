@@ -60,7 +60,7 @@ export function drawEasterEggToast(ctx, viewport) {
   if (!toast || toast.life <= 0) return;
   const t = Math.max(0, Math.min(1, toast.life / toast.maxLife));
   const alpha = Math.min(1, t * 1.4);
-  const y = 92 - (1 - t) * 16;
+  const y = Math.min(viewport.height - 82, 154) - (1 - t) * 16;
   ctx.save();
   ctx.globalAlpha = alpha;
   ctx.textAlign = "center";

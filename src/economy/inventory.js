@@ -1,90 +1,10 @@
 import { state } from "../state.js";
 import { recordCodexEntry } from "../systems/codex.js";
+import { QUALITY_INFO, WEAPON_INFO } from "../config/editableGameData.js";
 
 export const QUALITY_ORDER = ["common", "uncommon", "rare", "epic", "legendary"];
 
-export const QUALITY_INFO = {
-  common: { name: "普通", color: "#cbd5e1", mult: 1 },
-  uncommon: { name: "优秀", color: "#77ff8a", mult: 1.18 },
-  rare: { name: "精良", color: "#42e8ff", mult: 1.42 },
-  epic: { name: "史诗", color: "#b48cff", mult: 1.74 },
-  legendary: { name: "传说", color: "#ffd166", mult: 2.15 },
-};
-
-export const WEAPON_INFO = {
-  arc: {
-    icon: "⚡",
-    name: "棱镜电弧",
-    desc: "自动锁定最近的敌人，闪电会在附近目标之间连续传导。",
-    tags: ["自动锁定", "连锁传导", "瞬时命中"],
-  },
-  ice: {
-    icon: "❄",
-    name: "霜晶追踪",
-    desc: "追踪冰刀会持续转向追猎，命中后短暂冻结未死亡目标。",
-    tags: ["追踪", "冻结控制", "单体压制"],
-  },
-  missile: {
-    icon: "◆",
-    name: "核心飞弹",
-    desc: "追踪飞弹命中后产生范围爆炸，适合清理密集怪群。",
-    tags: ["追踪", "范围爆炸", "群体清理"],
-  },
-  boomerang: {
-    icon: "✦",
-    name: "霓虹回旋刃",
-    desc: "远距离飞出后高速回收，往返切割同一路径上的敌人。",
-    tags: ["远距离", "往返切割", "高穿透"],
-  },
-  drone: {
-    icon: "▣",
-    name: "星环无人机",
-    desc: "无人机会离身攻击，电量不足时返回玩家身边充电。",
-    tags: ["自动炮台", "电量循环", "持续输出"],
-  },
-  prism_railgun: {
-    icon: "⟐",
-    name: "棱镜轨道炮",
-    desc: "蓄能后发射贯穿战场的棱镜光束，沿直线撕开敌群并产生折射打击。",
-    tags: ["直线贯穿", "蓄能光束", "折射打击"],
-  },
-  void_singularity: {
-    icon: "◉",
-    name: "虚空奇点",
-    desc: "发射缓慢移动的黑洞核心，吸附敌人并在寿命结束时坍缩爆发。",
-    tags: ["引力吸附", "持续伤害", "坍缩爆发"],
-  },
-  tesla_mine_chain: {
-    icon: "⌬",
-    name: "特斯拉雷链",
-    desc: "在地面布置电磁节点，敌人靠近后触发多目标连锁放电。",
-    tags: ["电磁节点", "连锁放电", "陷阱控场"],
-  },
-  starfall_scepter: {
-    icon: "✦",
-    name: "星坠权杖",
-    desc: "锁定远处敌群召唤星雨轰击，命中后留下闪烁星痕。",
-    tags: ["远程锁定", "星雨轰击", "星痕残留"],
-  },
-  phase_needler: {
-    icon: "⌁",
-    name: "相位针雨",
-    desc: "发射高速穿刺针束，命中后植入延迟爆裂的相位标记。",
-    tags: ["高速穿刺", "延迟爆裂", "中距贯穿"],
-  },
-  echo_tuning_fork: {
-    icon: "♮",
-    name: "回声音叉",
-    desc: "释放扇形声波压制近中距离敌人，命中后扩散回响波。",
-    tags: ["扇形声波", "回响扩散", "持续压制"],
-  },
-  rift_loom: {
-    icon: "⌘",
-    name: "裂隙织机",
-    desc: "投放空间锚点织出旋转裂隙线网，切割敌群并在收束时爆发。",
-    tags: ["空间线网", "几何切割", "区域封锁"],
-  },
-};
+export { QUALITY_INFO, WEAPON_INFO };
 
 export function addWeaponToInventory(id, quality = "common") {
   const inv = state.inventory;

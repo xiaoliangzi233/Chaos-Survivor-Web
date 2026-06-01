@@ -1,4 +1,5 @@
 import { FIRST_WAVE_SECONDS, waveDurationFor } from "./constants.js";
+import { WEAPON_BASE_STATS } from "./config/editableGameData.js";
 
 export const state = {
   mode: "menu",
@@ -110,20 +111,7 @@ export function createPlayer() {
 }
 
 export function createWeapons() {
-  return {
-    arc: { level: 0, timer: 0, cooldown: 0.58, damage: 65, range: 720, chainRange: 205, chains: 3, falloff: 0.78, quality: "common", qualityMult: 1 },
-    ice: { level: 0, timer: 0.8, cooldown: 0.84, count: 1, damage: 53, range: 980, speed: 500, turnSpeed: 5.8, freezeDuration: 0.45, quality: "common", qualityMult: 1 },
-    missile: { level: 0, timer: 1.2, cooldown: 1.38, damage: 85, range: 1120, speed: 420, explodeRadius: 116, explodeDamage: 78, turnSpeed: 2.9, quality: "common", qualityMult: 1 },
-    boomerang: { level: 0, timer: 1.4, cooldown: 1.48, count: 1, damage: 68, range: 840, speed: 610, returnAfter: 0.6, returnSpeed: 1.35, quality: "common", qualityMult: 1 },
-    drone: { level: 0, angle: 0, count: 0, orbitRadius: 82, acquireRange: 650, attackRange: 500, fireCooldown: 0.34, bulletDamage: 33, bulletSpeed: 610, batteryMax: 150, shotCost: 20, rechargeRate: 46, drones: [], quality: "common", qualityMult: 1 },
-    prism_railgun: { level: 0, timer: 1.05, cooldown: 1.65, count: 1, damage: 76, range: 960, width: 13, hitLimit: 6, refractionRange: 155, quality: "common", qualityMult: 1 },
-    void_singularity: { level: 0, timer: 1.35, cooldown: 2.85, count: 1, damage: 28, range: 820, speed: 185, radius: 26, pullRadius: 170, damageRadius: 82, collapseRadius: 132, pullStrength: 310, pulseInterval: 0.58, life: 3.1, quality: "common", qualityMult: 1 },
-    tesla_mine_chain: { level: 0, timer: 1.1, cooldown: 2.05, count: 1, damage: 34, range: 760, triggerRadius: 118, chainRange: 185, chainCount: 4, nodeLife: 5.2, armTime: 0.24, pulseCooldown: 0.62, fieldRadius: 108, quality: "common", qualityMult: 1 },
-    starfall_scepter: { level: 0, timer: 1.6, cooldown: 2.65, count: 1, damage: 72, range: 1180, stars: 3, radius: 92, scarRadius: 86, scarDuration: 1.25, warningTime: 0.42, fallTime: 0.72, quality: "common", qualityMult: 1 },
-    phase_needler: { level: 0, timer: 0.9, cooldown: 1.18, count: 1, damage: 38, range: 780, speed: 1040, needles: 2, pierce: 3, phaseDelay: 0.42, phaseRadius: 74, phaseDamage: 56, quality: "common", qualityMult: 1 },
-    echo_tuning_fork: { level: 0, timer: 0.75, cooldown: 1.35, count: 1, damage: 54, range: 520, angle: Math.PI * 0.39, echoRadius: 118, echoDamage: 34, echoDuration: 0.55, resonanceDamage: 28, quality: "common", qualityMult: 1 },
-    rift_loom: { level: 0, timer: 1.25, cooldown: 2.2, count: 1, damage: 34, range: 760, anchors: 3, radius: 142, lineWidth: 18, life: 0.8, collapseDamage: 72, scarDamage: 28, quality: "common", qualityMult: 1 },
-  };
+  return Object.fromEntries(Object.entries(WEAPON_BASE_STATS).map(([id, stats]) => [id, structuredClone(stats)]));
 }
 
 export function createInventory() {

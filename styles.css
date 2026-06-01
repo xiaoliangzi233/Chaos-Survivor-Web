@@ -2191,12 +2191,12 @@ h2 {
 }
 
 .loadout-weapon-section {
-  grid-template-rows: auto auto minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr) auto;
 }
 
 .loadout-weapon-preview-wrap {
   display: grid;
-  grid-template-columns: minmax(250px, 0.9fr) minmax(240px, 1fr);
+  grid-template-columns: minmax(230px, 0.82fr) minmax(260px, 1fr);
   gap: 16px;
   padding: 16px 18px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
@@ -2208,7 +2208,7 @@ h2 {
 .loadout-weapon-preview {
   display: block;
   width: 100%;
-  height: 250px;
+  height: 230px;
   border: 1px solid rgba(255, 209, 102, 0.32);
   border-radius: 6px;
   background:
@@ -2245,11 +2245,11 @@ h2 {
 .loadout-weapon-list {
   display: grid;
   grid-template-columns: 1fr;
-  align-content: stretch;
+  align-content: center;
   gap: 0;
   min-height: 0;
   overflow: hidden;
-  padding: 18px;
+  padding: 14px 18px 18px;
 }
 
 .loadout-carousel {
@@ -2323,7 +2323,9 @@ h2 {
 }
 
 .weapon-carousel .carousel-card {
-  min-height: 224px;
+  min-height: 98px;
+  grid-template-columns: 72px minmax(0, 1fr);
+  align-items: center;
 }
 
 .loadout-weapon-card {
@@ -2385,8 +2387,9 @@ h2 {
 }
 
 .loadout-weapon-card.carousel-card i {
-  width: 64px;
-  height: 64px;
+  grid-row: span 2;
+  width: 58px;
+  height: 58px;
   border-color: rgba(255, 209, 102, 0.42);
   background:
     radial-gradient(circle, rgba(255, 209, 102, 0.18), rgba(66, 232, 255, 0.08)),
@@ -2397,6 +2400,15 @@ h2 {
 
 .loadout-weapon-card strong {
   font-size: 19px;
+}
+
+.loadout-weapon-card.carousel-card strong {
+  align-self: end;
+  font-size: 22px;
+}
+
+.loadout-weapon-card.carousel-card small {
+  align-self: start;
 }
 
 .loadout-weapon-card p,

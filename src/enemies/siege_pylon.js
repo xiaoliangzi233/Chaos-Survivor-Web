@@ -1,11 +1,12 @@
 import { TAU, WORLD_SIZE } from "../constants.js";
 import { state, world } from "../state.js";
 import { burst, particle, pulse } from "../effects.js";
-import { clamp } from "../utils.js";
+import { clamp, distSq } from "../utils.js";
 import { BaseEnemy } from "./BaseEnemy.js";
 
 const KEEP_RANGE = 600;
-const FIRE_RANGE = 880;
+const FIRE_RANGE = 980;
+const SHIELD_RANGE = 260;
 
 export class SiegePylon extends BaseEnemy {
   constructor(config, x, y) {
@@ -13,6 +14,8 @@ export class SiegePylon extends BaseEnemy {
     this.behavior = "pylon";
     this.cooldown = 1.1 + Math.random() * 0.6;
     this.charge = 0;
+    this.volleyLeft = 0;
+    this.volleyDelay = 0;
     this.angle = 0;
     this.legPhase = Math.random() * TAU;
     this.knockbackResistance = Math.max(this.knockbackResistance, 0.58);
@@ -28,20 +31,29 @@ export class SiegePylon extends BaseEnemy {
     this.flash = Math.max(0, this.flash - dt * 8);
     this.hitTimer = Math.max(0, this.hitTimer - dt);
     this.cooldown -= dt;
+    this.volleyDelay -= dt;
     this.flip = dx < 0 ? -1 : 1;
     this.angle = Math.atan2(dy, dx);
+    this.applyDamageField();
 
-    if (this.charge > 0) {
+    if (this.volleyLeft > 0 && this.volleyDelay <= 0) {
+      this.fireVolley(this.angle);
+      this.volleyLeft--;
+      this.volleyDelay = 0.09;
+    } else if (this.charge > 0) {
       this.charge -= dt;
-      if (this.charge <= 0) this.fireVolley(this.angle);
+      if (this.charge <= 0) {
+        this.volleyLeft = this.elite ? 7 : 5;
+        this.volleyDelay = 0.01;
+      }
     } else {
-      const dir = d < KEEP_RANGE ? -0.8 : d > FIRE_RANGE ? 0.45 : 0.08;
-      const strafe = Math.sin(this.anim * 0.7) * 0.2;
-      this.x += (dx / d * dir + -dy / d * strafe) * this.speed * dt;
-      this.y += (dy / d * dir + dx / d * strafe) * this.speed * dt;
+      const dir = d < KEEP_RANGE ? -0.52 : d > FIRE_RANGE ? 0.24 : 0.02;
+      const strafe = Math.sin(this.anim * 0.7) * 0.08;
+      this.x += (dx / d * dir + -dy / d * strafe) * this.speed * 0.34 * dt;
+      this.y += (dy / d * dir + dx / d * strafe) * this.speed * 0.34 * dt;
       if (this.cooldown <= 0 && d < FIRE_RANGE) {
-        this.charge = this.elite ? 0.38 : 0.52;
-        this.cooldown = this.elite ? 1.25 : 1.65;
+        this.charge = this.elite ? 0.28 : 0.4;
+        this.cooldown = this.elite ? 1.05 : 1.35;
         pulse(this.x, this.y, this.r * 2.1, this.color, 0.18);
       }
     }
@@ -56,23 +68,31 @@ export class SiegePylon extends BaseEnemy {
   }
 
   fireVolley(angle) {
-    const count = this.elite ? 3 : 2;
-    const spread = this.elite ? 0.13 : 0.08;
+    const count = this.elite ? 5 : 4;
+    const spread = this.elite ? 0.34 : 0.26;
     for (let i = 0; i < count; i++) {
       const a = angle + (i - (count - 1) / 2) * spread;
       world.enemyProjectiles.push({
         x: this.x + Math.cos(a) * (this.r + 8),
         y: this.y + Math.sin(a) * (this.r + 8),
-        vx: Math.cos(a) * (this.elite ? 300 : 255),
-        vy: Math.sin(a) * (this.elite ? 300 : 255),
-        r: this.elite ? 6 : 5,
+        vx: Math.cos(a) * (this.elite ? 330 : 285),
+        vy: Math.sin(a) * (this.elite ? 330 : 285),
+        r: this.elite ? 5.5 : 5,
         color: this.color,
-        damage: this.damage * 0.72,
+        damage: this.damage * 0.52,
         life: 3.9,
         shape: "pylonBolt",
       });
     }
     burst(this.x + Math.cos(angle) * this.r, this.y + Math.sin(angle) * this.r, 5, this.color, 130);
+  }
+
+  applyDamageField() {
+    const range2 = SHIELD_RANGE * SHIELD_RANGE;
+    for (const e of world.enemies) {
+      if (e === this || e.dead || e.boss) continue;
+      if (distSq(this.x, this.y, e.x, e.y) <= range2) e.shielded = true;
+    }
   }
 
   draw(ctx) {
@@ -156,6 +176,13 @@ export class SiegePylon extends BaseEnemy {
     ctx.closePath();
     ctx.fill();
     ctx.restore();
+    ctx.strokeStyle = `rgba(66,232,255,${0.16 + Math.sin(state.time * 4) * 0.04})`;
+    ctx.lineWidth = 1.2;
+    ctx.setLineDash([8, 8]);
+    ctx.beginPath();
+    ctx.arc(0, 0, SHIELD_RANGE, 0, TAU);
+    ctx.stroke();
+    ctx.setLineDash([]);
     ctx.restore();
   }
 }

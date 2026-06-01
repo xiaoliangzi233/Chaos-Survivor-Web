@@ -4,8 +4,8 @@ import { burst, particle, pulse } from "../effects.js";
 import { clamp } from "../utils.js";
 import { BaseEnemy } from "./BaseEnemy.js";
 
-const KEEP_RANGE = 520;
-const FIRE_RANGE = 980;
+const KEEP_RANGE = 680;
+const FIRE_RANGE = 1160;
 
 export class Artillery extends BaseEnemy {
   constructor(config, x, y) {
@@ -30,18 +30,18 @@ export class Artillery extends BaseEnemy {
 
     if (this.charge > 0) {
       this.charge -= dt;
-      if (Math.random() < dt * 9) particle("ember", this.x, this.y - this.r, { color: this.color, life: 0.28, size: 3, alpha: 0.8 });
+      if (Math.random() < dt * 12) particle("ember", this.x, this.y - this.r, { color: this.color, life: 0.32, size: 3.5, alpha: 0.88 });
       if (this.charge <= 0) this.launchShell();
     } else {
-      const dir = d < KEEP_RANGE ? -0.65 : d > FIRE_RANGE ? 0.38 : 0.02;
+      const dir = d < KEEP_RANGE ? -0.82 : d > FIRE_RANGE ? 0.18 : -0.1;
       const strafe = Math.sin(this.anim * 0.6) * 0.12;
       this.x += (dx / d * dir + -dy / d * strafe) * this.speed * dt;
       this.y += (dy / d * dir + dx / d * strafe) * this.speed * dt;
       if (this.cooldown <= 0 && d < FIRE_RANGE) {
         this.target = predictPlayerTarget();
-        this.charge = this.elite ? 0.48 : 0.68;
-        this.cooldown = this.elite ? 1.5 : 2.1;
-        pulse(this.target.x, this.target.y, 64, this.color, 0.48);
+        this.charge = this.elite ? 1.25 : 1.65;
+        this.cooldown = this.elite ? 2.7 : 3.35;
+        pulse(this.target.x, this.target.y, 78, this.color, 0.52);
       }
     }
 
@@ -63,10 +63,14 @@ export class Artillery extends BaseEnemy {
         y,
         r: 66,
         color: this.color,
-        damage: this.damage * 1.22,
-        life: 1.28,
-        maxLife: 1.28,
-        armTime: 0.82,
+        damage: this.damage * 1.72,
+        impactDamage: this.damage * 1.35,
+        impactRadius: 34,
+        life: 1.65,
+        maxLife: 1.65,
+        armTime: 1.08,
+        armDuration: 1.08,
+        shellY: -620,
         pulse: Math.random() * TAU,
       });
     }

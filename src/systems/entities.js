@@ -70,7 +70,10 @@ export function updateSpawning(dt) {
 
 export function updateEnemies(dt) {
   const p = state.player;
-  for (const e of world.enemies) e.shielded = false;
+  for (const e of world.enemies) {
+    e.shielded = false;
+    e.prismAssistTimer = Math.max(0, (e.prismAssistTimer || 0) - dt);
+  }
   for (let i = world.enemies.length - 1; i >= 0; i--) {
     const e = world.enemies[i];
     updateEnemyKnockback(e, dt);
@@ -82,7 +85,11 @@ export function updateEnemies(dt) {
     }
     if (e.freezeTimer > 0) e.freezeTimer = Math.max(0, e.freezeTimer - dt * 2.5);
     const beforeCooldowns = snapshotCooldowns(e);
+    const assisted = e.prismAssistTimer > 0 && !e.boss;
+    const baseSpeed = e.speed;
+    if (assisted) e.speed *= e.prismAssistSpeedMult || 1.22;
     e.update(dt);
+    if (assisted) e.speed = baseSpeed;
     applyDifficultyCooldownScale(e, beforeCooldowns);
   }
   updateEnemyProjectiles(dt);
@@ -411,13 +418,18 @@ function updateEmberMine(h, dt) {
 }
 
 function updateArtilleryBlast(h, dt) {
+  const wasArmed = (h.armTime || 0) <= 0;
   h.armTime = Math.max(0, (h.armTime || 0) - dt);
   h.pulse = (h.pulse || 0) + dt;
   if (h.armTime > 0) return;
   if (!h.exploding) {
     h.exploding = true;
-    h.life = Math.min(h.life, 0.26);
+    h.life = Math.min(h.life, 0.34);
     h.maxLife = Math.max(h.maxLife, 1.28);
+    if (!wasArmed && h.impactDamage > 0 && distSq(h.x, h.y, state.player.x, state.player.y) <= ((h.impactRadius || h.r * 0.45) + state.player.r) ** 2) {
+      applyPlayerDamage(h.impactDamage, h);
+      state.player.invuln = Math.min(state.player.invuln || 0, 0.08);
+    }
     burst(h.x, h.y, 18, h.color, 190);
     state.shake = Math.max(state.shake, 5);
   }
@@ -458,14 +470,14 @@ function updateEnemyKnockback(e, dt) {
 
 function updateSpecialEnemyProjectile(b, dt) {
   if (b.shape === "razorBoomerang") {
-    b.spin = (b.spin || 0) + dt * 16;
+    b.spin = (b.spin || 0) + dt * 24;
     if (b.owner && !b.owner.dead && b.life < (b.returnAt || 1.4)) {
       const dx = b.owner.x - b.x;
       const dy = b.owner.y - b.y;
       const d = Math.max(1, Math.hypot(dx, dy));
-      const speed = 285;
-      b.vx += (dx / d * speed - b.vx) * Math.min(1, dt * 3.2);
-      b.vy += (dy / d * speed - b.vy) * Math.min(1, dt * 3.2);
+      const speed = 360;
+      b.vx += (dx / d * speed - b.vx) * Math.min(1, dt * 6.5);
+      b.vy += (dy / d * speed - b.vy) * Math.min(1, dt * 6.5);
     }
   } else if (b.shape === "fastGear" || b.shape === "starShard" || b.shape === "phaseShard" || b.shape === "arcaneOrb") {
     b.spin = (b.spin || 0) + dt * (b.shape === "fastGear" ? 18 : 6);
@@ -482,7 +494,7 @@ function snapshotCooldowns(e) {
 }
 
 function applyDifficultyCooldownScale(e, beforeCooldowns) {
-  const attackSpeed = e.difficultyAttackSpeed || 1;
+  const attackSpeed = (e.difficultyAttackSpeed || 1) * (e.prismAssistTimer > 0 ? e.prismAssistAttackSpeedMult || 1.28 : 1);
   if (attackSpeed <= 1) return;
   for (const key of Object.keys(beforeCooldowns)) {
     const before = beforeCooldowns[key];

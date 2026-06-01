@@ -2614,10 +2614,23 @@ function drawFrostZoneHazard(ctx, h, alpha) {
 
 function drawArtilleryHazard(ctx, h, alpha) {
   const armed = (h.armTime || 0) <= 0;
-  const warn = Math.max(0, h.armTime || 0) / 0.82;
+  const armDuration = h.armDuration || 0.82;
+  const warn = Math.max(0, h.armTime || 0) / armDuration;
   ctx.save();
   ctx.translate(h.x, h.y);
   if (!armed) {
+    const shellY = (h.shellY || -420) * warn;
+    ctx.globalCompositeOperation = "lighter";
+    ctx.strokeStyle = hexToRgba(h.color, 0.62);
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(0, shellY - 90);
+    ctx.lineTo(0, -8);
+    ctx.stroke();
+    ctx.fillStyle = hexToRgba("#fff2a8", 0.9);
+    ctx.beginPath();
+    ctx.ellipse(0, shellY, h.r * 0.13, h.r * 0.3, 0, 0, TAU);
+    ctx.fill();
     ctx.fillStyle = hexToRgba(h.color, 0.08 + (1 - warn) * 0.14);
     ctx.beginPath();
     ctx.arc(0, 0, h.r, 0, TAU);

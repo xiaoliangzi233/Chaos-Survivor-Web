@@ -35,12 +35,12 @@ export class MagmaBeetle extends BaseEnemy {
       if (Math.random() < dt * 16) particle("ember", this.x, this.y, { color: this.color, life: 0.28, size: 3, alpha: 0.85 });
       if (this.windup <= 0) {
         this.state = "charge";
-        this.chargeTime = 0.52;
+        this.chargeTime = 0.82;
         pulse(this.x, this.y, 38, this.color, 0.2);
       }
     } else if (this.state === "charge") {
       this.chargeTime -= dt;
-      const speed = this.speed * 3.1;
+      const speed = this.speed * 3.55;
       const oldX = this.x;
       const oldY = this.y;
       this.x += Math.cos(this.chargeAngle) * speed * dt;

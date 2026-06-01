@@ -16,6 +16,7 @@ export class Gunner extends BaseEnemy {
     this.burstDelay = 0;
     this.angle = 0;
     this.step = Math.random() * TAU;
+    this.pattern = "triangle";
   }
 
   update(dt) {
@@ -42,9 +43,10 @@ export class Gunner extends BaseEnemy {
       this.burstLeft--;
       this.burstDelay = 0.12;
     } else if (this.cooldown <= 0 && d < FIRE_RANGE) {
-      this.burstLeft = this.elite ? 3 : 2;
+      this.pattern = ["triangle", "square", "hexagon", "circle"][Math.floor(Math.random() * 4)];
+      this.burstLeft = 1;
       this.burstDelay = 0.01;
-      this.cooldown = this.elite ? 1.05 : 1.45;
+      this.cooldown = this.elite ? 1.1 : 1.55;
       pulse(this.x, this.y, 24, this.color, 0.12);
     }
 
@@ -54,20 +56,26 @@ export class Gunner extends BaseEnemy {
   }
 
   fireShot(angle) {
-    const spread = (Math.random() - 0.5) * 0.05;
-    const a = angle + spread;
-    world.enemyProjectiles.push({
-      x: this.x + Math.cos(a) * (this.r + 10),
-      y: this.y + Math.sin(a) * (this.r + 10),
-      vx: Math.cos(a) * 300,
-      vy: Math.sin(a) * 300,
-      r: 4,
-      color: "#f3f7ff",
-      damage: this.damage * 0.72,
-      life: 2.5,
-      shape: "gunnerShot",
-    });
-    burst(this.x + Math.cos(a) * this.r, this.y + Math.sin(a) * this.r, 3, "#f3f7ff", 90);
+    const points = geometryPatternPoints(this.pattern, this.elite);
+    const forwardX = Math.cos(angle);
+    const forwardY = Math.sin(angle);
+    const sideX = -forwardY;
+    const sideY = forwardX;
+    const speed = this.elite ? 245 : 220;
+    for (const point of points) {
+      world.enemyProjectiles.push({
+        x: this.x + forwardX * (this.r + 16) + sideX * point.x + forwardX * point.y,
+        y: this.y + forwardY * (this.r + 16) + sideY * point.x + forwardY * point.y,
+        vx: forwardX * speed,
+        vy: forwardY * speed,
+        r: this.elite ? 4.5 : 4,
+        color: point.accent ? "#42e8ff" : "#f3f7ff",
+        damage: this.damage * 0.46,
+        life: 3.1,
+        shape: "gunnerShot",
+      });
+    }
+    burst(this.x + forwardX * this.r, this.y + forwardY * this.r, 5, "#f3f7ff", 110);
   }
 
   draw(ctx) {
@@ -144,6 +152,30 @@ export class Gunner extends BaseEnemy {
     ctx.restore();
     ctx.restore();
   }
+}
+
+function geometryPatternPoints(pattern, elite) {
+  const scale = elite ? 1.18 : 1;
+  const points = [];
+  if (pattern === "triangle") {
+    for (let i = 0; i < 3; i++) {
+      const a = -Math.PI / 2 + i * TAU / 3;
+      points.push({ x: Math.cos(a) * 38 * scale, y: Math.sin(a) * 38 * scale, accent: i === 0 });
+    }
+    return points;
+  }
+  if (pattern === "square") {
+    for (const x of [-34, 34]) for (const y of [-34, 34]) points.push({ x: x * scale, y: y * scale, accent: x === y });
+    return points;
+  }
+  const count = pattern === "hexagon" ? 6 : 10;
+  const radius = pattern === "hexagon" ? 44 : 40;
+  for (let i = 0; i < count; i++) {
+    const a = i * TAU / count;
+    points.push({ x: Math.cos(a) * radius * scale, y: Math.sin(a) * radius * scale, accent: i % 3 === 0 });
+  }
+  if (pattern === "circle") points.push({ x: 0, y: 0, accent: true });
+  return points;
 }
 
 function normalizeAngle(angle) {

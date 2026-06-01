@@ -1,19 +1,21 @@
 import { TAU, WORLD_SIZE } from "../constants.js";
 import { state, world } from "../state.js";
-import { particle, pulse, trail } from "../effects.js";
+import { burst, particle, pulse, trail } from "../effects.js";
 import { clamp, distSq } from "../utils.js";
 import { BaseEnemy } from "./BaseEnemy.js";
 
-const HEAL_RANGE = 290;
+const ASSIST_RANGE = 330;
 const KEEP_DISTANCE = 380;
 
 export class PrismMedic extends BaseEnemy {
   constructor(config, x, y) {
     super(config, x, y);
+    this.name = "棱镜协助者";
+    this.trait = "机动增幅";
     this.behavior = "prism_medic";
     this.cooldown = 0.65 + Math.random() * 0.5;
     this.channel = 0;
-    this.target = null;
+    this.targets = [];
     this.orbit = Math.random() * TAU;
     this.knockbackResistance = Math.max(this.knockbackResistance, 0.28);
   }
@@ -30,18 +32,15 @@ export class PrismMedic extends BaseEnemy {
     this.hitTimer = Math.max(0, this.hitTimer - dt);
     this.flip = dx < 0 ? -1 : 1;
 
-    this.target = this.findTarget();
-    if (this.target && this.cooldown <= 0 && this.channel <= 0) this.channel = 1.05;
+    this.targets = this.findTargets();
+    if (this.targets.length && this.cooldown <= 0 && this.channel <= 0) this.channel = 1.25;
 
-    if (this.channel > 0 && this.target && !this.target.dead) {
+    if (this.channel > 0 && this.targets.length) {
       this.channel -= dt;
-      this.target.hp = Math.min(this.target.maxHp, this.target.hp + (24 + state.wave * 2.5) * dt);
-      this.target.flash = Math.max(this.target.flash, 0.18);
-      trail(this.x, this.y, this.target.x, this.target.y, this.color, 3);
-      if (Math.random() < dt * 8) particle("mote", this.target.x, this.target.y, { color: this.color, life: 0.36, size: 3, alpha: 0.8 });
+      this.applyAssist(dt);
       if (this.channel <= 0) {
-        this.cooldown = 2.25;
-        pulse(this.target.x, this.target.y, 42, this.color, 0.2);
+        this.cooldown = 1.85;
+        pulse(this.x, this.y, ASSIST_RANGE, this.color, 0.16);
       }
       this.move(dx, dy, d, dt, d < KEEP_DISTANCE ? -0.8 : 0.08);
     } else {
@@ -60,21 +59,27 @@ export class PrismMedic extends BaseEnemy {
     this.y += (dy / d * dir + dx / d * strafe) * this.speed * dt;
   }
 
-  findTarget() {
-    let best = null;
-    let bestScore = 0;
-    const range2 = HEAL_RANGE * HEAL_RANGE;
+  findTargets() {
+    const targets = [];
+    const range2 = ASSIST_RANGE * ASSIST_RANGE;
     for (const e of world.enemies) {
-      if (e === this || e.dead || e.boss || e.hp >= e.maxHp) continue;
+      if (e === this || e.dead || e.boss) continue;
       if (distSq(this.x, this.y, e.x, e.y) > range2) continue;
-      const missing = 1 - e.hp / Math.max(1, e.maxHp);
-      const score = missing * (e.elite ? 1.6 : 1);
-      if (score > bestScore) {
-        bestScore = score;
-        best = e;
-      }
+      targets.push(e);
     }
-    return best;
+    return targets.sort((a, b) => distSq(this.x, this.y, a.x, a.y) - distSq(this.x, this.y, b.x, b.y)).slice(0, 7);
+  }
+
+  applyAssist(dt) {
+    for (const target of this.targets) {
+      target.prismAssistTimer = Math.max(target.prismAssistTimer || 0, 0.42);
+      target.prismAssistSpeedMult = target.elite ? 1.18 : 1.25;
+      target.prismAssistAttackSpeedMult = target.elite ? 1.22 : 1.34;
+      target.flash = Math.max(target.flash, 0.08);
+      trail(this.x, this.y, target.x, target.y, this.color, 2);
+      if (Math.random() < dt * 5) particle("mote", target.x, target.y, { color: this.color, life: 0.32, size: 2.6, alpha: 0.76 });
+    }
+    if (Math.random() < dt * 10) burst(this.x, this.y, 2, this.color, 60);
   }
 
   draw(ctx) {
@@ -87,26 +92,30 @@ export class PrismMedic extends BaseEnemy {
     ctx.beginPath();
     ctx.ellipse(0, this.r + 8 - bob, this.r, this.r * 0.22, 0, 0, TAU);
     ctx.fill();
-    ctx.strokeStyle = flash ? "#ffffff" : `rgba(114,255,180,${this.channel > 0 ? 0.48 : 0.22})`;
+    ctx.strokeStyle = flash ? "#ffffff" : `rgba(114,255,180,${this.channel > 0 ? 0.56 : 0.26})`;
     ctx.lineWidth = 1.2;
     ctx.beginPath();
     ctx.ellipse(0, 0, 25 * z, 17 * z, this.orbit * 0.1, 0, TAU);
     ctx.stroke();
 
-    ctx.fillStyle = flash ? "#ffffff" : "#eafff5";
+    ctx.fillStyle = flash ? "#ffffff" : "#dffcff";
     ctx.strokeStyle = flash ? "#ffffff" : this.color;
     ctx.lineWidth = 2;
     ctx.beginPath();
-    ctx.moveTo(0, -18 * z);
-    ctx.lineTo(14 * z, 0);
-    ctx.lineTo(0, 18 * z);
-    ctx.lineTo(-14 * z, 0);
+    ctx.moveTo(0, -22 * z);
+    ctx.lineTo(18 * z, -4 * z);
+    ctx.lineTo(10 * z, 18 * z);
+    ctx.lineTo(-10 * z, 18 * z);
+    ctx.lineTo(-18 * z, -4 * z);
     ctx.closePath();
     ctx.fill();
     ctx.stroke();
-    ctx.fillStyle = flash ? "#ffffff" : "#134e3a";
-    ctx.fillRect(-3 * z, -11 * z, 6 * z, 22 * z);
-    ctx.fillRect(-10 * z, -3 * z, 20 * z, 6 * z);
+    ctx.fillStyle = flash ? "#ffffff" : "#123045";
+    ctx.fillRect(-4 * z, -15 * z, 8 * z, 29 * z);
+    ctx.fillRect(-13 * z, -4 * z, 26 * z, 8 * z);
+    ctx.fillStyle = flash ? "#ffffff" : "rgba(66,232,255,0.26)";
+    ctx.fillRect(-11 * z, -15 * z, 22 * z, 3 * z);
+    ctx.fillRect(-9 * z, 12 * z, 18 * z, 3 * z);
     ctx.strokeStyle = flash ? "#ffffff" : "rgba(66,232,255,0.72)";
     ctx.lineWidth = 1.1;
     ctx.beginPath();
@@ -120,26 +129,34 @@ export class PrismMedic extends BaseEnemy {
     ctx.arc(0, 0, (3.4 + Math.sin(this.anim * 4) * 0.6) * z, 0, TAU);
     ctx.fill();
 
-    for (let i = 0; i < 4; i++) {
-      const a = this.orbit + i * TAU / 4;
+    for (let i = 0; i < 6; i++) {
+      const a = this.orbit + i * TAU / 6;
       const x = Math.cos(a) * 25 * z;
       const y = Math.sin(a) * 14 * z;
       ctx.save();
       ctx.translate(x, y);
       ctx.rotate(a);
       ctx.fillStyle = flash ? "#ffffff" : this.color;
-      ctx.fillRect(-4 * z, -2 * z, 8 * z, 4 * z);
+      ctx.beginPath();
+      ctx.moveTo(5 * z, 0);
+      ctx.lineTo(0, 4 * z);
+      ctx.lineTo(-5 * z, 0);
+      ctx.lineTo(0, -4 * z);
+      ctx.closePath();
+      ctx.fill();
       ctx.strokeStyle = "rgba(255,255,255,0.55)";
-      ctx.strokeRect(-5 * z, -3 * z, 10 * z, 6 * z);
+      ctx.stroke();
       ctx.restore();
     }
-    if (this.channel > 0 && this.target) {
+    if (this.channel > 0 && this.targets.length) {
       ctx.strokeStyle = "rgba(114,255,180,0.74)";
       ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.moveTo(0, 0);
-      ctx.lineTo(this.target.x - this.x, this.target.y - this.y);
-      ctx.stroke();
+      for (const target of this.targets.slice(0, 5)) {
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.lineTo(target.x - this.x, target.y - this.y);
+        ctx.stroke();
+      }
     }
     ctx.restore();
   }

@@ -11,6 +11,14 @@ const BASE_PULL = 285;
 const BASE_DAMAGE = 8;
 const BASE_LIFE = 7.2;
 const MAX_LIFE = 10.5;
+const BLACKHOLE_SPEED_BY_DIFFICULTY = {
+  ember: 0.82,
+  neon: 1,
+  overclock: 1.28,
+  singularity: 1.46,
+  apocalypse: 1.62,
+  void_crown: 2.05,
+};
 
 export function summonOrEmpowerBlackhole(x, y, dirX, dirY, color = "#8d6bff") {
   const half = WORLD_SIZE / 2;
@@ -64,7 +72,8 @@ export function updateBlackhole(dt) {
   h.spin += dt * (1.45 + h.level * 0.22);
   h.pulse = Math.max(0, h.pulse - dt * 2.6);
 
-  const speed = Math.max(20, 76 - h.level * 9 - h.r * 0.08);
+  const difficultySpeed = BLACKHOLE_SPEED_BY_DIFFICULTY[state.difficultyId || state.difficulty?.id] || 1;
+  const speed = Math.max(20, 76 - h.level * 9 - h.r * 0.08) * difficultySpeed;
   const dx = state.player.x - h.x;
   const dy = state.player.y - h.y;
   const d = Math.max(1, Math.hypot(dx, dy));

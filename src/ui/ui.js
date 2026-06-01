@@ -264,8 +264,7 @@ export function showRunSetup({ weapons, onConfirm, onBack }) {
       <button type="button" class="loadout-weapon-card carousel-card selected">
         <i>${item.icon}</i>
         <strong>${item.name}</strong>
-        <p>${item.desc}</p>
-        <small>${(info.tags || []).join(" · ")}</small>
+        <small>${(info.tags || []).slice(0, 3).join(" · ")}</small>
       </button>
       <button type="button" class="loadout-carousel-arrow" data-dir="1" aria-label="下一个武器">›</button>
       <div class="loadout-carousel-count">${weaponIndex + 1} / ${weapons.length}</div>`;

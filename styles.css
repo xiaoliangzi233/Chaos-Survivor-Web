@@ -2110,6 +2110,29 @@ h2 {
   color: var(--gold);
 }
 
+.loadout-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+#loadoutBackButton {
+  min-width: 142px;
+  min-height: 46px;
+  border-color: rgba(66, 232, 255, 0.34);
+  background: rgba(6, 9, 18, 0.58);
+  color: var(--muted);
+  font-weight: 800;
+}
+
+#loadoutBackButton:hover {
+  color: var(--ink);
+  border-color: rgba(66, 232, 255, 0.68);
+  box-shadow: 0 0 22px rgba(66, 232, 255, 0.16);
+}
+
 #loadoutConfirmButton {
   min-width: 210px;
   min-height: 52px;

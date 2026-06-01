@@ -55,6 +55,7 @@ export async function bootGame() {
     showRunSetup({
       weapons: STARTER_WEAPONS,
       onConfirm: startWithLoadout,
+      onBack: returnToMenu,
     });
     playSfx("select");
   }

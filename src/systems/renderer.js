@@ -33,6 +33,30 @@ export function enemyProjectileHasHalo(projectile) {
   return !projectile?.bossProjectile;
 }
 
+export function bossDirectionIndicator(view, camera, boss) {
+  if (!boss || boss.dead) return { visible: false };
+  const screenX = (boss.x - camera.x) * CAMERA_ZOOM + view.width / 2;
+  const screenY = (boss.y - camera.y) * CAMERA_ZOOM + view.height / 2;
+  const margin = Math.max(46, (boss.r || 32) * 0.72);
+  if (screenX >= margin && screenX <= view.width - margin && screenY >= margin && screenY <= view.height - margin) {
+    return { visible: false, x: screenX, y: screenY, angle: 0 };
+  }
+  const cx = view.width / 2;
+  const cy = view.height / 2;
+  const dx = screenX - cx;
+  const dy = screenY - cy;
+  const angle = Math.atan2(dy, dx);
+  const edgeX = cx + Math.cos(angle) * Math.min(view.width / 2 - margin, Math.abs((view.height / 2 - margin) / Math.sin(angle || 0.0001) * Math.cos(angle)));
+  const edgeY = cy + Math.sin(angle) * Math.min(view.height / 2 - margin, Math.abs((view.width / 2 - margin) / Math.cos(angle || 0.0001) * Math.sin(angle)));
+  return {
+    visible: true,
+    x: clamp(edgeX, margin, view.width - margin),
+    y: clamp(edgeY, margin, view.height - margin),
+    angle,
+    name: boss.name || "Boss",
+  };
+}
+
 const QUALITY_COLORS = {
   common: "#cbd5e1",
   uncommon: "#77ff8a",
@@ -117,6 +141,7 @@ export function render(ctx) {
   ctx.restore();
   renderLighting(ctx, { camX, camY, viewW, viewH }, viewport);
   drawBossBar(ctx);
+  drawBossDirectionIndicator(ctx);
   if (state.flash > 0) {
     ctx.fillStyle = `rgba(255,77,109,${state.flash * 0.18})`;
     ctx.fillRect(0, 0, viewport.width, viewport.height);
@@ -2692,6 +2717,39 @@ function drawBossBar(ctx) {
   ctx.strokeStyle = "rgba(255,209,102,0.9)";
   ctx.lineWidth = 2;
   ctx.strokeRect(x + 1, y + 1, w - 2, 26);
+}
+
+function drawBossDirectionIndicator(ctx) {
+  const indicator = bossDirectionIndicator(viewport, { x: state.cameraX, y: state.cameraY }, world.boss);
+  if (!indicator.visible) return;
+  const pulse = 0.85 + Math.sin(state.time * 8) * 0.15;
+  ctx.save();
+  ctx.translate(indicator.x, indicator.y);
+  ctx.rotate(indicator.angle);
+  ctx.globalCompositeOperation = "lighter";
+  glow(ctx, 0, 0, 28 * pulse, 0.28, "#ff4d6d");
+  ctx.fillStyle = "rgba(6,9,18,0.78)";
+  ctx.strokeStyle = "rgba(255,209,102,0.78)";
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.roundRect(-20, -16, 46, 32, 6);
+  ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = "#ff4d6d";
+  ctx.beginPath();
+  ctx.moveTo(24, 0);
+  ctx.lineTo(-8, -11);
+  ctx.lineTo(-2, 0);
+  ctx.lineTo(-8, 11);
+  ctx.closePath();
+  ctx.fill();
+  ctx.strokeStyle = "#fff3b0";
+  ctx.lineWidth = 1.2;
+  ctx.beginPath();
+  ctx.moveTo(12, 0);
+  ctx.lineTo(-3, 0);
+  ctx.stroke();
+  ctx.restore();
 }
 
 function drawTwinBossBar(ctx, b, x, y, w) {

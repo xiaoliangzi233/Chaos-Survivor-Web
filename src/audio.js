@@ -1,20 +1,21 @@
 let muted = false;
 let audio = null;
-let musicAudio = null;
-let musicTracks = null;
-let musicIndex = 0;
 let proceduralTimer = null;
 let musicGain = null;
 let proceduralPaused = false;
+let musicStep = 0;
+let musicSection = 0;
 const lastPlayed = new Map();
-const MUSIC_MANIFEST_URL = "./assets/music/playlist.json";
-const SUPPORTED_MUSIC = new Set(["mp3", "ogg", "wav", "m4a"]);
+const MUSIC_BPM = 138;
+const MUSIC_STEP_MS = Math.round(60000 / MUSIC_BPM / 2);
+const MUSIC_SCALE = [55, 65.41, 73.42, 82.41, 98, 110, 130.81, 146.83];
+const LEAD_PATTERN = [12, 14, 15, 10, 12, 17, 15, 14, 12, 10, 8, 10, 12, 15, 17, 19];
+const BASS_PATTERN = [0, 0, 3, 0, 5, 5, 3, 0, 0, 0, 3, 0, 6, 5, 3, 0];
 
 export function setMuted(value) {
   muted = value;
-  if (musicAudio) musicAudio.muted = muted;
   if (musicGain) musicGain.gain.value = muted ? 0.0001 : 0.035;
-  if (!muted && !musicAudio && !proceduralTimer) startMusic();
+  if (!muted && !proceduralTimer) startMusic();
 }
 
 export function isMuted() {
@@ -55,10 +56,6 @@ export function playSfx(name) {
 
 export async function startMusic() {
   if (muted) return;
-  if (musicAudio) {
-    if (musicAudio.paused) musicAudio.play().catch(() => {});
-    return;
-  }
   if (proceduralTimer) return;
   if (proceduralPaused) {
     proceduralPaused = false;
@@ -66,26 +63,15 @@ export async function startMusic() {
     return;
   }
   stopProceduralMusic();
-  const tracks = await loadMusicTracks();
-  if (!tracks.length) {
-    startProceduralMusic();
-    return;
-  }
-  playMusicTrack(musicIndex % tracks.length);
+  startProceduralMusic();
 }
 
 export function stopMusic() {
-  if (musicAudio) {
-    musicAudio.pause();
-    musicAudio.src = "";
-    musicAudio = null;
-  }
   proceduralPaused = false;
   stopProceduralMusic();
 }
 
 export function pauseMusic() {
-  if (musicAudio && !musicAudio.paused) musicAudio.pause();
   if (proceduralTimer) {
     stopProceduralMusic();
     proceduralPaused = true;
@@ -98,59 +84,18 @@ export function resumeMusic() {
 }
 
 export async function nextMusicTrack() {
-  const tracks = await loadMusicTracks();
-  if (!tracks.length) return;
-  musicIndex = (musicIndex + 1) % tracks.length;
-  playMusicTrack(musicIndex);
+  musicSection = (musicSection + 1) % 4;
+  musicStep = musicSection * 16;
+  if (!proceduralTimer && !muted) startProceduralMusic();
 }
 
-async function loadMusicTracks() {
-  if (musicTracks) return musicTracks;
-  try {
-    const res = await fetch(MUSIC_MANIFEST_URL, { cache: "no-store" });
-    if (!res.ok) throw new Error(`music manifest ${res.status}`);
-    const data = await res.json();
-    const rawTracks = Array.isArray(data) ? data : data.tracks;
-    const base = new URL(MUSIC_MANIFEST_URL, window.location.href);
-    musicTracks = (rawTracks || [])
-      .map(normalizeTrack)
-      .filter((track) => track && track.enabled !== false && SUPPORTED_MUSIC.has(fileExt(track.file)))
-      .map((track) => ({ ...track, url: new URL(track.file, base).href }));
-  } catch {
-    musicTracks = [];
-  }
-  return musicTracks;
-}
-
-function normalizeTrack(track) {
-  if (typeof track === "string") return { file: track, name: track };
-  if (!track || typeof track.file !== "string") return null;
-  return { file: track.file, name: track.name || track.file, enabled: track.enabled };
-}
-
-function fileExt(file) {
-  return file.split("?")[0].split("#")[0].split(".").pop().toLowerCase();
-}
-
-function playMusicTrack(index) {
-  const track = musicTracks[index];
-  if (!track || muted) return;
-  stopMusic();
-  proceduralPaused = false;
-  musicIndex = index;
-  musicAudio = new Audio(track.url);
-  musicAudio.loop = musicTracks.length === 1;
-  musicAudio.volume = 0.42;
-  musicAudio.muted = muted;
-  musicAudio.addEventListener("ended", () => {
-    if (!musicTracks?.length) return;
-    musicIndex = (musicIndex + 1) % musicTracks.length;
-    playMusicTrack(musicIndex);
-  });
-  musicAudio.play().catch(() => {
-    musicAudio = null;
-    startProceduralMusic();
-  });
+export function proceduralMusicArrangement() {
+  return {
+    externalTracks: false,
+    bpm: MUSIC_BPM,
+    key: "A Phrygian dominant / neon minor",
+    instruments: ["kick", "snare", "hat", "bass", "lead", "pad", "arpeggio"],
+  };
 }
 
 function startProceduralMusic() {
@@ -158,20 +103,14 @@ function startProceduralMusic() {
   try {
     const ctx = ensureAudio();
     musicGain ||= ctx.createGain();
-    musicGain.gain.value = 0.035;
+    musicGain.gain.value = 0.045;
     musicGain.connect(ctx.destination);
-    let step = 0;
-    const notes = [110, 146.83, 164.81, 220, 246.94, 293.66, 329.63, 440];
     const playStep = () => {
       if (muted) return;
-      const root = notes[step % notes.length];
-      playMusicNote(root, 1.8, "triangle", 0.022);
-      playMusicNote(root * 1.5, 0.42, "sine", 0.012, 0.08);
-      if (step % 4 === 0) playMusicNote(root * 0.5, 2.4, "sine", 0.018);
-      step++;
+      scheduleMusicStep(musicStep++);
     };
     playStep();
-    proceduralTimer = window.setInterval(playStep, 1850);
+    proceduralTimer = window.setInterval(playStep, MUSIC_STEP_MS);
   } catch {
     muted = true;
   }
@@ -198,6 +137,76 @@ function playMusicNote(freq, duration, type, gainValue, delay = 0) {
   gain.connect(musicGain || ctx.destination);
   osc.start(start);
   osc.stop(start + duration + 0.05);
+}
+
+function scheduleMusicStep(step) {
+  const beat = step % 16;
+  const phrase = Math.floor(step / 16) % 4;
+  if (beat === 0 || beat === 8 || beat === 11) playMusicKick(beat === 0 ? 1 : 0.72);
+  if (beat === 4 || beat === 12) playMusicSnare(phrase > 1 ? 0.78 : 0.62);
+  if (beat % 2 === 1 || (phrase > 0 && beat % 4 === 2)) playMusicHat(beat % 4 === 3 ? 0.034 : 0.022);
+  if (beat % 2 === 0) {
+    const bass = MUSIC_SCALE[BASS_PATTERN[beat] % MUSIC_SCALE.length] * (phrase === 3 && beat > 10 ? 2 : 1);
+    playMusicNote(bass, 0.22, "sawtooth", 0.018);
+  }
+  if (beat % 4 === 0) {
+    const root = MUSIC_SCALE[(phrase * 2) % MUSIC_SCALE.length];
+    playMusicNote(root * 2, 1.65, "triangle", 0.011);
+    playMusicNote(root * 3, 1.4, "sine", 0.007, 0.03);
+  }
+  if ((phrase > 0 && beat % 2 === 0) || phrase === 3) {
+    const degree = LEAD_PATTERN[(beat + phrase * 3) % LEAD_PATTERN.length] % MUSIC_SCALE.length;
+    const octave = LEAD_PATTERN[(beat + phrase * 3) % LEAD_PATTERN.length] > 11 ? 4 : 3;
+    playMusicNote(MUSIC_SCALE[degree] * octave, phrase === 3 ? 0.14 : 0.2, "square", phrase === 3 ? 0.01 : 0.007, 0.02);
+  }
+}
+
+function playMusicKick(power) {
+  const ctx = ensureAudio();
+  const start = ctx.currentTime;
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  osc.type = "sine";
+  osc.frequency.setValueAtTime(95, start);
+  osc.frequency.exponentialRampToValueAtTime(38, start + 0.12);
+  gain.gain.setValueAtTime(0.001, start);
+  gain.gain.exponentialRampToValueAtTime(0.045 * power, start + 0.006);
+  gain.gain.exponentialRampToValueAtTime(0.001, start + 0.18);
+  osc.connect(gain);
+  gain.connect(musicGain || ctx.destination);
+  osc.start(start);
+  osc.stop(start + 0.2);
+}
+
+function playMusicSnare(power) {
+  playMusicNoise({ d: 0.11, g: 0.038 * power, filter: 1800, type: "bandpass" });
+  playMusicNote(185, 0.06, "triangle", 0.008 * power);
+}
+
+function playMusicHat(gainValue) {
+  playMusicNoise({ d: 0.035, g: gainValue, filter: 7200, type: "highpass" });
+}
+
+function playMusicNoise(spec) {
+  const ctx = ensureAudio();
+  const start = ctx.currentTime;
+  const length = Math.max(1, Math.floor(ctx.sampleRate * spec.d));
+  const buffer = ctx.createBuffer(1, length, ctx.sampleRate);
+  const data = buffer.getChannelData(0);
+  for (let i = 0; i < length; i++) data[i] = (Math.random() * 2 - 1) * (1 - i / length);
+  const source = ctx.createBufferSource();
+  const filter = ctx.createBiquadFilter();
+  const gain = ctx.createGain();
+  source.buffer = buffer;
+  filter.type = spec.type || "highpass";
+  filter.frequency.value = spec.filter || 3000;
+  gain.gain.setValueAtTime(spec.g || 0.02, start);
+  gain.gain.exponentialRampToValueAtTime(0.001, start + spec.d);
+  source.connect(filter);
+  filter.connect(gain);
+  gain.connect(musicGain || ctx.destination);
+  source.start(start);
+  source.stop(start + spec.d);
 }
 
 const SFX = {

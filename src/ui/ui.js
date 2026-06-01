@@ -39,6 +39,7 @@ export const ui = {
   loadoutWeaponPreview: document.getElementById("loadoutWeaponPreview"),
   loadoutWeaponList: document.getElementById("loadoutWeaponList"),
   loadoutConfirmButton: document.getElementById("loadoutConfirmButton"),
+  loadoutBackButton: document.getElementById("loadoutBackButton"),
   loadoutDifficultyName: document.getElementById("loadoutDifficultyName"),
   loadoutWeaponName: document.getElementById("loadoutWeaponName"),
   loadoutSelectedWeaponName: document.getElementById("loadoutSelectedWeaponName"),
@@ -145,7 +146,7 @@ export function updateBestText() {
   ui.bestText.textContent = bestSummaryText(formatTime);
 }
 
-export function showRunSetup({ weapons, onConfirm }) {
+export function showRunSetup({ weapons, onConfirm, onBack }) {
   clearPreview();
   ui.quickActions?.classList.add("blocked");
   const difficulties = difficultyCards();
@@ -231,6 +232,13 @@ export function showRunSetup({ weapons, onConfirm }) {
     ui.loadoutConfirmButton.disabled = true;
     onConfirm({ difficulty: selectedDifficulty, weapon: selectedWeapon });
   };
+  if (ui.loadoutBackButton) {
+    ui.loadoutBackButton.onclick = () => {
+      if (confirmed) return;
+      hideRunSetup();
+      onBack?.();
+    };
+  }
 
   renderDifficultyList();
   renderWeaponList();

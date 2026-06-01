@@ -153,7 +153,7 @@ export class BaseEnemy {
     if (this.cooldown <= 0) {
       this.cooldown = this.behavior === "boss_crystal" ? 1.0 : 1.45;
       const count = this.behavior === "boss_crystal" ? 18 : 10;
-      for (let i = 0; i < count; i++) spawnEnemyBullet(this.x, this.y, (i / count) * TAU + this.phase, this.color, 170, this.damage * 0.45);
+      for (let i = 0; i < count; i++) spawnEnemyBullet(this.x, this.y, (i / count) * TAU + this.phase, this.color, 170, this.damage * 0.45, { bossProjectile: true });
       if (this.behavior === "boss_void") addHazard(state.player.x, state.player.y, this.color, this.damage * 0.5);
     }
   }
@@ -201,8 +201,8 @@ export function setSpawnConfigured(fn) {
   spawnConfigured = fn;
 }
 
-export function spawnEnemyBullet(x, y, angle, color, speed, damage) {
-  world.enemyProjectiles.push({ x, y, vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed, r: 5, color, damage, life: 4 });
+export function spawnEnemyBullet(x, y, angle, color, speed, damage, options = {}) {
+  world.enemyProjectiles.push({ x, y, vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed, r: 5, color, damage, life: 4, ...options });
 }
 
 function spawnMinion(x, y) {
@@ -297,7 +297,8 @@ function drawZombieShape(ctx, e) {
   const flash = e.flash > 0;
   const skin = flash ? "#ffffff" : zombieSkin(e);
   const dark = flash ? "#dfefff" : "#315436";
-  const cloth = flash ? "#ffffff" : zombieCloth(e);
+  const outfit = zombieOutfit(e);
+  const cloth = flash ? "#ffffff" : outfit.cloth;
   const wound = flash ? "#ffffff" : "#b91c1c";
 
   ctx.scale(e.flip || 1, 1);
@@ -329,6 +330,23 @@ function drawZombieShape(ctx, e) {
   ctx.fillRect(1 * z, -11 * z, 8 * z, 10 * z);
   ctx.fillStyle = flash ? "#ffffff" : "#26344a";
   ctx.fillRect(-9 * z, -13 * z, 8 * z, 5 * z);
+  if (!flash && e.clothingVariant === "scientist") {
+    ctx.fillStyle = "#e8f7ff";
+    ctx.fillRect(-11 * z, -14 * z, 6 * z, 26 * z);
+    ctx.fillRect(6 * z, -15 * z, 6 * z, 25 * z);
+    ctx.fillStyle = "#4ee7ff";
+    ctx.fillRect(5 * z, -9 * z, 4 * z, 3 * z);
+    ctx.strokeStyle = "rgba(26,55,70,0.7)";
+    ctx.lineWidth = 1 * z;
+    ctx.beginPath();
+    ctx.moveTo(-1 * z, -13 * z);
+    ctx.lineTo(-1 * z, 10 * z);
+    ctx.stroke();
+  } else if (!flash && outfit.accent) {
+    ctx.fillStyle = outfit.accent;
+    ctx.fillRect(-8 * z, -12 * z, 15 * z, 3 * z);
+    ctx.fillRect(6 * z, 2 * z, 4 * z, 8 * z);
+  }
   ctx.strokeStyle = flash ? "#ffffff" : "rgba(7,16,13,0.72)";
   ctx.lineWidth = 1.4 * z;
   ctx.stroke();
@@ -403,13 +421,23 @@ function zombieSkin(e) {
   return "#7ccf68";
 }
 
+function zombieOutfit(e) {
+  if (e.clothingVariant === "scientist") return { cloth: "#f4fbff", accent: "#4ee7ff" };
+  if (e.clothingVariant === "worker") return { cloth: "#d6b64f", accent: "#f97316" };
+  if (e.clothingVariant === "runner") return { cloth: "#9f7aea", accent: "#42e8ff" };
+  if (e.clothingVariant === "hazard") return { cloth: "#334155", accent: "#ffd166" };
+  if (e.clothingVariant === "security") return { cloth: "#264b63", accent: "#77ff8a" };
+  if (e.id === "tank" || e.type === "tank") return { cloth: "#6d5bbf", accent: "#ffd166" };
+  if (e.behavior === "lancer" || e.behavior === "line_raider") return { cloth: "#d6b64f", accent: "#ffef99" };
+  if (e.behavior === "ranged" || e.behavior === "gunner" || e.behavior === "wizard") return { cloth: "#2b8da4", accent: "#d9fbff" };
+  if (e.behavior === "hazard_mage") return { cloth: "#5f4aa8", accent: "#b48cff" };
+  if (e.behavior === "summoner") return { cloth: "#4d7c0f", accent: "#9dffac" };
+  return { cloth: "#345a78", accent: null };
+}
+
 function zombieCloth(e) {
-  if (e.id === "tank" || e.type === "tank") return "#6d5bbf";
-  if (e.behavior === "lancer" || e.behavior === "line_raider") return "#d6b64f";
-  if (e.behavior === "ranged" || e.behavior === "gunner" || e.behavior === "wizard") return "#2b8da4";
-  if (e.behavior === "hazard_mage") return "#5f4aa8";
-  if (e.behavior === "summoner") return "#4d7c0f";
-  return "#345a78";
+  const outfit = zombieOutfit(e);
+  return typeof outfit === "string" ? outfit : outfit.cloth;
 }
 
 function drawBossShape(ctx, e) {

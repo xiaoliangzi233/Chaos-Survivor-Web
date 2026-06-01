@@ -9,6 +9,30 @@ import { createDecorativeEnemy, decorativeEnemyIds } from "./enemyRegistry.js";
 
 export const viewport = { width: 1, height: 1, dpr: 1 };
 
+export function bossHudLayout(view, boss) {
+  const twin = Boolean(boss?.shared?.members);
+  const barHeight = twin ? 38 : 28;
+  return {
+    title: {
+      text: boss?.name || "Boss",
+      x: 0,
+      y: 42,
+      w: view.width,
+    },
+    bar: {
+      x: 0,
+      y: view.height - barHeight,
+      w: view.width,
+      h: barHeight,
+      showText: false,
+    },
+  };
+}
+
+export function enemyProjectileHasHalo(projectile) {
+  return !projectile?.bossProjectile;
+}
+
 const QUALITY_COLORS = {
   common: "#cbd5e1",
   uncommon: "#77ff8a",
@@ -2050,7 +2074,7 @@ function drawSpecialEnemyProjectile(ctx, b) {
   ctx.save();
   ctx.translate(b.x, b.y);
   ctx.rotate((b.spin || 0) + (b.shape === "razorBoomerang" ? angle : 0));
-  glow(ctx, 0, 0, b.r * 2.2, 0.42, b.color);
+  if (enemyProjectileHasHalo(b)) glow(ctx, 0, 0, b.r * 2.2, 0.42, b.color);
   if (b.shape === "arcaneOrb") {
     ctx.strokeStyle = b.color;
     ctx.lineWidth = 1.8;
@@ -2111,7 +2135,7 @@ function drawEnemyBolt(ctx, b) {
   const long = b.shape === "pylonBolt";
   const pulse = 0.78 + Math.sin(state.time * 18 + (b.spin || 0)) * 0.22;
   ctx.globalCompositeOperation = "lighter";
-  glow(ctx, -b.r * 1.4, 0, b.r * (long ? 3.6 : 2.2), long ? 0.72 : 0.34, b.color);
+  if (enemyProjectileHasHalo(b)) glow(ctx, -b.r * 1.4, 0, b.r * (long ? 3.6 : 2.2), long ? 0.72 : 0.34, b.color);
   ctx.strokeStyle = hexToRgba(b.color, long ? 0.34 : 0.22);
   ctx.lineWidth = long ? 12 : 7;
   ctx.lineCap = "round";
@@ -2154,8 +2178,10 @@ function drawFireballProjectile(ctx, b) {
   ctx.save();
   ctx.translate(b.x, b.y);
   ctx.rotate(angle);
-  glow(ctx, 0, 0, b.r * 3.2, 0.62, "#ff4d1f");
-  glow(ctx, -b.r * 1.3, 0, b.r * 2.4, 0.36, "#ffd166");
+  if (enemyProjectileHasHalo(b)) {
+    glow(ctx, 0, 0, b.r * 3.2, 0.62, "#ff4d1f");
+    glow(ctx, -b.r * 1.3, 0, b.r * 2.4, 0.36, "#ffd166");
+  }
   ctx.fillStyle = "rgba(255,77,31,0.26)";
   for (let i = 0; i < 3; i++) {
     ctx.beginPath();
@@ -2200,7 +2226,7 @@ function drawStormProjectile(ctx, b) {
   ctx.translate(b.x, b.y);
   ctx.rotate(b.shape === "stormBlade" ? angle : (b.spin || 0) + state.time * 8);
   ctx.globalCompositeOperation = "lighter";
-  glow(ctx, 0, 0, b.r * 3.1, 0.62, b.color);
+  if (enemyProjectileHasHalo(b)) glow(ctx, 0, 0, b.r * 3.1, 0.62, b.color);
   if (b.shape === "stormBlade") {
     ctx.fillStyle = hexToRgba(b.color, 0.22);
     ctx.beginPath();
@@ -2260,7 +2286,7 @@ function drawSnowflakeProjectile(ctx, b) {
   ctx.translate(b.x, b.y);
   ctx.rotate(spin);
   ctx.globalCompositeOperation = "lighter";
-  glow(ctx, 0, 0, b.r * (comet ? 3.25 : 2.1), comet ? 0.72 : 0.52, comet ? "#b48cff" : b.color);
+  if (enemyProjectileHasHalo(b)) glow(ctx, 0, 0, b.r * (comet ? 3.25 : 2.1), comet ? 0.72 : 0.52, comet ? "#b48cff" : b.color);
   if (comet) {
     const angle = Math.atan2(b.vy, b.vx) - spin;
     ctx.save();
@@ -2643,15 +2669,14 @@ function drawEmberMineHazard(ctx, h, alpha) {
 function drawBossBar(ctx) {
   const b = world.boss;
   if (!b || b.dead) return;
-  const w = viewport.width;
-  const x = 0;
-  const y = viewport.height - (b.shared?.members ? 38 : 28);
+  const layout = bossHudLayout(viewport, b);
+  const { x, y, w } = layout.bar;
+  drawBossTitle(ctx, layout.title.text, layout.title.x, layout.title.y, layout.title.w);
   if (b.shared?.members) {
     drawTwinBossBar(ctx, b, x, y, w);
     return;
   }
   const hpRatio = Math.max(0, b.hp / b.maxHp);
-  drawBossTitle(ctx, `${b.name} · ${b.trait}`, x, y - 18, w);
   ctx.fillStyle = "rgba(6,9,18,0.9)";
   ctx.fillRect(x, y, w, 28);
   ctx.fillStyle = "rgba(255,255,255,0.08)";
@@ -2667,10 +2692,6 @@ function drawBossBar(ctx) {
   ctx.strokeStyle = "rgba(255,209,102,0.9)";
   ctx.lineWidth = 2;
   ctx.strokeRect(x + 1, y + 1, w - 2, 26);
-  ctx.fillStyle = "#f3f7ff";
-  ctx.font = `14px ${CANVAS_PIXEL_FONT}`;
-  ctx.textAlign = "center";
-  ctx.fillText(`${Math.ceil(b.hp)} / ${Math.ceil(b.maxHp)}`, viewport.width / 2, y + 20);
 }
 
 function drawTwinBossBar(ctx, b, x, y, w) {
@@ -2678,8 +2699,6 @@ function drawTwinBossBar(ctx, b, x, y, w) {
   const crimson = members.find((e) => e.role === "crimson");
   const azure = members.find((e) => e.role === "azure");
   const alive = members.filter((e) => !e.dead);
-  const tag = b.shared.resonance ? " · 双瞳共鸣" : b.enraged ? " · 单眼暴走" : "";
-  drawBossTitle(ctx, `裂渊双瞳${tag}`, x, y - 18, w);
   if (alive.length === 1) {
     const solo = alive[0];
     const hpRatio = Math.max(0, solo.hp / solo.maxHp);
@@ -2695,10 +2714,6 @@ function drawTwinBossBar(ctx, b, x, y, w) {
     ctx.strokeStyle = "rgba(255,209,102,0.85)";
     ctx.lineWidth = 2;
     ctx.strokeRect(x + 1, y + 11, w - 2, 26);
-    ctx.fillStyle = "#f3f7ff";
-    ctx.font = `14px ${CANVAS_PIXEL_FONT}`;
-    ctx.textAlign = "center";
-    ctx.fillText(`${Math.ceil(solo.hp)} / ${Math.ceil(solo.maxHp)}`, viewport.width / 2, y + 30);
     return;
   }
   ctx.fillStyle = "rgba(6,9,18,0.9)";
@@ -2723,12 +2738,6 @@ function drawTwinBossBar(ctx, b, x, y, w) {
   ctx.strokeStyle = b.shared.resonance ? "rgba(255,255,255,0.95)" : "rgba(255,209,102,0.85)";
   ctx.lineWidth = 2;
   ctx.strokeRect(x + 1, y + 1, w - 2, 36);
-  ctx.fillStyle = "#f3f7ff";
-  ctx.font = `12px ${CANVAS_PIXEL_FONT}`;
-  ctx.textAlign = "center";
-  const leftHp = crimson && !crimson.dead ? `${Math.ceil(crimson.hp)}/${Math.ceil(crimson.maxHp)}` : "绯裂已毁";
-  const rightHp = azure && !azure.dead ? `${Math.ceil(azure.hp)}/${Math.ceil(azure.maxHp)}` : "苍雷已毁";
-  ctx.fillText(`${leftHp}    ${rightHp}`, viewport.width / 2, y + 27);
 }
 function drawBossTitle(ctx, text, x, y, w) {
   ctx.save();

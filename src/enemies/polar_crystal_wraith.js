@@ -298,6 +298,7 @@ export class PolarCrystalWraith extends BaseEnemy {
       frostDuration: split ? 1.2 : 0.8,
       frostSlow: split ? 0.24 : 0.18,
       splitOnExpire: split && this.phaseLevel >= 2,
+      bossProjectile: true,
     });
     if (Math.random() < 0.7) particle("mist", x, y, { color: "#9ff4ff", life: 0.32, size: 8, alpha: 0.35 });
   }

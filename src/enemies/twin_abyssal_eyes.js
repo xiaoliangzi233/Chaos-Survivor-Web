@@ -347,6 +347,7 @@ export class TwinAbyssalEyes extends BaseEnemy {
       life: 4.6,
       shape,
       spin: Math.random() * TAU,
+      bossProjectile: true,
     });
   }
 

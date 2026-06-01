@@ -293,6 +293,7 @@ export class StormRailDevourer extends BaseEnemy {
       life: 4,
       shape: "stormOrb",
       spin: Math.random() * TAU,
+      bossProjectile: true,
     });
   }
 

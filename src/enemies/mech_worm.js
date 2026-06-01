@@ -1,13 +1,14 @@
 ﻿import { TAU, WORLD_SIZE } from "../constants.js";
 import { state } from "../state.js";
 import { burst, pulse, trail } from "../effects.js";
-import { clamp } from "../utils.js";
+import { angleDiff, clamp } from "../utils.js";
 import { BaseEnemy } from "./BaseEnemy.js";
 import { applyPlayerDamage } from "../systems/items.js";
 
-const SEGMENT_COUNT = 7;
-const SEGMENT_GAP = 17;
+const BASE_SEGMENT_COUNT = 8;
+const BASE_SEGMENT_GAP = 22;
 const STRIKE_RANGE = 360;
+const DIFFICULTY_RANK = { ember: 0, neon: 1, overclock: 2, apocalypse: 3 };
 
 export class MechWorm extends BaseEnemy {
   constructor(config, x, y) {
@@ -24,10 +25,15 @@ export class MechWorm extends BaseEnemy {
     this.cooldown = 1.1 + Math.random() * 0.7;
     this.strikeAngle = 0;
     this.trailTimer = 0;
+    this.coastTime = 0;
+    this.difficultyRank = DIFFICULTY_RANK[state.difficulty?.id || state.difficultyId] ?? 1;
+    this.segmentGap = BASE_SEGMENT_GAP + this.difficultyRank * 3;
+    this.segmentCount = BASE_SEGMENT_COUNT + Math.floor(this.difficultyRank / 2);
+    this.coastTurnRate = 0.95 + this.difficultyRank * 0.42;
     this.path = [];
     this.segments = [];
-    for (let i = 0; i < SEGMENT_COUNT; i++) {
-      this.segments.push({ x: x - i * SEGMENT_GAP, y, angle: 0, phase: Math.random() * TAU });
+    for (let i = 0; i < this.segmentCount; i++) {
+      this.segments.push({ x: x - (i + 1) * this.segmentGap, y, angle: 0, phase: Math.random() * TAU });
     }
   }
 
@@ -46,6 +52,8 @@ export class MechWorm extends BaseEnemy {
       this.updateCharge(dt, dx, dy, d);
     } else if (this.state === "strike") {
       this.updateStrike(dt);
+    } else if (this.state === "coast") {
+      this.updateCoast(dt);
     } else {
       this.updateHunt(dt, dx, dy, d);
     }
@@ -59,7 +67,7 @@ export class MechWorm extends BaseEnemy {
   }
 
   updateHunt(dt, dx, dy, d) {
-    const side = Math.sin(this.anim * 0.7 + this.phase) * 0.62;
+    const side = Math.sin(this.anim * 0.65 + this.phase) * 0.18;
     this.x += (dx / d + -dy / d * side) * this.speed * dt;
     this.y += (dy / d + dx / d * side) * this.speed * dt;
     if (d < STRIKE_RANGE && this.cooldown <= 0) {
@@ -72,7 +80,7 @@ export class MechWorm extends BaseEnemy {
 
   updateCharge(dt, dx, dy, d) {
     this.chargeTime -= dt;
-    this.strikeAngle = this.strikeAngle * 0.9 + Math.atan2(dy, dx) * 0.1;
+    this.strikeAngle += angleDiff(Math.atan2(dy, dx), this.strikeAngle) * 0.12;
     this.x -= (dx / d) * this.speed * 0.34 * dt;
     this.y -= (dy / d) * this.speed * 0.34 * dt;
     if (this.chargeTime <= 0) {
@@ -85,8 +93,9 @@ export class MechWorm extends BaseEnemy {
   updateStrike(dt) {
     this.strikeTime -= dt;
     const speed = this.speed * 3.25;
-    const weave = Math.sin(this.strikeTime * 26 + this.phase) * 0.14;
+    const weave = Math.sin(this.strikeTime * 22 + this.phase) * 0.045;
     const angle = this.strikeAngle + weave;
+    this.strikeAngle = angle;
     this.x += Math.cos(angle) * speed * dt;
     this.y += Math.sin(angle) * speed * dt;
     this.trailTimer -= dt;
@@ -95,26 +104,48 @@ export class MechWorm extends BaseEnemy {
       trail(this.x, this.y, this.x - Math.cos(angle) * 28, this.y - Math.sin(angle) * 28, this.color, 10);
     }
     if (this.strikeTime <= 0) {
-      this.state = "hunt";
+      this.state = "coast";
+      this.coastTime = 0.46 + this.difficultyRank * 0.05;
       this.cooldown = 1.65;
     }
   }
 
+  updateCoast(dt) {
+    const p = state.player;
+    const target = Math.atan2(p.y - this.y, p.x - this.x);
+    this.strikeAngle += angleDiff(target, this.strikeAngle) * Math.min(1, this.coastTurnRate * dt);
+    const speed = this.speed * 1.65;
+    this.x += Math.cos(this.strikeAngle) * speed * dt;
+    this.y += Math.sin(this.strikeAngle) * speed * dt;
+    this.coastTime -= dt;
+    if (this.coastTime <= 0) this.state = "hunt";
+  }
+
   recordPath() {
     this.path.unshift({ x: this.x, y: this.y });
-    const max = SEGMENT_COUNT * SEGMENT_GAP + 24;
+    const max = this.segmentCount * this.segmentGap + 24;
     if (this.path.length > max) this.path.length = max;
   }
 
   updateSegments() {
+    let leadX = this.x;
+    let leadY = this.y;
+    let leadAngle = this.strikeAngle;
     for (let i = 0; i < this.segments.length; i++) {
-      const target = this.path[Math.min(this.path.length - 1, (i + 1) * SEGMENT_GAP)] || { x: this.x, y: this.y };
       const seg = this.segments[i];
-      const dx = target.x - seg.x;
-      const dy = target.y - seg.y;
-      seg.x += dx * 0.42;
-      seg.y += dy * 0.42;
-      seg.angle = Math.atan2(dy, dx);
+      const dx = leadX - seg.x;
+      const dy = leadY - seg.y;
+      const distance = Math.max(1, Math.hypot(dx, dy));
+      const angle = distance > 2 ? Math.atan2(dy, dx) : leadAngle;
+      const targetX = leadX - Math.cos(angle) * this.segmentGap;
+      const targetY = leadY - Math.sin(angle) * this.segmentGap;
+      const follow = this.state === "strike" || this.state === "coast" ? 0.86 : 0.72;
+      seg.x += (targetX - seg.x) * follow;
+      seg.y += (targetY - seg.y) * follow;
+      seg.angle = angle;
+      leadX = seg.x;
+      leadY = seg.y;
+      leadAngle = angle;
     }
   }
 

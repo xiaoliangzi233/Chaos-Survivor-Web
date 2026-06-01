@@ -20,7 +20,9 @@ export class SlimeEnemy extends BaseEnemy {
     this.lastY = y;
     this.landSquash = 0;
     this.faceBlink = Math.random() * 1.4;
-    this.slimeColors = pickSlimeVariant(profile);
+    const variant = pickSlimeVariant(profile);
+    this.slimeVariant = variant.id;
+    this.slimeColors = variant.colors;
     this.color = this.slimeColors.body;
   }
 
@@ -192,11 +194,14 @@ const SLIME_VARIANTS = {
   honey: { body: "#ffd166", core: "#ffe08a", dark: "#aa7422", light: "#fff1b7", trail: "#ffe08a", face: "#5f3b12", mouth: "#9b671d" },
   amber: { body: "#ffad66", core: "#ffc28a", dark: "#a65a22", light: "#ffe0b8", trail: "#ffc48a", face: "#5a2f15", mouth: "#914f1e" },
   lime: { body: "#b6ff69", core: "#cfff93", dark: "#5f9325", light: "#e4ffc2", trail: "#d7ff9a", face: "#28440f", mouth: "#5d8f22" },
+  rainbow: { body: "#ff4dd8", core: "#fff16a", dark: "#5b21b6", light: "#7df9ff", trail: "#ff9df2", face: "#24103f", mouth: "#ffffff" },
 };
 
 function pickSlimeVariant(profile) {
+  if (Math.random() > 0.9985) return { id: "rainbow", colors: SLIME_VARIANTS.rainbow };
   const keys = profile.variants || ["green"];
-  return SLIME_VARIANTS[keys[Math.floor(Math.random() * keys.length)]] || SLIME_VARIANTS.green;
+  const id = keys[Math.floor(Math.random() * keys.length)] || "green";
+  return { id, colors: SLIME_VARIANTS[id] || SLIME_VARIANTS.green };
 }
 
 function drawSlimeShadow(ctx, e, lift) {

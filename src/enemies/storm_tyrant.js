@@ -211,6 +211,7 @@ export class StormTyrant extends BaseEnemy {
       life: 4.8,
       shape,
       spin: Math.random() * TAU,
+      bossProjectile: true,
     });
   }
 

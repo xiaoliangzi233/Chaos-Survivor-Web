@@ -878,5 +878,45 @@
     "spawnWeight": 1,
     "desc": "趁实验室断电出来搬金币的游荡目标，击倒后会撒出一串金币。",
     "tip": "奖励波优先追击它，别让金币散在危险边缘。"
+  },
+  "slime_king": {
+    "name": "史莱姆王",
+    "category": "Boss",
+    "trait": "凝胶王冠",
+    "difficultyWaves": {
+      "neon": {
+        "bossWave": 10
+      }
+    },
+    "hp": 30000,
+    "speed": 58,
+    "damage": 30,
+    "xp": 220,
+    "radius": 66,
+    "color": "#77ff8a",
+    "behavior": "boss_slime_king",
+    "boss": true,
+    "desc": "培养池深处凝结出的巨型史莱姆核心，头顶一圈金色凝胶王冠。它会弹跳碾压、喷出环形凝胶弹、在玩家附近制造黏液区，并召唤各种史莱姆护驾。",
+    "tip": "看到它压低身体就是弹跳预警；优先拉开落点，再处理召唤出的史莱姆。"
+  },
+  "gear_king": {
+    "name": "齿轮王",
+    "category": "Boss",
+    "trait": "发条审判",
+    "difficultyWaves": {
+      "neon": {
+        "bossWave": 20
+      }
+    },
+    "hp": 46000,
+    "speed": 52,
+    "damage": 38,
+    "xp": 340,
+    "radius": 68,
+    "color": "#f59e0b",
+    "behavior": "boss_gear_king",
+    "boss": true,
+    "desc": "实验室中央传动井里的总控齿轮获得意识后自封为王。它会发射扇形齿轮弹幕、沿预警方向锯轨冲刺、铺设齿轮陷阱，并召唤齿轮怪维护自己的机械王座。",
+    "tip": "锯轨冲刺会留下短暂齿轮陷阱，别沿冲刺轨迹追击；后半血弹幕会变成红色高速齿轮。"
   }
 }

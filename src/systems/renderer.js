@@ -39,14 +39,16 @@ export function enemyProjectileHasHalo(projectile) {
 export function eliteOutlineStyle(enemy) {
   if (!enemy?.elite) return null;
   return {
-    color: enemy.eliteVariant === "giant" ? "#ff9f6e" : "#ffd166",
-    width: enemy.eliteVariant === "giant" ? 4 : 2.5,
+    color: enemy.eliteVariant === "giant" ? "#ffb86b" : "#ffe08a",
+    width: enemy.eliteVariant === "giant" ? 2.6 : 1.8,
   };
 }
 
 export function scenarioOverlayStyle(effect) {
   if (effect === "blind") return { color: "rgba(0,0,0,0.34)" };
   if (effect === "ice_skate") return { color: "rgba(159,244,255,0.12)" };
+  if (effect === "invisible_brain_eaters") return { color: "rgba(20,255,190,0.055)" };
+  if (effect === "mini_overdrive") return { color: "rgba(255,209,102,0.055)" };
   return null;
 }
 
@@ -143,11 +145,25 @@ export function render(ctx) {
   drawGems(ctx);
   drawCoins(ctx);
   drawProjectiles(ctx);
+  const invisibleEnemies = activeWaveEffect("invisible_brain_eaters");
+  const miniOverdrive = activeWaveEffect("mini_overdrive");
   for (const e of world.enemies) {
     if (!inView(e.x, e.y, e.r + 80)) continue;
-    e.draw(ctx);
-    drawEliteOutline(ctx, e);
-    if (e.shielded) drawEnemyShield(ctx, e);
+    if (invisibleEnemies && !e.boss) continue;
+    if (miniOverdrive && !e.boss) {
+      ctx.save();
+      ctx.translate(e.x, e.y);
+      ctx.scale(0.5, 0.5);
+      ctx.translate(-e.x, -e.y);
+      e.draw(ctx);
+      drawEliteOutline(ctx, e);
+      if (e.shielded && !e.globalShielded) drawEnemyShield(ctx, e);
+      ctx.restore();
+    } else {
+      e.draw(ctx);
+      drawEliteOutline(ctx, e);
+      if (e.shielded && !e.globalShielded) drawEnemyShield(ctx, e);
+    }
   }
   drawDrones(ctx);
   drawPlayer(ctx);
@@ -2397,6 +2413,10 @@ function drawHazards(ctx) {
       drawMagmaCrackHazard(ctx, h, alpha);
       continue;
     }
+    if (h.kind === "toxic_residue") {
+      drawToxicResidueHazard(ctx, h, alpha);
+      continue;
+    }
     if (h.kind === "twin_arc_field") {
       drawTwinArcFieldHazard(ctx, h, alpha);
       continue;
@@ -2440,6 +2460,36 @@ function drawGearTrapHazard(ctx, h, alpha) {
   ctx.arc(0, 0, h.r, 0, TAU);
   ctx.stroke();
   ctx.setLineDash([]);
+  ctx.restore();
+}
+
+function drawToxicResidueHazard(ctx, h, alpha) {
+  ctx.save();
+  ctx.translate(h.x, h.y);
+  const pulse = 0.5 + Math.sin(state.time * 2.2 + h.x * 0.01) * 0.08;
+  ctx.fillStyle = hexToRgba("#06130b", 0.52 * alpha);
+  ctx.beginPath();
+  ctx.arc(0, 0, h.r, 0, TAU);
+  ctx.fill();
+  ctx.fillStyle = hexToRgba(h.color, 0.13 * alpha);
+  ctx.beginPath();
+  ctx.ellipse(0, 0, h.r * 0.94, h.r * 0.72, Math.sin(state.time + h.y) * 0.2, 0, TAU);
+  ctx.fill();
+  ctx.strokeStyle = hexToRgba(h.color, 0.42 * alpha);
+  ctx.lineWidth = 2;
+  ctx.setLineDash([10, 8]);
+  ctx.beginPath();
+  ctx.arc(0, 0, h.r * pulse, 0, TAU);
+  ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.strokeStyle = hexToRgba("#d7ffe4", 0.24 * alpha);
+  ctx.lineWidth = 1;
+  for (let i = 0; i < 5; i++) {
+    const a = i / 5 * TAU + state.time * 0.18;
+    ctx.beginPath();
+    ctx.arc(Math.cos(a) * h.r * 0.35, Math.sin(a) * h.r * 0.24, h.r * 0.08, 0, TAU);
+    ctx.stroke();
+  }
   ctx.restore();
 }
 
@@ -2694,15 +2744,29 @@ function drawEliteOutline(ctx, e) {
   ctx.translate(e.x, e.y);
   ctx.strokeStyle = style.color;
   ctx.lineWidth = style.width;
-  ctx.setLineDash(e.eliteVariant === "giant" ? [10, 5] : [5, 4]);
+  ctx.setLineDash(e.eliteVariant === "giant" ? [12, 8] : [7, 6]);
   ctx.beginPath();
   ctx.arc(0, 0, e.r + 8 + Math.sin(state.time * 5) * 2, 0, TAU);
+  ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.strokeStyle = hexToRgba("#ffffff", e.eliteVariant === "giant" ? 0.26 : 0.18);
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.arc(0, 0, e.r + 14, 0, TAU);
   ctx.stroke();
   ctx.restore();
 }
 
 function drawScenarioOverlay(ctx) {
-  const effect = activeWaveEffect("blind") ? "blind" : activeWaveEffect("ice_skate") ? "ice_skate" : null;
+  const effect = activeWaveEffect("blind")
+    ? "blind"
+    : activeWaveEffect("ice_skate")
+      ? "ice_skate"
+      : activeWaveEffect("invisible_brain_eaters")
+        ? "invisible_brain_eaters"
+        : activeWaveEffect("mini_overdrive")
+          ? "mini_overdrive"
+          : null;
   const style = scenarioOverlayStyle(effect);
   if (!style) return;
   ctx.fillStyle = style.color;

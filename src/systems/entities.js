@@ -8,7 +8,7 @@ import { updateBlackhole } from "../blackhole.js";
 import { difficultyMultiplier, currentDifficulty } from "../difficulty.js";
 import { applyPlayerDamage, coinDropMultiplier, onWeaponHit, rollWeaponDamage, waveSpawnMultiplier } from "./items.js";
 import { spawnDamageText } from "../effects.js";
-import { emberSpawnRateForWave } from "../config/ember-wave-scenarios.js";
+import { waveScenarioSpawnRate } from "../config/wave-scenario-config.js";
 import { activeWaveEffect } from "./waveScenarios.js";
 export { applyFrostMark } from "./statusEffects.js";
 import { applyFrostMark } from "./statusEffects.js";
@@ -107,7 +107,7 @@ export function updateSpawning(dt) {
 export function spawnBudgetGainPerSecond({ wave, difficultyId, difficultySpawnRate, itemSpawnMultiplier }) {
   const danger = wave / 20;
   const earlyMul = wave <= 3 ? 0.52 : wave <= 6 ? 0.68 : wave <= 9 ? 0.84 : 1;
-  const scenarioMul = difficultyId === "ember" ? emberSpawnRateForWave(wave) : 1;
+  const scenarioMul = waveScenarioSpawnRate(difficultyId, wave);
   return (2.1 + danger * 10.5 + wave * 0.36) * earlyMul * difficultySpawnRate * itemSpawnMultiplier * scenarioMul;
 }
 
@@ -115,6 +115,7 @@ export function updateEnemies(dt) {
   const p = state.player;
   for (const e of world.enemies) {
     e.shielded = false;
+    e.globalShielded = false;
     e.prismAssistTimer = Math.max(0, (e.prismAssistTimer || 0) - dt);
   }
   for (let i = world.enemies.length - 1; i >= 0; i--) {
@@ -132,8 +133,10 @@ export function updateEnemies(dt) {
     const assisted = e.prismAssistTimer > 0 && !e.boss;
     const baseSpeed = e.speed;
     if (assisted) e.speed *= e.prismAssistSpeedMult || 1.22;
-    e.update(dt);
+    if (activeWaveEffect("mini_overdrive") && !e.boss) e.speed *= 1.5;
+    if (!updateEliteDashTrap(e, dt)) e.update(dt);
     if (assisted) e.speed = baseSpeed;
+    if (activeWaveEffect("mini_overdrive") && !e.boss) e.speed = baseSpeed;
     updateEliteSkill(e, dt);
     applyDifficultyCooldownScale(e, beforeCooldowns);
   }
@@ -333,8 +336,9 @@ function updateEnemyProjectiles(dt) {
   for (let i = world.enemyProjectiles.length - 1; i >= 0; i--) {
     const b = world.enemyProjectiles[i];
     updateSpecialEnemyProjectile(b, dt);
-    b.x += b.vx * dt;
-    b.y += b.vy * dt;
+    const speedScale = activeWaveEffect("mini_overdrive") && !b.bossProjectile ? 1.5 : 1;
+    b.x += b.vx * dt * speedScale;
+    b.y += b.vy * dt * speedScale;
     b.life -= dt;
     if (circleHit(b.x, b.y, b.r, p.x, p.y, p.r) && p.invuln <= 0) {
       const result = applyPlayerDamage(b.damage, b);
@@ -342,6 +346,10 @@ function updateEnemyProjectiles(dt) {
       if (result.damaged && b.burnDuration > 0) {
         p.burnTimer = Math.max(p.burnTimer || 0, b.burnDuration);
         p.burnDps = Math.max(p.burnDps || 0, b.burnDps || 0);
+      }
+      if (result.damaged && b.poisonDuration > 0) {
+        p.burnTimer = Math.max(p.burnTimer || 0, b.poisonDuration);
+        p.burnDps = Math.max(p.burnDps || 0, b.poisonDps || 0);
       }
       if (result.damaged && b.frostDuration > 0) {
         if (b.frostMarks) applyFrostMark(p, { duration: b.frostDuration, slow: b.frostSlow || 0.18, freezeDuration: b.freezeDuration || 5 });
@@ -421,6 +429,7 @@ function updateHazards(dt) {
       (h.kind === "artillery_blast" && h.exploding) ||
       h.kind === "gear_trap" ||
       h.kind === "magma_crack" ||
+      h.kind === "toxic_residue" ||
       h.kind === "twin_arc_field" ||
       (h.kind === "storm_laser_net" && (h.armTime || 0) <= 0) ||
       h.kind === "frost_zone" ||
@@ -439,6 +448,10 @@ function updateHazards(dt) {
           p.frostSlow = Math.max(p.frostSlow || 0, h.frostSlow || 0.18);
         }
       }
+      if ((result.damaged || h.kind === "toxic_residue") && h.poisonDuration > 0) {
+        p.burnTimer = Math.max(p.burnTimer || 0, h.poisonDuration);
+        p.burnDps = Math.max(p.burnDps || 0, h.poisonDps || 0);
+      }
       playSfx("hurt");
       if (h.kind === "ember_mine") h.life = 0;
       if (h.kind === "artillery_blast") h.life = Math.min(h.life, 0.12);
@@ -449,6 +462,7 @@ function updateHazards(dt) {
 
 function updateEliteSkill(e, dt) {
   if (!e?.elite || e.dead || e.boss) return;
+  if (e.eliteGlobalShield) return applyEliteGlobalShield(e);
   e.eliteSkillCooldown ??= 3 + Math.random() * 1.2;
   e.eliteSkillInterval ??= e.eliteVariant === "giant" ? 5.2 : 4.4;
   e.eliteSkillProjectileCount ??= e.eliteVariant === "giant" ? 16 : 10;
@@ -459,7 +473,7 @@ function updateEliteSkill(e, dt) {
       e.eliteSkillPulse = 0.16;
       pulse(e.x, e.y, e.r * (2.2 + (e.eliteSkillWindup || 0)), "#ffd166", 0.18);
     }
-    if (e.eliteSkillWindup <= 0) releaseElitePulse(e);
+    if (e.eliteSkillWindup <= 0) releaseEliteSkill(e);
     return;
   }
   e.eliteSkillCooldown -= dt;
@@ -467,6 +481,12 @@ function updateEliteSkill(e, dt) {
   e.eliteSkillWindup = e.eliteVariant === "giant" ? 0.82 : 0.62;
   e.eliteSkillPulse = 0;
   pulse(e.x, e.y, e.r * 3.1, "#ffd166", 0.34);
+}
+
+function releaseEliteSkill(e) {
+  if (e.eliteFireballSkill) return releaseEliteFireballs(e);
+  if (e.eliteDashTrapSkill) return releaseEliteDashTrap(e);
+  releaseElitePulse(e);
 }
 
 function releaseElitePulse(e) {
@@ -484,10 +504,11 @@ function releaseElitePulse(e) {
       vx: Math.cos(a) * speed,
       vy: Math.sin(a) * speed,
       r: radius,
-      color: "#ffd166",
+      color: e.eliteVariant === "giant" ? "#ffb86b" : "#ffe08a",
       damage,
       life: 4.2,
-      shape: "elitePulse",
+      shape: "starShard",
+      spin: Math.random() * TAU,
     });
   }
   burst(e.x, e.y, e.eliteVariant === "giant" ? 24 : 16, "#ffd166", 210);
@@ -495,6 +516,73 @@ function releaseElitePulse(e) {
   world.weaponFx.push({ kind: "shockRing", x: e.x, y: e.y, radius: e.r * 3.2, life: 0.34, maxLife: 0.34, color: "#ffd166" });
   state.shake = Math.max(state.shake, e.eliteVariant === "giant" ? 7 : 4);
   e.eliteSkillCooldown = e.eliteSkillInterval;
+}
+
+function releaseEliteFireballs(e) {
+  const count = e.eliteVariant === "giant" ? 5 : 3;
+  const base = Math.atan2(state.player.y - e.y, state.player.x - e.x);
+  for (let i = 0; i < count; i++) {
+    const spread = (i - (count - 1) / 2) * 0.18;
+    const a = base + spread;
+    world.enemyProjectiles.push({
+      x: e.x + Math.cos(a) * e.r,
+      y: e.y + Math.sin(a) * e.r,
+      vx: Math.cos(a) * 250,
+      vy: Math.sin(a) * 250,
+      r: 9,
+      color: "#ff7a1a",
+      damage: Math.max(1, e.damage * 0.42),
+      life: 4,
+      shape: "fireball",
+      spin: Math.random() * TAU,
+      burnDuration: 2.6,
+      burnDps: e.damage * 0.22,
+    });
+  }
+  burst(e.x, e.y, 18, "#ff7a1a", 180);
+  pulse(e.x, e.y, e.r * 2.6, "#ffad66", 0.28);
+  e.eliteSkillCooldown = e.eliteSkillInterval;
+}
+
+function releaseEliteDashTrap(e) {
+  e.eliteDashTime = 0.48;
+  const a = Math.atan2(state.player.y - e.y, state.player.x - e.x);
+  e.eliteDashVx = Math.cos(a) * 560;
+  e.eliteDashVy = Math.sin(a) * 560;
+  e.eliteDashTrapTimer = 0;
+  e.eliteSkillCooldown = e.eliteSkillInterval;
+  burst(e.x, e.y, 14, e.color, 180);
+}
+
+function updateEliteDashTrap(e, dt) {
+  if ((e.eliteDashTime || 0) <= 0) return false;
+  e.eliteDashTime = Math.max(0, e.eliteDashTime - dt);
+  e.x += (e.eliteDashVx || 0) * dt;
+  e.y += (e.eliteDashVy || 0) * dt;
+  e.eliteDashTrapTimer -= dt;
+  if (e.eliteDashTrapTimer <= 0) {
+    e.eliteDashTrapTimer = 0.08;
+    world.hazards.push({
+      kind: "gear_trap",
+      x: e.x,
+      y: e.y,
+      r: 36,
+      color: e.color,
+      damage: e.damage * 0.5,
+      life: 2.6,
+      maxLife: 2.6,
+      spin: Math.random() * TAU,
+    });
+  }
+  return true;
+}
+
+function applyEliteGlobalShield(e) {
+  for (const other of world.enemies) {
+    if (other === e || other.dead || other.boss) continue;
+    other.shielded = true;
+    other.globalShielded = true;
+  }
 }
 
 function pointLineDistance(px, py, x, y, angle, length) {

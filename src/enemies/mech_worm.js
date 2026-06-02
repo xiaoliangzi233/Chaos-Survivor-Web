@@ -37,6 +37,20 @@ export class MechWorm extends BaseEnemy {
     }
   }
 
+  extendSegments(multiplier) {
+    const target = Math.max(this.segmentCount, Math.round(this.segmentCount * multiplier));
+    this.segmentCount = target;
+    while (this.segments.length < target) {
+      const tail = this.segments[this.segments.length - 1] || { x: this.x, y: this.y, angle: this.strikeAngle || 0 };
+      this.segments.push({
+        x: tail.x - Math.cos(tail.angle) * this.segmentGap,
+        y: tail.y - Math.sin(tail.angle) * this.segmentGap,
+        angle: tail.angle,
+        phase: Math.random() * TAU,
+      });
+    }
+  }
+
   update(dt) {
     const p = state.player;
     const dx = p.x - this.x;

@@ -4,7 +4,7 @@ import { clamp } from "../utils.js";
 import { setSpawnConfigured } from "../enemies/BaseEnemy.js";
 import { currentDifficulty, difficultyOrder } from "../difficulty.js";
 import { recordCodexEntry } from "./codex.js";
-import { emberWaveScenario, emberWaveSpawnPool } from "../config/ember-wave-scenarios.js";
+import { waveScenarioFor, waveScenarioSpawnPool } from "../config/wave-scenario-config.js";
 import { Zombie } from "../enemies/zombie.js";
 import { Lancer } from "../enemies/lancer.js";
 import { Wisp } from "../enemies/wisp.js";
@@ -44,6 +44,8 @@ import { StormTyrant } from "../enemies/storm_tyrant.js";
 import { StormRailDevourer } from "../enemies/storm_rail_devourer.js";
 import { TwinAbyssalEyes } from "../enemies/twin_abyssal_eyes.js";
 import { PolarCrystalWraith } from "../enemies/polar_crystal_wraith.js";
+import { SlimeKing } from "../enemies/slime_king.js";
+import { GearKing } from "../enemies/gear_king.js";
 
 const classes = {
   zombie: Zombie,
@@ -85,6 +87,8 @@ const classes = {
   storm_rail_devourer: StormRailDevourer,
   twin_abyssal_eyes: TwinAbyssalEyes,
   polar_crystal_wraith: PolarCrystalWraith,
+  slime_king: SlimeKing,
+  gear_king: GearKing,
 };
 const WAVE_SPAWN_LIMITS = {
   thief: 3,
@@ -185,7 +189,8 @@ function randomSpawnPosition(radius) {
 }
 
 function isEnemyAvailableFor(entry, wave, difficultyId = state.difficultyId || currentDifficulty()?.id) {
-  if (difficultyId === "ember" && !isAllowedByEmberScenario(entry, wave)) return false;
+  const scenario = waveScenarioFor(difficultyId, wave);
+  if (scenario && !isAllowedByScenario(entry, wave, difficultyId)) return false;
   return isWaveAllowed(entry, wave, difficultyId) && isDifficultyAllowed(entry, difficultyId);
 }
 
@@ -211,11 +216,11 @@ function syncLimitedEnemyWave(id) {
   state[countKey] = 0;
 }
 
-function isAllowedByEmberScenario(entry, wave) {
-  const scenario = emberWaveScenario(wave);
-  if (!scenario) return false;
+function isAllowedByScenario(entry, wave, difficultyId) {
+  const scenario = waveScenarioFor(difficultyId, wave);
+  if (!scenario) return true;
   if (entry.boss) return scenario.boss === entry.id;
-  return emberWaveSpawnPool(wave).includes(entry.id);
+  return waveScenarioSpawnPool(difficultyId, wave).includes(entry.id);
 }
 
 function isWaveAllowed(entry, wave, difficultyId) {

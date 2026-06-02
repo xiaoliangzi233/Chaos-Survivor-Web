@@ -190,7 +190,11 @@ export function dropCoin(x, y, amount) {
 }
 
 export function coinAmountForEnemy(enemy) {
-  if (!enemy || enemy.boss || enemy.elite || enemy.category !== "小怪") return 0;
+  if (!enemy || enemy.elite || (enemy.category !== "小怪" && !enemy.boss)) return 0;
+  if (enemy.boss) {
+    const amount = enemy.coinDrop ?? Math.max(90, Math.round((enemy.xp || 100) * 0.55));
+    return Math.max(30, Math.round(amount * (enemy.rewardScale ?? 1) * difficultyMultiplier("coinGain") * coinDropMultiplier()));
+  }
   const amount = 1 + Math.floor(Math.random() * 3) + Math.floor((enemy.xp || 1) / 10) + Math.floor(state.wave / 7);
   return Math.min(24, Math.max(1, Math.round(amount * difficultyMultiplier("coinGain") * coinDropMultiplier())));
 }

@@ -181,7 +181,8 @@ export class BaseEnemy {
     burst(this.x, this.y, this.boss ? 48 : 12, this.color, this.boss ? 240 : 140);
     playSfx(this.boss ? "explode" : "hit");
     import("../systems/entities.js").then(({ coinAmountForEnemy, dropGem, dropCoin }) => {
-      dropGem(this.x, this.y, this.xp);
+      const rewardScale = this.rewardScale ?? 1;
+      dropGem(this.x, this.y, (this.boss ? (this.xp || 1) * 2.4 : this.xp) * rewardScale);
       const amount = coinAmountForEnemy(this);
       if (amount > 0) dropCoin(this.x, this.y, amount);
     });

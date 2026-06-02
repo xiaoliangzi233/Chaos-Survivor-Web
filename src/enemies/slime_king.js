@@ -216,6 +216,7 @@ export class SlimeKing extends BaseEnemy {
       const heir = new SlimeKing(this, this.x + side * this.r * 0.9, this.y);
       heir.name = i ? "史莱姆王·右冠" : "史莱姆王·左冠";
       heir.splitChild = true;
+      heir.rewardScale = 0.5;
       heir.phase2 = true;
       heir.r = this.r * 0.68;
       heir.radius = heir.r;

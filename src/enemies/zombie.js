@@ -1,6 +1,6 @@
 import { BaseEnemy } from "./BaseEnemy.js";
 
-const CLOTHING_VARIANTS = ["street", "worker", "runner", "hazard", "security"];
+const CLOTHING_VARIANTS = ["street", "worker", "runner", "hazard", "security", "medic", "engineer", "janitor", "prisoner", "courier", "lab_guard", "chemist", "mechanic"];
 
 export class Zombie extends BaseEnemy {
   constructor(config, x, y) {

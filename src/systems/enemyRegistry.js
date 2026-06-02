@@ -86,6 +86,9 @@ const classes = {
   twin_abyssal_eyes: TwinAbyssalEyes,
   polar_crystal_wraith: PolarCrystalWraith,
 };
+const WAVE_SPAWN_LIMITS = {
+  thief: 3,
+};
 
 export let enemyConfig = {};
 
@@ -108,9 +111,11 @@ export function spawnEnemyById(id, x = null, y = null) {
   const cfg = enemyConfig[id];
   const Klass = classes[id] || Zombie;
   if (!cfg) return null;
+  if (!canSpawnLimitedEnemy(id)) return null;
   const pos = x == null || y == null ? randomSpawnPosition(cfg.radius) : { x, y };
   const e = new Klass(cfg, pos.x, pos.y);
   world.enemies.push(e);
+  recordLimitedEnemySpawn(id);
   if (e.boss) world.boss = e;
   recordCodexEntry("enemies", id);
   return e;
@@ -137,7 +142,7 @@ export function availableEnemyIdsForWave(wave) {
 
 export function randomEnemyForWave(wave) {
   const difficultyId = state.difficultyId || currentDifficulty()?.id;
-  const entries = Object.values(enemyConfig).filter((entry) => !entry.boss && isEnemyAvailableFor(entry, wave, difficultyId));
+  const entries = Object.values(enemyConfig).filter((entry) => !entry.boss && isEnemyAvailableFor(entry, wave, difficultyId) && canSpawnLimitedEnemy(entry.id));
   const weighted = entries
     .map((entry) => ({ id: entry.id, weight: spawnWeightFor(entry, wave, difficultyId) }))
     .filter((entry) => entry.weight > 0);
@@ -182,6 +187,28 @@ function randomSpawnPosition(radius) {
 function isEnemyAvailableFor(entry, wave, difficultyId = state.difficultyId || currentDifficulty()?.id) {
   if (difficultyId === "ember" && !isAllowedByEmberScenario(entry, wave)) return false;
   return isWaveAllowed(entry, wave, difficultyId) && isDifficultyAllowed(entry, difficultyId);
+}
+
+function canSpawnLimitedEnemy(id) {
+  const limit = WAVE_SPAWN_LIMITS[id];
+  if (!limit) return true;
+  syncLimitedEnemyWave(id);
+  return state[`${id}SpawnCount`] < limit;
+}
+
+function recordLimitedEnemySpawn(id) {
+  const limit = WAVE_SPAWN_LIMITS[id];
+  if (!limit) return;
+  syncLimitedEnemyWave(id);
+  state[`${id}SpawnCount`] = (state[`${id}SpawnCount`] || 0) + 1;
+}
+
+function syncLimitedEnemyWave(id) {
+  const waveKey = `${id}SpawnWave`;
+  const countKey = `${id}SpawnCount`;
+  if (state[waveKey] === state.wave) return;
+  state[waveKey] = state.wave;
+  state[countKey] = 0;
 }
 
 function isAllowedByEmberScenario(entry, wave) {

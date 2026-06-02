@@ -59,7 +59,7 @@ export function applyItemPurchase(offer) {
   const item = ITEM_DEFS.find((entry) => entry.id === offer.itemId || entry.id === offer.id);
   if (!item || !state.player) return;
   if (item.unique && hasPurchasedUniqueItem(item.id)) return;
-  const quality = item.singleQuality ? "common" : offer.rarity || "common";
+  const quality = offerQualityForItem(item, offer.rarity);
   const scale = qualityScale(quality);
   item.apply?.({ player: state.player, quality, scale });
   if (item.unique) {
@@ -214,6 +214,7 @@ export function canPurchaseItem(itemId) {
 }
 
 export function offerQualityForItem(item, rarity) {
+  if (item?.fixedQuality) return item.fixedQuality;
   return item?.singleQuality ? "common" : rarity || "common";
 }
 

@@ -1,4 +1,4 @@
-import { QUALITY_INFO, WEAPON_INFO } from "../economy/inventory.js";
+import { QUALITY_INFO, QUALITY_ORDER, WEAPON_INFO } from "../economy/inventory.js";
 import { createDecorativeEnemy, enemyConfig } from "../systems/enemyRegistry.js";
 import { getCodexEntries } from "../systems/codex.js";
 import { ITEM_DEFS, itemDescription } from "../systems/items.js";
@@ -99,7 +99,8 @@ function entriesFor(type) {
         desc: entry.desc || enemyRole(entry),
         color: entry.color || "#42e8ff",
         raw: entry,
-      }));
+      }))
+      .sort(compareEnemyCodexEntries);
   }
   if (type === "weapons") {
     return Object.entries(WEAPON_INFO)
@@ -117,16 +118,53 @@ function entriesFor(type) {
   }
   return ITEM_DEFS
     .filter((item) => unlocked.has(item.id))
-    .map((item) => ({
-      type,
-      id: item.id,
-      icon: item.icon,
-      name: item.name,
-      tag: item.unique ? "唯一道具" : item.singleQuality ? "普通道具" : "品质道具",
-      desc: itemDescription(item, "common") || item.desc,
-      color: item.unique ? "#ffd166" : "#77ff8a",
-      raw: item,
-    }));
+    .map((item) => itemCodexEntry(item, type))
+    .sort(compareItemCodexEntries);
+}
+
+function itemCodexEntry(item, type) {
+  const qualityId = itemCodexQuality(item);
+  const quality = QUALITY_INFO[qualityId] || QUALITY_INFO.common;
+  return {
+    type,
+    id: item.id,
+    icon: item.icon,
+    name: item.name,
+    tag: item.unique ? `唯一 · ${quality.name}` : `${quality.name}道具`,
+    desc: itemDescription(item, qualityId) || item.desc,
+    color: quality.color,
+    qualityId,
+    raw: item,
+  };
+}
+
+function compareItemCodexEntries(a, b) {
+  const uniqueRank = Number(Boolean(a.raw.unique)) - Number(Boolean(b.raw.unique));
+  if (uniqueRank) return uniqueRank;
+  const qualityRank = qualityIndex(a.qualityId) - qualityIndex(b.qualityId);
+  if (qualityRank) return qualityRank;
+  return ITEM_DEFS.findIndex((item) => item.id === a.id) - ITEM_DEFS.findIndex((item) => item.id === b.id);
+}
+
+function compareEnemyCodexEntries(a, b) {
+  const bossRank = Number(Boolean(a.raw.boss)) - Number(Boolean(b.raw.boss));
+  if (bossRank) return bossRank;
+  return enemyConfigIndex(a.id) - enemyConfigIndex(b.id);
+}
+
+function enemyConfigIndex(id) {
+  const index = Object.keys(enemyConfig).indexOf(id);
+  return index < 0 ? 999 : index;
+}
+
+function itemCodexQuality(item) {
+  if (item?.fixedQuality) return item.fixedQuality;
+  return item?.singleQuality ? "common" : "common";
+}
+
+function qualityIndex(qualityId) {
+  const index = QUALITY_ORDER.indexOf(qualityId || "common");
+  return index < 0 ? 0 : index;
 }
 
 function renderList(entries) {
@@ -321,7 +359,8 @@ function metaLabels(entry) {
     return [`生命 ${Math.round(e.hp || 0)}`, `伤害 ${Math.round(e.damage || 0)}`, `速度 ${Math.round(e.speed || 0)}`];
   }
   if (entry.type === "weapons") return entry.raw.tags || ["武器"];
-  return [entry.raw.unique ? "唯一" : "可叠加", entry.raw.singleQuality ? "固定品质" : "多品质", `基础价 ${entry.raw.basePrice}`];
+  const quality = QUALITY_INFO[entry.qualityId] || QUALITY_INFO.common;
+  return [entry.raw.unique ? "唯一" : "可叠加", entry.raw.singleQuality ? `固定品质：${quality.name}` : "多品质", `基础价 ${entry.raw.basePrice}`];
 }
 
 function enemyRole(entry) {

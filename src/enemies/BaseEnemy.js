@@ -346,6 +346,26 @@ function drawZombieShape(ctx, e) {
     ctx.moveTo(-1 * z, -13 * z);
     ctx.lineTo(-1 * z, 10 * z);
     ctx.stroke();
+  } else if (!flash && e.clothingVariant === "medic") {
+    ctx.fillStyle = "#f8fafc";
+    ctx.fillRect(-9 * z, -13 * z, 18 * z, 7 * z);
+    ctx.fillStyle = "#ef4444";
+    ctx.fillRect(-2 * z, -12 * z, 4 * z, 5 * z);
+    ctx.fillRect(-5 * z, -10 * z, 10 * z, 2 * z);
+  } else if (!flash && e.clothingVariant === "engineer") {
+    ctx.fillStyle = "#facc15";
+    ctx.fillRect(-10 * z, -15 * z, 20 * z, 4 * z);
+    ctx.fillStyle = "#64748b";
+    ctx.fillRect(-8 * z, -4 * z, 5 * z, 8 * z);
+    ctx.fillRect(5 * z, -3 * z, 4 * z, 7 * z);
+  } else if (!flash && e.clothingVariant === "prisoner") {
+    ctx.fillStyle = "#111827";
+    for (let y = -12; y <= 7; y += 7) ctx.fillRect(-10 * z, y * z, 22 * z, 3 * z);
+  } else if (!flash && e.clothingVariant === "courier") {
+    ctx.fillStyle = "#7c2d12";
+    ctx.fillRect(-13 * z, -7 * z, 7 * z, 15 * z);
+    ctx.fillStyle = "#fde68a";
+    ctx.fillRect(3 * z, -13 * z, 6 * z, 5 * z);
   } else if (!flash && outfit.accent) {
     ctx.fillStyle = outfit.accent;
     ctx.fillRect(-8 * z, -12 * z, 15 * z, 3 * z);
@@ -431,6 +451,14 @@ function zombieOutfit(e) {
   if (e.clothingVariant === "runner") return { cloth: "#9f7aea", accent: "#42e8ff" };
   if (e.clothingVariant === "hazard") return { cloth: "#334155", accent: "#ffd166" };
   if (e.clothingVariant === "security") return { cloth: "#264b63", accent: "#77ff8a" };
+  if (e.clothingVariant === "medic") return { cloth: "#e2e8f0", accent: "#ef4444" };
+  if (e.clothingVariant === "engineer") return { cloth: "#475569", accent: "#facc15" };
+  if (e.clothingVariant === "janitor") return { cloth: "#0f766e", accent: "#67e8f9" };
+  if (e.clothingVariant === "prisoner") return { cloth: "#f97316", accent: "#111827" };
+  if (e.clothingVariant === "courier") return { cloth: "#7c3aed", accent: "#fde68a" };
+  if (e.clothingVariant === "lab_guard") return { cloth: "#172554", accent: "#38bdf8" };
+  if (e.clothingVariant === "chemist") return { cloth: "#5b21b6", accent: "#a7f3d0" };
+  if (e.clothingVariant === "mechanic") return { cloth: "#78350f", accent: "#fb923c" };
   if (e.id === "tank" || e.type === "tank") return { cloth: "#6d5bbf", accent: "#ffd166" };
   if (e.behavior === "lancer" || e.behavior === "line_raider") return { cloth: "#d6b64f", accent: "#ffef99" };
   if (e.behavior === "ranged" || e.behavior === "gunner" || e.behavior === "wizard") return { cloth: "#2b8da4", accent: "#d9fbff" };

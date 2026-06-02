@@ -10,6 +10,8 @@ export const state = {
   pendingNextWave: false,
   pendingVictory: false,
   spawnedBossWaves: new Set(),
+  thiefSpawnWave: 0,
+  thiefSpawnCount: 0,
   bossWaveActive: false,
   kills: 0,
   gold: 0,
@@ -164,6 +166,8 @@ export function resetRun(map) {
   state.pendingNextWave = false;
   state.pendingVictory = false;
   state.spawnedBossWaves = new Set();
+  state.thiefSpawnWave = 0;
+  state.thiefSpawnCount = 0;
   state.bossWaveActive = false;
   state.kills = 0;
   state.gold = 0;

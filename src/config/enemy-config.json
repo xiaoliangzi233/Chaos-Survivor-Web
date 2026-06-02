@@ -866,14 +866,15 @@
         ]
       }
     },
-    "hp": 42,
-    "speed": 138,
+    "hp": 999999,
+    "speed": 560,
     "damage": 0,
     "xp": 1,
     "radius": 13,
     "color": "#ffd166",
     "behavior": "thief",
     "coinDrop": 28,
+    "hitCoinDrop": 2,
     "spawnWeight": 1,
     "desc": "趁实验室断电出来搬金币的游荡目标，击倒后会撒出一串金币。",
     "tip": "奖励波优先追击它，别让金币散在危险边缘。"

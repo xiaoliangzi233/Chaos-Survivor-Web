@@ -9,6 +9,7 @@ const DASH_TRIGGER_RANGE = 330;
 const DASH_SPEED = 760;
 const DASH_TIME = 0.58;
 const DASH_DISTANCE = DASH_SPEED * DASH_TIME;
+const LANCER_CLOTHING_VARIANTS = ["scavenger", "guard", "hazard", "medic", "courier", "night_ops", "engineer"];
 
 export class Lancer extends BaseEnemy {
   constructor(config, x, y) {
@@ -22,6 +23,7 @@ export class Lancer extends BaseEnemy {
     this.dashVx = 0;
     this.dashVy = 0;
     this.afterimageTimer = 0;
+    this.clothingVariant = LANCER_CLOTHING_VARIANTS[Math.floor(Math.random() * LANCER_CLOTHING_VARIANTS.length)];
   }
 
   update(dt) {
@@ -112,12 +114,13 @@ export class Lancer extends BaseEnemy {
     ctx.translate(lean, crouch + Math.sin(this.anim * 1.5) * (dash ? 0.4 : 1.1));
 
     if (dash) drawDashAfterimage(ctx);
+    const outfit = lancerOutfit(this);
     drawShadow(ctx, z);
-    drawLegs(ctx, z, walk, run, charge, dash);
-    drawCloak(ctx, z, flash, charge, dash, run);
+    drawLegs(ctx, z, walk, run, charge, dash, outfit);
+    drawCloak(ctx, z, flash, charge, dash, run, outfit);
     drawKnifeArm(ctx, z, flash, charge, dash);
     drawOffhand(ctx, z, flash, walk, dash);
-    drawHead(ctx, z, flash, charge, run);
+    drawHead(ctx, z, flash, charge, run, outfit);
     drawBladeGlint(ctx, charge, dash);
     ctx.restore();
   }
@@ -168,10 +171,10 @@ function drawShadow(ctx, z) {
   ctx.fill();
 }
 
-function drawLegs(ctx, z, walk, run, charge, dash) {
+function drawLegs(ctx, z, walk, run, charge, dash, outfit) {
   const bend = charge ? 2.8 : dash ? -1 : 0;
   const stride = charge ? 1.2 : dash ? 1.8 : 3.4;
-  ctx.fillStyle = "#1a202c";
+  ctx.fillStyle = outfit.pants;
   ctx.save();
   ctx.translate(-6 * z + run * 2.4 * z, 4 * z + walk * stride * z + bend);
   ctx.rotate(walk * 0.22);
@@ -187,10 +190,10 @@ function drawLegs(ctx, z, walk, run, charge, dash) {
   ctx.fillRect(1 * z - run * 3.2 * z, 18 * z - walk * stride * z + bend, 10 * z, 4 * z);
 }
 
-function drawCloak(ctx, z, flash, charge, dash, run) {
-  const cloak = flash ? "#ffffff" : "#2a2035";
-  const lining = flash ? "#ffffff" : "#111827";
-  const scarf = flash ? "#ffffff" : "#ff9f6e";
+function drawCloak(ctx, z, flash, charge, dash, run, outfit) {
+  const cloak = flash ? "#ffffff" : outfit.cloak;
+  const lining = flash ? "#ffffff" : outfit.lining;
+  const scarf = flash ? "#ffffff" : outfit.accent;
   ctx.fillStyle = cloak;
   ctx.beginPath();
   ctx.moveTo(-12 * z, -16 * z);
@@ -217,6 +220,7 @@ function drawCloak(ctx, z, flash, charge, dash, run) {
     ctx.fillStyle = flash ? "#ffffff" : "rgba(255,159,110,0.8)";
     ctx.fillRect(-17 * z, -11 * z, 10 * z, 4 * z);
   }
+  if (!flash) drawLancerClothMark(ctx, z, outfit);
   ctx.strokeStyle = dash ? "#ffe7b0" : "rgba(255,207,138,0.65)";
   ctx.lineWidth = 1.7;
   ctx.stroke();
@@ -267,7 +271,7 @@ function drawOffhand(ctx, z, flash, walk, dash) {
   ctx.stroke();
 }
 
-function drawHead(ctx, z, flash, charge, run) {
+function drawHead(ctx, z, flash, charge, run, outfit) {
   ctx.save();
   ctx.translate(0, Math.abs(run) * -0.7 * z);
   ctx.fillStyle = flash ? "#ffffff" : "#151926";
@@ -282,7 +286,7 @@ function drawHead(ctx, z, flash, charge, run) {
   ctx.closePath();
   ctx.fill();
 
-  ctx.fillStyle = flash ? "#ffffff" : "#ffcf8a";
+  ctx.fillStyle = flash ? "#ffffff" : outfit.accent;
   ctx.fillRect(-8 * z, -21 * z, 18 * z, 4 * z);
   ctx.fillStyle = "#060912";
   ctx.fillRect(-7 * z, -20 * z, 6 * z, 2 * z);
@@ -296,6 +300,35 @@ function drawHead(ctx, z, flash, charge, run) {
   ctx.lineWidth = 1.5;
   ctx.stroke();
   ctx.restore();
+}
+
+function drawLancerClothMark(ctx, z, outfit) {
+  if (outfit.mark === "cross") {
+    ctx.fillStyle = "#f8fafc";
+    ctx.fillRect(1 * z, -6 * z, 3 * z, 9 * z);
+    ctx.fillRect(-2 * z, -3 * z, 9 * z, 3 * z);
+  } else if (outfit.mark === "stripe") {
+    ctx.fillStyle = "rgba(255,255,255,0.35)";
+    ctx.fillRect(-7 * z, -7 * z, 18 * z, 3 * z);
+    ctx.fillRect(-5 * z, 1 * z, 16 * z, 3 * z);
+  } else if (outfit.mark === "badge") {
+    ctx.fillStyle = "#ffd166";
+    ctx.fillRect(4 * z, -8 * z, 4 * z, 4 * z);
+  } else if (outfit.mark === "pocket") {
+    ctx.fillStyle = "rgba(15,23,42,0.55)";
+    ctx.fillRect(-5 * z, 0, 6 * z, 6 * z);
+    ctx.fillRect(4 * z, -1 * z, 5 * z, 6 * z);
+  }
+}
+
+function lancerOutfit(e) {
+  if (e.clothingVariant === "guard") return { cloak: "#23395d", lining: "#0f172a", pants: "#172554", accent: "#38bdf8", mark: "badge" };
+  if (e.clothingVariant === "hazard") return { cloak: "#3f3f24", lining: "#171717", pants: "#1f2937", accent: "#ffd166", mark: "stripe" };
+  if (e.clothingVariant === "medic") return { cloak: "#e2e8f0", lining: "#475569", pants: "#334155", accent: "#ef4444", mark: "cross" };
+  if (e.clothingVariant === "courier") return { cloak: "#4c1d95", lining: "#1e1b4b", pants: "#312e81", accent: "#fde68a", mark: "pocket" };
+  if (e.clothingVariant === "night_ops") return { cloak: "#111827", lining: "#020617", pants: "#0f172a", accent: "#a78bfa", mark: "stripe" };
+  if (e.clothingVariant === "engineer") return { cloak: "#7c2d12", lining: "#1f2937", pants: "#451a03", accent: "#fb923c", mark: "pocket" };
+  return { cloak: "#2a2035", lining: "#111827", pants: "#1a202c", accent: "#ff9f6e", mark: "badge" };
 }
 
 function drawBladeGlint(ctx, charge, dash) {

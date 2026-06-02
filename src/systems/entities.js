@@ -120,6 +120,7 @@ export function updateEnemies(dt) {
   for (let i = world.enemies.length - 1; i >= 0; i--) {
     const e = world.enemies[i];
     updateEnemyKnockback(e, dt);
+    if (e.controlImmune && e.freezeTimer > 0) e.freezeTimer = 0;
     if (e.freezeTimer > 0 && !e.boss) {
       e.freezeTimer = Math.max(0, e.freezeTimer - dt);
       e.hitTimer = Math.max(0, e.hitTimer - dt);
@@ -152,6 +153,7 @@ export function damageEnemy(e, amount, x, y) {
 
 export function applyKnockback(e, dx, dy, force) {
   if (!e || e.dead || force <= 0) return;
+  if (e.controlImmune) return;
   const len = Math.max(1, Math.hypot(dx, dy));
   const resistance = e.knockbackResistance ?? defaultKnockbackResistance(e);
   const applied = force * Math.max(0.08, 1 - resistance);

@@ -26,6 +26,8 @@ export const state = {
   initialWeaponId: null,
   shop: null,
   easterEggs: null,
+  waveScenario: null,
+  spawnedWaveEvents: new Set(),
   difficultyId: "ember",
   difficulty: null,
   difficultyProgress: null,
@@ -107,6 +109,8 @@ export function createPlayer() {
     dirX: 1,
     dirY: 0,
     trailTimer: 0,
+    slideVx: 0,
+    slideVy: 0,
   };
 }
 
@@ -176,5 +180,7 @@ export function resetRun(map) {
   state.initialWeaponId = null;
   state.shop = null;
   state.easterEggs = createEasterEggState();
+  state.waveScenario = null;
+  state.spawnedWaveEvents = new Set();
   state.difficultyId = state.difficultyId || "ember";
 }

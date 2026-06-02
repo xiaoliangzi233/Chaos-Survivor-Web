@@ -8,6 +8,8 @@ import { updateBlackhole } from "../blackhole.js";
 import { difficultyMultiplier, currentDifficulty } from "../difficulty.js";
 import { applyPlayerDamage, coinDropMultiplier, onWeaponHit, rollWeaponDamage, waveSpawnMultiplier } from "./items.js";
 import { spawnDamageText } from "../effects.js";
+import { emberSpawnRateForWave } from "../config/ember-wave-scenarios.js";
+import { activeWaveEffect } from "./waveScenarios.js";
 export { applyFrostMark } from "./statusEffects.js";
 import { applyFrostMark } from "./statusEffects.js";
 
@@ -27,13 +29,43 @@ export function updatePlayer(dt) {
     vy /= len;
     p.dirX = vx;
     p.dirY = vy;
-    const frostScale = 1 - Math.min(0.42, p.frostSlow || 0);
-    p.x += vx * p.speed * frostScale * dt;
-    p.y += vy * p.speed * frostScale * dt;
+  } else {
+    vx = 0;
+    vy = 0;
+  }
+  const frostScale = 1 - Math.min(0.42, p.frostSlow || 0);
+  const moveSpeed = p.speed * frostScale;
+  const skating = activeWaveEffect("ice_skate");
+  if (skating) {
+    const accel = 850;
+    const drag = len > 0.001 ? 0.985 : 0.992;
+    p.slideVx = (p.slideVx || 0) * Math.pow(drag, dt * 60) + vx * accel * dt;
+    p.slideVy = (p.slideVy || 0) * Math.pow(drag, dt * 60) + vy * accel * dt;
+    const maxSlide = moveSpeed * 1.65;
+    const slideLen = Math.hypot(p.slideVx, p.slideVy);
+    if (slideLen > maxSlide) {
+      p.slideVx = p.slideVx / slideLen * maxSlide;
+      p.slideVy = p.slideVy / slideLen * maxSlide;
+    }
+    p.x += p.slideVx * dt;
+    p.y += p.slideVy * dt;
+  } else if (len > 0.001) {
+    p.slideVx = 0;
+    p.slideVy = 0;
+    p.x += vx * moveSpeed * dt;
+    p.y += vy * moveSpeed * dt;
+  } else {
+    p.slideVx = 0;
+    p.slideVy = 0;
+  }
+  const trailVx = skating ? p.slideVx || 0 : vx * moveSpeed;
+  const trailVy = skating ? p.slideVy || 0 : vy * moveSpeed;
+  const trailLen = Math.hypot(trailVx, trailVy);
+  if (trailLen > 1) {
     p.trailTimer -= dt;
     if (p.trailTimer <= 0) {
       p.trailTimer = 0.055;
-      dust(p.x - vx * 12, p.y - vy * 12, -vx, -vy);
+      dust(p.x - trailVx / trailLen * 12, p.y - trailVy / trailLen * 12, -trailVx / trailLen, -trailVy / trailLen);
     }
   }
   if (p.burnTimer > 0) {
@@ -59,14 +91,24 @@ export function updatePlayer(dt) {
 export function updateSpawning(dt) {
   spawnWaveBoss();
   if (isBossWave(state.wave)) return;
-  const danger = state.wave / 20;
-  const earlyMul = state.wave <= 3 ? 0.52 : state.wave <= 6 ? 0.68 : state.wave <= 9 ? 0.84 : 1;
-  state.spawnBudget += dt * (2.1 + danger * 10.5 + state.wave * 0.36) * earlyMul * difficultyMultiplier("spawnRate") * waveSpawnMultiplier();
+  state.spawnBudget += dt * spawnBudgetGainPerSecond({
+    wave: state.wave,
+    difficultyId: state.difficultyId,
+    difficultySpawnRate: difficultyMultiplier("spawnRate"),
+    itemSpawnMultiplier: waveSpawnMultiplier(),
+  });
   const enemyLimit = currentDifficulty().enemyLimit || ENEMY_LIMIT;
   while (state.spawnBudget >= 1 && world.enemies.length < enemyLimit) {
     state.spawnBudget--;
     spawnEnemyById(randomEnemyForWave(state.wave));
   }
+}
+
+export function spawnBudgetGainPerSecond({ wave, difficultyId, difficultySpawnRate, itemSpawnMultiplier }) {
+  const danger = wave / 20;
+  const earlyMul = wave <= 3 ? 0.52 : wave <= 6 ? 0.68 : wave <= 9 ? 0.84 : 1;
+  const scenarioMul = difficultyId === "ember" ? emberSpawnRateForWave(wave) : 1;
+  return (2.1 + danger * 10.5 + wave * 0.36) * earlyMul * difficultySpawnRate * itemSpawnMultiplier * scenarioMul;
 }
 
 export function updateEnemies(dt) {

@@ -15,7 +15,26 @@
     "color": "#7ccf68",
     "behavior": "melee",
     "desc": "曾经是实验室里最勤快的实习生，被“优化”后成了永不下班的近战劳模。动作虽慢，但胜在执着，会一路贴脸求你给个五星好评。",
-    "tip": "利用走位和范围武器边退边清，不要被数量包住。"
+    "tip": "利用走位和范围武器边退边清，不要被数量包住。",
+    "difficultyWaves": {
+      "ember": {
+        "spawnWaves": [
+          1,
+          2,
+          3,
+          5,
+          6,
+          7,
+          9,
+          11,
+          14,
+          15,
+          17,
+          18,
+          19
+        ]
+      }
+    }
   },
   "lancer": {
     "name": "突刺者",
@@ -33,7 +52,24 @@
     "color": "#ff9f6e",
     "behavior": "lancer",
     "desc": "某次失败的人体强化实验品，一心想成为田径选手。助跑后猛冲过来，爆发力堪比实习生抢最后一份免费午餐。",
-    "tip": "保持斜向移动，让它扑空后再回头输出。"
+    "tip": "保持斜向移动，让它扑空后再回头输出。",
+    "difficultyWaves": {
+      "ember": {
+        "spawnWaves": [
+          3,
+          4,
+          5,
+          7,
+          9,
+          11,
+          14,
+          15,
+          17,
+          18,
+          19
+        ]
+      }
+    }
   },
   "wisp": {
     "name": "冰霜幽灵",
@@ -51,7 +87,19 @@
     "color": "#9ff4ff",
     "behavior": "ranged",
     "desc": "实验室制冷系统泄漏后凝成的幽怨冰灵。总是保持社交距离，并朝你丢冰棍，嘴里念叨着“空调太贵，一起凉凉”。",
-    "tip": "优先处理，避免远程弹幕在场上越积越多。"
+    "tip": "优先处理，避免远程弹幕在场上越积越多。",
+    "difficultyWaves": {
+      "ember": {
+        "spawnWaves": [
+          11,
+          12,
+          14,
+          16,
+          18,
+          19
+        ]
+      }
+    }
   },
   "slime_large": {
     "name": "大型史莱姆",
@@ -69,7 +117,22 @@
     "color": "#77ff8a",
     "behavior": "split_large",
     "desc": "源于废弃培养缸里忘记清理的培养基，如今已进化出集体意识。走路像老大爷，但碾过来的气势像装满了实验废料的垃圾桶。死后还会把小弟溅得到处都是。",
-    "tip": "尽量在空旷区域击杀，避免被分裂体围住。"
+    "tip": "尽量在空旷区域击杀，避免被分裂体围住。",
+    "difficultyWaves": {
+      "ember": {
+        "spawnWaves": [
+          6,
+          7,
+          8,
+          9,
+          14,
+          15,
+          17,
+          18,
+          19
+        ]
+      }
+    }
   },
   "slime_medium": {
     "name": "中型史莱姆",
@@ -87,7 +150,22 @@
     "color": "#66d96d",
     "behavior": "split_medium",
     "desc": "大型史莱姆的青春版，继承了“分裂即永生”的家族信条。速度提上来了，就是为了证明自己不是最胖的那个负担。",
-    "tip": "保持移动，把它们引成一串后集中清理。"
+    "tip": "保持移动，把它们引成一串后集中清理。",
+    "difficultyWaves": {
+      "ember": {
+        "spawnWaves": [
+          6,
+          7,
+          8,
+          9,
+          14,
+          15,
+          17,
+          18,
+          19
+        ]
+      }
+    }
   },
   "slime_small": {
     "name": "小型史莱姆",
@@ -105,7 +183,22 @@
     "color": "#b6ff99",
     "behavior": "melee",
     "desc": "史莱姆家族的短跑健将，小体格大能量，跑起来像追着冰淇淋车的孩子。唯一的目标是抱住你的腿，让你感受培养基的余温。",
-    "tip": "不要贪金币，优先清小体型单位避免被追上。"
+    "tip": "不要贪金币，优先清小体型单位避免被追上。",
+    "difficultyWaves": {
+      "ember": {
+        "spawnWaves": [
+          6,
+          7,
+          8,
+          9,
+          14,
+          15,
+          17,
+          18,
+          19
+        ]
+      }
+    }
   },
   "blackhole_mage": {
     "name": "黑洞法师",
@@ -300,7 +393,17 @@
     "color": "#c7d2ff",
     "behavior": "razorbat",
     "desc": "原本是仿生扑翼无人机，被乌鸦教会了耍飞镖。它会绕着你头转圈，扔出去的回旋镖总是让人怀疑物理定律是否还在正常工作。",
-    "tip": "留意弧线返回的翼刃，不要只躲第一段飞行轨迹。"
+    "tip": "留意弧线返回的翼刃，不要只躲第一段飞行轨迹。",
+    "difficultyWaves": {
+      "ember": {
+        "spawnWaves": [
+          15,
+          16,
+          18,
+          19
+        ]
+      }
+    }
   },
   "wizard": {
     "name": "奥术巫师",
@@ -354,7 +457,16 @@
     "color": "#f59e0b",
     "behavior": "gearfiend",
     "desc": "从钟表匠的噩梦里逃出来的齿轮魔鬼，把实验室当成了它的发条游乐场。发射的齿轮分两种：快的追人，慢的卡位，完美模拟了老旧打印机卡纸的烦躁感。",
-    "tip": "慢齿轮会在场上停留，绕路比硬穿更安全。"
+    "tip": "慢齿轮会在场上停留，绕路比硬穿更安全。",
+    "difficultyWaves": {
+      "ember": {
+        "spawnWaves": [
+          17,
+          18,
+          19
+        ]
+      }
+    }
   },
   "prism_medic": {
     "name": "棱镜协助者",
@@ -551,7 +663,12 @@
     "behavior": "boss_storm",
     "boss": true,
     "desc": "实验室顶楼的风暴模拟器暴走，吸收了内部所有气象数据后自封为王。它把战场当成交响乐厅，切换攻击模式就像换乐章，偶尔还叫小弟来伴舞。",
-    "tip": "预留绕场空间，优先关注它当前切换到的攻击模式。"
+    "tip": "预留绕场空间，优先关注它当前切换到的攻击模式。",
+    "difficultyWaves": {
+      "ember": {
+        "bossWave": 10
+      }
+    }
   },
   "polar_crystal_wraith": {
     "name": "极霜晶魂",
@@ -567,7 +684,12 @@
     "behavior": "boss_polar",
     "boss": true,
     "desc": "冷冻实验室的终极悲剧：一个穿着羽绒服的灵魂和一台制冰机合体了。它恨透了全球变暖，所以发誓要用雪花、冰刺和暴雪把每个活人冻成冰棍收藏。",
-    "tip": "冰刺不会直接砸在脚下，观察预警位置并持续变向移动。"
+    "tip": "冰刺不会直接砸在脚下，观察预警位置并持续变向移动。",
+    "difficultyWaves": {
+      "ember": {
+        "bossWave": 20
+      }
+    }
   },
   "storm_rail_devourer": {
     "name": "雷铸吞星者",
@@ -600,5 +722,160 @@
     "boss": true,
     "desc": "实验室里一对失控的双子安保探头，红色的只会动手，蓝色的只会哔哔。它们共享同一个内核，死一个另一个就彻底发疯，从相爱相杀变成同归于尽模式。",
     "tip": "不要同时被冲锋和激光夹住。先击杀哪一只会改变后半场节奏。"
+  },
+  "slime_diamond": {
+    "name": "钻石史莱姆",
+    "category": "小怪",
+    "trait": "高韧晶核",
+    "difficultyWaves": {
+      "ember": {
+        "spawnWaves": [
+          8
+        ]
+      }
+    },
+    "hp": 115,
+    "speed": 72,
+    "damage": 16,
+    "xp": 12,
+    "radius": 18,
+    "color": "#9ff4ff",
+    "behavior": "melee",
+    "spawnWeight": 0.8,
+    "desc": "晶化培养基里长出的硬壳史莱姆，身体折出冷蓝色高光。",
+    "tip": "血量更高，适合用持续伤害先软化。"
+  },
+  "slime_gold": {
+    "name": "黄金史莱姆",
+    "category": "小怪",
+    "trait": "金币诱饵",
+    "difficultyWaves": {
+      "ember": {
+        "spawnWaves": [
+          8
+        ]
+      }
+    },
+    "hp": 80,
+    "speed": 76,
+    "damage": 13,
+    "xp": 10,
+    "radius": 17,
+    "color": "#ffd166",
+    "behavior": "melee",
+    "spawnWeight": 0.9,
+    "desc": "吸附了废弃实验室金币涂层的史莱姆，弹跳时会拖出金色残影。",
+    "tip": "移动不快但会混在史莱姆潮里，优先清出移动空间。"
+  },
+  "slime_glow": {
+    "name": "荧光史莱姆",
+    "category": "小怪",
+    "trait": "高速发光",
+    "difficultyWaves": {
+      "ember": {
+        "spawnWaves": [
+          8
+        ]
+      }
+    },
+    "hp": 58,
+    "speed": 96,
+    "damage": 10,
+    "xp": 8,
+    "radius": 14,
+    "color": "#7df9ff",
+    "behavior": "melee",
+    "spawnWeight": 1.2,
+    "desc": "培养皿照明液泄漏后诞生的发光小型史莱姆，行动轨迹非常醒目。",
+    "tip": "速度较快，利用范围武器在它们贴身前清掉。"
+  },
+  "slime_weeping": {
+    "name": "哭泣的史莱姆",
+    "category": "小怪",
+    "trait": "迟缓厚胶",
+    "difficultyWaves": {
+      "ember": {
+        "spawnWaves": [
+          8
+        ]
+      }
+    },
+    "hp": 96,
+    "speed": 58,
+    "damage": 12,
+    "xp": 11,
+    "radius": 18,
+    "color": "#8fb7ff",
+    "behavior": "melee",
+    "spawnWeight": 0.8,
+    "desc": "不断渗出蓝色凝胶的史莱姆，看起来委屈但会坚定地堵住路线。",
+    "tip": "它们推进慢但耐打，别被拖在密集怪潮边缘。"
+  },
+  "slime_devil": {
+    "name": "恶魔史莱姆",
+    "category": "小怪",
+    "trait": "红色突进",
+    "difficultyWaves": {
+      "ember": {
+        "spawnWaves": [
+          8
+        ]
+      }
+    },
+    "hp": 72,
+    "speed": 118,
+    "damage": 18,
+    "xp": 11,
+    "radius": 14,
+    "color": "#ff4d6d",
+    "behavior": "melee",
+    "spawnWeight": 0.75,
+    "desc": "被高温反应液染红的暴躁史莱姆，跳跃短促而凶狠。",
+    "tip": "伤害更高，看到红色残影时优先拉开距离。"
+  },
+  "slime_angel": {
+    "name": "天使史莱姆",
+    "category": "小怪",
+    "trait": "大型浮光",
+    "difficultyWaves": {
+      "ember": {
+        "spawnWaves": [
+          8
+        ]
+      }
+    },
+    "hp": 130,
+    "speed": 66,
+    "damage": 10,
+    "xp": 13,
+    "radius": 21,
+    "color": "#f8fafc",
+    "behavior": "melee",
+    "spawnWeight": 0.65,
+    "desc": "覆盖白色凝胶薄膜的大型史莱姆，像移动的实验室无菌泡泡。",
+    "tip": "体型更大，适合在空旷区域集中火力处理。"
+  },
+  "thief": {
+    "name": "实验室小偷",
+    "category": "奖励怪",
+    "trait": "金币逃逸",
+    "difficultyWaves": {
+      "ember": {
+        "spawnWaves": [
+          13
+        ]
+      }
+    },
+    "hp": 42,
+    "speed": 138,
+    "damage": 0,
+    "xp": 1,
+    "radius": 13,
+    "color": "#ffd166",
+    "behavior": "thief",
+    "coinDrop": 28,
+    "spawnWeight": 1,
+    "desc": "趁实验室断电出来搬金币的游荡目标，击倒后会撒出一串金币。",
+    "tip": "奖励波优先追击它，别让金币散在危险边缘。"
   }
 }

@@ -25,6 +25,7 @@ import { updatePlayer, updateSpawning, updateEnemies, rebuildGrid, updateGems, u
 import { updateWeapons, STARTER_WEAPONS, UPGRADE_DEFS, activateWeapon, refreshStarterWeapons } from "../systems/weapons.js";
 import { consumeNextWaveSpawnBonus, startWaveItems, updateItems } from "../systems/items.js";
 import { updateEasterEggs } from "../systems/easterEggs.js";
+import { applyWaveStartScenario, resetWaveScenarioState } from "../systems/waveScenarios.js";
 import { createShopState } from "../economy/shop.js";
 import * as effects from "../effects.js";
 import { resizeCanvas, updateCamera, render } from "../systems/renderer.js";
@@ -75,6 +76,8 @@ export async function bootGame() {
     state.initialWeaponId = weapon.id;
     activateWeapon(weapon.id);
     state.mode = "playing";
+    resetWaveScenarioState();
+    applyWaveStartScenario();
     playSfx("start");
     startMusic();
   }
@@ -161,6 +164,7 @@ export async function bootGame() {
     consumeNextWaveSpawnBonus();
     startWaveItems();
     state.mode = "playing";
+    applyWaveStartScenario();
     playSfx("wave");
   }
 

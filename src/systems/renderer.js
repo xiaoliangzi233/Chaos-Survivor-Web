@@ -7,6 +7,7 @@ import { renderLighting } from "./lighting.js";
 import { drawBlackhole } from "../blackhole.js";
 import { createDecorativeEnemy, decorativeEnemyIds } from "./enemyRegistry.js";
 import { drawEasterEggObject, drawEasterEggToast } from "./easterEggs.js";
+import { activeWaveEffect } from "./waveScenarios.js";
 
 export const viewport = { width: 1, height: 1, dpr: 1 };
 
@@ -33,6 +34,20 @@ export function bossHudLayout(view, boss) {
 
 export function enemyProjectileHasHalo(projectile) {
   return !projectile?.bossProjectile;
+}
+
+export function eliteOutlineStyle(enemy) {
+  if (!enemy?.elite) return null;
+  return {
+    color: enemy.eliteVariant === "giant" ? "#ff9f6e" : "#ffd166",
+    width: enemy.eliteVariant === "giant" ? 4 : 2.5,
+  };
+}
+
+export function scenarioOverlayStyle(effect) {
+  if (effect === "blind") return { color: "rgba(0,0,0,0.34)" };
+  if (effect === "ice_skate") return { color: "rgba(159,244,255,0.12)" };
+  return null;
 }
 
 export function bossDirectionIndicator(view, camera, boss) {
@@ -131,6 +146,7 @@ export function render(ctx) {
   for (const e of world.enemies) {
     if (!inView(e.x, e.y, e.r + 80)) continue;
     e.draw(ctx);
+    drawEliteOutline(ctx, e);
     if (e.shielded) drawEnemyShield(ctx, e);
   }
   drawDrones(ctx);
@@ -149,6 +165,7 @@ export function render(ctx) {
     ctx.fillStyle = `rgba(255,77,109,${state.flash * 0.18})`;
     ctx.fillRect(0, 0, viewport.width, viewport.height);
   }
+  drawScenarioOverlay(ctx);
   drawEasterEggToast(ctx, viewport);
 }
 
@@ -2668,6 +2685,28 @@ function drawEnemyShield(ctx, e) {
   ctx.closePath();
   ctx.stroke();
   ctx.restore();
+}
+
+function drawEliteOutline(ctx, e) {
+  const style = eliteOutlineStyle(e);
+  if (!style) return;
+  ctx.save();
+  ctx.translate(e.x, e.y);
+  ctx.strokeStyle = style.color;
+  ctx.lineWidth = style.width;
+  ctx.setLineDash(e.eliteVariant === "giant" ? [10, 5] : [5, 4]);
+  ctx.beginPath();
+  ctx.arc(0, 0, e.r + 8 + Math.sin(state.time * 5) * 2, 0, TAU);
+  ctx.stroke();
+  ctx.restore();
+}
+
+function drawScenarioOverlay(ctx) {
+  const effect = activeWaveEffect("blind") ? "blind" : activeWaveEffect("ice_skate") ? "ice_skate" : null;
+  const style = scenarioOverlayStyle(effect);
+  if (!style) return;
+  ctx.fillStyle = style.color;
+  ctx.fillRect(0, 0, viewport.width, viewport.height);
 }
 
 function drawEmberMineHazard(ctx, h, alpha) {

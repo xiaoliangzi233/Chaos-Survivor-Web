@@ -4,12 +4,20 @@ import { clamp } from "../utils.js";
 import { setSpawnConfigured } from "../enemies/BaseEnemy.js";
 import { currentDifficulty, difficultyOrder } from "../difficulty.js";
 import { recordCodexEntry } from "./codex.js";
+import { emberWaveScenario, emberWaveSpawnPool } from "../config/ember-wave-scenarios.js";
 import { Zombie } from "../enemies/zombie.js";
 import { Lancer } from "../enemies/lancer.js";
 import { Wisp } from "../enemies/wisp.js";
 import { SlimeLarge } from "../enemies/slime_large.js";
 import { SlimeMedium } from "../enemies/slime_medium.js";
 import { SlimeSmall } from "../enemies/slime_small.js";
+import { SlimeDiamond } from "../enemies/slime_diamond.js";
+import { SlimeGold } from "../enemies/slime_gold.js";
+import { SlimeGlow } from "../enemies/slime_glow.js";
+import { SlimeWeeping } from "../enemies/slime_weeping.js";
+import { SlimeDevil } from "../enemies/slime_devil.js";
+import { SlimeAngel } from "../enemies/slime_angel.js";
+import { Thief } from "../enemies/thief.js";
 import { BlackholeMage } from "../enemies/blackhole_mage.js";
 import { MechWorm } from "../enemies/mech_worm.js";
 import { Doctor } from "../enemies/doctor.js";
@@ -44,6 +52,13 @@ const classes = {
   slime_large: SlimeLarge,
   slime_medium: SlimeMedium,
   slime_small: SlimeSmall,
+  slime_diamond: SlimeDiamond,
+  slime_gold: SlimeGold,
+  slime_glow: SlimeGlow,
+  slime_weeping: SlimeWeeping,
+  slime_devil: SlimeDevil,
+  slime_angel: SlimeAngel,
+  thief: Thief,
   blackhole_mage: BlackholeMage,
   mech_worm: MechWorm,
   doctor: Doctor,
@@ -73,6 +88,10 @@ const classes = {
 };
 
 export let enemyConfig = {};
+
+export function setEnemyConfigForTests(config) {
+  enemyConfig = config;
+}
 
 export async function setupEnemyRegistry() {
   if (!Object.keys(enemyConfig).length) {
@@ -161,7 +180,15 @@ function randomSpawnPosition(radius) {
 }
 
 function isEnemyAvailableFor(entry, wave, difficultyId = state.difficultyId || currentDifficulty()?.id) {
+  if (difficultyId === "ember" && !isAllowedByEmberScenario(entry, wave)) return false;
   return isWaveAllowed(entry, wave, difficultyId) && isDifficultyAllowed(entry, difficultyId);
+}
+
+function isAllowedByEmberScenario(entry, wave) {
+  const scenario = emberWaveScenario(wave);
+  if (!scenario) return false;
+  if (entry.boss) return scenario.boss === entry.id;
+  return emberWaveSpawnPool(wave).includes(entry.id);
 }
 
 function isWaveAllowed(entry, wave, difficultyId) {

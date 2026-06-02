@@ -3,6 +3,7 @@ import { state, world } from "../state.js";
 import { burst, pulse } from "../effects.js";
 import { clamp } from "../utils.js";
 import { BaseEnemy } from "./BaseEnemy.js";
+import { activeGearfiendMode } from "../systems/waveScenarios.js";
 
 const KEEP_DISTANCE = 410;
 
@@ -16,6 +17,7 @@ export class Gearfiend extends BaseEnemy {
     this.angle = 0;
     this.spin = Math.random() * TAU;
     this.knockbackResistance = Math.max(this.knockbackResistance, 0.48);
+    this.fastOnly = false;
   }
 
   update(dt) {
@@ -29,6 +31,7 @@ export class Gearfiend extends BaseEnemy {
     this.flash = Math.max(0, this.flash - dt * 8);
     this.hitTimer = Math.max(0, this.hitTimer - dt);
     this.flip = dx < 0 ? -1 : 1;
+    this.applyScenario();
 
     if (this.windup > 0) {
       this.windup -= dt;
@@ -41,7 +44,8 @@ export class Gearfiend extends BaseEnemy {
       this.y += (dy / d * dir + dx / d * strafe) * this.speed * dt;
       if (this.cooldown <= 0 && d < 760) {
         this.windup = 0.42;
-        this.mode = Math.random() < 0.56 ? "fast" : "slow";
+        if (!this.fastOnly) this.mode = Math.random() < 0.56 ? "fast" : "slow";
+        else this.mode = "fast";
         pulse(this.x, this.y, this.mode === "fast" ? 28 : 40, this.color, 0.2);
       }
     }
@@ -51,7 +55,13 @@ export class Gearfiend extends BaseEnemy {
     this.y = clamp(this.y, -half + this.r, half - this.r);
   }
 
+  applyScenario() {
+    this.fastOnly = activeGearfiendMode() === "fast_only";
+    if (this.fastOnly) this.mode = "fast";
+  }
+
   fireGear() {
+    this.applyScenario();
     if (this.mode === "fast") {
       const a = this.angle + (Math.random() - 0.5) * 0.08;
       world.enemyProjectiles.push({

@@ -185,6 +185,10 @@ export const SLIME_PROFILES = {
   },
 };
 
+export function slimeProfile(base, overrides = {}) {
+  return { ...SLIME_PROFILES[base], ...overrides };
+}
+
 const SLIME_VARIANTS = {
   green: { body: "#77ff8a", core: "#9dffac", dark: "#2f8b4b", light: "#caffb8", trail: "#b8ffba", face: "#173b1c", mouth: "#20662d" },
   mint: { body: "#6fffd6", core: "#9affe7", dark: "#228f7a", light: "#c9fff1", trail: "#9fffea", face: "#123f39", mouth: "#1b7d6b" },
@@ -194,10 +198,17 @@ const SLIME_VARIANTS = {
   honey: { body: "#ffd166", core: "#ffe08a", dark: "#aa7422", light: "#fff1b7", trail: "#ffe08a", face: "#5f3b12", mouth: "#9b671d" },
   amber: { body: "#ffad66", core: "#ffc28a", dark: "#a65a22", light: "#ffe0b8", trail: "#ffc48a", face: "#5a2f15", mouth: "#914f1e" },
   lime: { body: "#b6ff69", core: "#cfff93", dark: "#5f9325", light: "#e4ffc2", trail: "#d7ff9a", face: "#28440f", mouth: "#5d8f22" },
+  diamond: { body: "#9ff4ff", core: "#ffffff", dark: "#2b7fa3", light: "#e6fbff", trail: "#d9fbff", face: "#123447", mouth: "#1b6b8e" },
+  gold: { body: "#ffd166", core: "#fff2a8", dark: "#a66a12", light: "#fff6c7", trail: "#ffe08a", face: "#5a3510", mouth: "#9b671d" },
+  glow: { body: "#7df9ff", core: "#d9fbff", dark: "#137c8b", light: "#efffff", trail: "#9ff4ff", face: "#0c3a44", mouth: "#138d9c" },
+  weeping: { body: "#8fb7ff", core: "#c7d2ff", dark: "#3d5fa4", light: "#e1e8ff", trail: "#b8d2ff", face: "#1d2a55", mouth: "#3b5aa0" },
+  devil: { body: "#ff4d6d", core: "#ff9ab0", dark: "#8f1d38", light: "#ffd1da", trail: "#ff7a9d", face: "#3f0f1c", mouth: "#9f1f3c" },
+  angel: { body: "#f8fafc", core: "#fff2a8", dark: "#9aa7b4", light: "#ffffff", trail: "#d9fbff", face: "#334155", mouth: "#64748b" },
   rainbow: { body: "#ff4dd8", core: "#fff16a", dark: "#5b21b6", light: "#7df9ff", trail: "#ff9df2", face: "#24103f", mouth: "#ffffff" },
 };
 
 function pickSlimeVariant(profile) {
+  if (profile.fixedVariant) return { id: profile.fixedVariant, colors: SLIME_VARIANTS[profile.fixedVariant] || SLIME_VARIANTS.green };
   if (Math.random() > 0.9985) return { id: "rainbow", colors: SLIME_VARIANTS.rainbow };
   const keys = profile.variants || ["green"];
   const id = keys[Math.floor(Math.random() * keys.length)] || "green";

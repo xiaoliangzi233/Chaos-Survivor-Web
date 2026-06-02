@@ -1,6 +1,7 @@
 import { CAMERA_ZOOM, TAU } from "../constants.js";
 import { state, world } from "../state.js";
 import { hexToRgba } from "../utils.js";
+import { activeWaveEffect } from "./waveScenarios.js";
 
 const LIGHT_SCALE = 0.45;
 const MAX_PROJECTILE_LIGHTS = 56;
@@ -50,6 +51,11 @@ function ensureLightBuffer(viewport) {
 }
 
 function drawDarkness(ctx, width, height) {
+  if (activeWaveEffect("blind")) {
+    ctx.fillStyle = "rgba(0,0,0,0.78)";
+    ctx.fillRect(0, 0, width, height);
+    return;
+  }
   const boss = world.boss && !world.boss.dead;
   const danger = state.player.hp / state.player.maxHp < 0.32;
   ctx.fillStyle = boss ? "rgba(1,3,9,0.58)" : danger ? "rgba(4,2,8,0.55)" : "rgba(1,4,11,0.48)";
@@ -71,13 +77,14 @@ function collectLights(camera, viewport) {
 function addPlayerLight(lights, camera, viewport) {
   const p = state.player;
   const lowHp = p.hp / p.maxHp < 0.32;
+  const blind = activeWaveEffect("blind");
   addWorldLight(lights, camera, viewport, {
     x: p.x,
     y: p.y,
-    radius: lowHp ? 220 : 250,
-    color: lowHp ? "#ff4d6d" : "#ffd6a8",
-    strength: lowHp ? 0.92 : 0.82,
-    core: 0.32,
+    radius: blind ? 120 : lowHp ? 220 : 250,
+    color: blind ? "#d9fbff" : lowHp ? "#ff4d6d" : "#ffd6a8",
+    strength: blind ? 0.95 : lowHp ? 0.92 : 0.82,
+    core: blind ? 0.42 : 0.32,
   });
 }
 

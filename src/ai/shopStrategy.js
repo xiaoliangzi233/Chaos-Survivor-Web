@@ -1,3 +1,5 @@
+import { evaluateBuild, scoreItemForBuild, scoreWeaponForBuild } from "./buildEvaluator.js";
+
 const QUALITY_RANK = {
   common: 0,
   uncommon: 1,
@@ -33,11 +35,12 @@ const ITEM_VALUES = {
 export function decideShopActions({ offers, player, inventory, state, refreshCost, refreshesUsed = 0, config = {}, situation = {} }) {
   const actions = [];
   const profile = buildInventoryProfile(player, inventory, state, situation);
+  const build = evaluateBuild({ player, state, inventory, weapons: state.weapons, situation });
   const reserveGold = dynamicReserveGold(state, profile) * (config.reserveGoldMultiplier || 1);
   const refreshThreshold = 58 * (config.refreshAggression ? 1 / config.refreshAggression : 1);
   const scored = (offers || [])
     .filter((offer) => !isSoldOut(offer))
-    .map((offer) => scoreOffer({ offer, player, inventory, state, profile, situation, config }))
+    .map((offer) => scoreOffer({ offer, player, inventory, state, profile, build, situation, config }))
     .sort((a, b) => b.score - a.score);
 
   for (const entry of scored) {
@@ -58,7 +61,8 @@ export function decideShopActions({ offers, player, inventory, state, refreshCos
   return actions;
 }
 
-export function scoreOffer({ offer, player, inventory, state, profile = buildInventoryProfile(player, inventory, state), situation = {}, config = {} }) {
+export function scoreOffer({ offer, player, inventory, state, profile = buildInventoryProfile(player, inventory, state), build = null, situation = {}, config = {} }) {
+  build ||= evaluateBuild({ player, state, inventory, weapons: state.weapons, situation });
   const category = offerCategory(offer);
   const rank = QUALITY_RANK[offer.rarity] ?? 0;
   let score = 0;
@@ -79,6 +83,11 @@ export function scoreOffer({ offer, player, inventory, state, profile = buildInv
       score = -100;
       reason = "slots_full";
     }
+    score += scoreWeaponForBuild(offer.weaponId, build, {
+      starterWeaponId: state.initialWeaponId,
+      canFuse: Boolean(matching),
+      config: state.ai?.config?.buildEvaluator || {},
+    });
   } else {
     const id = offer.itemId || offer.id;
     score = estimateOfferGain(offer, profile).score + rank * 8;
@@ -91,6 +100,10 @@ export function scoreOffer({ offer, player, inventory, state, profile = buildInv
     if (id === "shackles" && (player.speed || 0) < 230) score -= 30;
     if (id === "dodge_cloak" && player.maxHp < 90) score -= 25;
     if (id === "thief_mark" && state.gold > 80) score -= 18;
+    score += scoreItemForBuild(id, build, {
+      situation,
+      config: state.ai?.config?.buildEvaluator || {},
+    });
   }
 
   const impact = simulatePurchaseImpact(offer, profile, inventory, state, situation);

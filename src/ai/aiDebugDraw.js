@@ -21,6 +21,7 @@ export function drawAiHud(ctx, view) {
   if (!runtime?.enabled || state.mode === "menu") return;
   const training = state.ai?.training || {};
   const config = state.ai?.config || {};
+  if (config.hud?.showAiPanel === false) return;
   const p = state.player || {};
   const runs = training.totalRuns || 0;
   const victories = training.victories || 0;
@@ -29,16 +30,24 @@ export function drawAiHud(ctx, view) {
   const risk = Math.round(runtime.lastPlanRisk || 0);
   const threatCount = runtime.lastThreatCount || runtime.debugThreats?.length || 0;
   const hp = p.maxHp ? `${Math.ceil(Math.max(0, p.hp || 0))}/${Math.ceil(p.maxHp)}` : "--";
-  const lines = [
-    ["AI", runtime.enabled ? "TRAIN" : "OFF"],
-    ["Mode", `${state.mode} / ${config.profile || "balanced"}`],
-    ["Run", `${runs}  Win ${winRate}%`],
-    ["Wave", `${state.wave || 0}  HP ${hp}`],
+  const latestDeath = [...(training.recentRuns || [])].reverse().find((run) => !run.victory)?.deathReason || "";
+  const recommendation = training.recommendations || {};
+  const perf = runtime.perf?.movementPlanMs;
+  const avgMs = perf ? (perf.total / Math.max(1, perf.count)).toFixed(1) : "0.0";
+  const compact = view.width < 760;
+  const lines = compact ? [
+    ["AI", `${runtime.enabled ? "TRAIN" : "OFF"} ${config.profile || "balanced"}`],
+    ["Run", `${runs} Win ${winRate}%`],
     ["Target", target],
-    ["Risk", `${risk}  Threat ${threatCount}`],
-    ["Damage", `${Math.round(runtime.recentDamage || 0)}  Budget ${runtime.budgetLevel || 0}`],
+    ["Risk", `${risk} T${threatCount}`],
+  ] : [
+    ["RUN", `${runs} Win ${winRate}%  W${state.wave || 0} HP ${hp}`],
+    ["PLAN", `${target}  Risk ${risk} T${threatCount}`],
+    ["TRAIN", `${latestDeath || "none"} -> ${recommendation.profile || config.profile || "balanced"}`],
+    ["CONFIG", `${runtime.configSource?.aiRunConfigProfile || config.profile || "balanced"} enabled=${runtime.configSource?.aiTrainingConfigEnabled ? "Y" : "N"}`],
+    ["PERF", `${avgMs}ms  Budget ${runtime.budgetLevel || 0}`],
   ];
-  const width = Math.min(260, Math.max(210, view.width * 0.32));
+  const width = compact ? Math.min(230, Math.max(190, view.width * 0.42)) : Math.min(320, Math.max(255, view.width * 0.34));
   const rowH = 17;
   const height = 16 + lines.length * rowH;
   const x = Math.max(8, view.width - width - 14);

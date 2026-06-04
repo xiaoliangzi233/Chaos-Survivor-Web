@@ -66,6 +66,10 @@ export function normalizeAiConfig(value = {}) {
   config.bossMemory = normalizeBossMemory(config.bossMemory);
   config.trainingMatrix = normalizeTrainingMatrix(config.trainingMatrix);
   config.performance = normalizePerformance(config.performance);
+  config.routePlanner = normalizeRoutePlanner(config.routePlanner);
+  config.threatMemory = normalizeThreatMemory(config.threatMemory);
+  config.buildEvaluator = normalizeBuildEvaluator(config.buildEvaluator);
+  config.hud = normalizeHud(config.hud);
   config.telemetry = normalizeTelemetry(config.telemetry);
   return config;
 }
@@ -99,6 +103,9 @@ function normalizeOrca(value = {}) {
     highRiskCandidates: clampInt(value.highRiskCandidates, 8, 128, AI_CONFIG.orca.highRiskCandidates),
     reuseSafeVelocitySeconds: clampNumber(value.reuseSafeVelocitySeconds, 0, 1.5, AI_CONFIG.orca.reuseSafeVelocitySeconds),
     maxSolveMs: clampNumber(value.maxSolveMs, 0.5, 12, AI_CONFIG.orca.maxSolveMs),
+    earlyExitRisk: clampNumber(value.earlyExitRisk, 0, 80, AI_CONFIG.orca.earlyExitRisk),
+    earlyExitConstraint: clampNumber(value.earlyExitConstraint, 0, 60, AI_CONFIG.orca.earlyExitConstraint),
+    earlyExitDot: clampNumber(value.earlyExitDot, 0, 1, AI_CONFIG.orca.earlyExitDot),
   };
 }
 
@@ -210,6 +217,55 @@ function normalizePerformance(value = {}) {
     dropClusterRefreshTicks: clampInt(value.dropClusterRefreshTicks, 1, 10, defaults.dropClusterRefreshTicks),
     bossMemoryRefreshTicks: clampInt(value.bossMemoryRefreshTicks, 1, 10, defaults.bossMemoryRefreshTicks),
     degradedCollectLimit: clampInt(value.degradedCollectLimit, 4, 80, defaults.degradedCollectLimit),
+  };
+}
+
+function normalizeRoutePlanner(value = {}) {
+  const defaults = AI_CONFIG.routePlanner;
+  return {
+    ...defaults,
+    ...value,
+    enabled: value.enabled !== false,
+    samples: clampInt(value.samples, 2, 32, defaults.samples),
+    escapeCandidates: clampInt(value.escapeCandidates, 8, 32, defaults.escapeCandidates),
+    safeRouteRisk: clampNumber(value.safeRouteRisk, 4, 120, defaults.safeRouteRisk),
+    collectRouteRisk: clampNumber(value.collectRouteRisk, 4, 120, defaults.collectRouteRisk),
+  };
+}
+
+function normalizeThreatMemory(value = {}) {
+  const defaults = AI_CONFIG.threatMemory;
+  return {
+    ...defaults,
+    ...value,
+    enabled: value.enabled !== false,
+    windowSeconds: clampNumber(value.windowSeconds, 1, 20, defaults.windowSeconds),
+    maxSnapshots: clampInt(value.maxSnapshots, 20, 300, defaults.maxSnapshots),
+    deathWindowSeconds: clampNumber(value.deathWindowSeconds, 1, 20, defaults.deathWindowSeconds),
+  };
+}
+
+function normalizeBuildEvaluator(value = {}) {
+  const defaults = AI_CONFIG.buildEvaluator;
+  return {
+    ...defaults,
+    ...value,
+    enabled: value.enabled !== false,
+    minWeaponCoverage: clampInt(value.minWeaponCoverage, 1, 6, defaults.minWeaponCoverage),
+    bossDpsWeight: clampNumber(value.bossDpsWeight, 0, 3, defaults.bossDpsWeight),
+    survivalDeficitWeight: clampNumber(value.survivalDeficitWeight, 0, 3, defaults.survivalDeficitWeight),
+  };
+}
+
+function normalizeHud(value = {}) {
+  const defaults = AI_CONFIG.hud;
+  return {
+    ...defaults,
+    ...value,
+    showAiPanel: value.showAiPanel !== false,
+    showDeathReason: value.showDeathReason !== false,
+    showConfigSource: value.showConfigSource !== false,
+    showPerfBudget: value.showPerfBudget !== false,
   };
 }
 

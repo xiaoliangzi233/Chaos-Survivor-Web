@@ -1,4 +1,5 @@
 import { chooseTrainingLoadout as chooseLoadoutFromTraining } from "./aiState.js";
+import { evaluateBuild, scoreUpgradeForBuild } from "./buildEvaluator.js";
 
 const UPGRADE_BASE = {
   vital_core: 55,
@@ -38,6 +39,7 @@ export function scoreUpgrade({ item, player, state, context = {}, training, conf
   const adjustments = training?.adjustments || {};
   const upgradeBias = adjustments.upgradeBias || {};
   const situation = context.situation || {};
+  const build = evaluateBuild({ player, state, inventory: state.inventory, weapons: state.weapons, situation });
   let score = UPGRADE_BASE[id] ?? 20;
   const reasons = [];
 
@@ -87,6 +89,7 @@ export function scoreUpgrade({ item, player, state, context = {}, training, conf
   if (situation.damage === "low" && ["damage_matrix", "overclock", "scope_lens", "crit_kernel"].includes(id)) score += 24;
   if (situation.economy === "poor" && ["magnet_field", "lucky_cache"].includes(id)) score += 20;
   if (situation.phase === "boss" && ["damage_matrix", "overclock", "scope_lens", "crit_kernel"].includes(id)) score += 18;
+  score += scoreUpgradeForBuild(id, build, { situation, config: config?.buildEvaluator || {} });
   score *= upgradeCategoryMultiplier(id, config?.upgrade);
   return { score, reason: reasons.join(",") || "baseline" };
 }

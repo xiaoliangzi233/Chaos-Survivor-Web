@@ -9,6 +9,9 @@ export function solveAvoidanceVelocity({ player, desired, threats, options = {} 
   const baseRisk = riskAtPoint(player, neighbors, options);
   const count = adaptiveCandidateCount(neighbors, baseRisk, options.orca || options, options.budgetLevel || 0);
   const candidates = candidateVelocities(desiredVelocity, maxSpeed, count, options);
+  const cache = { risks: new Map(), constraints: new Map() };
+  const orca = options.orca || options;
+  const desiredLen = Math.hypot(desiredVelocity.x, desiredVelocity.y);
   let best = desiredVelocity;
   let bestCost = Infinity;
   for (const velocity of candidates) {
@@ -17,8 +20,8 @@ export function solveAvoidanceVelocity({ player, desired, threats, options = {} 
       y: player.y + velocity.y * (options.lookAhead || 0.85),
       r: player.r || 14,
     };
-    const risk = riskAtPoint(future, neighbors, options);
-    const constraint = velocityConstraintCost(player, velocity, neighbors, options);
+    const risk = cachedRisk(cache, future, neighbors, options);
+    const constraint = cachedConstraint(cache, player, velocity, neighbors, options);
     const desire = Math.hypot(velocity.x - desiredVelocity.x, velocity.y - desiredVelocity.y) * 0.035;
     const last = options.lastVelocity || null;
     const lastBias = last ? Math.hypot(velocity.x - last.x, velocity.y - last.y) * 0.009 : 0;
@@ -28,6 +31,10 @@ export function solveAvoidanceVelocity({ player, desired, threats, options = {} 
     if (cost < bestCost) {
       best = velocity;
       bestCost = cost;
+    }
+    if (risk < (orca.earlyExitRisk ?? 10) && constraint < (orca.earlyExitConstraint ?? 4) && directionDot(velocity, desiredVelocity, desiredLen) >= (orca.earlyExitDot ?? 0.82)) {
+      best = velocity;
+      break;
     }
   }
   return best;
@@ -79,7 +86,13 @@ function velocityConstraintCost(player, velocity, threats, options) {
 }
 
 function selectNeighbors(player, threats, maxNeighbors) {
-  return [...threats]
+  const special = [];
+  const rest = [];
+  for (const threat of threats || []) {
+    if (isSpecialThreat(threat) && special.length < Math.ceil(maxNeighbors * 0.45)) special.push(threat);
+    else rest.push(threat);
+  }
+  const scored = rest
     .map((threat) => {
       const dx = threat.x - player.x;
       const dy = threat.y - player.y;
@@ -89,8 +102,9 @@ function selectNeighbors(player, threats, maxNeighbors) {
       return { threat, score };
     })
     .sort((a, b) => b.score - a.score)
-    .slice(0, maxNeighbors)
+    .slice(0, Math.max(0, maxNeighbors - special.length))
     .map((entry) => entry.threat);
+  return [...special, ...scored];
 }
 
 function candidateVelocities(desired, maxSpeed, directions, options = {}) {
@@ -129,4 +143,37 @@ function limitVector(v, max) {
 
 function clamp(value, min, max) {
   return Math.max(min, Math.min(max, value));
+}
+
+function cachedRisk(cache, point, threats, options) {
+  const grid = options.riskCacheGrid || options.performance?.riskCacheGrid || 32;
+  const key = `${Math.round(point.x / grid)},${Math.round(point.y / grid)},${Math.round(point.r || 14)}`;
+  if (cache.risks.has(key)) return cache.risks.get(key);
+  const value = riskAtPoint(point, threats, options);
+  cache.risks.set(key, value);
+  return value;
+}
+
+function cachedConstraint(cache, player, velocity, threats, options) {
+  const key = `${Math.round(velocity.x / 16)},${Math.round(velocity.y / 16)}`;
+  if (cache.constraints.has(key)) return cache.constraints.get(key);
+  const value = velocityConstraintCost(player, velocity, threats, options);
+  cache.constraints.set(key, value);
+  return value;
+}
+
+function directionDot(velocity, desired, desiredLen) {
+  const len = Math.hypot(velocity.x, velocity.y);
+  if (len < 1 || desiredLen < 1) return 1;
+  return (velocity.x * desired.x + velocity.y * desired.y) / (len * desiredLen);
+}
+
+function isSpecialThreat(threat) {
+  return threat.kind === "gravity_well"
+    || threat.kind === "boss_dash"
+    || threat.kind === "boss_segment_dash"
+    || threat.kind === "boss_body_chain"
+    || threat.kind === "enemy_dash"
+    || threat.baseKind === "boss"
+    || threat.baseKind === "blackhole";
 }

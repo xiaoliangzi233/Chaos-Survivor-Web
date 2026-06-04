@@ -11,6 +11,7 @@ import { exportTrainingSummary } from "./trainingExport.js";
 import { beginAiTick } from "./aiTickCache.js";
 import { classifySituation } from "./situationModel.js";
 import { updateBossMemory } from "./bossStrategy.js";
+import { inferThreatMemoryDeathReason, recordThreatSnapshot, summarizeThreatMemory } from "./threatMemory.js";
 import { canFuseWeapons, findFuseCandidate, fuseWeaponSlots } from "../economy/inventory.js";
 import { purchaseOffer, refreshCost, refreshShopOffers, shopOffers, toggleOfferLock } from "../economy/shop.js";
 import { closeShop, renderShop } from "../ui/shopUi.js";
@@ -33,7 +34,18 @@ export function initAi(options = {}) {
   state.ai.runtime = createAiRuntime(state.ai.runtime || {});
   state.ai.training = training;
   state.ai.config = config;
+  state.ai.runtime.configSource = {
+    aiTrainingConfigEnabled: options.config?.enabled === true,
+    aiRunConfigProfile: config.profile || "balanced",
+    ignoredStoredEnabled: options.ignoreStoredEnabled === true,
+  };
   setAiEnabled(readAiEnabled(undefined, undefined, config.enabled, { ignoreStorage: options.ignoreStoredEnabled === true }), false);
+  aiLog(config, "startup", {
+    enabled: state.ai.runtime.enabled,
+    trainingConfig: options.config?.enabled === true,
+    profile: config.profile,
+    ignoreStored: options.ignoreStoredEnabled === true,
+  }, "summary");
   exposeDebugApi();
 }
 
@@ -84,6 +96,7 @@ export function updateAi(dt) {
   runtime.debugThreats = plan.threats || [];
   runtime.lastPlanRisk = plan.risk || 0;
   runtime.lastThreatCount = runtime.debugThreats.length;
+  recordThreatSnapshot(runtime, { state, world, plan, config });
   if (plan.target?.kind !== runtime.lastLoggedTarget) {
     runtime.lastLoggedTarget = plan.target?.kind;
     pushAiEvent(runtime, { type: "target", targetKind: plan.target?.kind, time: state.time });
@@ -128,6 +141,9 @@ async function chooseAndStartRun(runtime) {
     if (state.mode === "menu" && typeof actions.openLoadout === "function") {
       actions.openLoadout();
     }
+    if (state.mode === "choosingWeapon" && !state.ai?.loadoutPanel) {
+      aiLog(config, "loadout_panel_missing", { fallback: typeof actions.startWithLoadout === "function" }, "summary");
+    }
     await reloadConfigForNextRun(runtime);
     const options = actions.getLoadoutOptions?.() || {};
     const loadout = chooseOpeningLoadout({
@@ -146,21 +162,21 @@ async function chooseAndStartRun(runtime) {
 function startSelectedLoadout(runtime, loadout) {
   const panel = state.ai?.loadoutPanel;
   const usingPanel = state.mode === "choosingWeapon" && panel;
+  let selected = loadout;
   if (usingPanel) {
-    const difficultySelected = panel.selectDifficulty?.(loadout.difficulty.id);
-    const weaponSelected = panel.selectWeapon?.(loadout.weapon.id);
-    if (!difficultySelected || !weaponSelected || !panel.confirm?.()) {
+    selected = selectLoadoutFromPanel(panel, loadout);
+    if (!selected || !panel.confirm?.()) {
+      runtime.actionCooldown = 0.15;
       aiLog(config, "start_blocked", {
         reason: "loadout_panel",
-        difficulty: loadout.difficulty.id,
-        weapon: loadout.weapon.id,
-        difficultySelected: Boolean(difficultySelected),
-        weaponSelected: Boolean(weaponSelected),
+        preferredDifficulty: loadout.difficulty?.id || "",
+        preferredWeapon: loadout.weapon?.id || "",
+        panelSelection: panel.getSelection?.() || null,
       }, "summary");
       return false;
     }
   } else if (typeof actions.startWithLoadout === "function") {
-    actions.startWithLoadout({ difficulty: loadout.difficulty, weapon: loadout.weapon });
+    actions.startWithLoadout({ difficulty: selected.difficulty, weapon: selected.weapon });
   } else {
     aiLog(config, "start_blocked", { reason: "missing_start_action" }, "summary");
     return false;
@@ -170,8 +186,35 @@ function startSelectedLoadout(runtime, loadout) {
   runtime.shopRefreshesUsed = 0;
   runtime.upgradeRefreshesUsed = 0;
   runtime.actionCooldown = config.actionCooldown;
-  aiLog(config, "start", { difficulty: loadout.difficulty.id, weapon: loadout.weapon.id, profile: config.profile });
+  aiLog(config, "start", { difficulty: selected.difficulty.id, weapon: selected.weapon.id, profile: config.profile });
   return true;
+}
+
+function selectLoadoutFromPanel(panel, preferred) {
+  const preferredDifficultyId = preferred.difficulty?.id || "";
+  const preferredWeaponId = preferred.weapon?.id || "";
+  let difficulty = preferred.difficulty;
+  let weapon = preferred.weapon;
+  let difficultySelected = Boolean(preferredDifficultyId && panel.selectDifficulty?.(preferredDifficultyId));
+  if (!difficultySelected) {
+    difficulty = (panel.difficulties || []).find((item) => item?.unlocked) || null;
+    difficultySelected = Boolean(difficulty?.id && panel.selectDifficulty?.(difficulty.id));
+  }
+  let weaponSelected = Boolean(preferredWeaponId && panel.selectWeapon?.(preferredWeaponId));
+  if (!weaponSelected) {
+    weapon = (panel.weapons || []).find((item) => item?.id) || null;
+    weaponSelected = Boolean(weapon?.id && panel.selectWeapon?.(weapon.id));
+  }
+  if (!difficultySelected || !weaponSelected || !difficulty || !weapon) return null;
+  if (difficulty.id !== preferredDifficultyId || weapon.id !== preferredWeaponId) {
+    aiLog(config, "loadout_fallback", {
+      preferredDifficulty: preferredDifficultyId,
+      selectedDifficulty: difficulty.id,
+      preferredWeapon: preferredWeaponId,
+      selectedWeapon: weapon.id,
+    }, "summary");
+  }
+  return { difficulty, weapon };
 }
 
 async function reloadConfigForNextRun(runtime) {
@@ -183,6 +226,11 @@ async function reloadConfigForNextRun(runtime) {
   config.enabled = previousEnabled;
   if (previousLogLevel && !next.logLevel) config.logLevel = previousLogLevel;
   state.ai.config = config;
+  runtime.configSource = {
+    ...(runtime.configSource || {}),
+    aiRunConfigProfile: config.profile || "balanced",
+    aiRunConfigError: config.configLoadError || "",
+  };
   aiLog(config, "config_reload", {
     profile: config.profile,
     difficultyTraining: config.difficultyTraining?.enabled !== false,
@@ -299,7 +347,8 @@ function handleEnded(runtime, dt) {
       wave: state.wave,
       profile: config.profile,
       stuckEvents: runtime.stuckEvents,
-      deathReason: inferRunFailure(runtime, state, world),
+      deathReason: inferThreatMemoryDeathReason(runtime, { config }) || inferRunFailure(runtime, state, world),
+      deathWindow: summarizeThreatMemory(runtime, { config }),
     });
     state.ai.training = training;
     saveAiTraining(training, undefined, config.storageKey);
@@ -374,7 +423,8 @@ function updateDamageMemory(runtime, dt) {
   if (p.hp < runtime.lastHp) {
     const amount = runtime.lastHp - p.hp;
     runtime.recentDamage = (runtime.recentDamage || 0) + amount;
-    pushAiEvent(runtime, { type: "damage", sourceKind: inferDamageSourceKind(), amount, time: state.time });
+    runtime.lastDamageSourceKind = inferDamageSourceKind();
+    pushAiEvent(runtime, { type: "damage", sourceKind: runtime.lastDamageSourceKind, amount, time: state.time });
   }
   runtime.recentDamage = Math.max(0, (runtime.recentDamage || 0) - dt * 4);
   runtime.lastHp = p.hp;

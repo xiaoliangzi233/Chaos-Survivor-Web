@@ -28,6 +28,9 @@ export const AI_CONFIG = {
     highRiskCandidates: 40,
     reuseSafeVelocitySeconds: 0.35,
     maxSolveMs: 3,
+    earlyExitRisk: 10,
+    earlyExitConstraint: 4,
+    earlyExitDot: 0.82,
   },
   economy: {
     minRefreshReserve: 10,
@@ -94,6 +97,31 @@ export const AI_CONFIG = {
     dropClusterRefreshTicks: 2,
     bossMemoryRefreshTicks: 1,
     degradedCollectLimit: 12,
+  },
+  routePlanner: {
+    enabled: true,
+    samples: 8,
+    escapeCandidates: 16,
+    safeRouteRisk: 28,
+    collectRouteRisk: 32,
+  },
+  threatMemory: {
+    enabled: true,
+    windowSeconds: 8,
+    maxSnapshots: 160,
+    deathWindowSeconds: 8,
+  },
+  buildEvaluator: {
+    enabled: true,
+    minWeaponCoverage: 2,
+    bossDpsWeight: 1.2,
+    survivalDeficitWeight: 1.35,
+  },
+  hud: {
+    showAiPanel: true,
+    showDeathReason: true,
+    showConfigSource: true,
+    showPerfBudget: true,
   },
   telemetry: {
     decisionLogInterval: 1,

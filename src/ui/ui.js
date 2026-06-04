@@ -336,12 +336,15 @@ export function showRunSetup({ weapons, onConfirm, onBack }) {
     }
   };
 
-  ui.loadoutConfirmButton.onclick = () => {
+  function confirmLoadout() {
     if (confirmed || !selectedDifficulty?.unlocked || !selectedWeapon) return;
     confirmed = true;
     ui.loadoutConfirmButton.disabled = true;
     onConfirm({ difficulty: selectedDifficulty, weapon: selectedWeapon });
-  };
+    return true;
+  }
+
+  ui.loadoutConfirmButton.onclick = confirmLoadout;
   if (ui.loadoutBackButton) {
     ui.loadoutBackButton.onclick = () => {
       if (confirmed) return;
@@ -373,8 +376,15 @@ export function showRunSetup({ weapons, onConfirm, onBack }) {
     },
     confirm: () => {
       if (confirmed || !selectedDifficulty?.unlocked || !selectedWeapon) return false;
-      ui.loadoutConfirmButton.onclick?.();
-      return true;
+      return Boolean(confirmLoadout());
+    },
+    getSelection: () => {
+      return {
+        difficulty: selectedDifficulty?.id || "",
+        weapon: selectedWeapon?.id || "",
+        confirmed,
+        canConfirm: Boolean(!confirmed && selectedDifficulty?.unlocked && selectedWeapon),
+      };
     },
   };
 

@@ -11,6 +11,9 @@ export function exportTrainingSummary(training = {}) {
     bestDifficulties: rankedStats(training.difficultyStats || {}),
     bestMatrix: rankedMatrix(training.matrix || {}, "best"),
     worstMatrix: rankedMatrix(training.matrix || {}, "worst"),
+    profileStats: rankedStats(training.profileStats || {}),
+    strategyStats: rankedStrategy(training.strategyStats || {}),
+    deathWindows: (training.deathWindows || []).slice(-6),
     recentFailures: (training.recentRuns || []).filter((run) => !run.victory).slice(-6).map((run) => run.deathReason),
     nextRecommendation: recommendNext(training),
     adjustments: training.adjustments || {},
@@ -58,7 +61,21 @@ function recommendNext(training) {
   const worst = rankedMatrix(training.matrix || {}, "worst")[0];
   const best = rankedMatrix(training.matrix || {}, "best")[0];
   return {
+    learned: training.recommendations || null,
     avoid: worst ? { profile: worst.profile, difficultyId: worst.difficultyId, weaponId: worst.weaponId, reason: "matrix_early_deaths" } : null,
     prefer: best ? { profile: best.profile, difficultyId: best.difficultyId, weaponId: best.weaponId, reason: "matrix_best_result" } : null,
   };
+}
+
+function rankedStrategy(stats) {
+  return Object.entries(stats)
+    .map(([id, value]) => ({
+      id,
+      runs: value.runs || 0,
+      wins: value.wins || 0,
+      averageWave: value.runs ? (value.totalWave || 0) / value.runs : 0,
+      averageRisk: value.runs ? (value.totalRisk || 0) / value.runs : 0,
+    }))
+    .sort((a, b) => b.runs - a.runs || b.averageRisk - a.averageRisk)
+    .slice(0, 8);
 }

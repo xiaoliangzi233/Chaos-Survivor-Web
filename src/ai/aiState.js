@@ -1,6 +1,6 @@
 import { AI_CONFIG } from "./aiConfig.js";
 
-const TRAINING_VERSION = 2;
+const TRAINING_VERSION = 3;
 const TRAINING_KEY_PREFIX = "pixel-survivor-ai-training";
 
 const DEFAULT_WEAPON_WEIGHTS = {
@@ -56,6 +56,10 @@ export function createTrainingState() {
     weaponStats: {},
     difficultyStats: {},
     matrix: {},
+    strategyStats: {},
+    deathWindows: [],
+    recommendations: {},
+    profileStats: {},
     upgradeCounts: {},
     shopCounts: {},
     adjustments: {
@@ -127,6 +131,7 @@ export function recordRunResult(training, result) {
     difficultyId: result.difficultyId || "unknown",
     deathReason: result.deathReason || inferDeathReason(result),
     profile: result.profile || "balanced",
+    deathWindow: result.deathWindow || null,
     at: Date.now(),
   };
   data.totalRuns += 1;
@@ -136,7 +141,11 @@ export function recordRunResult(training, result) {
   while (data.recentRuns.length > 20) data.recentRuns.shift();
   updateBucket(data.weaponStats, summary.weaponId, summary);
   updateBucket(data.difficultyStats, summary.difficultyId, summary);
+  updateBucket(data.profileStats, summary.profile, summary);
   updateMatrix(data.matrix, summary);
+  updateStrategyStats(data.strategyStats, summary);
+  recordDeathWindow(data, summary);
+  data.recommendations = buildRecommendation(data, summary);
   applyAdjustment(data.adjustments, summary);
   Object.assign(training, data);
   return data;
@@ -247,6 +256,45 @@ function updateMatrix(matrix, summary) {
   matrix[key] = bucket;
 }
 
+function updateStrategyStats(strategyStats, summary) {
+  const key = summary.deathReason || "unknown";
+  const bucket = strategyStats[key] || { runs: 0, wins: 0, totalWave: 0, totalRisk: 0 };
+  bucket.runs += 1;
+  bucket.wins += summary.victory ? 1 : 0;
+  bucket.totalWave += summary.wave || 1;
+  bucket.totalRisk += summary.deathWindow?.riskAvg || 0;
+  strategyStats[key] = bucket;
+}
+
+function recordDeathWindow(data, summary) {
+  if (summary.victory || !summary.deathWindow) return;
+  data.deathWindows.push({
+    at: summary.at,
+    profile: summary.profile,
+    difficultyId: summary.difficultyId,
+    weaponId: summary.weaponId,
+    deathReason: summary.deathReason,
+    ...summary.deathWindow,
+  });
+  while (data.deathWindows.length > 12) data.deathWindows.shift();
+}
+
+function buildRecommendation(data, summary) {
+  const latest = summary || {};
+  const profile = latest.deathReason?.includes("damage") ? "aggressive"
+    : latest.deathReason?.includes("gold") ? "farmer"
+      : latest.victory ? latest.profile : "survivor";
+  return {
+    profile,
+    difficultyId: latest.difficultyId || "",
+    weaponId: latest.weaponId || "",
+    shopBias: latest.deathReason?.includes("gold") ? "economy" : latest.deathReason?.includes("damage") ? "damage" : "survival",
+    upgradeBias: latest.deathReason?.includes("projectile") ? "mobility" : latest.deathReason?.includes("damage") ? "damage" : "survival",
+    movementBias: latest.deathReason?.includes("collect") ? "less_greed" : latest.deathReason?.includes("corner") ? "center_return" : "survive",
+    runs: data.totalRuns,
+  };
+}
+
 function matrixPenaltyFor(training, profile, difficultyId, weaponId, config = AI_CONFIG.trainingMatrix) {
   if (config?.enabled === false) return 0;
   const bucket = training.matrix?.[matrixKey(profile, difficultyId, weaponId)];
@@ -329,6 +377,10 @@ function normalizeTraining(value) {
     weaponStats: { ...(value?.weaponStats || {}) },
     difficultyStats: { ...(value?.difficultyStats || {}) },
     matrix: { ...(value?.matrix || {}) },
+    strategyStats: { ...(value?.strategyStats || {}) },
+    deathWindows: Array.isArray(value?.deathWindows) ? value.deathWindows.slice(-12) : [],
+    recommendations: { ...(value?.recommendations || {}) },
+    profileStats: { ...(value?.profileStats || {}) },
     upgradeCounts: { ...(value?.upgradeCounts || {}) },
     shopCounts: { ...(value?.shopCounts || {}) },
     adjustments: {

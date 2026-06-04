@@ -3,6 +3,7 @@ import { bossContext, bossMovementTarget } from "./bossStrategy.js";
 import { solveAvoidanceVelocity } from "./orcaAvoidance.js";
 import { collectThreats, pathRisk, riskAtPoint, surroundScore } from "./riskModel.js";
 import { getCachedDropClusters } from "./aiTickCache.js";
+import { findEscapeRoute, routePressureLevel, scoreRoute } from "./routePlanner.js";
 
 export function planMovement({ state, world, runtime = {}, config = AI_CONFIG }) {
   const p = state.player;
@@ -22,6 +23,7 @@ export function planMovement({ state, world, runtime = {}, config = AI_CONFIG })
       lastVelocity: runtime.lastVelocity,
       breakoutAngle: context.breakoutAngle,
       budgetLevel: runtime.budgetLevel || 0,
+      riskCacheGrid: config.performance?.riskCacheGrid,
     },
   });
   updateStuckState(runtime, p, velocity, context);
@@ -53,10 +55,10 @@ function chooseTarget({ state, world, threats, context, runtime, movement, confi
   const stormRailEscape = stormRailDashEscapeTarget(p, world.boss, runtime);
   if (stormRailEscape) return stormRailEscape;
   if (runtime.stuckTimer > (movement.stuckSeconds || 1.2) || context.surrounded) {
-    return { kind: "breakout", x: p.x + Math.cos(context.breakoutAngle) * 260, y: p.y + Math.sin(context.breakoutAngle) * 260, priority: 100 };
+    return escapeTarget(p, threats, context, movement, config) || { kind: "breakout", x: p.x + Math.cos(context.breakoutAngle) * 260, y: p.y + Math.sin(context.breakoutAngle) * 260, priority: 100 };
   }
   if (context.lowHp || context.projectilePressure > 0.42) {
-    return safestNearbyPoint(p, threats, movement);
+    return escapeTarget(p, threats, context, movement, config) || safestNearbyPoint(p, threats, movement, config);
   }
   const blended = blendedTarget({ state, world, threats, context, runtime, movement, config });
   if (blended) return blended;
@@ -77,7 +79,7 @@ export function buildMovementObjectives({ state, world, threats, context, runtim
   const situation = runtime.situation || (world.boss ? { phase: "boss" } : {});
   const weights = config.objectiveWeights || {};
   const objectives = [];
-  const survive = safestNearbyPoint(p, threats, movement);
+  const survive = escapeTarget(p, threats, context, movement, config) || safestNearbyPoint(p, threats, movement, config);
   objectives.push({ ...survive, weight: objectiveWeight("survive", situation, weights) });
   const gravityEscape = blackholeEscapeTarget(p, world.blackhole, runtime);
   if (gravityEscape) objectives.push({ ...gravityEscape, weight: objectiveWeight("survive", situation, weights) * 2.4 });
@@ -136,7 +138,7 @@ function bestCollectTarget(p, world, threats, movement, state, runtime = {}) {
     const d = dist(p, cluster);
     if (d < (p.magnet || 90) * 0.85) continue;
     if (d > (world.boss ? 520 : 820)) continue;
-    const scored = scoreDropCluster(cluster, state, threats, movement);
+    const scored = scoreDropCluster(cluster, state, threats, movement, runtime);
     if (!scored.safe) continue;
     const score = scored.score;
     if (score > bestScore) {
@@ -225,16 +227,34 @@ function stormRailDashEscapeTarget(p, boss, runtime = {}) {
   };
 }
 
-function safestNearbyPoint(p, threats, movement) {
+function escapeTarget(p, threats, context, movement, config = AI_CONFIG) {
+  const routeConfig = config.routePlanner || {};
+  if (routeConfig.enabled === false) return null;
+  const route = findEscapeRoute({
+    player: p,
+    threats,
+    context,
+    movement: { ...movement, ...routeConfig },
+    samples: Math.max(2, (routeConfig.samples || 8) - Math.max(0, (config.budgetLevel || 0) * 2)),
+  });
+  if (!route) return null;
+  route.kind = context.surrounded ? "breakout" : "survive";
+  return route;
+}
+
+function safestNearbyPoint(p, threats, movement, config = AI_CONFIG) {
   let best = { kind: "survive", x: p.x, y: p.y, priority: 90 };
   let bestRisk = riskAtPoint(p, threats, movement);
-  for (let i = 0; i < 24; i++) {
-    const a = (i / 24) * Math.PI * 2;
+  const routeConfig = config.routePlanner || {};
+  const candidates = routeConfig.enabled === false ? 24 : Math.min(24, routeConfig.escapeCandidates || 16);
+  for (let i = 0; i < candidates; i++) {
+    const a = (i / candidates) * Math.PI * 2;
     const point = { x: p.x + Math.cos(a) * 220, y: p.y + Math.sin(a) * 220, r: p.r || 14 };
-    const risk = riskAtPoint(point, threats, movement);
+    const route = routeConfig.enabled === false ? null : scoreRoute({ from: p, to: point, threats, movement: { ...movement, ...routeConfig }, samples: routeConfig.samples || 8 });
+    const risk = route ? route.score : riskAtPoint(point, threats, movement);
     if (risk < bestRisk) {
       bestRisk = risk;
-      best = { kind: "survive", x: point.x, y: point.y, priority: 90 };
+      best = { kind: "survive", x: point.x, y: point.y, priority: 90, route };
     }
   }
   return best;
@@ -273,7 +293,7 @@ export function clusterDrops(gems = [], coins = [], radius = 180) {
   return clusters.sort((a, b) => b.totalValue - a.totalValue);
 }
 
-export function scoreDropCluster(cluster, state, threats, movement) {
+export function scoreDropCluster(cluster, state, threats, movement, runtime = {}) {
   const p = state.player;
   const d = dist(p, cluster);
   const xpNeed = Math.max(1, p.xpNeed || 100);
@@ -283,12 +303,25 @@ export function scoreDropCluster(cluster, state, threats, movement) {
   const bossPenalty = state.bossWaveActive ? 0.65 : 1;
   const greed = movement.greed || 1;
   const riskTolerance = movement.riskTolerance || 1;
-  const routeRisk = pathRisk({ x: p.x, y: p.y, r: p.r || 14 }, { x: cluster.x, y: cluster.y, r: p.r || 14 }, threats, { ...movement, samples: movement.samples || 8 });
+  const routePlanner = state.ai?.config?.routePlanner || {};
+  const route = routePlanner.enabled === false
+    ? null
+    : scoreRoute({
+      from: { x: p.x, y: p.y, r: p.r || 14 },
+      to: { x: cluster.x, y: cluster.y, r: p.r || 14 },
+      threats,
+      movement: { ...movement, ...routePlanner },
+      samples: Math.max(2, (routePlanner.samples || 8) - Math.max(0, runtime.budgetLevel || 0)),
+    });
+  const routeRisk = route ? route.score : pathRisk({ x: p.x, y: p.y, r: p.r || 14 }, { x: cluster.x, y: cluster.y, r: p.r || 14 }, threats, { ...movement, samples: movement.samples || 8 });
   const value = cluster.gemValue * gemWeight + cluster.coinValue * coinWeight + cluster.count * 1.5;
+  const pressure = routePressureLevel(route, routePlanner);
+  const pressureLimit = pressure === "high" ? (p.magnet || 90) * 1.35 : pressure === "medium" ? 520 : Infinity;
   return {
     score: value * 160 * greed / Math.max(90, d) * bossPenalty - routeRisk * 0.55,
-    safe: routeRisk < (movement.collectRiskLimit || 32) * riskTolerance,
+    safe: d <= pressureLimit && routeRisk < (routePlanner.collectRouteRisk || movement.collectRiskLimit || 32) * riskTolerance,
     routeRisk,
+    route,
   };
 }
 

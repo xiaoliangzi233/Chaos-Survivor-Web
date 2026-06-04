@@ -66,14 +66,22 @@ export function classifyThreat(source, kind) {
   if (kind === "blackhole") return "gravity_well";
   if (kind === "projectile") {
     const speed = Math.hypot(source.vx || 0, source.vy || 0);
+    if (source.orbiting || source.orbitCenter || source.kind === "orbit") return "projectile_orbit";
+    if (source.returning || source.boomerang || source.kind === "boomerang") return "projectile_boomerang";
     if (speed >= 560) return "projectile_fast";
     if ((source.life || 0) > 2.4 || (source.r || 0) >= 12 || source.landTrapOnExpire) return "projectile_slow_field";
     return "projectile";
   }
   if (kind === "hazard") {
-    if (source.kind === "blizzard_core") return "hazard_disruption";
-    if ((source.armTime || 0) > 0.35) return "hazard_windup";
-    return "hazard_armed";
+    if (source.kind === "blizzard_core") return "hazard_zone_soft";
+    if (source.kind === "storm_laser_net") return (source.armTime || 0) > 0 ? "warning_line" : "hazard_zone_hard";
+    if (source.kind === "toxic_residue" || source.kind === "frost_zone") return "hazard_armed";
+    if ((source.armTime || 0) > 0.35) {
+      if (source.length || source.warningType === "line") return "warning_line";
+      if (source.warningType === "circle") return "warning_circle";
+      return "hazard_windup";
+    }
+    return source.damage ? "hazard_armed" : "hazard_zone_soft";
   }
   if (kind === "enemy") {
     const speed = Math.hypot(source.eliteDashVx || source.vx || 0, source.eliteDashVy || source.vy || 0);
@@ -81,13 +89,13 @@ export function classifyThreat(source, kind) {
     return "enemy_contact";
   }
   if (kind === "boss") return isBossDashLike(source) ? "boss_dash" : "boss_body";
-  if (kind === "boss_segment") return isBossDashLike(source) ? "boss_segment_dash" : "boss_segment";
+  if (kind === "boss_segment") return isBossDashLike(source) ? "boss_segment_dash" : "boss_body_chain";
   return kind;
 }
 
 export function riskSamplesForThreat(threat, lookAhead = DEFAULT_LOOK_AHEAD) {
   if (threat.kind === "projectile_fast" || threat.kind === "enemy_dash" || threat.kind === "boss_dash" || threat.kind === "boss_segment_dash") return [0, 0.1, 0.2, 0.34, 0.52].filter((t) => t <= lookAhead);
-  if (threat.kind === "projectile_slow_field" || threat.kind === "hazard_armed" || threat.kind === "gravity_well" || threat.kind === "hazard_disruption") return [0, 0.25, 0.55, 0.85].filter((t) => t <= lookAhead);
+  if (threat.kind === "projectile_slow_field" || threat.kind === "projectile_orbit" || threat.kind === "projectile_boomerang" || threat.kind === "hazard_zone_hard" || threat.kind === "hazard_zone_soft" || threat.kind === "gravity_well") return [0, 0.25, 0.55, 0.85].filter((t) => t <= lookAhead);
   return SAMPLE_TIMES.filter((t) => t <= lookAhead);
 }
 
@@ -106,7 +114,7 @@ export function riskAtPoint(point, threats, options = {}) {
       risk += gravityRisk(point, threat);
       continue;
     }
-    if (threat.kind === "hazard_armed" || threat.kind === "hazard_windup" || threat.kind === "hazard_disruption") {
+    if (threat.kind === "hazard_armed" || threat.kind === "hazard_windup" || threat.kind === "hazard_disruption" || threat.kind === "hazard_zone_hard" || threat.kind === "hazard_zone_soft" || threat.kind === "warning_line" || threat.kind === "warning_circle") {
       risk += hazardRisk(point, threat);
       continue;
     }
@@ -123,6 +131,24 @@ export function riskAtPoint(point, threats, options = {}) {
     }
   }
   return risk;
+}
+
+export function riskBreakdownAtPoint(point, threats, options = {}) {
+  const breakdown = {
+    lethalRisk: boundaryRisk(point, options),
+    controlRisk: 0,
+    positionRisk: boundaryRisk(point, options),
+    objectiveRisk: 0,
+    total: 0,
+  };
+  for (const threat of threats || []) {
+    const single = riskAtPoint(point, [threat], options);
+    if (threat.kind === "gravity_well" || threat.kind === "hazard_zone_soft" || threat.kind === "hazard_disruption") breakdown.controlRisk += single;
+    else if (threat.kind === "warning_line" || threat.kind === "warning_circle") breakdown.objectiveRisk += single;
+    else breakdown.lethalRisk += single;
+  }
+  breakdown.total = breakdown.lethalRisk + breakdown.controlRisk + breakdown.positionRisk + breakdown.objectiveRisk;
+  return breakdown;
 }
 
 export function isPointSafe(point, threats, options = {}) {
@@ -199,13 +225,19 @@ export function surroundScore(player, enemies, options = {}) {
 }
 
 function hazardRisk(point, threat) {
-  if (threat.armTime > 0.45) return 0;
+  if (threat.armTime > 0.45 && threat.kind !== "warning_line" && threat.kind !== "warning_circle") return 0;
   if (threat.line) return lineRisk(point, threat);
   const dx = point.x - threat.x;
   const dy = point.y - threat.y;
   const d = Math.max(1, Math.hypot(dx, dy));
   const safeRadius = (point.r || 14) + threat.r + 24;
-  if (threat.kind === "hazard_disruption") {
+  if (threat.kind === "warning_line") return lineRisk(point, threat) * windupScale(threat);
+  if (threat.kind === "warning_circle") {
+    const scale = windupScale(threat);
+    if (d < safeRadius) return (threat.weight || 1) * scale * (1 + (safeRadius - d) / safeRadius) * 8;
+    return (threat.weight || 1) * scale * Math.max(0, 1 - (d - safeRadius) / 160);
+  }
+  if (threat.kind === "hazard_disruption" || threat.kind === "hazard_zone_soft") {
     const disruptionRadius = (point.r || 14) + threat.r + 36;
     if (d < disruptionRadius) return (threat.weight || 1) * (1 + (disruptionRadius - d) / disruptionRadius) * 14;
     return (threat.weight || 1) * Math.max(0, 1 - (d - disruptionRadius) / 110) * 2;
@@ -243,14 +275,20 @@ function lineRisk(point, threat) {
 function threatPadding(threat) {
   if (threat.kind === "projectile_fast") return 34;
   if (threat.kind === "projectile_slow_field") return 42;
+  if (threat.kind === "projectile_orbit" || threat.kind === "projectile_boomerang") return 46;
   if (threat.kind === "projectile") return 22;
   if (threat.kind === "enemy_dash") return 64;
   if (threat.kind === "boss_dash") return 150;
   if (threat.kind === "boss_segment_dash") return 86;
-  if (threat.kind === "boss_segment") return 48;
+  if (threat.kind === "boss_body_chain") return 58;
   if (threat.kind === "boss_body") return 90;
   if (threat.kind === "gravity_well") return 96;
   return 38;
+}
+
+function windupScale(threat) {
+  if (!threat.armTime) return 1;
+  return Math.max(0.15, Math.min(1, 1 - threat.armTime / 1.2));
 }
 
 function hazardWeight(h) {

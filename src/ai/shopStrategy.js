@@ -105,6 +105,9 @@ export function scoreOffer({ offer, player, inventory, state, profile = buildInv
     });
   } else {
     const id = offer.itemId || offer.id;
+    if (id === "healing_potion" && player.hp >= player.maxHp) {
+      return { offer, score: -100, reason: "full_health_skip_healing_potion", fuseWeaponUid, sellWeaponUid, sellWeaponSlot };
+    }
     score = estimateOfferGain(offer, profile).score + rank * 8;
     reason = id;
     const hpRatio = player.maxHp ? player.hp / player.maxHp : 1;

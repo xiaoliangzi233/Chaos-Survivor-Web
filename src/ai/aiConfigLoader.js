@@ -150,6 +150,8 @@ function normalizeDifficultyTraining(value = {}) {
     ...defaults,
     ...value,
     enabled: value.enabled !== false,
+    targetDifficultyId: typeof value.targetDifficultyId === "string" ? value.targetDifficultyId.trim() : defaults.targetDifficultyId,
+    allowTargetDemotion: value.allowTargetDemotion !== false,
     demotion: {
       earlyDeathWave: clampInt(demotion.earlyDeathWave, 1, 20, defaults.demotion.earlyDeathWave),
       earlyDeathLimit: clampInt(demotion.earlyDeathLimit, 1, 20, defaults.demotion.earlyDeathLimit),

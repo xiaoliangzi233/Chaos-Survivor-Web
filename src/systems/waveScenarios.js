@@ -27,13 +27,15 @@ export function activeGearfiendMode() {
 function spawnScenarioElite(scenario) {
   const elite = scenario.elite;
   if (!elite) return;
-  const key = `${state.difficultyId}-${scenario.wave}-elite-${elite.id}`;
+  const key = `${state.difficultyId}-${scenario.wave}-elite-${elite.id || "variants"}`;
   state.spawnedWaveEvents ||= new Set();
   if (state.spawnedWaveEvents.has(key)) return;
+  const variants = elite.variants || [{ id: elite.id, variant: elite.variant }];
   for (let i = 0; i < elite.count; i++) {
-    const enemy = spawnEnemyById(elite.id);
+    const choice = variants[i % variants.length];
+    const enemy = spawnEnemyById(choice.id);
     if (!enemy) continue;
-    markElite(enemy, elite.variant);
+    markElite(enemy, choice.variant);
     pulse(enemy.x, enemy.y, enemy.r * 3.2, enemy.color, 0.4);
   }
   state.spawnedWaveEvents.add(key);
@@ -48,6 +50,11 @@ function spawnScenarioEvent(scenario) {
   if (event.type === "hazard_ring") spawnHazardRing(event);
   if (event.type === "hazard_line") spawnHazardLine(event);
   if (event.type === "hazard_field") spawnHazardField(event);
+  if (event.type === "gravity_well_grid") spawnScenarioNodeField(event, "gravity_well", "#8d6bff");
+  if (event.type === "ember_mine_rain") spawnEmberMineRain(event);
+  if (event.type === "prism_refraction") spawnScenarioNodeField(event, "prism_reflector", "#f3f7ff");
+  if (event.type === "magnetic_drift") spawnScenarioNodeField(event, "magnetic_node", "#42e8ff");
+  if (event.type === "nest_spore_bloom") spawnScenarioNodeField(event, "brood_pod", "#a3e635");
   state.spawnedWaveEvents.add(key);
 }
 
@@ -97,6 +104,61 @@ function spawnHazardField(event) {
   }
 }
 
+function spawnScenarioNodeField(event, kind, color) {
+  const count = event.count || 6;
+  const half = WORLD_SIZE / 2 - 180;
+  const minPlayerDistance = event.minPlayerDistance || 240;
+  let spawned = 0;
+  let attempts = 0;
+  while (spawned < count && attempts < count * 24) {
+    attempts++;
+    const x = (Math.random() * 2 - 1) * half;
+    const y = (Math.random() * 2 - 1) * half;
+    if (Math.hypot(x - state.player.x, y - state.player.y) < minPlayerDistance) continue;
+    addScenarioHazard(x, y, {
+      ...event,
+      kind,
+      color,
+      damage: 0,
+      life: event.life || 12,
+      radius: event.radius || 96,
+    }, Math.random() * TAU);
+    spawned++;
+  }
+}
+
+function spawnEmberMineRain(event) {
+  const clusters = event.clusters || 5;
+  const minesPerCluster = event.minesPerCluster || 3;
+  const half = WORLD_SIZE / 2 - 150;
+  const minPlayerDistance = event.minPlayerDistance || 220;
+  for (let c = 0; c < clusters; c++) {
+    let cx = 0;
+    let cy = 0;
+    for (let attempts = 0; attempts < 18; attempts++) {
+      cx = (Math.random() * 2 - 1) * half;
+      cy = (Math.random() * 2 - 1) * half;
+      if (Math.hypot(cx - state.player.x, cy - state.player.y) >= minPlayerDistance) break;
+    }
+    const offset = Math.random() * TAU;
+    for (let i = 0; i < minesPerCluster; i++) {
+      const a = offset + i / minesPerCluster * TAU;
+      const spread = 58 + Math.random() * 34;
+      addScenarioHazard(cx + Math.cos(a) * spread, cy + Math.sin(a) * spread, {
+        kind: "ember_mine",
+        color: "#ff7a1a",
+        radius: 13,
+        damage: event.damage || 22,
+        life: event.life || 10,
+        triggerRadius: 42,
+        explodeRadius: event.radius || 78,
+        armTime: 0.9 + Math.random() * 0.45,
+        triggered: false,
+      }, a);
+    }
+  }
+}
+
 function addScenarioHazard(x, y, event, angle) {
   const half = WORLD_SIZE / 2 - 80;
   world.hazards.push({
@@ -110,6 +172,10 @@ function addScenarioHazard(x, y, event, angle) {
     maxLife: event.life || 3.2,
     poisonDps: event.poisonDps || 0,
     poisonDuration: event.poisonDuration || 0,
+    armTime: event.armTime || 0,
+    triggerRadius: event.triggerRadius || 0,
+    explodeRadius: event.explodeRadius || 0,
+    triggered: Boolean(event.triggered),
     fullWave: Boolean(event.fullWave),
     angle,
     spin: Math.random() * TAU,
@@ -146,5 +212,26 @@ function markElite(enemy, variant) {
     enemy.eliteDashTrapSkill = true;
     enemy.eliteSkillInterval = 4.2;
     enemy.eliteSkillCooldown = 1.8;
+  }
+  if (variant === "collapsing_blackhole") {
+    enemy.name = "坍缩星核术师";
+    enemy.eliteCollapseSkill = true;
+    enemy.eliteSkillInterval = 3.8;
+    enemy.eliteSkillCooldown = 1.2;
+    enemy.speed *= 1.08;
+  }
+  if (variant === "magnetic_captain") {
+    enemy.name = "磁暴掠夺队长";
+    enemy.eliteMagnetDashSkill = true;
+    enemy.eliteSkillInterval = 3.6;
+    enemy.eliteSkillCooldown = 1.1;
+    enemy.speed *= 1.18;
+  }
+  if (variant === "brood_core") {
+    enemy.name = "巢核播撒母体";
+    enemy.eliteBroodPodSkill = true;
+    enemy.eliteSkillInterval = 4.2;
+    enemy.eliteSkillCooldown = 1.4;
+    enemy.speed *= 0.86;
   }
 }

@@ -60,6 +60,10 @@ function chooseTarget({ state, world, threats, context, runtime, movement, confi
     return escapeTarget(p, threats, context, movement, config) || { kind: "breakout", x: p.x + Math.cos(context.breakoutAngle) * 260, y: p.y + Math.sin(context.breakoutAngle) * 260, priority: 100 };
   }
   if (context.lowHp || context.projectilePressure > 0.42) {
+    if (world.boss && !context.lowHp) {
+      const bossPressureTarget = blendedTarget({ state, world, threats, context, runtime, movement, config });
+      if (bossPressureTarget) return bossPressureTarget;
+    }
     return escapeTarget(p, threats, context, movement, config) || safestNearbyPoint(p, threats, movement, config);
   }
   const blended = blendedTarget({ state, world, threats, context, runtime, movement, config });

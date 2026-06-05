@@ -52,6 +52,8 @@ export const AI_CONFIG = {
   },
   difficultyTraining: {
     enabled: true,
+    targetDifficultyId: "",
+    allowTargetDemotion: true,
     demotion: {
       earlyDeathWave: 2,
       earlyDeathLimit: 3,

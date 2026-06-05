@@ -134,9 +134,10 @@ export function updateEnemies(dt) {
     const baseSpeed = e.speed;
     if (assisted) e.speed *= e.prismAssistSpeedMult || 1.22;
     if (activeWaveEffect("mini_overdrive") && !e.boss) e.speed *= 1.5;
+    if (activeWaveEffect("overclock_pulse") && !e.boss) e.speed *= overclockPulseMultiplier();
     if (!updateEliteDashTrap(e, dt)) e.update(dt);
     if (assisted) e.speed = baseSpeed;
-    if (activeWaveEffect("mini_overdrive") && !e.boss) e.speed = baseSpeed;
+    if ((activeWaveEffect("mini_overdrive") || activeWaveEffect("overclock_pulse")) && !e.boss) e.speed = baseSpeed;
     updateEliteSkill(e, dt);
     applyDifficultyCooldownScale(e, beforeCooldowns);
   }
@@ -340,7 +341,8 @@ function updateEnemyProjectiles(dt) {
   for (let i = world.enemyProjectiles.length - 1; i >= 0; i--) {
     const b = world.enemyProjectiles[i];
     updateSpecialEnemyProjectile(b, dt);
-    const speedScale = activeWaveEffect("mini_overdrive") && !b.bossProjectile ? 1.5 : 1;
+    updatePrismRefraction(b);
+    const speedScale = (activeWaveEffect("mini_overdrive") && !b.bossProjectile ? 1.5 : 1) * (activeWaveEffect("overclock_pulse") && !b.bossProjectile ? overclockPulseMultiplier() : 1);
     b.x += b.vx * dt * speedScale;
     b.y += b.vy * dt * speedScale;
     b.life -= dt;
@@ -442,6 +444,9 @@ function updateHazards(dt) {
     const h = world.hazards[i];
     h.life -= dt;
     if (h.kind === "ember_mine") updateEmberMine(h, dt);
+    if (h.kind === "gravity_well") updateGravityWell(h, dt);
+    if (h.kind === "magnetic_node") updateMagneticNode(h, dt);
+    if (h.kind === "brood_pod") updateBroodPod(h, dt);
     if (h.kind === "storm_laser_net" && h.armTime > 0) h.armTime = Math.max(0, h.armTime - dt);
     if (h.kind === "artillery_blast") updateArtilleryBlast(h, dt);
     if (h.kind === "ice_spike" || h.kind === "ice_seal") updateIceHazard(h, dt);
@@ -509,6 +514,9 @@ function updateEliteSkill(e, dt) {
 function releaseEliteSkill(e) {
   if (e.eliteFireballSkill) return releaseEliteFireballs(e);
   if (e.eliteDashTrapSkill) return releaseEliteDashTrap(e);
+  if (e.eliteCollapseSkill) return releaseEliteCollapse(e);
+  if (e.eliteMagnetDashSkill) return releaseEliteMagnetDash(e);
+  if (e.eliteBroodPodSkill) return releaseEliteBroodPods(e);
   releaseElitePulse(e);
 }
 
@@ -577,6 +585,78 @@ function releaseEliteDashTrap(e) {
   burst(e.x, e.y, 14, e.color, 180);
 }
 
+function releaseEliteCollapse(e) {
+  const p = state.player;
+  const tx = clamp(p.x + (p.dirX || 1) * 130, -WORLD_SIZE / 2 + 110, WORLD_SIZE / 2 - 110);
+  const ty = clamp(p.y + (p.dirY || 0) * 130, -WORLD_SIZE / 2 + 110, WORLD_SIZE / 2 - 110);
+  world.hazards.push({
+    kind: "gravity_well",
+    x: tx,
+    y: ty,
+    r: 118,
+    color: "#8d6bff",
+    damage: 0,
+    life: 2.6,
+    maxLife: 2.6,
+    armTime: 0.42,
+    pull: 210,
+    spin: Math.random() * TAU,
+  });
+  for (let i = 0; i < 8; i++) {
+    const a = i / 8 * TAU + e.anim * 0.12;
+    world.enemyProjectiles.push({
+      x: e.x + Math.cos(a) * e.r,
+      y: e.y + Math.sin(a) * e.r,
+      vx: Math.cos(a) * 165,
+      vy: Math.sin(a) * 165,
+      r: 5.5,
+      color: "#b48cff",
+      damage: Math.max(1, e.damage * 0.26),
+      life: 2.4,
+      shape: "starShard",
+      spin: Math.random() * TAU,
+    });
+  }
+  pulse(tx, ty, 118, "#8d6bff", 0.32);
+  e.eliteSkillCooldown = e.eliteSkillInterval;
+}
+
+function releaseEliteMagnetDash(e) {
+  e.eliteDashTime = 0.42;
+  const a = Math.atan2(state.player.y - e.y, state.player.x - e.x);
+  e.eliteDashVx = Math.cos(a) * 620;
+  e.eliteDashVy = Math.sin(a) * 620;
+  e.eliteDashTrapTimer = 0.08;
+  e.eliteMagnetTrail = true;
+  e.eliteSkillCooldown = e.eliteSkillInterval;
+  pulse(e.x, e.y, e.r * 3, "#42e8ff", 0.22);
+}
+
+function releaseEliteBroodPods(e) {
+  const p = state.player;
+  const count = 5;
+  const base = Math.atan2(p.y - e.y, p.x - e.x) + Math.PI / 2;
+  for (let i = 0; i < count; i++) {
+    const offset = (i - (count - 1) / 2) * 62;
+    const x = clamp(p.x + Math.cos(base) * offset + (Math.random() - 0.5) * 36, -WORLD_SIZE / 2 + 100, WORLD_SIZE / 2 - 100);
+    const y = clamp(p.y + Math.sin(base) * offset + (Math.random() - 0.5) * 36, -WORLD_SIZE / 2 + 100, WORLD_SIZE / 2 - 100);
+    world.hazards.push({
+      kind: "brood_pod",
+      x,
+      y,
+      r: 48,
+      color: "#a3e635",
+      damage: 0,
+      life: 5.4,
+      maxLife: 5.4,
+      armTime: 2.2,
+      spin: Math.random() * TAU,
+    });
+  }
+  pulse(e.x, e.y, e.r * 2.5, "#a3e635", 0.24);
+  e.eliteSkillCooldown = e.eliteSkillInterval;
+}
+
 function updateEliteDashTrap(e, dt) {
   if ((e.eliteDashTime || 0) <= 0) return false;
   e.eliteDashTime = Math.max(0, e.eliteDashTime - dt);
@@ -588,23 +668,39 @@ function updateEliteDashTrap(e, dt) {
     const base = Math.atan2(e.eliteDashVy || 0, e.eliteDashVx || 1) + Math.PI;
     const side = Math.random() < 0.5 ? -1 : 1;
     const a = base + side * (0.48 + Math.random() * 0.22);
-    world.enemyProjectiles.push({
-      x: e.x + Math.cos(a) * e.r * 0.4,
-      y: e.y + Math.sin(a) * e.r * 0.4,
-      vx: Math.cos(a) * 260,
-      vy: Math.sin(a) * 260,
-      r: 13,
-      color: e.color,
-      damage: e.damage * 0.22,
-      life: 0.46,
-      shape: "fastGear",
-      spin: Math.random() * TAU,
-      landTrapOnExpire: true,
-      trapRadius: 38,
-      trapDamage: e.damage * 0.5,
-      trapLife: 2.6,
-    });
+    if (!e.eliteMagnetTrail) {
+      world.enemyProjectiles.push({
+        x: e.x + Math.cos(a) * e.r * 0.4,
+        y: e.y + Math.sin(a) * e.r * 0.4,
+        vx: Math.cos(a) * 260,
+        vy: Math.sin(a) * 260,
+        r: 13,
+        color: e.color,
+        damage: e.damage * 0.22,
+        life: 0.46,
+        shape: "fastGear",
+        spin: Math.random() * TAU,
+        landTrapOnExpire: true,
+        trapRadius: 38,
+        trapDamage: e.damage * 0.5,
+        trapLife: 2.6,
+      });
+    }
+    if (e.eliteMagnetTrail) {
+      world.hazards.push({
+        kind: "magnetic_node",
+        x: clamp(e.x, -WORLD_SIZE / 2 + 90, WORLD_SIZE / 2 - 90),
+        y: clamp(e.y, -WORLD_SIZE / 2 + 90, WORLD_SIZE / 2 - 90),
+        r: 78,
+        color: "#42e8ff",
+        damage: 0,
+        life: 1.6,
+        maxLife: 1.6,
+        spin: Math.random() * TAU,
+      });
+    }
   }
+  if (e.eliteDashTime <= 0) e.eliteMagnetTrail = false;
   return true;
 }
 
@@ -637,6 +733,91 @@ function updateEmberMine(h, dt) {
     return;
   }
   h.r = h.baseRadius || h.r;
+}
+
+function updateGravityWell(h, dt) {
+  h.armTime = Math.max(0, (h.armTime || 0) - dt);
+  h.spin = (h.spin || 0) + dt * 3.6;
+  if (h.armTime > 0) return;
+  pullBody(state.player, h, dt, h.pull || 150, 0.5);
+  for (const e of world.enemies) {
+    if (e.dead || e.boss) continue;
+    pullBody(e, h, dt, (h.pull || 150) * 0.38, 0.3);
+  }
+  for (const collection of [world.gems, world.coins]) {
+    for (const item of collection) pullBody(item, h, dt, (h.pull || 150) * 0.72, 0.4);
+  }
+}
+
+function updateMagneticNode(h, dt) {
+  h.spin = (h.spin || 0) + dt * 5.8;
+  for (const collection of [world.gems, world.coins]) {
+    for (const item of collection) pullBody(item, h, dt, 180, 0.52);
+  }
+  for (const b of world.enemyProjectiles) {
+    const speed = Math.hypot(b.vx || 0, b.vy || 0);
+    if (speed > 240) continue;
+    pullBody(b, h, dt, 54, 0.22);
+  }
+}
+
+function updateBroodPod(h, dt) {
+  h.armTime = Math.max(0, (h.armTime || 0) - dt);
+  h.spin = (h.spin || 0) + dt * 2.4;
+  if (h.armTime > 0 || h.hatched) return;
+  h.hatched = true;
+  h.life = Math.min(h.life, 0.5);
+  const existing = world.enemies.filter((e) => e.type === "zombie" || e.type === "slime_small").length;
+  if (existing > 70 || world.enemies.length > 160) return;
+  const count = 2 + (state.wave >= 16 ? 1 : 0);
+  for (let i = 0; i < count; i++) {
+    const a = h.spin + i / count * TAU;
+    spawnEnemyById(i % 2 ? "slime_small" : "zombie", h.x + Math.cos(a) * 34, h.y + Math.sin(a) * 34);
+  }
+  burst(h.x, h.y, 10, h.color, 120);
+}
+
+function pullBody(body, h, dt, strength, falloffPower) {
+  const dx = h.x - body.x;
+  const dy = h.y - body.y;
+  const d = Math.max(1, Math.hypot(dx, dy));
+  if (d > h.r) return;
+  const force = Math.pow(1 - d / h.r, falloffPower) * strength;
+  body.x += dx / d * force * dt;
+  body.y += dy / d * force * dt;
+}
+
+function updatePrismRefraction(b) {
+  if (b.prismReflected || b.bossProjectile) return;
+  const prisms = world.hazards.filter((h) => h.kind === "prism_reflector");
+  if (!prisms.length) return;
+  for (const h of prisms) {
+    if (distSq(h.x, h.y, b.x, b.y) > (h.r + b.r) ** 2) continue;
+    b.prismReflected = true;
+    const base = Math.atan2(b.vy || 0, b.vx || 1);
+    const side = Math.random() < 0.5 ? -1 : 1;
+    const a = base + side * 0.42;
+    const speed = Math.max(120, Math.hypot(b.vx || 0, b.vy || 0) * 0.82);
+    world.enemyProjectiles.push({
+      x: b.x,
+      y: b.y,
+      vx: Math.cos(a) * speed,
+      vy: Math.sin(a) * speed,
+      r: Math.max(3, (b.r || 5) * 0.78),
+      color: "#f3f7ff",
+      damage: (b.damage || 1) * 0.38,
+      life: Math.min(1.8, b.life || 1.8),
+      shape: "laserShard",
+      prismReflected: true,
+    });
+    pulse(h.x, h.y, h.r * 0.55, "#f3f7ff", 0.12);
+    break;
+  }
+}
+
+function overclockPulseMultiplier() {
+  const k = Math.sin(state.time * TAU / 6);
+  return k > 0.35 ? 1.28 : 1;
 }
 
 function updateArtilleryBlast(h, dt) {

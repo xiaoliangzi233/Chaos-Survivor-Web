@@ -7,6 +7,7 @@ import { BaseEnemy } from "./BaseEnemy.js";
 import { applyPlayerDamage } from "../systems/items.js";
 
 const MODES = ["fan", "ring", "dash", "summon"];
+const FAR_DASH_DISTANCE = 760;
 
 export class StormTyrant extends BaseEnemy {
   constructor(config, x, y) {
@@ -89,8 +90,14 @@ export class StormTyrant extends BaseEnemy {
 
   chooseMode() {
     this.mode = "windup";
-    this.currentAttack = MODES[this.modeIndex % MODES.length];
-    this.modeIndex++;
+    const scheduledAttack = MODES[this.modeIndex % MODES.length];
+    const d = Math.hypot(state.player.x - this.x, state.player.y - this.y);
+    if (d > FAR_DASH_DISTANCE && scheduledAttack !== "dash") {
+      this.currentAttack = "dash";
+    } else {
+      this.currentAttack = scheduledAttack;
+      this.modeIndex++;
+    }
     this.modeTimer = this.currentAttack === "dash" ? 0.66 : this.currentAttack === "summon" ? 0.78 : 0.5;
     this.attackCount = 0;
     this.lockAngle = Math.atan2(state.player.y - this.y, state.player.x - this.x);

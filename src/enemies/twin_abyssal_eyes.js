@@ -9,6 +9,7 @@ import { maybeTriggerBossSignature } from "../systems/easterEggs.js";
 
 const TETHER_RANGE = 920;
 const RESONANCE_HP = 0.4;
+const FAR_DASH_DISTANCE = 760;
 
 export class TwinAbyssalEyes extends BaseEnemy {
   constructor(config, x, y, shared = null, role = "crimson") {
@@ -141,7 +142,7 @@ export class TwinAbyssalEyes extends BaseEnemy {
   }
 
   chooseCrimsonMode(d) {
-    if (d < 620 || Math.random() < 0.68) {
+    if (d > FAR_DASH_DISTANCE || d < 620 || Math.random() < 0.68) {
       this.mode = "dash_windup";
       this.modeTimer = this.enraged ? 0.34 : 0.52;
       this.attackCount = 0;

@@ -187,6 +187,17 @@ function chooseDifficulty(training, unlocked, config = AI_CONFIG) {
   const currentRun = training.totalRuns || 0;
   const eligible = ordered.filter((item) => !isDifficultyCoolingDown(training, item.id, currentRun));
   const candidates = eligible.length ? eligible : ordered;
+  const target = trainingConfig.targetDifficultyId
+    ? ordered.find((item) => item.id === trainingConfig.targetDifficultyId)
+    : null;
+  if (target) {
+    const targetIndex = ordered.indexOf(target);
+    const canDemote = trainingConfig.allowTargetDemotion !== false;
+    if (canDemote && hasEarlyDeathPattern(training.difficultyStats[target.id], demotion) && targetIndex > 0) {
+      return ordered[targetIndex - 1];
+    }
+    if (!isDifficultyCoolingDown(training, target.id, currentRun) || !canDemote) return target;
+  }
   for (let i = candidates.length - 1; i >= 0; i -= 1) {
     const item = candidates[i];
     if (!hasEarlyDeathPattern(training.difficultyStats[item.id], demotion)) return item;

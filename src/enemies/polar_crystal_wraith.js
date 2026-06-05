@@ -8,6 +8,7 @@ import { applyPlayerDamage } from "../systems/items.js";
 import { applyFrostMark } from "../systems/statusEffects.js";
 
 const MODES = ["snowflake_barrage", "ice_spike_field", "crystal_dash", "frost_orbit", "blizzard_core"];
+const FAR_DASH_DISTANCE = 760;
 
 export class PolarCrystalWraith extends BaseEnemy {
   constructor(config, x, y) {
@@ -90,6 +91,19 @@ export class PolarCrystalWraith extends BaseEnemy {
   }
 
   chooseMode() {
+    const d = Math.hypot(state.player.x - this.x, state.player.y - this.y);
+    const scheduledMode = MODES[this.modeIndex % MODES.length];
+    if (d > FAR_DASH_DISTANCE && scheduledMode !== "crystal_dash") {
+      this.mode = "crystal_dash";
+      this.attackCount = 0;
+      this.attackTimer = 0.08;
+      this.modeTimer = 0.62;
+      this.dashLeft = this.phaseLevel;
+      this.dashing = false;
+      this.angle = Math.atan2(state.player.y - this.y, state.player.x - this.x);
+      pulse(this.x, this.y, this.r + 34, this.color, 0.24);
+      return;
+    }
     if (this.phaseLevel >= 3 && this.sealCooldown <= 0) {
       this.mode = "absolute_seal";
       this.modeTimer = 1.2;
@@ -98,7 +112,7 @@ export class PolarCrystalWraith extends BaseEnemy {
       pulse(this.x, this.y, this.r + 70, "#d9fbff", 0.28);
       return;
     }
-    this.mode = MODES[this.modeIndex % MODES.length];
+    this.mode = scheduledMode;
     this.modeIndex += this.phaseLevel === 3 ? 2 : 1;
     this.attackCount = 0;
     this.attackTimer = 0.08;

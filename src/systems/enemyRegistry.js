@@ -46,6 +46,8 @@ import { TwinAbyssalEyes } from "../enemies/twin_abyssal_eyes.js";
 import { PolarCrystalWraith } from "../enemies/polar_crystal_wraith.js";
 import { SlimeKing } from "../enemies/slime_king.js";
 import { GearKing } from "../enemies/gear_king.js";
+import { VoidFoldArchon } from "../enemies/void_fold_archon.js";
+import { MagrailBroodMatriarch } from "../enemies/magrail_brood_matriarch.js";
 
 const classes = {
   zombie: Zombie,
@@ -89,6 +91,8 @@ const classes = {
   polar_crystal_wraith: PolarCrystalWraith,
   slime_king: SlimeKing,
   gear_king: GearKing,
+  void_fold_archon: VoidFoldArchon,
+  magrail_brood_matriarch: MagrailBroodMatriarch,
 };
 const WAVE_SPAWN_LIMITS = {
   thief: 3,

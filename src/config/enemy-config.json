@@ -215,6 +215,20 @@
     "radius": 15,
     "color": "#8d6bff",
     "behavior": "hazard_mage",
+    "difficultyWaves": {
+      "overclock": {
+        "spawnWaves": [
+          4,
+          5,
+          9,
+          12,
+          14,
+          17,
+          18,
+          19
+        ]
+      }
+    },
     "desc": "原来负责微引力实验的研究员，实验失败后把实验室变成了他的小型黑洞靶场。别在他面前提“奇点稳定性”，他会用黑洞把你吸过去理论。",
     "tip": "看到黑洞立刻离开边缘，别在黑洞与怪潮之间停留。"
   },
@@ -270,6 +284,17 @@
     "radius": 14,
     "color": "#ff7a1a",
     "behavior": "embermine",
+    "difficultyWaves": {
+      "overclock": {
+        "spawnWaves": [
+          6,
+          7,
+          12,
+          17,
+          19
+        ]
+      }
+    },
     "desc": "原本是实验室地板清洁机器人，被改造成布雷器后开始疯狂撒“火星跳跳糖”。它坚信地雷是解决走位问题的终极方案。",
     "tip": "看到地面火芯后及时绕开，不要把怪群拉进雷区中心。"
   },
@@ -288,6 +313,18 @@
     "radius": 13,
     "color": "#ff4d6d",
     "behavior": "exploder",
+    "difficultyWaves": {
+      "overclock": {
+        "spawnWaves": [
+          7,
+          12,
+          13,
+          16,
+          17,
+          19
+        ]
+      }
+    },
     "desc": "实验体#143，因为情感模块短路，见到人就激动到自爆。倒计时的滴滴声代表它那无处安放的热情，炸开前还会膨胀成一只愤怒的河豚。",
     "tip": "看到它发光膨胀就立刻拉开，在爆炸范围外击杀更安全。"
   },
@@ -520,6 +557,19 @@
     "radius": 15,
     "color": "#42e8ff",
     "behavior": "magnet_raider",
+    "difficultyWaves": {
+      "overclock": {
+        "spawnWaves": [
+          8,
+          9,
+          13,
+          15,
+          17,
+          18,
+          19
+        ]
+      }
+    },
     "desc": "原本是用于回收金属碎屑的磁力清洁器，报废后染上收藏癖。它四处吸走你的金币和经验，像个贪婪的拾荒老太，口头禅是“我的，都是我的”。",
     "tip": "它不会造成强火力，但拖太久会让资源堆到危险区域。"
   },
@@ -575,6 +625,17 @@
     "radius": 17,
     "color": "#a3e635",
     "behavior": "summoner",
+    "difficultyWaves": {
+      "overclock": {
+        "spawnWaves": [
+          11,
+          12,
+          16,
+          17,
+          19
+        ]
+      }
+    },
     "desc": "从生物繁殖实验室逃出的播种机器，把战斗变成了它的生育派对。它坚信“人多力量大”，所以不停下单，数量多到让人怀疑它偷了实习生文件夹里的备用试管。",
     "tip": "看到它优先集火，不然会把局面拖进刷怪雪崩。"
   },
@@ -630,6 +691,18 @@
     "radius": 15,
     "color": "#f3f7ff",
     "behavior": "gunner",
+    "difficultyWaves": {
+      "overclock": {
+        "spawnWaves": [
+          9,
+          14,
+          15,
+          17,
+          18,
+          19
+        ]
+      }
+    },
     "desc": "实验室武器测试员，总觉得电影里的枪战太假，于是亲自上阵表演走射。边溜达边点射，弹道直得像他的脑回路，想躲？学螃蟹斜着走。",
     "tip": "斜向移动最容易躲掉它的直线弹道。"
   },
@@ -737,7 +810,7 @@
       }
     },
     "hp": 115,
-    "speed": 72,
+    "speed": 70,
     "damage": 16,
     "xp": 12,
     "radius": 18,
@@ -759,7 +832,7 @@
       }
     },
     "hp": 80,
-    "speed": 76,
+    "speed": 70,
     "damage": 13,
     "xp": 10,
     "radius": 17,
@@ -781,7 +854,7 @@
       }
     },
     "hp": 58,
-    "speed": 80,
+    "speed": 70,
     "damage": 10,
     "xp": 8,
     "radius": 14,
@@ -825,7 +898,7 @@
       }
     },
     "hp": 72,
-    "speed": 82,
+    "speed": 70,
     "damage": 18,
     "xp": 11,
     "radius": 14,
@@ -920,5 +993,45 @@
     "boss": true,
     "desc": "实验室中央传动井里的总控齿轮获得意识后自封为王。它会发射扇形齿轮弹幕、沿预警方向锯轨冲刺、铺设齿轮陷阱，并召唤齿轮怪维护自己的机械王座。",
     "tip": "锯轨冲刺会留下短暂齿轮陷阱，别沿冲刺轨迹追击；后半血弹幕会变成红色高速齿轮。"
+  },
+  "void_fold_archon": {
+    "name": "虚空折叠师",
+    "category": "Boss",
+    "trait": "重力折叠",
+    "difficultyWaves": {
+      "overclock": {
+        "bossWave": 10
+      }
+    },
+    "hp": 145000,
+    "speed": 56,
+    "damage": 34,
+    "xp": 280,
+    "radius": 64,
+    "color": "#8d6bff",
+    "behavior": "boss_void_fold",
+    "boss": true,
+    "desc": "废弃重力实验室的首席研究员被折叠进奇点后留下的虚空外壳，背后悬浮着三层事件视界圆环，会用奇点、星屑阵列和空间折叠冲刺重写战场距离。",
+    "tip": "奇点预警出现后先脱离牵引路线；它连续施法后会短暂显露核心，适合贴近爆发。"
+  },
+  "magrail_brood_matriarch": {
+    "name": "磁轨巢母",
+    "category": "Boss",
+    "trait": "磁轨巢群",
+    "difficultyWaves": {
+      "overclock": {
+        "bossWave": 20
+      }
+    },
+    "hp": 310000,
+    "speed": 50,
+    "damage": 42,
+    "xp": 430,
+    "radius": 72,
+    "color": "#42e8ff",
+    "behavior": "boss_magrail_brood",
+    "boss": true,
+    "desc": "磁力回收系统和巢群培养仓融合出的终局实验体，黑色六边形甲片包裹着蓝紫磁轨核心，背部孢囊仓会不断投放巢种、地雷和几何弹幕。",
+    "tip": "距离过远时它会优先磁轨冲刺贴近；清理孢囊和地雷后，趁核心暴露窗口集中输出。"
   }
 }

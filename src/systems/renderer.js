@@ -2418,6 +2418,22 @@ function drawHazards(ctx) {
       drawStormLaserNetHazard(ctx, h, alpha);
       continue;
     }
+    if (h.kind === "gravity_well") {
+      drawGravityWellHazard(ctx, h, alpha);
+      continue;
+    }
+    if (h.kind === "prism_reflector") {
+      drawPrismReflectorHazard(ctx, h, alpha);
+      continue;
+    }
+    if (h.kind === "magnetic_node") {
+      drawMagneticNodeHazard(ctx, h, alpha);
+      continue;
+    }
+    if (h.kind === "brood_pod") {
+      drawBroodPodHazard(ctx, h, alpha);
+      continue;
+    }
     ctx.save();
     ctx.translate(h.x, h.y);
     ctx.globalCompositeOperation = "lighter";
@@ -2432,6 +2448,110 @@ function drawGearTrapHazard(ctx, h, alpha) {
   ctx.save();
   ctx.translate(h.x, h.y);
   drawMiniGear(ctx, 0, 0, h.r * 0.8, 14, h.color, (h.spin || 0) + state.time * 7);
+  ctx.restore();
+}
+
+function drawGravityWellHazard(ctx, h, alpha) {
+  const armed = (h.armTime || 0) <= 0;
+  const spin = (h.spin || 0) + state.time * 1.8;
+  ctx.save();
+  ctx.translate(h.x, h.y);
+  ctx.globalCompositeOperation = "lighter";
+  glow(ctx, 0, 0, h.r * 0.85, (armed ? 0.22 : 0.1) * alpha, h.color);
+  ctx.strokeStyle = hexToRgba(h.color, (armed ? 0.72 : 0.35) * alpha);
+  ctx.lineWidth = 2;
+  for (let i = 0; i < 3; i++) {
+    ctx.beginPath();
+    ctx.ellipse(0, 0, h.r * (0.42 + i * 0.18), h.r * (0.2 + i * 0.08), spin + i * Math.PI / 3, 0, TAU);
+    ctx.stroke();
+  }
+  ctx.fillStyle = armed ? "#090516" : hexToRgba("#ffffff", 0.38 * alpha);
+  ctx.beginPath();
+  ctx.arc(0, 0, h.r * 0.12, 0, TAU);
+  ctx.fill();
+  ctx.strokeStyle = hexToRgba("#ffffff", 0.18 * alpha);
+  ctx.beginPath();
+  ctx.arc(0, 0, h.r * 0.86, 0, TAU);
+  ctx.stroke();
+  ctx.restore();
+}
+
+function drawPrismReflectorHazard(ctx, h, alpha) {
+  const spin = (h.spin || 0) + state.time * 0.8;
+  ctx.save();
+  ctx.translate(h.x, h.y);
+  ctx.rotate(spin);
+  ctx.globalCompositeOperation = "lighter";
+  glow(ctx, 0, 0, h.r * 0.55, 0.16 * alpha, "#f3f7ff");
+  ctx.strokeStyle = hexToRgba("#f3f7ff", 0.72 * alpha);
+  ctx.lineWidth = 2;
+  for (let i = 0; i < 3; i++) {
+    ctx.rotate(TAU / 3);
+    ctx.beginPath();
+    ctx.moveTo(0, -h.r * 0.42);
+    ctx.lineTo(h.r * 0.48, h.r * 0.36);
+    ctx.lineTo(-h.r * 0.48, h.r * 0.36);
+    ctx.closePath();
+    ctx.stroke();
+  }
+  ctx.fillStyle = hexToRgba("#42e8ff", 0.16 * alpha);
+  ctx.beginPath();
+  ctx.moveTo(0, -h.r * 0.32);
+  ctx.lineTo(h.r * 0.34, h.r * 0.26);
+  ctx.lineTo(-h.r * 0.34, h.r * 0.26);
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
+}
+
+function drawMagneticNodeHazard(ctx, h, alpha) {
+  const spin = (h.spin || 0) + state.time * 3.8;
+  ctx.save();
+  ctx.translate(h.x, h.y);
+  ctx.globalCompositeOperation = "lighter";
+  glow(ctx, 0, 0, h.r * 0.72, 0.15 * alpha, h.color);
+  ctx.strokeStyle = hexToRgba(h.color, 0.62 * alpha);
+  ctx.lineWidth = 2;
+  for (let i = 0; i < 4; i++) {
+    const a = spin + i * TAU / 4;
+    ctx.beginPath();
+    ctx.arc(0, 0, h.r * (0.28 + i * 0.1), a, a + 1.1);
+    ctx.stroke();
+  }
+  ctx.fillStyle = "#071522";
+  ctx.fillRect(-h.r * 0.14, -h.r * 0.28, h.r * 0.28, h.r * 0.56);
+  ctx.fillStyle = "#ff4d6d";
+  ctx.fillRect(-h.r * 0.38, -h.r * 0.2, h.r * 0.24, h.r * 0.4);
+  ctx.fillStyle = "#42e8ff";
+  ctx.fillRect(h.r * 0.14, -h.r * 0.2, h.r * 0.24, h.r * 0.4);
+  ctx.restore();
+}
+
+function drawBroodPodHazard(ctx, h, alpha) {
+  const armed = (h.armTime || 0) <= 0;
+  const pulseK = 1 + Math.sin(state.time * (armed ? 12 : 5) + (h.spin || 0)) * 0.08;
+  ctx.save();
+  ctx.translate(h.x, h.y);
+  ctx.scale(pulseK, 1 / pulseK);
+  ctx.fillStyle = hexToRgba("#17210d", 0.68 * alpha);
+  ctx.beginPath();
+  ctx.ellipse(0, 0, h.r * 0.52, h.r * 0.72, 0, 0, TAU);
+  ctx.fill();
+  ctx.strokeStyle = hexToRgba(h.color, (armed ? 0.84 : 0.48) * alpha);
+  ctx.lineWidth = 2;
+  ctx.stroke();
+  ctx.fillStyle = hexToRgba(h.color, (armed ? 0.42 : 0.24) * alpha);
+  ctx.beginPath();
+  ctx.ellipse(0, -h.r * 0.04, h.r * 0.34, h.r * 0.48, 0, 0, TAU);
+  ctx.fill();
+  ctx.strokeStyle = hexToRgba("#eaff9a", 0.42 * alpha);
+  for (let i = 0; i < 5; i++) {
+    const a = i / 5 * TAU + (h.spin || 0);
+    ctx.beginPath();
+    ctx.moveTo(Math.cos(a) * h.r * 0.18, Math.sin(a) * h.r * 0.22);
+    ctx.lineTo(Math.cos(a) * h.r * 0.5, Math.sin(a) * h.r * 0.64);
+    ctx.stroke();
+  }
   ctx.restore();
 }
 

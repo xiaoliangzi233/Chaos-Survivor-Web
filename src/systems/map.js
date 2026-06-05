@@ -39,6 +39,13 @@ const RECTANGULAR_PROP_KINDS = new Set([
   "brokenRobotArm",
   "leakingPipeVent",
   "flickerBeacon",
+  "securityCameraShell",
+  "wallPanelPatch",
+  "sampleTray",
+  "coolantValve",
+  "burntKeyboard",
+  "tornSealCrate",
+  "energyNodeBase",
 ]);
 
 const LAB_PALETTE = {
@@ -71,6 +78,7 @@ export function generateMap() {
   addPerimeterServiceLines(rng, half, props, cableRuns, energyLines, fogBanks);
   addRandomWear(rng, tiles, floorDecals);
   const doors = createDoorways(rooms, corridors);
+  addDoorwayDecals(rng, doors, floorDecals);
 
   const map = { tileSize, palette: LAB_PALETTE, rooms, corridors, doors, tiles, props, energyLines, floorDecals, cableRuns, fogBanks };
   finalizeMapLayers(map);
@@ -154,6 +162,13 @@ function createDoorways(rooms, corridors) {
     seen.add(key);
     return true;
   }).slice(0, 42);
+}
+
+function addDoorwayDecals(rng, doors, decals) {
+  for (const door of doors) {
+    if (rng() > 0.62) continue;
+    decals.push(createDecal(rng, door.x, door.y, "airlockSeal", door.zone === "bio" ? "#72ffb4" : door.zone === "cryo" ? "#7dd3fc" : door.zone === "control" ? "#ffd166" : "#9aa7b4", door.horizontal ? 0 : Math.PI / 2, door.w + 38, 62));
+  }
 }
 
 function addRoomTiles(rng, room, tiles, decals, props, energyLines, cables, fogBanks) {
@@ -242,6 +257,10 @@ function maybeAddRoomDecal(rng, x, y, w, h, zone, decals) {
   if (rng() < 0.045) decals.push(createDecal(rng, x + w * 0.5, y + h * 0.5, "spill", zone === "bio" ? "#72ffb4" : "#7dd3fc", rng() * TAU, w, h));
   if (rng() < 0.035) decals.push(createDecal(rng, x + w * 0.5, y + h * 0.5, "hatch", LAB_PALETTE.line, rng() * TAU, w, h));
   if (zone === "service" && rng() < 0.08) decals.push(createDecal(rng, x + w * 0.5, y + h * 0.5, "grate", LAB_PALETTE.line, rng() * TAU, w, h));
+  if ((zone === "bio" || zone === "cryo") && rng() < 0.035) decals.push(createDecal(rng, x + w * 0.48, y + h * 0.54, "footprintTrail", zone === "bio" ? "#72ffb4" : "#d9fbff", rng() * TAU, Math.min(120, w * 0.9), Math.min(54, h * 0.52)));
+  if ((zone === "bio" || zone === "cryo" || zone === "control") && rng() < 0.032) decals.push(createDecal(rng, x + w * 0.5, y + h * 0.5, "sampleLabel", zone === "control" ? "#ffd166" : LAB_PALETTE.line, rng() * TAU, Math.min(92, w * 0.72), Math.min(38, h * 0.42)));
+  if ((zone === "bio" || zone === "cryo" || zone === "reactor") && rng() < 0.03) decals.push(createDecal(rng, x + w * 0.5, y + h * 0.52, "chemicalResidue", zone === "reactor" ? "#ff7a1a" : zone === "bio" ? "#72ffb4" : "#7dd3fc", rng() * TAU, Math.min(110, w * 0.82), Math.min(44, h * 0.46)));
+  if ((zone === "service" || zone === "control") && rng() < 0.035) decals.push(createDecal(rng, x + w * 0.5, y + h * 0.5, "pipeShadowBand", "#000000", rng() < 0.5 ? 0 : Math.PI / 2, Math.min(150, w), 26));
 }
 
 function addFixedRoomProps(rng, room, props, decals, energyLines, cables, fogBanks) {
@@ -250,6 +269,8 @@ function addFixedRoomProps(rng, room, props, decals, energyLines, cables, fogBan
   const accent = room.zone === "bio" ? "#72ffb4" : room.zone === "cryo" ? "#7dd3fc" : room.zone === "control" ? "#ffd166" : LAB_PALETTE.line;
   props.push(createProp(rng, room.x + 42, room.y + 42, "wallLight", 18, accent, 0));
   props.push(createProp(rng, room.x + room.w - 42, room.y + room.h - 42, "wallLight", 18, accent, Math.PI));
+  if (rng() < 0.58) props.push(createProp(rng, room.x + room.w - 74, room.y + 78, "securityCameraShell", 18 + rng() * 5, "#9aa7b4", Math.PI * 0.2));
+  if (rng() < 0.62) props.push(createProp(rng, room.x + 82, room.y + room.h - 68, "wallPanelPatch", 22 + rng() * 7, accent, 0));
 
   if (room.zone === "reactor") {
     props.push(createProp(rng, cx, cy, "reactorCore", 70, "#7dd3fc"));
@@ -307,26 +328,44 @@ function addAbandonedLabDetails(rng, room, props, decals, fogBanks, accent) {
   if (room.zone === "bio" || room.zone === "cryo") {
     props.push(createProp(rng, left, bottom, "looseCanister", 22 + rng() * 8, accent, rng() * TAU));
     props.push(createProp(rng, right, top, "surgicalTray", 28 + rng() * 8, "#9aa7b4", rng() < 0.5 ? 0 : Math.PI / 2));
+    props.push(createProp(rng, left, top, room.zone === "bio" ? "sampleTray" : "coolantValve", 24 + rng() * 8, accent, rng() < 0.5 ? 0 : Math.PI / 2));
     props.push(createDynamicProp(rng, right, bottom, "steamLeak", 30 + rng() * 10, accent, rng() * TAU));
+    props.push(createDynamicProp(rng, left + 90, top + 42, "dripValve", 20 + rng() * 7, accent, rng() * TAU));
     decals.push(createDecal(rng, left + 44, bottom + 10, "spill", accent, rng() * TAU, 80, 38));
+    decals.push(createDecal(rng, right - 34, mid, "glassShards", "#d9fbff", rng() * TAU, 96, 34));
+    decals.push(createDecal(rng, left + 80, mid + 32, "footprintTrail", room.zone === "bio" ? "#72ffb4" : "#d9fbff", rng() * TAU, 132, 46));
   } else if (room.zone === "control") {
     props.push(createProp(rng, left, bottom, "fallenMonitor", 30 + rng() * 8, "#7dd3fc", -0.25 + rng() * 0.5));
     props.push(createProp(rng, right, mid, "brokenRobotArm", 34 + rng() * 8, "#9aa7b4", rng() * TAU));
+    props.push(createProp(rng, left + 86, top, "burntKeyboard", 24 + rng() * 7, "#ffd166", rng() * 0.5));
     props.push(createDynamicProp(rng, room.x + room.w * 0.52, bottom, "flickerBeacon", 20 + rng() * 6, "#ffd166", 0));
+    props.push(createDynamicProp(rng, right - 70, top + 20, "faultyScreenStrip", 22 + rng() * 6, "#7dd3fc", 0));
+    decals.push(createDecal(rng, room.x + room.w * 0.54, room.y + room.h * 0.64, "windowFrameShadow", "#000000", -0.18 + rng() * 0.36, 170, 48));
+    decals.push(createDecal(rng, left + 40, bottom + 30, "sampleLabel", "#ffd166", rng() * TAU, 86, 32));
   } else if (room.zone === "storage") {
     props.push(createProp(rng, left, top, "hazardBarrel", 28 + rng() * 8, "#ff7a1a", rng() * TAU));
     props.push(createProp(rng, right, bottom, "looseCanister", 24 + rng() * 8, "#72ffb4", rng() * TAU));
+    props.push(createProp(rng, right - 70, top + 36, "tornSealCrate", 30 + rng() * 8, "#ffd166", rng() < 0.5 ? 0 : Math.PI / 2));
     props.push(createDynamicProp(rng, room.x + room.w * 0.48, top, "swingingCable", 34 + rng() * 12, "#64748b", rng() * TAU));
+    decals.push(createDecal(rng, left + 80, bottom - 20, "sampleLabel", "#ffd166", rng() * TAU, 92, 34));
   } else if (room.zone === "service") {
     props.push(createProp(rng, left, mid, "leakingPipeVent", 36 + rng() * 10, "#9aa7b4", rng() < 0.5 ? 0 : Math.PI / 2));
+    props.push(createProp(rng, left + 78, top, "coolantValve", 24 + rng() * 8, accent, rng() < 0.5 ? 0 : Math.PI / 2));
     props.push(createDynamicProp(rng, right, top, "swingingCable", 30 + rng() * 12, "#64748b", rng() * TAU));
     props.push(createDynamicProp(rng, right, bottom, "steamLeak", 28 + rng() * 10, accent, rng() * TAU));
+    props.push(createDynamicProp(rng, left + 82, mid + 60, "dripValve", 18 + rng() * 7, "#7dd3fc", rng() * TAU));
+    decals.push(createDecal(rng, right - 60, mid, "pipeShadowBand", "#000000", rng() < 0.5 ? 0 : Math.PI / 2, 150, 30));
   } else if (room.zone === "reactor") {
     props.push(createProp(rng, left, bottom, "hazardBarrel", 26 + rng() * 8, "#ff7a1a", rng() * TAU));
+    props.push(createProp(rng, left + 86, top, "energyNodeBase", 28 + rng() * 8, "#7dd3fc", rng() * TAU));
     props.push(createDynamicProp(rng, right, top, "flickerBeacon", 22 + rng() * 6, "#ffd166", 0));
+    props.push(createDynamicProp(rng, right - 64, bottom - 28, "dripValve", 18 + rng() * 6, "#ff7a1a", rng() * TAU));
+    decals.push(createDecal(rng, right - 86, mid + 20, "chemicalResidue", "#ff7a1a", rng() * TAU, 120, 44));
   } else {
     props.push(createProp(rng, left, top, "fallenMonitor", 28 + rng() * 8, accent, rng() * TAU));
+    props.push(createProp(rng, right, top, "wallPanelPatch", 24 + rng() * 8, accent, 0));
     props.push(createDynamicProp(rng, right, bottom, "steamLeak", 28 + rng() * 10, accent, rng() * TAU));
+    decals.push(createDecal(rng, left + 70, mid, "pipeShadowBand", "#000000", rng() < 0.5 ? 0 : Math.PI / 2, 150, 28));
   }
 
   if (rng() < 0.55) {
@@ -441,9 +480,12 @@ function enrichPropLayer(prop) {
 
 function getFloorDecalPriority(item) {
   if (item.kind === "reactorRing") return 6;
+  if (item.kind === "airlockSeal") return 6;
   if (item.kind === "hatch" || item.kind === "grate") return 5;
   if (item.kind === "arrow") return 4;
+  if (item.kind === "footprintTrail" || item.kind === "windowFrameShadow" || item.kind === "pipeShadowBand") return 4;
   if (item.kind === "spill") return 3;
+  if (item.kind === "glassShards" || item.kind === "chemicalResidue" || item.kind === "sampleLabel") return 3;
   if (item.kind === "scorch") return 2;
   return 1;
 }
@@ -452,7 +494,7 @@ function getPropPriority(prop) {
   if (KEY_PROP_KINDS.has(prop.kind)) return 5;
   if (prop.kind === "wallLight" || prop.kind === "overheadLightRig") return 4;
   if (prop.dynamicDecor) return 4;
-  if (prop.kind === "fallenMonitor" || prop.kind === "surgicalTray" || prop.kind === "hazardBarrel" || prop.kind === "looseCanister" || prop.kind === "brokenRobotArm") return 3;
+  if (prop.kind === "fallenMonitor" || prop.kind === "surgicalTray" || prop.kind === "hazardBarrel" || prop.kind === "looseCanister" || prop.kind === "brokenRobotArm" || prop.kind === "securityCameraShell" || prop.kind === "wallPanelPatch" || prop.kind === "sampleTray" || prop.kind === "coolantValve" || prop.kind === "burntKeyboard" || prop.kind === "tornSealCrate" || prop.kind === "energyNodeBase") return 3;
   if (isStaticProp(prop)) return 3;
   return 1;
 }
@@ -518,22 +560,31 @@ function getPropFootprintSize(prop) {
   if (prop.kind === "steamLeak") return { w: s * 1.45, h: s * 1.05 };
   if (prop.kind === "swingingCable") return { w: s * 0.95, h: s * 2.25 };
   if (prop.kind === "flickerBeacon") return { w: s * 1.15, h: s * 1.15 };
+  if (prop.kind === "securityCameraShell") return { w: s * 1.65, h: s * 1.05 };
+  if (prop.kind === "wallPanelPatch") return { w: s * 1.8, h: s * 1.28 };
+  if (prop.kind === "sampleTray") return { w: s * 2.1, h: s * 1.1 };
+  if (prop.kind === "coolantValve") return { w: s * 2.2, h: s * 0.95 };
+  if (prop.kind === "burntKeyboard") return { w: s * 2.05, h: s * 0.9 };
+  if (prop.kind === "tornSealCrate") return { w: s * 1.85, h: s * 1.35 };
+  if (prop.kind === "energyNodeBase") return { w: s * 1.55, h: s * 1.45 };
+  if (prop.kind === "dripValve") return { w: s * 1.35, h: s * 2.05 };
+  if (prop.kind === "faultyScreenStrip") return { w: s * 2.0, h: s * 0.9 };
   return { w: s * 1.8, h: s * 1.2 };
 }
 
 function getPropHeight(prop) {
   if (prop.kind === "wallLight" || prop.kind === "overheadLightRig" || prop.kind === "hangingCable") return prop.size * 1.2;
   if (prop.kind === "reactorCore" || prop.kind === "serverWall") return prop.size * 1.1;
-  if (prop.kind === "brokenGlass" || prop.kind === "ceilingFanShadow" || prop.kind === "cargoLift") return prop.size * 0.18;
-  if (prop.kind === "steamLeak") return prop.size * 0.1;
+  if (prop.kind === "brokenGlass" || prop.kind === "ceilingFanShadow" || prop.kind === "cargoLift" || prop.kind === "sampleTray" || prop.kind === "burntKeyboard" || prop.kind === "energyNodeBase") return prop.size * 0.18;
+  if (prop.kind === "steamLeak" || prop.kind === "dripValve" || prop.kind === "faultyScreenStrip") return prop.size * 0.1;
   if (prop.kind === "swingingCable") return prop.size * 1.25;
   if (prop.kind === "flickerBeacon") return prop.size * 0.55;
-  if (prop.kind === "terminal" || prop.kind === "warningSign") return prop.size * 0.46;
+  if (prop.kind === "terminal" || prop.kind === "warningSign" || prop.kind === "securityCameraShell" || prop.kind === "wallPanelPatch" || prop.kind === "coolantValve") return prop.size * 0.46;
   return prop.size * 0.72;
 }
 
 function getPropSortOffset(prop) {
-  if (prop.kind === "wallLight" || prop.kind === "overheadLightRig" || prop.kind === "hangingCable" || prop.kind === "swingingCable") return -prop.size * 0.8;
+  if (prop.kind === "wallLight" || prop.kind === "overheadLightRig" || prop.kind === "hangingCable" || prop.kind === "swingingCable" || prop.kind === "securityCameraShell") return -prop.size * 0.8;
   if (prop.kind === "serverWall" || prop.kind === "observationWindow" || prop.kind === "deconGate") return -prop.size * 0.35;
   return prop.size * 0.35;
 }
@@ -836,6 +887,13 @@ function drawFloorDecals(ctx, map, camX, camY, viewW, viewH, time) {
     else if (d.kind === "reactorRing") drawReactorRingDecal(ctx, d, time);
     else if (d.kind === "spill") drawSpillDecal(ctx, d, time);
     else if (d.kind === "scratch") drawScratchDecal(ctx, d);
+    else if (d.kind === "footprintTrail") drawFootprintTrailDecal(ctx, d);
+    else if (d.kind === "sampleLabel") drawSampleLabelDecal(ctx, d);
+    else if (d.kind === "glassShards") drawGlassShardsDecal(ctx, d);
+    else if (d.kind === "chemicalResidue") drawChemicalResidueDecal(ctx, d, time);
+    else if (d.kind === "airlockSeal") drawAirlockSealDecal(ctx, d);
+    else if (d.kind === "windowFrameShadow") drawWindowFrameShadowDecal(ctx, d);
+    else if (d.kind === "pipeShadowBand") drawPipeShadowBandDecal(ctx, d);
     else drawScorchDecal(ctx, d);
     ctx.restore();
   }
@@ -921,6 +979,124 @@ function drawScorchDecal(ctx, d) {
   ctx.beginPath();
   ctx.ellipse(0, 0, d.w * 0.5, d.h * 0.5, 0, 0, TAU);
   ctx.fill();
+}
+
+function drawFootprintTrailDecal(ctx, d) {
+  ctx.fillStyle = hexToRgba(d.color, 0.12);
+  for (let i = 0; i < 7; i++) {
+    const x = -d.w * 0.42 + i * d.w * 0.14;
+    const y = (i % 2 ? 0.18 : -0.12) * d.h;
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate((i % 2 ? 0.28 : -0.22) + d.phase * 0.03);
+    ctx.fillRect(-d.w * 0.028, -d.h * 0.12, d.w * 0.056, d.h * 0.18);
+    ctx.fillRect(d.w * 0.015, d.h * 0.02, d.w * 0.035, d.h * 0.08);
+    ctx.restore();
+  }
+  ctx.strokeStyle = hexToRgba(d.color, 0.045);
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(-d.w * 0.5, d.h * 0.2);
+  ctx.bezierCurveTo(-d.w * 0.15, -d.h * 0.18, d.w * 0.18, d.h * 0.24, d.w * 0.48, -d.h * 0.1);
+  ctx.stroke();
+}
+
+function drawSampleLabelDecal(ctx, d) {
+  ctx.fillStyle = "rgba(0,0,0,0.24)";
+  ctx.fillRect(-d.w * 0.5, -d.h * 0.36, d.w, d.h * 0.72);
+  ctx.strokeStyle = hexToRgba(d.color, 0.18);
+  ctx.lineWidth = 2;
+  ctx.strokeRect(-d.w * 0.5, -d.h * 0.36, d.w, d.h * 0.72);
+  ctx.fillStyle = hexToRgba(d.color, 0.18);
+  for (let i = 0; i < 4; i++) {
+    const w = d.w * (0.16 + (i % 2) * 0.12);
+    ctx.fillRect(-d.w * 0.38 + i * d.w * 0.2, -d.h * 0.12, w, 3);
+    ctx.fillRect(-d.w * 0.38 + i * d.w * 0.2, d.h * 0.08, w * 0.62, 3);
+  }
+  ctx.fillStyle = "rgba(255,255,255,0.08)";
+  ctx.fillRect(d.w * 0.26, -d.h * 0.24, d.w * 0.14, d.h * 0.48);
+}
+
+function drawGlassShardsDecal(ctx, d) {
+  ctx.strokeStyle = "rgba(217,251,255,0.18)";
+  ctx.lineWidth = 1;
+  ctx.fillStyle = "rgba(217,251,255,0.075)";
+  for (let i = 0; i < 9; i++) {
+    const x = -d.w * 0.45 + i * d.w * 0.11;
+    const y = Math.sin(d.phase + i * 1.7) * d.h * 0.22;
+    ctx.beginPath();
+    ctx.moveTo(x, y - d.h * 0.08);
+    ctx.lineTo(x + d.w * 0.04, y + d.h * 0.02);
+    ctx.lineTo(x - d.w * 0.025, y + d.h * 0.12);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+  }
+}
+
+function drawChemicalResidueDecal(ctx, d, time) {
+  const alpha = 0.05 + Math.max(0, Math.sin(time * 1.2 + d.phase)) * 0.018;
+  ctx.fillStyle = hexToRgba(d.color, alpha);
+  ctx.beginPath();
+  ctx.ellipse(-d.w * 0.12, 0, d.w * 0.36, d.h * 0.42, 0.14, 0, TAU);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.ellipse(d.w * 0.2, d.h * 0.05, d.w * 0.2, d.h * 0.25, -0.28, 0, TAU);
+  ctx.fill();
+  ctx.strokeStyle = hexToRgba(d.color, 0.12);
+  ctx.lineWidth = 1;
+  for (let i = 0; i < 4; i++) {
+    ctx.beginPath();
+    ctx.moveTo(-d.w * 0.34 + i * d.w * 0.18, -d.h * 0.14);
+    ctx.lineTo(-d.w * 0.2 + i * d.w * 0.16, d.h * 0.2);
+    ctx.stroke();
+  }
+}
+
+function drawAirlockSealDecal(ctx, d) {
+  ctx.fillStyle = "rgba(0,0,0,0.2)";
+  ctx.fillRect(-d.w * 0.5, -d.h * 0.5, d.w, d.h);
+  ctx.strokeStyle = hexToRgba(d.color, 0.18);
+  ctx.lineWidth = 3;
+  ctx.strokeRect(-d.w * 0.45, -d.h * 0.34, d.w * 0.9, d.h * 0.68);
+  ctx.strokeStyle = "rgba(255,209,102,0.16)";
+  ctx.lineWidth = 2;
+  for (let x = -d.w * 0.42; x < d.w * 0.42; x += 18) {
+    ctx.beginPath();
+    ctx.moveTo(x, -d.h * 0.32);
+    ctx.lineTo(x + 10, -d.h * 0.2);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(x + 6, d.h * 0.32);
+    ctx.lineTo(x + 16, d.h * 0.2);
+    ctx.stroke();
+  }
+}
+
+function drawWindowFrameShadowDecal(ctx, d) {
+  ctx.strokeStyle = "rgba(0,0,0,0.22)";
+  ctx.lineWidth = 8;
+  for (let i = -2; i <= 2; i++) {
+    ctx.beginPath();
+    ctx.moveTo(-d.w * 0.48 + i * d.w * 0.18, -d.h * 0.42);
+    ctx.lineTo(-d.w * 0.28 + i * d.w * 0.18, d.h * 0.42);
+    ctx.stroke();
+  }
+  ctx.strokeStyle = "rgba(217,251,255,0.035)";
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(-d.w * 0.42, -d.h * 0.3);
+  ctx.lineTo(d.w * 0.44, d.h * 0.22);
+  ctx.stroke();
+}
+
+function drawPipeShadowBandDecal(ctx, d) {
+  ctx.fillStyle = "rgba(0,0,0,0.16)";
+  ctx.fillRect(-d.w * 0.5, -d.h * 0.22, d.w, d.h * 0.44);
+  ctx.fillStyle = "rgba(255,255,255,0.025)";
+  for (let x = -d.w * 0.42; x < d.w * 0.45; x += 32) {
+    ctx.fillRect(x, -d.h * 0.28, 4, d.h * 0.56);
+  }
 }
 
 function drawCableRuns(ctx, map, camX, camY, viewW, viewH, time, cached = false) {
@@ -1066,7 +1242,14 @@ function isStaticProp(prop) {
     prop.kind === "hazardBarrel" ||
     prop.kind === "looseCanister" ||
     prop.kind === "brokenRobotArm" ||
-    prop.kind === "leakingPipeVent";
+    prop.kind === "leakingPipeVent" ||
+    prop.kind === "securityCameraShell" ||
+    prop.kind === "wallPanelPatch" ||
+    prop.kind === "sampleTray" ||
+    prop.kind === "coolantValve" ||
+    prop.kind === "burntKeyboard" ||
+    prop.kind === "tornSealCrate" ||
+    prop.kind === "energyNodeBase";
 }
 
 function drawProps(ctx, map, camX, camY, viewW, viewH, time, dynamicOnly = false) {
@@ -1122,6 +1305,15 @@ function drawPropBody(ctx, prop, time) {
   else if (prop.kind === "steamLeak") drawSteamLeak(ctx, prop, time);
   else if (prop.kind === "swingingCable") drawSwingingCable(ctx, prop, time);
   else if (prop.kind === "flickerBeacon") drawFlickerBeacon(ctx, prop, time);
+  else if (prop.kind === "securityCameraShell") drawSecurityCameraShell(ctx, prop);
+  else if (prop.kind === "wallPanelPatch") drawWallPanelPatch(ctx, prop);
+  else if (prop.kind === "sampleTray") drawSampleTray(ctx, prop, time);
+  else if (prop.kind === "coolantValve") drawCoolantValve(ctx, prop, time);
+  else if (prop.kind === "burntKeyboard") drawBurntKeyboard(ctx, prop, time);
+  else if (prop.kind === "tornSealCrate") drawTornSealCrate(ctx, prop);
+  else if (prop.kind === "energyNodeBase") drawEnergyNodeBase(ctx, prop, time);
+  else if (prop.kind === "dripValve") drawDripValve(ctx, prop, time);
+  else if (prop.kind === "faultyScreenStrip") drawFaultyScreenStrip(ctx, prop, time);
   else drawStorageProp(ctx, prop);
 }
 
@@ -1727,6 +1919,185 @@ function drawFlickerBeacon(ctx, prop, time) {
   ctx.beginPath();
   ctx.arc(0, 0, s * 0.22, 0, TAU);
   ctx.fill();
+}
+
+function drawSecurityCameraShell(ctx, prop) {
+  const s = prop.size;
+  ctx.fillStyle = "rgba(0,0,0,0.54)";
+  ctx.fillRect(-s * 0.72, -s * 0.34, s * 1.26, s * 0.68);
+  ctx.fillStyle = "rgba(154,166,182,0.72)";
+  ctx.fillRect(-s * 0.58, -s * 0.24, s * 0.9, s * 0.48);
+  ctx.strokeStyle = "rgba(255,255,255,0.16)";
+  ctx.lineWidth = 2;
+  ctx.strokeRect(-s * 0.58, -s * 0.24, s * 0.9, s * 0.48);
+  ctx.fillStyle = "rgba(0,0,0,0.68)";
+  ctx.fillRect(s * 0.18, -s * 0.14, s * 0.38, s * 0.28);
+  ctx.strokeStyle = "rgba(100,116,139,0.55)";
+  ctx.beginPath();
+  ctx.moveTo(-s * 0.8, -s * 0.38);
+  ctx.lineTo(-s * 0.38, -s * 0.12);
+  ctx.moveTo(-s * 0.84, s * 0.38);
+  ctx.lineTo(-s * 0.38, s * 0.12);
+  ctx.stroke();
+}
+
+function drawWallPanelPatch(ctx, prop) {
+  const s = prop.size;
+  ctx.fillStyle = "rgba(0,0,0,0.5)";
+  ctx.fillRect(-s * 0.8, -s * 0.54, s * 1.6, s * 1.08);
+  ctx.strokeStyle = "rgba(255,255,255,0.12)";
+  ctx.lineWidth = 2;
+  ctx.strokeRect(-s * 0.8, -s * 0.54, s * 1.6, s * 1.08);
+  ctx.strokeStyle = hexToRgba(prop.color, 0.18);
+  for (let i = 0; i < 3; i++) {
+    const x = -s * 0.48 + i * s * 0.42;
+    ctx.beginPath();
+    ctx.moveTo(x, -s * 0.34);
+    ctx.lineTo(x + s * 0.22, s * 0.32);
+    ctx.stroke();
+  }
+  ctx.fillStyle = "rgba(255,255,255,0.12)";
+  ctx.fillRect(-s * 0.65, -s * 0.42, 4, 4);
+  ctx.fillRect(s * 0.52, s * 0.32, 4, 4);
+}
+
+function drawSampleTray(ctx, prop, time) {
+  const s = prop.size;
+  const pulse = 0.12 + Math.max(0, Math.sin(time * 2.2 + prop.phase)) * 0.08;
+  ctx.fillStyle = "rgba(0,0,0,0.46)";
+  ctx.fillRect(-s * 0.95, -s * 0.42, s * 1.9, s * 0.84);
+  ctx.strokeStyle = "rgba(217,251,255,0.16)";
+  ctx.lineWidth = 2;
+  ctx.strokeRect(-s * 0.95, -s * 0.42, s * 1.9, s * 0.84);
+  for (let i = 0; i < 4; i++) {
+    const x = -s * 0.56 + i * s * 0.34;
+    ctx.fillStyle = hexToRgba(i % 2 ? "#d9fbff" : prop.color, 0.12 + pulse);
+    ctx.fillRect(x - s * 0.08, -s * 0.22, s * 0.16, s * 0.44);
+    ctx.fillStyle = "rgba(255,255,255,0.14)";
+    ctx.fillRect(x - s * 0.04, -s * 0.18, s * 0.03, s * 0.28);
+  }
+}
+
+function drawCoolantValve(ctx, prop, time) {
+  const s = prop.size;
+  const pulse = 0.12 + Math.max(0, Math.sin(time * 1.8 + prop.phase)) * 0.06;
+  ctx.strokeStyle = "rgba(0,0,0,0.62)";
+  ctx.lineWidth = s * 0.28;
+  ctx.lineCap = "round";
+  ctx.beginPath();
+  ctx.moveTo(-s * 1.0, 0);
+  ctx.lineTo(s * 1.0, 0);
+  ctx.stroke();
+  ctx.strokeStyle = "rgba(154,166,182,0.75)";
+  ctx.lineWidth = s * 0.15;
+  ctx.stroke();
+  ctx.lineCap = "butt";
+  ctx.strokeStyle = hexToRgba(prop.color, 0.24 + pulse);
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.arc(0, 0, s * 0.34, 0, TAU);
+  ctx.moveTo(-s * 0.34, 0);
+  ctx.lineTo(s * 0.34, 0);
+  ctx.moveTo(0, -s * 0.34);
+  ctx.lineTo(0, s * 0.34);
+  ctx.stroke();
+}
+
+function drawBurntKeyboard(ctx, prop, time) {
+  const s = prop.size;
+  const flicker = Math.max(0, Math.sin(time * 5.5 + prop.phase));
+  ctx.fillStyle = "rgba(0,0,0,0.58)";
+  ctx.fillRect(-s * 0.94, -s * 0.36, s * 1.88, s * 0.72);
+  ctx.strokeStyle = "rgba(255,255,255,0.1)";
+  ctx.strokeRect(-s * 0.94, -s * 0.36, s * 1.88, s * 0.72);
+  for (let row = 0; row < 2; row++) {
+    for (let col = 0; col < 5; col++) {
+      ctx.fillStyle = col === 3 && row === 1 ? hexToRgba(prop.color, 0.12 + flicker * 0.16) : "rgba(255,255,255,0.08)";
+      ctx.fillRect(-s * 0.68 + col * s * 0.28, -s * 0.18 + row * s * 0.22, s * 0.16, s * 0.09);
+    }
+  }
+  ctx.strokeStyle = "rgba(154,79,47,0.28)";
+  ctx.beginPath();
+  ctx.moveTo(s * 0.44, -s * 0.28);
+  ctx.lineTo(s * 0.72, s * 0.18);
+  ctx.stroke();
+}
+
+function drawTornSealCrate(ctx, prop) {
+  const s = prop.size;
+  drawStorageProp(ctx, prop);
+  ctx.strokeStyle = hexToRgba(prop.color, 0.26);
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.moveTo(-s * 0.7, -s * 0.2);
+  ctx.lineTo(-s * 0.28, s * 0.08);
+  ctx.lineTo(s * 0.12, -s * 0.16);
+  ctx.lineTo(s * 0.7, s * 0.18);
+  ctx.stroke();
+  ctx.fillStyle = "rgba(255,209,102,0.1)";
+  ctx.fillRect(-s * 0.54, s * 0.25, s * 0.9, 4);
+}
+
+function drawEnergyNodeBase(ctx, prop, time) {
+  const s = prop.size;
+  const pulse = 0.1 + Math.max(0, Math.sin(time * 2.4 + prop.phase)) * 0.08;
+  glow(ctx, 0, 0, s * 1.1, prop.color, pulse * 0.55);
+  ctx.fillStyle = "rgba(0,0,0,0.5)";
+  ctx.beginPath();
+  ctx.moveTo(0, -s * 0.66);
+  ctx.lineTo(s * 0.62, -s * 0.18);
+  ctx.lineTo(s * 0.42, s * 0.52);
+  ctx.lineTo(-s * 0.42, s * 0.52);
+  ctx.lineTo(-s * 0.62, -s * 0.18);
+  ctx.closePath();
+  ctx.fill();
+  ctx.strokeStyle = hexToRgba(prop.color, 0.24 + pulse);
+  ctx.lineWidth = 2;
+  ctx.stroke();
+  ctx.fillStyle = hexToRgba(prop.color, 0.16 + pulse);
+  ctx.fillRect(-s * 0.2, -s * 0.1, s * 0.4, s * 0.2);
+}
+
+function drawDripValve(ctx, prop, time) {
+  const s = prop.size;
+  ctx.strokeStyle = "rgba(0,0,0,0.62)";
+  ctx.lineWidth = 5;
+  ctx.beginPath();
+  ctx.moveTo(-s * 0.42, -s * 0.48);
+  ctx.lineTo(s * 0.42, -s * 0.48);
+  ctx.stroke();
+  ctx.strokeStyle = "rgba(154,166,182,0.72)";
+  ctx.lineWidth = 2;
+  ctx.stroke();
+  ctx.fillStyle = hexToRgba(prop.color, 0.18);
+  ctx.fillRect(-s * 0.12, -s * 0.48, s * 0.24, s * 0.28);
+  for (let i = 0; i < 3; i++) {
+    const k = (time * 0.75 + prop.phase + i * 0.33) % 1;
+    ctx.fillStyle = hexToRgba(prop.color, (1 - k) * 0.24);
+    ctx.beginPath();
+    ctx.ellipse(0, -s * 0.12 + k * s * 1.1, s * (0.06 + k * 0.04), s * (0.1 + k * 0.05), 0, 0, TAU);
+    ctx.fill();
+  }
+  ctx.fillStyle = hexToRgba(prop.color, 0.055);
+  ctx.beginPath();
+  ctx.ellipse(0, s * 0.86, s * 0.44, s * 0.14, 0, 0, TAU);
+  ctx.fill();
+}
+
+function drawFaultyScreenStrip(ctx, prop, time) {
+  const s = prop.size;
+  const scan = (time * 1.2 + prop.phase) % 1;
+  ctx.fillStyle = "rgba(0,0,0,0.52)";
+  ctx.fillRect(-s * 0.95, -s * 0.38, s * 1.9, s * 0.76);
+  ctx.strokeStyle = "rgba(255,255,255,0.11)";
+  ctx.strokeRect(-s * 0.95, -s * 0.38, s * 1.9, s * 0.76);
+  ctx.fillStyle = hexToRgba(prop.color, 0.1);
+  ctx.fillRect(-s * 0.78, -s * 0.24, s * 1.56, s * 0.48);
+  ctx.fillStyle = hexToRgba(prop.color, 0.28);
+  ctx.fillRect(-s * 0.72, -s * 0.22 + scan * s * 0.36, s * 1.44, 3);
+  ctx.fillStyle = "rgba(255,255,255,0.11)";
+  ctx.fillRect(-s * 0.6, -s * 0.14, s * 0.38, 2);
+  ctx.fillRect(s * 0.08, s * 0.1, s * 0.42, 2);
 }
 
 function drawFog(ctx, map, camX, camY, viewW, viewH, time) {

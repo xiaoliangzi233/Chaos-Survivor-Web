@@ -346,6 +346,7 @@ function updateEnemyProjectiles(dt) {
     b.x += b.vx * dt * speedScale;
     b.y += b.vy * dt * speedScale;
     b.life -= dt;
+    const outsideMap = isEnemyProjectileOutsideMap(b);
     if (b.landTrapAtY != null && b.y >= b.landTrapAtY) b.life = 0;
     if (circleHit(b.x, b.y, b.r, p.x, p.y, p.r) && p.invuln <= 0) {
       const result = applyPlayerDamage(b.damage, b);
@@ -369,12 +370,18 @@ function updateEnemyProjectiles(dt) {
       playSfx("hurt");
       if (b.landTrapOnHit) placeGearProjectileTrap(b);
       world.enemyProjectiles.splice(i, 1);
-    } else if (b.life <= 0) {
+    } else if ((b.bossProjectile && outsideMap) || (!b.bossProjectile && b.life <= 0)) {
       if (b.splitOnExpire) splitEnemyProjectile(b);
       if (b.landTrapOnExpire) placeGearProjectileTrap(b);
       world.enemyProjectiles.splice(i, 1);
     }
   }
+}
+
+function isEnemyProjectileOutsideMap(b) {
+  const margin = Math.max(40, (b.r || 0) * 4);
+  const half = WORLD_SIZE / 2 + margin;
+  return b.x < -half || b.x > half || b.y < -half || b.y > half;
 }
 
 function placeGearProjectileTrap(b) {

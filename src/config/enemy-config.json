@@ -557,6 +557,7 @@
     "radius": 15,
     "color": "#42e8ff",
     "behavior": "magnet_raider",
+    "spawnWeight": 0.1,
     "difficultyWaves": {
       "overclock": {
         "spawnWaves": [
@@ -625,6 +626,7 @@
     "radius": 17,
     "color": "#a3e635",
     "behavior": "summoner",
+    "spawnWeight": 0.1,
     "difficultyWaves": {
       "overclock": {
         "spawnWaves": [

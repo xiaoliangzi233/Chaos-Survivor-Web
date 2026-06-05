@@ -18,6 +18,10 @@
     "candidateDirections": 32,
     "boundaryPadding": 50,
     "stuckSeconds": 1.2,
+    "velocitySmoothing": 0.35,
+    "directionSwitchDot": -0.35,
+    "directionSwitchHoldTicks": 3,
+    "urgentEscapePriority": 110,
     "riskTolerance": 1,
     "greed": 1,
     "bossAggression": 1

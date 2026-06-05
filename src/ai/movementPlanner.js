@@ -13,7 +13,7 @@ export function planMovement({ state, world, runtime = {}, config = AI_CONFIG })
   const context = movementContext({ state, world, threats, movement });
   const target = chooseTarget({ state, world, threats, context, runtime, movement, config });
   const desired = desiredVelocityForTarget(p, target);
-  const velocity = solveAvoidanceVelocity({
+  const rawVelocity = solveAvoidanceVelocity({
     player: p,
     desired,
     threats,
@@ -26,10 +26,48 @@ export function planMovement({ state, world, runtime = {}, config = AI_CONFIG })
       riskCacheGrid: config.performance?.riskCacheGrid,
     },
   });
+  const velocity = stabilizeMovementVelocity({ rawVelocity, player: p, target, context, runtime, movement });
   updateStuckState(runtime, p, velocity, context);
   runtime.currentTarget = target;
   runtime.lastVelocity = velocity;
   return { velocity, target, threats, risk: riskAtPoint(p, threats, movement), context };
+}
+
+export function stabilizeMovementVelocity({ rawVelocity, player, target, context = {}, runtime = {}, movement = {} }) {
+  const raw = limitVector(rawVelocity || { x: 0, y: 0 }, player?.speed || 200);
+  const last = runtime.lastVelocity || null;
+  const rawLen = Math.hypot(raw.x || 0, raw.y || 0);
+  const lastLen = Math.hypot(last?.x || 0, last?.y || 0);
+  if (!last || rawLen < 1 || lastLen < 10) {
+    runtime.directionSwitchTicks = 0;
+    runtime.directionSwitchKey = "";
+    return raw;
+  }
+
+  const dot = directionDot(raw, last);
+  const sameTargetKind = runtime.currentTarget?.kind && runtime.currentTarget.kind === target?.kind;
+  const urgent = isUrgentMovementTarget(target, context, movement);
+  const switchDot = movement.directionSwitchDot ?? -0.35;
+  const holdTicks = movement.directionSwitchHoldTicks ?? 3;
+  if (!urgent && sameTargetKind && holdTicks > 0 && dot < switchDot) {
+    const key = `${target?.kind || ""}:${Math.round(Math.atan2(raw.y || 0, raw.x || 0) * 4)}`;
+    runtime.directionSwitchTicks = runtime.directionSwitchKey === key ? (runtime.directionSwitchTicks || 0) + 1 : 1;
+    runtime.directionSwitchKey = key;
+    if (runtime.directionSwitchTicks < holdTicks) return limitVector(last, rawLen || lastLen);
+  } else {
+    runtime.directionSwitchTicks = 0;
+    runtime.directionSwitchKey = "";
+  }
+
+  const smoothing = urgent ? Math.min(0.16, (movement.velocitySmoothing ?? 0.35) * 0.35) : movement.velocitySmoothing ?? 0.35;
+  if (smoothing <= 0) return raw;
+  const blended = {
+    x: last.x * smoothing + raw.x * (1 - smoothing),
+    y: last.y * smoothing + raw.y * (1 - smoothing),
+  };
+  const blendedLen = Math.hypot(blended.x, blended.y);
+  if (rawLen > 30 && blendedLen < rawLen * 0.35) return raw;
+  return limitVector(blended, player?.speed || 200);
 }
 
 export function movementContext({ state, world, threats, movement }) {
@@ -423,6 +461,29 @@ function nearestEnemy(p, enemies) {
 function normalize(x, y) {
   const d = Math.max(1, Math.hypot(x, y));
   return { x: x / d, y: y / d };
+}
+
+function limitVector(v, max) {
+  const len = Math.hypot(v.x || 0, v.y || 0);
+  if (len <= max || len < 0.001) return { x: v.x || 0, y: v.y || 0 };
+  return { x: v.x / len * max, y: v.y / len * max };
+}
+
+function directionDot(a, b) {
+  const al = Math.hypot(a.x || 0, a.y || 0);
+  const bl = Math.hypot(b.x || 0, b.y || 0);
+  if (al < 1 || bl < 1) return 1;
+  return ((a.x || 0) * (b.x || 0) + (a.y || 0) * (b.y || 0)) / (al * bl);
+}
+
+function isUrgentMovementTarget(target, context, movement) {
+  if (!target) return false;
+  if ((target.priority || 0) >= (movement.urgentEscapePriority ?? 110)) return true;
+  if (context.lowHp && target.kind !== "collect") return true;
+  if ((context.projectilePressure || 0) > 0.55 && target.kind?.includes("escape")) return true;
+  return target.kind === "blackhole_escape"
+    || target.kind === "storm_laser_net_escape"
+    || target.kind === "storm_rail_dash_evade";
 }
 
 function stormRailDashActive(boss) {

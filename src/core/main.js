@@ -30,6 +30,7 @@ import { applyWaveStartScenario, resetWaveScenarioState } from "../systems/waveS
 import { createShopState } from "../economy/shop.js";
 import * as effects from "../effects.js";
 import { autoSave, loadAutoSave, clearAutoSave, hasAutoSave } from "../systems/autosave.js";
+import { initTestTools } from "../systems/testTools.js";
 import { resizeCanvas, updateCamera, render } from "../systems/renderer.js";
 import { playSfx, startMusic, stopMusic, pauseMusic, resumeMusic } from "../audio.js";
 import { CAMERA_ZOOM } from "../constants.js";
@@ -325,6 +326,7 @@ export async function bootGame() {
 
   resizeCanvas(ui.canvas, ctx);
   window.addEventListener("resize", () => resizeCanvas(ui.canvas, ctx));
+  initTestTools({ completeWave, finishWaveTransition });
   bindInput({ start, restart: start, togglePause, resume: resumeGame, returnToMenu });
   ui.continueButton?.addEventListener("click", continueGame);
   resetRun(generateMap());

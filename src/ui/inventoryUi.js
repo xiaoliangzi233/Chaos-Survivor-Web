@@ -9,6 +9,7 @@ import {
   selectedWeaponSlot,
 } from "../economy/inventory.js";
 import { itemSellPrice, sellInventoryItem, sellWeaponSlot, weaponSellPrice } from "../economy/shop.js";
+import { renderShop } from "./shopUi.js";
 
 let initialized = false;
 let previousMode = "playing";
@@ -74,6 +75,7 @@ export function initInventoryUi() {
   dom.fuseButton = document.getElementById("weaponFuseButton");
   dom.items = document.getElementById("itemList");
   dom.pauseOverlay = document.getElementById("pauseOverlay");
+  dom.shopOverlay = document.getElementById("shopOverlay");
   dom.tooltip = document.createElement("div");
   dom.tooltip.className = "inventory-tooltip";
   document.body.appendChild(dom.tooltip);
@@ -98,6 +100,7 @@ export function openInventory() {
   if (!canOpenInventory()) return false;
   previousMode = state.mode;
   if (previousMode === "paused") dom.pauseOverlay?.classList.remove("active");
+  if (previousMode === "shop") dom.shopOverlay?.classList.remove("active");
   state.mode = "inventory";
   fuseMaterialUid = normalizeFuseMaterial()?.uid ?? null;
   syncDetailSelection();
@@ -113,8 +116,14 @@ export function closeInventory() {
   fuseMessage = "";
   detailSelection = { type: "weapon", id: state.inventory?.selectedWeaponUid ?? null };
   dom.overlay?.classList.remove("active");
-  state.mode = previousMode === "paused" ? "paused" : "playing";
-  if (state.mode === "paused") dom.pauseOverlay?.classList.add("active");
+  if (previousMode === "shop") {
+    state.mode = "shop";
+    dom.shopOverlay?.classList.add("active");
+    renderShop();
+  } else {
+    state.mode = previousMode === "paused" ? "paused" : "playing";
+    if (state.mode === "paused") dom.pauseOverlay?.classList.add("active");
+  }
   return true;
 }
 
@@ -144,7 +153,7 @@ function handleKeyDown(event) {
 
 function canOpenInventory() {
   if (!state.player || !state.inventory) return false;
-  return state.mode === "playing" || state.mode === "paused";
+  return state.mode === "playing" || state.mode === "paused" || state.mode === "shop";
 }
 
 function renderStats() {

@@ -3042,8 +3042,8 @@ h2 {
 }
 
 .inventory-panel {
-  width: min(1280px, calc(100vw - 18px));
-  height: min(860px, calc(100vh - 18px));
+  width: min(1280px, calc(100vw - 36px));
+  height: min(860px, calc(100vh - 36px));
   overflow: hidden;
   padding: 0;
   border-color: rgba(66, 232, 255, 0.32);
@@ -3639,6 +3639,50 @@ h2 {
     border-color 160ms ease,
     box-shadow 160ms ease,
     filter 160ms ease;
+}
+
+/* Scrollable inventory sub-panels on small screens */
+.inventory-stats,
+.inventory-items,
+.inventory-detail {
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.inventory-detail .weapon-detail {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.inventory-stats .stat-grid {
+  min-height: 0;
+}
+
+.inventory-stats::-webkit-scrollbar,
+.inventory-items::-webkit-scrollbar,
+.inventory-detail::-webkit-scrollbar,
+.inventory-detail .weapon-detail::-webkit-scrollbar {
+  width: 8px;
+}
+
+.inventory-stats::-webkit-scrollbar-track,
+.inventory-items::-webkit-scrollbar-track,
+.inventory-detail::-webkit-scrollbar-track,
+.inventory-detail .weapon-detail::-webkit-scrollbar-track {
+  border: 1px solid rgba(66, 232, 255, 0.14);
+  border-radius: 3px;
+  background: rgba(3, 8, 16, 0.72);
+}
+
+.inventory-stats::-webkit-scrollbar-thumb,
+.inventory-items::-webkit-scrollbar-thumb,
+.inventory-detail::-webkit-scrollbar-thumb,
+.inventory-detail .weapon-detail::-webkit-scrollbar-thumb {
+  border: 1px solid rgba(3, 8, 16, 0.78);
+  border-radius: 3px;
+  background: linear-gradient(180deg, rgba(66, 232, 255, 0.65), rgba(66, 180, 255, 0.45));
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.12);
 }
 
 .codex-detail {

@@ -1,4 +1,4 @@
-﻿<!doctype html>
+<!doctype html>
 <html lang="zh-CN">
   <head>
     <meta charset="UTF-8" />
@@ -12,6 +12,7 @@
   </head>
   <body>
     <main id="gameRoot">
+      <div id="weaponSwitchToast" class="weapon-switch-toast" aria-hidden="true"></div>
       <canvas id="gameCanvas" aria-label="混乱幸存者游戏区域"></canvas>
 
       <section id="hud" class="hud" aria-live="polite">
@@ -104,14 +105,24 @@
 
       <section id="loadoutOverlay" class="overlay loadout-overlay" aria-hidden="true">
         <div class="panel loadout-panel">
-          <div class="loadout-fx" aria-hidden="true">
-            <i></i><i></i><i></i><i></i><i></i><i></i>
-          </div>
+            
           <header class="loadout-head">
             <div>
               <p class="eyebrow">COMBAT SETUP</p>
               <h2>作战配置</h2>
             </div>
+            <div id="loadoutControlMode" class="loadout-control-mode inline-header">
+              <span class="loadout-control-label">操控</span>
+              <div class="loadout-control-options">
+                <button type="button" id="loadoutControlAuto" class="loadout-control-btn compact active" data-mode="auto">
+                  <strong>自动开火</strong>
+                </button>
+                <button type="button" id="loadoutControlManual" class="loadout-control-btn compact" data-mode="manual">
+                  <strong>手动开火</strong>
+                </button>
+              </div>
+            </div>
+
             <p>同时选择作战难度与开局武器。确认后立即进入战场。</p>
           </header>
           <div class="loadout-body">

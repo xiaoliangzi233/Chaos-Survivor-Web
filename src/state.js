@@ -3,6 +3,8 @@ import { WEAPON_BASE_STATS } from "./config/editableGameData.js";
 
 export const state = {
   mode: "menu",
+  controlMode: "auto",
+  manualPrimaryIndex: null,
   time: 0,
   wave: 1,
   waveDuration: FIRST_WAVE_SECONDS,
@@ -59,6 +61,9 @@ export const input = {
   vx: 0,
   vy: 0,
   pointerId: null,
+  mouseX: 0,
+  mouseY: 0,
+  mouseDown: false,
 };
 
 export function addCameraShake(amount, cap = 18) {
@@ -193,6 +198,8 @@ export function resetRun(map) {
   world.blackhole = null;
 
   state.mode = "choosingWeapon";
+  state.controlMode = state.controlMode || "auto";
+  state.manualPrimaryIndex = state.controlMode === "manual" ? 0 : null;
   state.time = 0;
   state.wave = 1;
   state.waveDuration = waveDurationFor(1);

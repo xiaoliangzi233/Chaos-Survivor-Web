@@ -1,4 +1,4 @@
-﻿:root {
+:root {
   --ink: #f3f7ff;
   --muted: #a7b4c7;
   --panel: rgba(10, 16, 28, 0.78);
@@ -4751,4 +4751,103 @@ h2 {
   .loadout-weapon-card {
     min-height: 54px;
   }
+}
+
+/* ---- Weapon Switch Toast ---- */
+.weapon-switch-toast {
+  position: fixed;
+  top: 8%;
+  left: 50%;
+  transform: translate(-50%, 0);
+  z-index: 500;
+  padding: 6px 22px;
+  background: rgba(8, 12, 20, 0.92);
+  border: 1px solid rgba(66, 232, 255, 0.45);
+  border-radius: 6px;
+  color: #42e8ff;
+  font-size: 0.9rem;
+  font-weight: 600;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.15s ease, transform 0.15s ease;
+  white-space: nowrap;
+}
+.weapon-switch-toast.active {
+  opacity: 1;
+  transform: translate(-50%, 4px);
+}
+
+/* ---- Control Mode Selector ---- */
+.loadout-control-mode {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+.loadout-control-label {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  color: rgba(200, 210, 224, 0.55);
+  letter-spacing: 0.12em;
+  font-weight: 600;
+}
+.loadout-control-options {
+  display: flex;
+  gap: 10px;
+}
+.loadout-control-btn {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 12px 10px;
+  background: rgba(58, 68, 92, 0.38);
+  border: 1.5px solid rgba(100, 120, 160, 0.28);
+  border-radius: 3px;
+  color: rgba(210, 218, 238, 0.72);
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.2s ease;
+}
+.loadout-control-btn:hover {
+  background: rgba(66, 232, 255, 0.06);
+  border-color: rgba(66, 232, 255, 0.25);
+  color: #ccd6f6;
+}
+.loadout-control-btn.active {
+  background: rgba(66, 232, 255, 0.1);
+  border-color: rgba(66, 232, 255, 0.5);
+  color: #42e8ff;
+  box-shadow: 0 0 18px rgba(66, 232, 255, 0.12);
+}
+.loadout-control-btn i {
+  font-size: 1.4rem;
+  font-style: normal;
+}
+.loadout-control-btn strong {
+  font-size: 0.88rem;
+  font-weight: 700;
+}
+.loadout-control-btn small {
+  font-size: 0.68rem;
+  opacity: 0.6;
+}
+.loadout-control-btn.active small {
+  opacity: 0.85;
+}
+
+/* ---- Manual HUD indicator ---- */
+.manual-hud-indicator {
+  position: fixed;
+  top: 52%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 100;
+  pointer-events: none;
+  opacity: 0.55;
+  font-size: 0.72rem;
+  color: #ffd166;
+  text-shadow: 0 0 8px rgba(255, 209, 102, 0.5);
+  letter-spacing: 0.08em;
 }

@@ -1,4 +1,4 @@
-﻿import { TOTAL_WAVES } from "../constants.js";
+import { TOTAL_WAVES } from "../constants.js";
 import { state, world } from "../state.js";
 import { choice, formatTime } from "../utils.js";
 import { bestSummaryText, difficultyCards } from "../difficulty.js";
@@ -39,6 +39,8 @@ export const ui = {
   loadoutWeaponPreview: document.getElementById("loadoutWeaponPreview"),
   loadoutWeaponList: document.getElementById("loadoutWeaponList"),
   loadoutConfirmButton: document.getElementById("loadoutConfirmButton"),
+  loadoutControlAuto: document.getElementById("loadoutControlAuto"),
+  loadoutControlManual: document.getElementById("loadoutControlManual"),
   loadoutBackButton: document.getElementById("loadoutBackButton"),
   loadoutDifficultyName: document.getElementById("loadoutDifficultyName"),
   loadoutWeaponName: document.getElementById("loadoutWeaponName"),
@@ -167,6 +169,20 @@ export function showRunSetup({ weapons, onConfirm, onBack }) {
   let selectedDifficulty = difficulties[difficultyIndex] || null;
   let selectedWeapon = weapons[weaponIndex] || null;
   let confirmed = false;
+  var savedMode = (function() { try { return localStorage.getItem("survivor_controlMode") || "auto"; } catch(e) { return "auto"; } })(); let selectedControlMode = (savedMode === "manual" ? "manual" : "auto");
+  setupControlModeButtons();
+
+  function setupControlModeButtons() {
+    if (!ui.loadoutControlAuto || !ui.loadoutControlManual) return;
+    ui.loadoutControlAuto.className = selectedControlMode === "auto" ? "loadout-control-btn compact active" : "loadout-control-btn compact";
+    ui.loadoutControlManual.className = selectedControlMode === "manual" ? "loadout-control-btn compact active" : "loadout-control-btn compact";
+    ui.loadoutControlAuto.onclick = function() {
+      selectedControlMode = "auto"; try { localStorage.setItem("survivor_controlMode", "auto"); } catch(e) {} setupControlModeButtons();
+    };
+    ui.loadoutControlManual.onclick = function() {
+      selectedControlMode = "manual"; try { localStorage.setItem("survivor_controlMode", "manual"); } catch(e) {} setupControlModeButtons();
+    };
+  }
 
   ui.loadoutDifficultyList.innerHTML = "";
   ui.loadoutWeaponList.innerHTML = "";
@@ -341,14 +357,14 @@ export function showRunSetup({ weapons, onConfirm, onBack }) {
     if (confirmed || !selectedDifficulty?.unlocked || !selectedWeapon) return;
     confirmed = true;
     ui.loadoutConfirmButton.disabled = true;
-    onConfirm({ difficulty: selectedDifficulty, weapon: selectedWeapon });
+    onConfirm({ difficulty: selectedDifficulty, weapon: selectedWeapon, controlMode: selectedControlMode });
     return true;
   }
 
   ui.loadoutConfirmButton.onclick = confirmLoadout;
   if (ui.loadoutBackButton) {
     ui.loadoutBackButton.onclick = () => {
-      if (confirmed) return;
+    if (confirmed) return;
       hideRunSetup();
       onBack?.();
     };

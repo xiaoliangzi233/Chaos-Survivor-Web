@@ -74,12 +74,14 @@ export async function bootGame() {
     playSfx("select");
   }
 
-  function startWithLoadout({ difficulty, weapon }) {
+  function startWithLoadout({ difficulty, weapon, controlMode }) {
     closeCodex();
     selectDifficulty(difficulty.id);
     resetRun(generateMap());
     selectDifficulty(difficulty.id);
     state.shop = createShopState();
+    state.controlMode = controlMode || "auto";
+    state.manualPrimaryIndex = controlMode === "manual" ? 0 : null;
     hideAllOverlays();
     hideRunSetup();
     state.initialWeaponId = weapon.id;

@@ -108,7 +108,7 @@ export function updateHud(fps) {
   ui.hpText.textContent = `${hp}`;
   ui.levelText.textContent = `Lv.${p.level}`;
   if (state.gameMode === "challenge" && state.waveScenario?.type === "annihilation" && !state.bossWaveActive) {
-    ui.timerText.textContent = `敌 ${state.challengeRemaining}`;
+    ui.timerText.textContent = `剩余敌怪 ${state.challengeRemaining}`;
     ui.timerText.style.color = "var(--red)";
   } else if (state.bossWaveActive) {
     ui.timerText.textContent = world.boss?.name || "BOSS";

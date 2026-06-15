@@ -1,4 +1,4 @@
-import { CELL_SIZE, ENEMY_LIMIT, GEM_LIMIT, TAU, WORLD_SIZE } from "../constants.js";
+﻿import { CELL_SIZE, ENEMY_LIMIT, GEM_LIMIT, TAU, WORLD_SIZE } from "../constants.js";
 import { state, world, input } from "../state.js";
 import { clamp, distSq, circleHit } from "../utils.js";
 import { burst, dust, pulse } from "../effects.js";
@@ -108,7 +108,7 @@ export function updateChallengeSpawning(dt) {
     for (const entry of group.enemies) {
       for (let i = 0; i < entry.count; i++) {
         if (world.enemies.length >= enemyLimit) break;
-        spawnEnemyById(entry.id);
+        spawnEnemyById(entry.id, null, null, entry.config || null);
       }
     }
   }

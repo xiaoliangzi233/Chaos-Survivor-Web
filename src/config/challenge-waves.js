@@ -8,8 +8,7 @@
 export const CHALLENGE_WAVES = [
   {
     wave: 1,
-    type: "countdown",
-    duration: 30,
+    type: "annihilation",
     groups: [
       { time: 0, enemies: [{ id: "zombie", count: 6 }] },
       { time: 10, enemies: [{ id: "lancer", count: 4 }] },
@@ -19,7 +18,7 @@ export const CHALLENGE_WAVES = [
     wave: 2,
     type: "annihilation",
     groups: [
-      { time: 0, enemies: [{ id: "slime_small", count: 8 }, { id: "slime_medium", count: 6 }] },
+      { time: 0, enemies: [{ id: "tank", count: 3 , config: { speed: 120 ,hp: 360} }, { id: "lancer", count: 4 , config: { speed: 180 ,hp: 300} }] },
     ],
   },
 ];

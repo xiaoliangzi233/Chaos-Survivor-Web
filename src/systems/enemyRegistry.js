@@ -116,16 +116,18 @@ export async function setupEnemyRegistry() {
       challengeEnemyConfig = challengeCfg;
     } catch { /* challenge config optional */ }
   }
-  setSpawnConfigured((id, x, y) => spawnEnemyById(id, x, y));
+  setSpawnConfigured((id, x, y, overrides) => spawnEnemyById(id, x, y, overrides));
 }
 
-export function spawnEnemyById(id, x = null, y = null) {
+export function spawnEnemyById(id, x = null, y = null, overrides = null) {
   const difficulty = currentDifficulty();
   if (world.enemies.length >= (difficulty.enemyLimit || ENEMY_LIMIT)) return null;
   const baseCfg = enemyConfig[id];
   if (!baseCfg) return null;
   const challengeOverride = (state.gameMode === "challenge") ? (challengeEnemyConfig[id] || null) : null;
-  const cfg = challengeOverride ? { ...baseCfg, ...challengeOverride } : baseCfg;
+  const cfg = overrides
+    ? { ...baseCfg, ...(challengeOverride || {}), ...overrides }
+    : (challengeOverride ? { ...baseCfg, ...challengeOverride } : baseCfg);
   const Klass = classes[id] || Zombie;
 
   if (!canSpawnLimitedEnemy(id)) return null;

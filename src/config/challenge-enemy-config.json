@@ -75,19 +75,19 @@
     "damage": 28,
     "hp": 200,
     "xp": 12,
-    "speed": 88
+    "speed": 120
   },
   "tank": {
     "damage": 36,
-    "hp": 260,
+    "hp": 360,
     "xp": 30,
-    "speed": 38
+    "speed": 70
   },
   "zombie": {
     "damage": 22,
     "hp": 100,
     "xp": 9,
-    "speed": 84
+    "speed": 100
   },
   "razorbat": {
     "damage": 26,

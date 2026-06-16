@@ -59,7 +59,7 @@ export class Tank extends BaseEnemy {
   fireBurst(angle) {
     this.cooldown = this.cd + Math.random() * this.cdRandom;
     const baseSpeed = this.bulletSpeed;
-    for (let i = 0; i < 4; i++) {
+    for (let i = 0; i < this.bulletCount; i++) {
       const a = angle + (i - 1.5) * 0.075;
       world.enemyProjectiles.push({
         x: this.x + Math.cos(a) * (this.r + 8),

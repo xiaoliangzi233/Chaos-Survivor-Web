@@ -8,6 +8,7 @@ import { drawBlackhole } from "../blackhole.js";
 import { createDecorativeEnemy, decorativeEnemyIds } from "./enemyRegistry.js";
 import { drawEasterEggObject, drawEasterEggToast } from "./easterEggs.js";
 import { activeWaveEffect } from "./waveScenarios.js";
+import { drawLaserBeam } from "../enemies/laser_eye.js";
 import { getSetting } from "./settings.js";
 import { drawAiDebug, drawAiHud } from "../ai/aiDebugDraw.js";
 
@@ -167,6 +168,15 @@ export function render(ctx) {
       drawEliteOutline(ctx, e);
       if (e.shielded && !e.globalShielded) drawEnemyShield(ctx, e);
       drawEnemyHpBar(ctx, e);
+    }
+  }
+  // Draw laser eye beams for off-screen laser_eye enemies
+  for (const e of world.enemies) {
+    if (e.behavior === 'laser_eye' && (e.state === 'aim' || e.state === 'fire') && !inView(e.x, e.y, e.r + 80)) {
+      ctx.save();
+      ctx.translate(e.x, e.y + Math.sin(e.anim * 1.4) * 3);
+      drawLaserBeam(ctx, e);
+      ctx.restore();
     }
   }
   drawDrones(ctx);

@@ -54,10 +54,10 @@ export const CHALLENGE_WAVES = [
     wave: 5,
     type: "annihilation",
     groups: [
-      { time: 0, enemies: [{ id: "laser_eye", count: 1, config: { scale: 2, hp: 3500, cd: 1, cdAlt: 1, shardVolleySpeed: 700, fireRange: 1200, aimTurnSpeed: 3, fireDuration: 1.5, beamDamageMul: 2.5, immuneFreeze: true, immuneGravity: true } }] },
-      { time: 5, enemies: [{ id: "laser_eye", count: 2, config: { speed: 100, hp: 800, cd: 1, cdAlt: 1, fireRange: 1200, aimTurnSpeed: 3, fireTurnSpeed: 1.2, fireDuration: 0.5 } }] },
-      { time: 15, enemies: [{ id: "laser_eye", count: 2, config: { speed: 100, hp: 800, cd: 1, cdAlt: 1, fireRange: 1200, aimTurnSpeed: 3, fireTurnSpeed: 1.2, fireDuration: 0.5 } }] },
-      { time: 25, enemies: [{ id: "laser_eye", count: 3, config: { speed: 100, hp: 800, cd: 1, cdAlt: 1, fireRange: 1200, aimTurnSpeed: 3, fireTurnSpeed: 1.2, fireDuration: 0.5 } }] },
+      { time: 0, enemies: [{ id: "laser_eye", count: 1, config: { scale: 2, hp: 4000, cd: 1, cdAlt: 1, shardVolleySpeed: 700, fireRange: 2000, aimTurnSpeed: 3, fireDuration: 2, beamDamageMul: 3, immuneFreeze: true, immuneGravity: true } }] },
+      { time: 5, enemies: [{ id: "laser_eye", count: 2, config: { speed: 100, hp: 800, cd: 1, cdAlt: 1, fireRange: 1200, aimTurnSpeed: 3, fireTurnSpeed: 1.2, fireDuration: 0.5, immuneFreeze: true, immuneGravity: true } }] },
+      { time: 15, enemies: [{ id: "laser_eye", count: 2, config: { speed: 100, hp: 800, cd: 1, cdAlt: 1, fireRange: 1200, aimTurnSpeed: 3, fireTurnSpeed: 1.2, fireDuration: 0.5, immuneFreeze: true, immuneGravity: true } }] },
+      { time: 25, enemies: [{ id: "laser_eye", count: 3, config: { speed: 100, hp: 800, cd: 1, cdAlt: 1, fireRange: 1200, aimTurnSpeed: 3, fireTurnSpeed: 1.2, fireDuration: 0.5, immuneFreeze: true, immuneGravity: true } }] },
     ],
   },
 ];

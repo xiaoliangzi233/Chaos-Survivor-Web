@@ -1,9 +1,10 @@
-﻿import { TAU, WORLD_SIZE } from "../constants.js";
+import { TAU, WORLD_SIZE } from "../constants.js";
 import { state, world } from "../state.js";
 import { burst, particle, pulse, trail } from "../effects.js";
 import { playSfx } from "../audio.js";
 import { clamp, distSq } from "../utils.js";
 import { BaseEnemy } from "./BaseEnemy.js";
+import { dropGem } from "../systems/entities.js";
 import { applyPlayerDamage } from "../systems/items.js";
 import { maybeTriggerBossSignature } from "../systems/easterEggs.js";
 
@@ -386,7 +387,7 @@ export class TwinAbyssalEyes extends BaseEnemy {
     world.boss = null;
     if (!this.shared.rewardDropped) {
       this.shared.rewardDropped = true;
-      import("../systems/entities.js").then(({ dropGem }) => dropGem(this.x, this.y, this.shared.rewardXp || this.xp));
+      dropGem(this.x, this.y, this.shared.rewardXp || this.xp);
     }
   }
 

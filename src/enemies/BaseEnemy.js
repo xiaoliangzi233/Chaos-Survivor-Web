@@ -6,6 +6,7 @@ import { playSfx } from "../audio.js";
 import { currentDifficulty } from "../difficulty.js";
 import { applyPlayerDamage } from "../systems/items.js";
 import { maybeTriggerBossSignature } from "../systems/easterEggs.js";
+import { coinAmountForEnemy, dropGem, dropCoin } from "../systems/entities.js";
 
 export class BaseEnemy {
   constructor(config, x, y) {
@@ -180,12 +181,10 @@ export class BaseEnemy {
     if (this.boss && world.boss === this) world.boss = null;
     burst(this.x, this.y, this.boss ? 48 : 12, this.color, this.boss ? 240 : 140);
     playSfx(this.boss ? "explode" : "hit");
-    import("../systems/entities.js").then(({ coinAmountForEnemy, dropGem, dropCoin }) => {
-      const rewardScale = this.rewardScale ?? 1;
-      dropGem(this.x, this.y, (this.boss ? (this.xp || 1) * 2.4 : this.xp) * rewardScale);
-      const amount = coinAmountForEnemy(this);
-      if (amount > 0) dropCoin(this.x, this.y, amount);
-    });
+    const rewardScale = this.rewardScale ?? 1;
+    dropGem(this.x, this.y, (this.boss ? (this.xp || 1) * 2.4 : this.xp) * rewardScale);
+    const amount = coinAmountForEnemy(this);
+    if (amount > 0) dropCoin(this.x, this.y, amount);
     const i = world.enemies.indexOf(this);
     if (i >= 0) world.enemies.splice(i, 1);
     if (this.behavior === "split_large") splitInto("slime_medium", this.x, this.y, 2, this.r * 0.8);

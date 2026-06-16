@@ -3,6 +3,7 @@ import { state } from "../state.js";
 import { burst, pulse, trail } from "../effects.js";
 import { clamp } from "../utils.js";
 import { BaseEnemy } from "./BaseEnemy.js";
+import { dropCoin } from "../systems/entities.js";
 
 export class Thief extends BaseEnemy {
   constructor(config, x, y) {
@@ -85,7 +86,7 @@ export class Thief extends BaseEnemy {
     this.knockbackX = 0;
     this.knockbackY = 0;
     if (!options.statusEffect) {
-      import("../systems/entities.js").then(({ dropCoin }) => dropCoin(x ?? this.x, y ?? this.y, this.hitCoinDrop));
+      dropCoin(x ?? this.x, y ?? this.y, this.hitCoinDrop);
     }
     super.takeDamage(amount, x, y, options);
   }
@@ -94,7 +95,7 @@ export class Thief extends BaseEnemy {
     const x = this.x;
     const y = this.y;
     super.kill();
-    import("../systems/entities.js").then(({ dropCoin }) => dropCoin(x, y, this.coinDrop));
+    dropCoin(x, y, this.coinDrop);
     burst(x, y, 18, "#ffd166", 180);
   }
 

@@ -1,4 +1,4 @@
-import { CELL_SIZE, ENEMY_LIMIT, GEM_LIMIT, TAU, WORLD_SIZE } from "../constants.js";
+﻿import { CELL_SIZE, ENEMY_LIMIT, GEM_LIMIT, TAU, WORLD_SIZE } from "../constants.js";
 import { state, world, input } from "../state.js";
 import { clamp, distSq, circleHit } from "../utils.js";
 import { burst, dust, pulse } from "../effects.js";
@@ -88,6 +88,36 @@ export function updatePlayer(dt) {
   p.invuln = Math.max(0, p.invuln - dt);
 }
 
+
+export function updateChallengeSpawning(dt) {
+  spawnWaveBoss();
+  if (isBossWave(state.wave)) return;
+  state.challengeSpawnTime += dt;
+  const scenario = state.waveScenario;
+  if (!scenario || !scenario.groups) return;
+  const enemyLimit = currentDifficulty().enemyLimit || ENEMY_LIMIT;
+  const spawnedKey = `challenge_grp_${state.difficultyId}_${state.wave}`;
+  state.spawnedWaveEvents ||= new Set();
+  for (let gi = 0; gi < scenario.groups.length; gi++) {
+    const group = scenario.groups[gi];
+    const gKey = `${spawnedKey}_${gi}`;
+    if (state.spawnedWaveEvents.has(gKey)) continue;
+    const shouldSpawn = state.challengeSpawnTime >= group.time || world.enemies.length === 0;
+    if (!shouldSpawn) break;
+    state.spawnedWaveEvents.add(gKey);
+    for (const entry of group.enemies) {
+      for (let i = 0; i < entry.count; i++) {
+        if (world.enemies.length >= enemyLimit) break;
+        spawnEnemyById(entry.id, null, null, entry.config || null);
+      }
+    }
+  }
+  // Count remaining enemies for annihilation mode
+  if (scenario.type === "annihilation") {
+    state.challengeRemaining = world.enemies.length;
+  }
+}
+
 export function updateSpawning(dt) {
   spawnWaveBoss();
   if (isBossWave(state.wave)) return;
@@ -121,7 +151,7 @@ export function updateEnemies(dt) {
   for (let i = world.enemies.length - 1; i >= 0; i--) {
     const e = world.enemies[i];
     updateEnemyKnockback(e, dt);
-    if (e.controlImmune && e.freezeTimer > 0) e.freezeTimer = 0;
+    if ((e.controlImmune || e.immuneFreeze) && e.freezeTimer > 0) e.freezeTimer = 0;
     if (e.freezeTimer > 0 && !e.boss) {
       e.freezeTimer = Math.max(0, e.freezeTimer - dt);
       e.hitTimer = Math.max(0, e.hitTimer - dt);
@@ -748,7 +778,7 @@ function updateGravityWell(h, dt) {
   if (h.armTime > 0) return;
   pullBody(state.player, h, dt, h.pull || 150, 0.5);
   for (const e of world.enemies) {
-    if (e.dead || e.boss) continue;
+    if (e.dead || e.boss || e.immuneGravity) continue;
     pullBody(e, h, dt, (h.pull || 150) * 0.38, 0.3);
   }
   for (const collection of [world.gems, world.coins]) {
@@ -927,3 +957,4 @@ function cellKey(x, y) {
 }
 
 export { circleHit };
+

@@ -14,3 +14,7 @@ export const SAVE_KEY = "pixel-survivor-best";
 export function waveDurationFor(wave) {
   return Math.min(MAX_WAVE_SECONDS, FIRST_WAVE_SECONDS + (wave - 1) * 2);
 }
+
+export const GAME_MODE_SWARM = "swarm";
+export const GAME_MODE_CHALLENGE = "challenge";
+

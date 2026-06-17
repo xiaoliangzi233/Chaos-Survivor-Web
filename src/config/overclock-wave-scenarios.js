@@ -9,7 +9,7 @@ const ALL_SLIMES = [
   "slime_angel",
 ];
 const WAVE_1_POOL = ["zombie", "lancer", ...BASIC_SLIMES];
-const WAVE_2_POOL = ["razorbat", "wisp", "mech_worm", "pentastar"];
+const WAVE_2_POOL = ["zombie", "lancer"];
 const WAVE_3_POOL = [...new Set([...WAVE_1_POOL, ...WAVE_2_POOL])];
 const OVERCLOCK_NEWCOMERS = ["blackhole_mage", "embermine", "exploder", "magnet_raider", "gunner", "brood_seeder"];
 const OVERCLOCK_SUPPORT = ["doctor", "shield_caster", "wizard", "magma_beetle", "gearfiend", "mech_worm", "pentastar", "razorbat"];

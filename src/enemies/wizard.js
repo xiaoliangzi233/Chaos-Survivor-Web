@@ -4,8 +4,8 @@ import { burst, particle, pulse } from "../effects.js";
 import { clamp } from "../utils.js";
 import { BaseEnemy } from "./BaseEnemy.js";
 
-const KEEP_DISTANCE = 455;
-const CAST_RANGE = 900;
+
+
 
 export class Wizard extends BaseEnemy {
   constructor(config, x, y) {
@@ -13,7 +13,7 @@ export class Wizard extends BaseEnemy {
     this.behavior = "wizard";
     this.castTime = 0;
     this.castAngle = 0;
-    this.cooldown = 1.15 + Math.random() * 0.8;
+    this.cooldown = this.cdInitial;
     this.orbit = Math.random() * TAU;
   }
 
@@ -38,12 +38,12 @@ export class Wizard extends BaseEnemy {
       }
       if (this.castTime <= 0) this.releaseSpell();
     } else {
-      const dir = d < KEEP_DISTANCE ? -0.75 : d > CAST_RANGE ? 0.48 : 0.04;
+      const dir = d < this.keepDistance ? -0.75 : d > this.castRange ? 0.48 : 0.04;
       const strafe = Math.sin(this.anim * 0.52) * 0.42;
       this.x += (dx / d * dir + -dy / d * strafe) * this.speed * dt;
       this.y += (dy / d * dir + dx / d * strafe) * this.speed * dt;
-      if (this.cooldown <= 0 && d < CAST_RANGE) {
-        this.castTime = this.elite ? 0.48 : 0.68;
+      if (this.cooldown <= 0 && d < this.castRange) {
+        this.castTime = this.elite ? this.castTimeElite : this.castDuration;
         this.castAngle = Math.atan2(dy, dx);
         pulse(this.x, this.y, 38, this.color, 0.28);
       }
@@ -55,7 +55,7 @@ export class Wizard extends BaseEnemy {
   }
 
   releaseSpell() {
-    this.cooldown = this.elite ? 1.35 : 1.95;
+    this.cooldown = this.elite ? this.cdElite : this.cd + Math.random() * this.cdRandom;
     const count = this.elite ? 2 : 1;
     for (let i = 0; i < count; i++) {
       const a = this.castAngle + (count === 1 ? 0 : (i - 0.5) * 0.16);

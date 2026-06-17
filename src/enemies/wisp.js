@@ -1,4 +1,4 @@
-﻿import { TAU, WORLD_SIZE } from "../constants.js";
+import { TAU, WORLD_SIZE } from "../constants.js";
 import { state, world } from "../state.js";
 import { burst, pulse, trail } from "../effects.js";
 import { clamp } from "../utils.js";
@@ -8,10 +8,10 @@ import { applyPlayerDamage } from "../systems/items.js";
 export class Wisp extends BaseEnemy {
   constructor(config, x, y) {
     super(config, x, y);
-    this.preferredRange = 350;
-    this.closeRange = 270;
-    this.farRange = 460;
-    this.shootCooldown = 0.7 + Math.random() * 0.6;
+    this.preferredRange = this.preferredDist;
+    this.closeRange = this.closeDist;
+    this.farRange = this.farDist;
+    this.shootCooldown = this.shootInitialCd + Math.random() * this.shootInitialCdRandom;
     this.strafeDir = Math.random() < 0.5 ? -1 : 1;
     this.hoverPhase = Math.random() * TAU;
     this.trailTimer = Math.random() * 0.12;
@@ -55,8 +55,8 @@ export class Wisp extends BaseEnemy {
     this.x = clamp(this.x, -half + this.r, half - this.r);
     this.y = clamp(this.y, -half + this.r, half - this.r);
 
-    if (this.shootCooldown <= 0 && d < 720) {
-      this.shootCooldown = this.elite ? 0.78 : 1.08;
+    if (this.shootCooldown <= 0 && d < this.fireRange) {
+      this.shootCooldown = this.elite ? this.shootCdElite : this.shootCd;
       this.fireSnowflake(Math.atan2(dy, dx), d);
     }
 
@@ -76,9 +76,9 @@ export class Wisp extends BaseEnemy {
   }
 
   fireSnowflake(angle, distance) {
-    const speed = this.elite ? 220 : 185;
+    const speed = this.elite ? this.bulletSpeedElite : this.bulletSpeed;
     const spread = distance < this.preferredRange ? 0.1 : 0.04;
-    const count = this.elite ? 3 : 1;
+    const count = this.elite ? this.bulletCountElite : this.bulletCount;
     const start = -(count - 1) * 0.12;
     pulse(this.x, this.y, 34, "#9ff4ff", 0.28);
     burst(this.x, this.y, 5, "#d9fbff", 80);
@@ -92,7 +92,7 @@ export class Wisp extends BaseEnemy {
         vy: Math.sin(a) * speed,
         r: this.elite ? 7 : 6,
         color: "#9ff4ff",
-        damage: this.damage * 0.68,
+        damage: this.damage * this.bulletDamageMul,
         life: 4.2,
         shape: "snowflake",
         spin: Math.random() * TAU,

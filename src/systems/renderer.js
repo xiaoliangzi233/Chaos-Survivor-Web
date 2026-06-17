@@ -2,12 +2,14 @@ import { CAMERA_ZOOM, TAU, WORLD_SIZE } from "../constants.js";
 import { state, world, input } from "../state.js";
 import { clamp, hexToRgba } from "../utils.js";
 import { drawMap } from "./map.js";
-import { drawEffects } from "../effects.js";
+import { drawDamageTexts, drawEffects } from "../effects.js";
 import { renderLighting } from "./lighting.js";
 import { drawBlackhole } from "../blackhole.js";
 import { createDecorativeEnemy, decorativeEnemyIds } from "./enemyRegistry.js";
 import { drawEasterEggObject, drawEasterEggToast } from "./easterEggs.js";
 import { activeWaveEffect } from "./waveScenarios.js";
+import { drawLaserBeam } from "../enemies/laser_eye.js";
+import { getSetting } from "./settings.js";
 import { drawAiDebug, drawAiHud } from "../ai/aiDebugDraw.js";
 
 export const viewport = { width: 1, height: 1, dpr: 1 };
@@ -159,11 +161,22 @@ export function render(ctx) {
       e.draw(ctx);
       drawEliteOutline(ctx, e);
       if (e.shielded && !e.globalShielded) drawEnemyShield(ctx, e);
+      drawEnemyHpBar(ctx, e);
       ctx.restore();
     } else {
       e.draw(ctx);
       drawEliteOutline(ctx, e);
       if (e.shielded && !e.globalShielded) drawEnemyShield(ctx, e);
+      drawEnemyHpBar(ctx, e);
+    }
+  }
+  // Draw laser eye beams for off-screen laser_eye enemies
+  for (const e of world.enemies) {
+    if (e.behavior === 'laser_eye' && (e.state === 'aim' || e.state === 'fire') && !inView(e.x, e.y, e.r + 80)) {
+      ctx.save();
+      ctx.translate(e.x, e.y + Math.sin(e.anim * 1.4) * 3);
+      drawLaserBeam(ctx, e);
+      ctx.restore();
     }
   }
   drawDrones(ctx);
@@ -175,6 +188,7 @@ export function render(ctx) {
   drawEffects(ctx);
   drawWeaponFx(ctx);
   ctx.restore();
+  drawDamageTexts(ctx, camX, camY, CAMERA_ZOOM);
   renderLighting(ctx, { camX, camY, viewW, viewH }, viewport);
   drawBossBar(ctx);
   drawBossDirectionIndicator(ctx);
@@ -3448,3 +3462,22 @@ function diamond(ctx, len, w, color) { ctx.fillStyle = color; ctx.beginPath(); c
 function star(ctx, r, color) { ctx.fillStyle = color; ctx.beginPath(); for (let i = 0; i < 4; i++) { const a = (i / 4) * TAU, rr = i % 2 ? r * 0.35 : r; const x = Math.cos(a) * rr, y = Math.sin(a) * rr; if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y); } ctx.closePath(); ctx.fill(); ctx.strokeStyle = "#fff"; ctx.stroke(); }
 function drawStarShape(ctx, x, y, outer, inner, points = 10) { ctx.beginPath(); for (let i = 0; i < points; i++) { const a = -Math.PI / 2 + i * TAU / points; const r = i % 2 ? inner : outer; const px = x + Math.cos(a) * r, py = y + Math.sin(a) * r; if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py); } ctx.closePath(); }
 function diamondAt(ctx, x, y, r) { ctx.beginPath(); ctx.moveTo(x, y - r); ctx.lineTo(x + r, y); ctx.lineTo(x, y + r); ctx.lineTo(x - r, y); ctx.closePath(); ctx.fill(); }
+
+function drawEnemyHpBar(ctx, e) {
+  if (!getSetting("showEnemyHpBar")) return;
+  if (e.dead || e.hp <= 0 || !e.maxHp || e.hp >= e.maxHp) return;
+  const barW = e.r * 2.4;
+  const barH = 4;
+  const barX = e.x - barW / 2;
+  const barY = e.y + e.r + 6;
+  const ratio = Math.max(0, Math.min(1, e.hp / e.maxHp));
+  // Background
+  ctx.fillStyle = "rgba(0,0,0,0.42)";
+  ctx.fillRect(barX, barY, barW, barH);
+  // HP bar - green to red gradient
+  const r = ratio < 0.5 ? 255 : Math.round(255 * (1 - ratio) * 2);
+  const g = ratio > 0.5 ? 255 : Math.round(255 * ratio * 2);
+  const color = "rgb(" + r + "," + g + ",40)";
+  ctx.fillStyle = color;
+  ctx.fillRect(barX, barY, barW * ratio, barH);
+}

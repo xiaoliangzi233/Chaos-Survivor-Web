@@ -5,14 +5,14 @@ import { playSfx } from "../audio.js";
 import { clamp, distSq } from "../utils.js";
 import { BaseEnemy } from "./BaseEnemy.js";
 
-const HEAL_RANGE = 260;
-const KEEP_DISTANCE = 330;
+
+
 
 export class Doctor extends BaseEnemy {
   constructor(config, x, y) {
     super(config, x, y);
     this.behavior = "doctor";
-    this.cooldown = 0.8;
+    this.cooldown = this.cdInitial;
     this.healTarget = null;
     this.healTargets = [];
     this.channel = 0;
@@ -45,14 +45,14 @@ export class Doctor extends BaseEnemy {
         if (Math.random() < dt * 14) particle("healPlus", target.x, target.y - target.r - 8, { color: "#72ffb4", life: 0.42, size: 9, alpha: 0.9, vy: -18 });
       }
       if (this.channel <= 0) {
-        this.cooldown = 2.4;
-        pulse(this.x, this.y, HEAL_RANGE, "#72ffb4", 0.18);
+        this.cooldown = this.cd + Math.random() * this.cdRandom;
+        pulse(this.x, this.y, this.healRange, "#72ffb4", 0.18);
         playSfx("level");
       }
-      this.moveRelative(dx, dy, d, dt, d < KEEP_DISTANCE ? -0.75 : 0.15);
+      this.moveRelative(dx, dy, d, dt, d < this.keepDistance ? -0.75 : 0.15);
     } else {
       this.channel = 0;
-      this.moveRelative(dx, dy, d, dt, d < KEEP_DISTANCE ? -0.85 : 0.32);
+      this.moveRelative(dx, dy, d, dt, d < this.keepDistance ? -0.85 : 0.32);
     }
 
     const half = WORLD_SIZE / 2;
@@ -68,7 +68,7 @@ export class Doctor extends BaseEnemy {
 
   findHealTargets() {
     const targets = [];
-    const range2 = HEAL_RANGE * HEAL_RANGE;
+    const range2 = this.healRange * this.healRange;
     for (const e of world.enemies) {
       if (e === this || e.dead || e.boss || e.hp >= e.maxHp) continue;
       if (distSq(this.x, this.y, e.x, e.y) > range2) continue;
@@ -113,7 +113,7 @@ export class Doctor extends BaseEnemy {
       ctx.strokeStyle = "rgba(114,255,180,0.34)";
       ctx.lineWidth = 1.6;
       ctx.beginPath();
-      ctx.arc(0, 0, HEAL_RANGE, 0, TAU);
+      ctx.arc(0, 0, this.healRange, 0, TAU);
       ctx.stroke();
     }
     ctx.restore();

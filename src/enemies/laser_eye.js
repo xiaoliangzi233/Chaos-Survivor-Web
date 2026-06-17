@@ -1,4 +1,4 @@
-﻿import { TAU, WORLD_SIZE } from "../constants.js";
+import { TAU, WORLD_SIZE } from "../constants.js";
 import { state, world } from "../state.js";
 import { burst, pulse } from "../effects.js";
 import { clamp } from "../utils.js";
@@ -14,7 +14,7 @@ export class LaserEye extends BaseEnemy {
     this.aimTime = 0;
     this.fireTime = 0;
     this.angle = 0;
-    this.cooldown = 1.4 + Math.random();
+    this.cooldown = this.cdInitial;
     this.nextAttack = "beam";
   }
 
@@ -32,35 +32,35 @@ export class LaserEye extends BaseEnemy {
     if (this.state === "aim") {
       this.aimTime -= dt;
       const target = Math.atan2(dy, dx);
-      this.angle = turnToward(this.angle, target, dt * 2.2);
+      this.angle = turnToward(this.angle, target, dt * this.aimTurnSpeed);
       if (this.aimTime <= 0) {
         this.state = "fire";
-        this.fireTime = 0.46;
+        this.fireTime = this.fireDuration;
         pulse(this.x, this.y, 46, this.color, 0.25);
       }
     } else if (this.state === "fire") {
       this.fireTime -= dt;
       const target = Math.atan2(dy, dx);
-      this.angle = turnToward(this.angle, target, dt * 0.7);
+      this.angle = turnToward(this.angle, target, dt * this.fireTurnSpeed);
       this.damageLaser(dt);
       if (this.fireTime <= 0) {
         this.state = "move";
-        this.cooldown = 2.4;
+        this.cooldown = this.cd + Math.random() * this.cdRandom;
       }
     } else {
-      const dir = d < 480 ? -0.75 : 0.22;
+      const dir = d < this.keepDistance ? -0.75 : 0.22;
       const strafe = Math.sin(this.anim * 0.72) * 0.45;
       this.x += (dx / d * dir + -dy / d * strafe) * this.speed * dt;
       this.y += (dy / d * dir + dx / d * strafe) * this.speed * dt;
-      if (this.cooldown <= 0 && d < 820) {
+      if (this.cooldown <= 0 && d < this.fireRange) {
         if (this.nextAttack === "shards") {
           this.fireLaserShardVolley(Math.atan2(dy, dx));
           this.nextAttack = "beam";
-          this.cooldown = 2.1;
+          this.cooldown = this.cdAlt + Math.random() * this.cdAltRandom;
           return;
         }
         this.state = "aim";
-        this.aimTime = 0.75;
+        this.aimTime = this.aimDuration;
         this.angle = Math.atan2(dy, dx);
         this.nextAttack = "shards";
       }
@@ -74,9 +74,9 @@ export class LaserEye extends BaseEnemy {
   damageLaser(dt) {
     const p = state.player;
     const dist = pointLineDistance(p.x, p.y, this.x, this.y, this.angle);
-    const beamWidth = this.r * 0.5 + 10;
+    const beamWidth = this.r * 0.5 + this.beamWidthExtra;
     if (dist < p.r + beamWidth) {
-      const result = applyPlayerDamage(this.damage * 1.35 * dt, this);
+      const result = applyPlayerDamage(this.damage * this.beamDamageMul * dt, this);
       state.flash = Math.max(state.flash, 0.12);
       state.shake = Math.max(state.shake, 3);
       if (result.damaged) {
@@ -89,17 +89,17 @@ export class LaserEye extends BaseEnemy {
 
   fireLaserShardVolley(angle) {
     this.angle = angle;
-    for (let i = 0; i < 3; i++) {
+    for (let i = 0; i < this.shardVolleyCount; i++) {
       const a = angle + (i - 1) * 0.09;
       world.enemyProjectiles.push({
         x: this.x + Math.cos(a) * (this.r + 12),
         y: this.y + Math.sin(a) * (this.r + 12),
-        vx: Math.cos(a) * 420,
-        vy: Math.sin(a) * 420,
+        vx: Math.cos(a) * this.shardVolleySpeed,
+        vy: Math.sin(a) * this.shardVolleySpeed,
         r: 5,
         color: this.color,
-        damage: this.damage * 0.56,
-        life: 2.2,
+        damage: this.damage * this.shardVolleyDamageMul,
+        life: this.shardVolleyLife,
         shape: "laserShard",
         long: true,
         spin: Math.random() * TAU,
@@ -115,7 +115,7 @@ export class LaserEye extends BaseEnemy {
     const aiming = this.state === "aim" || this.state === "fire";
     ctx.save();
     ctx.translate(this.x, this.y + Math.sin(this.anim * 1.4) * 3);
-    if (aiming) drawLaser(ctx, this);
+    if (aiming) drawLaserBeam(ctx, this);
     ctx.fillStyle = "rgba(0,0,0,0.24)";
     ctx.beginPath();
     ctx.ellipse(0, this.r + 8, this.r, this.r * 0.25, 0, 0, TAU);
@@ -174,22 +174,22 @@ export class LaserEye extends BaseEnemy {
   }
 }
 
-function drawLaser(ctx, e) {
+export function drawLaserBeam(ctx, e) {
   ctx.save();
   ctx.rotate(e.angle);
   const alpha = e.state === "fire" ? 0.82 : 0.24 + Math.sin(e.anim * 9) * 0.08;
   ctx.strokeStyle = `rgba(255,77,109,${alpha})`;
-  ctx.lineWidth = e.state === "fire" ? 9 : 2;
+  ctx.lineWidth = (e.state === "fire" ? 9 : 2) * (e.scale || 1);
   ctx.beginPath();
   ctx.moveTo(e.r, 0);
-  ctx.lineTo(920, 0);
+  ctx.lineTo(WORLD_SIZE, 0);
   ctx.stroke();
   if (e.state === "fire") {
     ctx.strokeStyle = "rgba(255,255,255,0.78)";
     ctx.lineWidth = 2;
     ctx.beginPath();
     ctx.moveTo(e.r, 0);
-    ctx.lineTo(920, 0);
+    ctx.lineTo(WORLD_SIZE, 0);
     ctx.stroke();
   }
   ctx.restore();

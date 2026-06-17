@@ -1,4 +1,4 @@
-﻿import { TAU, WORLD_SIZE } from "../constants.js";
+import { TAU, WORLD_SIZE } from "../constants.js";
 import { state } from "../state.js";
 import { burst, pulse } from "../effects.js";
 import { playSfx } from "../audio.js";
@@ -6,8 +6,8 @@ import { clamp, distSq } from "../utils.js";
 import { BaseEnemy } from "./BaseEnemy.js";
 import { applyPlayerDamage } from "../systems/items.js";
 
-const ARM_RANGE = 92;
-const EXPLODE_RADIUS = 92;
+
+
 
 export class Exploder extends BaseEnemy {
   constructor(config, x, y) {
@@ -28,15 +28,15 @@ export class Exploder extends BaseEnemy {
     this.hitTimer = Math.max(0, this.hitTimer - dt);
     this.flip = dx < 0 ? -1 : 1;
 
-    if (!this.armed && d < ARM_RANGE) {
+    if (!this.armed && d < this.armRange) {
       this.armed = true;
-      this.fuse = 1.05;
-      pulse(this.x, this.y, EXPLODE_RADIUS, this.color, 0.25);
+      this.fuse = this.fuseTime;
+      pulse(this.x, this.y, this.explodeRadius, this.color, 0.25);
     }
     if (this.armed) {
       this.fuse -= dt;
-      this.x += (dx / d) * this.speed * 0.42 * dt;
-      this.y += (dy / d) * this.speed * 0.42 * dt;
+      this.x += (dx / d) * this.speed * this.armedSpeedMul * dt;
+      this.y += (dy / d) * this.speed * this.armedSpeedMul * dt;
       if (this.fuse <= 0) this.explode();
     } else {
       this.x += (dx / d) * this.speed * dt;
@@ -50,14 +50,14 @@ export class Exploder extends BaseEnemy {
 
   explode() {
     const p = state.player;
-    if (distSq(this.x, this.y, p.x, p.y) < (EXPLODE_RADIUS + p.r) ** 2 && p.invuln <= 0) {
+    if (distSq(this.x, this.y, p.x, p.y) < (this.explodeRadius + p.r) ** 2 && p.invuln <= 0) {
       applyPlayerDamage(this.damage, this);
       p.invuln = 0.52;
       state.flash = 0.38;
       state.shake = 14;
       playSfx("hurt");
     }
-    pulse(this.x, this.y, EXPLODE_RADIUS, this.color, 0.48);
+    pulse(this.x, this.y, this.explodeRadius, this.color, 0.48);
     burst(this.x, this.y, 24, this.color, 230);
     this.kill();
   }
@@ -114,7 +114,7 @@ export class Exploder extends BaseEnemy {
       ctx.strokeStyle = "rgba(255,77,109,0.48)";
       ctx.lineWidth = 2;
       ctx.beginPath();
-      ctx.arc(0, 0, EXPLODE_RADIUS, 0, TAU);
+      ctx.arc(0, 0, this.explodeRadius, 0, TAU);
       ctx.stroke();
     }
     ctx.restore();

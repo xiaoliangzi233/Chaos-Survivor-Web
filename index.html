@@ -12,6 +12,7 @@
   </head>
   <body>
     <main id="gameRoot">
+      <div id="weaponSwitchToast" class="weapon-switch-toast" aria-hidden="true"></div>
       <canvas id="gameCanvas" aria-label="混乱幸存者游戏区域"></canvas>
 
       <section id="hud" class="hud" aria-live="polite">
@@ -57,7 +58,34 @@
 
       <div id="touchStick" class="touch-stick" aria-hidden="true"><i></i></div>
 
-      <section id="startOverlay" class="overlay active">
+      
+      <!-- 模式选择界面 -->
+      <section id="modeOverlay" class="overlay mode-overlay" aria-hidden="true">
+        <div class="panel mode-panel">
+          <header class="mode-head">
+            <div>
+              <p class="eyebrow">SELECT MODE</p>
+              <h2>选择模式</h2>
+            </div>
+          </header>
+          <div class="mode-body">
+            <button id="modeSwarmButton" type="button" class="mode-select-button swarm" data-mode="swarm">
+              <span class="mode-button-icon">&#x1F41B;</span>
+              <span class="mode-button-title">虫潮模式</span>
+              <span class="mode-button-sub">SWARM</span>
+            </button>
+            <button id="modeChallengeButton" type="button" class="mode-select-button challenge" data-mode="challenge">
+              <span class="mode-button-icon">&#x2694;</span>
+              <span class="mode-button-title">挑战模式</span>
+              <span class="mode-button-sub">CHALLENGE</span>
+            </button>
+          </div>
+          <div id="modeDescription" class="mode-description">
+            选择一种游戏模式以继续。
+          </div>
+        </div>
+      </section>
+<section id="startOverlay" class="overlay active">
         <div class="menu-title" aria-label="游戏名称">
           <span>NEON RUINS Survivor</span>
           <h1>混乱幸存者</h1>
@@ -66,7 +94,14 @@
           <span>开始</span>
           <i>START</i>
         </button>
+        <button id="continueButton" type="button" class="menu-continue-button" aria-label="继续游戏" disabled>
+          <span>继续</span>
+          <i>CONTINUE</i>
+        </button>
         <p id="bestText" class="menu-best">最佳纪录 00:00</p>
+                <button id="settingsButton" type="button" class="menu-settings-button" aria-label="打开设置">
+          <span>设置</span>
+        </button>
         <button id="codexButton" type="button" class="menu-codex-button" aria-label="打开图鉴">
           <span>图鉴</span>
         </button>
@@ -100,14 +135,24 @@
 
       <section id="loadoutOverlay" class="overlay loadout-overlay" aria-hidden="true">
         <div class="panel loadout-panel">
-          <div class="loadout-fx" aria-hidden="true">
-            <i></i><i></i><i></i><i></i><i></i><i></i>
-          </div>
+            
           <header class="loadout-head">
             <div>
               <p class="eyebrow">COMBAT SETUP</p>
               <h2>作战配置</h2>
             </div>
+            <div id="loadoutControlMode" class="loadout-control-mode inline-header">
+              <span class="loadout-control-label">操控</span>
+              <div class="loadout-control-options">
+                <button type="button" id="loadoutControlAuto" class="loadout-control-btn compact active" data-mode="auto">
+                  <strong>自动开火</strong>
+                </button>
+                <button type="button" id="loadoutControlManual" class="loadout-control-btn compact" data-mode="manual">
+                  <strong>手动开火</strong>
+                </button>
+              </div>
+            </div>
+
             <p>同时选择作战难度与开局武器。确认后立即进入战场。</p>
           </header>
           <div class="loadout-body">
@@ -231,6 +276,37 @@
           </div>
         </div>
       </section>
+            <section id="settingsOverlay" class="overlay settings-overlay" aria-hidden="true">
+        <div class="panel settings-panel">
+          <header class="settings-head">
+            <div>
+              <p class="eyebrow">SETTINGS</p>
+              <h2>设置</h2>
+            </div>
+          </header>
+          <div class="settings-body">
+            <div class="settings-toggle" id="settingShowEnemyHpBar" role="switch" aria-checked="false" tabindex="0">
+              <div class="settings-toggle-label">
+                <strong>敌人血量显示</strong>
+                <p>在敌人下方显示简易HP条</p>
+              </div>
+              <div class="settings-toggle-switch">
+                <span class="settings-toggle-knob"></span>
+              </div>
+            </div>
+            <div class="settings-toggle" id="settingShowDamageNumbers" role="switch" aria-checked="false" tabindex="0">
+              <div class="settings-toggle-label">
+                <strong>造成伤害显示</strong>
+                <p>命中敌人时显示伤害数字</p>
+              </div>
+              <div class="settings-toggle-switch">
+                <span class="settings-toggle-knob"></span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
       <section id="endOverlay" class="overlay">
         <div class="panel end">
           <p id="endEyebrow" class="eyebrow">RUN COMPLETE</p>
@@ -244,3 +320,4 @@
     <script type="module" src="./src/core/game.js"></script>
   </body>
 </html>
+

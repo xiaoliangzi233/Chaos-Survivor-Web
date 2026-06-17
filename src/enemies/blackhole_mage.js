@@ -1,4 +1,4 @@
-﻿import { TAU, WORLD_SIZE } from "../constants.js";
+import { TAU, WORLD_SIZE } from "../constants.js";
 import { state, world } from "../state.js";
 import { clamp } from "../utils.js";
 import { burst, pulse, trail } from "../effects.js";
@@ -13,7 +13,7 @@ export class BlackholeMage extends BaseEnemy {
     this.castTime = 0;
     this.channelTime = 0;
     this.recoverTime = 0;
-    this.cooldown = 2.2 + Math.random() * 1.2;
+    this.cooldown = this.cdInitial;
     this.castTargetX = x;
     this.castTargetY = y;
     this.orbitSide = Math.random() < 0.5 ? -1 : 1;
@@ -88,8 +88,8 @@ export class BlackholeMage extends BaseEnemy {
     if (world.blackhole) trail(this.x, this.y, world.blackhole.x, world.blackhole.y, this.color, 3);
     if (this.channelTime <= 0) {
       this.state = "recover";
-      this.recoverTime = 0.55;
-      this.cooldown = 4.2 + Math.random() * 1.2;
+      this.recoverTime = this.recoverDuration;
+      this.cooldown = this.cd + Math.random() * this.cdRandom;
     }
   }
 

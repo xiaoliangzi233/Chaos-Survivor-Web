@@ -4,14 +4,14 @@ import { particle, pulse, trail } from "../effects.js";
 import { clamp, distSq } from "../utils.js";
 import { BaseEnemy } from "./BaseEnemy.js";
 
-const SHIELD_RANGE = 210;
-const KEEP_RANGE = 320;
+
+
 
 export class ShieldCaster extends BaseEnemy {
   constructor(config, x, y) {
     super(config, x, y);
     this.behavior = "shield";
-    this.cooldown = 0.6;
+    this.cooldown = this.cdInitial;
     this.channel = 0;
     this.knockbackResistance = Math.max(this.knockbackResistance, 0.4);
   }
@@ -38,7 +38,7 @@ export class ShieldCaster extends BaseEnemy {
         this.y += (ty / td) * this.speed * 0.38 * dt;
       }
     } else {
-      const dir = d < KEEP_RANGE ? -0.82 : 0.22;
+      const dir = d < this.keepRange ? -0.82 : 0.22;
       const strafe = Math.sin(this.anim * 0.8) * 0.35;
       this.x += (dx / d * dir + -dy / d * strafe) * this.speed * dt;
       this.y += (dy / d * dir + dx / d * strafe) * this.speed * dt;
@@ -47,7 +47,7 @@ export class ShieldCaster extends BaseEnemy {
     let shielded = 0;
     for (const e of world.enemies) {
       if (e === this || e.dead || e.boss) continue;
-      if (distSq(e.x, e.y, this.x, this.y) <= SHIELD_RANGE * SHIELD_RANGE) {
+      if (distSq(e.x, e.y, this.x, this.y) <= this.shieldRange * this.shieldRange) {
         e.shielded = true;
         e.shieldPulse = Math.max(e.shieldPulse || 0, 0.18);
         shielded++;
@@ -56,9 +56,9 @@ export class ShieldCaster extends BaseEnemy {
     }
 
     if (shielded > 0 && this.cooldown <= 0) {
-      this.cooldown = 1.1;
-      this.channel = 0.35;
-      pulse(this.x, this.y, SHIELD_RANGE * 0.36, this.color, 0.16);
+      this.cooldown = this.cd + Math.random() * this.cdRandom;
+      this.channel = this.channelDuration;
+      pulse(this.x, this.y, this.shieldRange * 0.36, this.color, 0.16);
     }
     if (this.channel > 0 && Math.random() < dt * 12) particle("mote", this.x, this.y, { color: this.color, life: 0.35, size: 2.5, alpha: 0.72 });
 
@@ -73,7 +73,7 @@ export class ShieldCaster extends BaseEnemy {
     let count = 0;
     for (const e of world.enemies) {
       if (e === this || e.dead || e.boss) continue;
-      if (distSq(e.x, e.y, this.x, this.y) < 420 * 420) {
+      if (distSq(e.x, e.y, this.x, this.y) < this.clusterRange * this.clusterRange) {
         x += e.x;
         y += e.y;
         count++;

@@ -4,13 +4,13 @@ import { burst, particle, pulse } from "../effects.js";
 import { clamp } from "../utils.js";
 import { BaseEnemy } from "./BaseEnemy.js";
 
-const STRIKE_RANGE = 360;
+
 
 export class PhaseMirage extends BaseEnemy {
   constructor(config, x, y) {
     super(config, x, y);
     this.behavior = "phase_mirage";
-    this.cooldown = 1.2 + Math.random() * 0.8;
+    this.cooldown = this.cdInitial;
     this.phaseState = "move";
     this.windup = 0;
     this.afterImages = [];
@@ -39,16 +39,16 @@ export class PhaseMirage extends BaseEnemy {
       this.strikeTimer -= dt;
       if (this.strikeTimer <= 0) {
         this.phaseState = "move";
-        this.cooldown = 2.2;
+        this.cooldown = this.cd + Math.random() * this.cdRandom;
       }
     } else {
-      const dir = d < STRIKE_RANGE * 0.8 ? -0.35 : 0.92;
+      const dir = d < this.strikeRange * 0.8 ? -0.35 : 0.92;
       const strafe = Math.sin(this.anim * 0.7) * 0.72;
       this.x += (dx / d * dir + -dy / d * strafe) * this.speed * dt;
       this.y += (dy / d * dir + dx / d * strafe) * this.speed * dt;
-      if (this.cooldown <= 0 && d < 620) {
+      if (this.cooldown <= 0 && d < this.fireRange) {
         this.phaseState = "windup";
-        this.windup = 0.42;
+        this.windup = this.windupTime;
         pulse(this.x, this.y, 32, this.color, 0.2);
       }
     }
@@ -66,19 +66,19 @@ export class PhaseMirage extends BaseEnemy {
     this.x = clamp(p.x + bx, -WORLD_SIZE / 2 + this.r, WORLD_SIZE / 2 - this.r);
     this.y = clamp(p.y + by, -WORLD_SIZE / 2 + this.r, WORLD_SIZE / 2 - this.r);
     this.phaseState = "strike";
-    this.strikeTimer = 0.34;
+    this.strikeTimer = this.strikeDuration;
     pulse(this.x, this.y, 64, this.color, 0.3);
     for (let i = 0; i < 8; i++) {
       const a = i * TAU / 8;
       world.enemyProjectiles.push({
         x: this.x + Math.cos(a) * 12,
         y: this.y + Math.sin(a) * 12,
-        vx: Math.cos(a) * 180,
-        vy: Math.sin(a) * 180,
+        vx: Math.cos(a) * this.shardSpeed,
+        vy: Math.sin(a) * this.shardSpeed,
         r: 4,
         color: this.color,
-        damage: this.damage * 0.34,
-        life: 0.75,
+        damage: this.damage * this.shardDamageMul,
+        life: this.shardLife,
         shape: "phaseShard",
       });
     }

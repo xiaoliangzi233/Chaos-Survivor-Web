@@ -1,4 +1,4 @@
-(() => {
+﻿(() => {
   "use strict";
 
   const TAU = Math.PI * 2;
@@ -365,7 +365,7 @@
 
   function showChoices(eyebrow,title,items,onPick){ui.levelEyebrow.textContent=eyebrow;ui.levelTitle.textContent=title;ui.choiceList.innerHTML="";for(const item of items){const b=document.createElement("button");b.type="button";b.className="choice-card";b.innerHTML=`<i>${item.icon}</i><strong>${item.name}</strong><p>${item.desc}</p>`;b.onclick=()=>onPick(item);ui.choiceList.appendChild(b);}ui.levelOverlay.classList.add("active");}
   function hideChoices(){ui.levelOverlay.classList.remove("active");}
-  function end(win){s.mode="ended";ui.endEyebrow.textContent=win?"VICTORY":"RUN COMPLETE";ui.endTitle.textContent=win?"20 波已完成":"生存结束";ui.endStats.innerHTML="";[`时间 ${fmt(s.time)}`,`等级 ${player.level}`,`击败 ${s.kills}`,`金币 ${s.gold}`].forEach(t=>{const el=document.createElement("span");el.textContent=t;ui.endStats.appendChild(el);});ui.endOverlay.classList.add("active");}
+  function end(win){s.mode="ended";ui.endEyebrow.textContent=win?"VICTORY":"RUN COMPLETE";ui.endTitle.textContent=win?TOTAL_WAVES+" 波已完成":"生存结束";ui.endStats.innerHTML="";[`时间 ${fmt(s.time)}`,`等级 ${player.level}`,`击败 ${s.kills}`,`金币 ${s.gold}`].forEach(t=>{const el=document.createElement("span");el.textContent=t;ui.endStats.appendChild(el);});ui.endOverlay.classList.add("active");}
 
   function bind(){const keys=new Map([["KeyW","up"],["ArrowUp","up"],["KeyS","down"],["ArrowDown","down"],["KeyA","left"],["ArrowLeft","left"],["KeyD","right"],["ArrowRight","right"]]);window.onkeydown=e=>{const a=keys.get(e.code);if(a){input[a]=true;e.preventDefault();}if(e.code==="KeyP"||e.code==="Escape")togglePause();if(e.code==="Space"&&s.mode==="menu")start();};window.onkeyup=e=>{const a=keys.get(e.code);if(a){input[a]=false;e.preventDefault();}};ui.startButton.onclick=start;ui.restartButton.onclick=start;ui.pauseButton.onclick=togglePause;ui.muteButton.onclick=()=>{muted=!muted;ui.muteButton.textContent=muted?"×":"♪";};canvas.onpointerdown=e=>{if(s.mode==="menu")return;input.pid=e.pointerId;stick(e);canvas.setPointerCapture(e.pointerId);};canvas.onpointermove=e=>{if(e.pointerId===input.pid)stick(e);};canvas.onpointerup=clearStick;canvas.onpointercancel=clearStick;}
   function stick(e){const max=42,bx=78,by=H-78,dx=e.clientX-bx,dy=e.clientY-by,len=Math.hypot(dx,dy),sc=len>max?max/len:1;input.vx=clamp(dx/max,-1,1);input.vy=clamp(dy/max,-1,1);ui.touchStick.querySelector("i").style.transform=`translate(${dx*sc}px, ${dy*sc}px)`;}

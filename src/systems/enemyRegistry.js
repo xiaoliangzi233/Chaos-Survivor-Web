@@ -1,4 +1,4 @@
-import { WORLD_SIZE, TAU, ENEMY_LIMIT } from "../constants.js";
+﻿import { WORLD_SIZE, TAU, ENEMY_LIMIT } from "../constants.js";
 import { state, world } from "../state.js";
 import { clamp } from "../utils.js";
 import { setSpawnConfigured } from "../enemies/BaseEnemy.js";
@@ -99,6 +99,7 @@ const WAVE_SPAWN_LIMITS = {
 };
 
 export let enemyConfig = {};
+export let challengeEnemyConfig = {};
 
 export function setEnemyConfigForTests(config) {
   enemyConfig = config;
@@ -109,16 +110,26 @@ export async function setupEnemyRegistry() {
     const response = await fetch(new URL("../config/enemy-config.json", import.meta.url), { cache: "no-store" });
     const config = await response.json();
     enemyConfig = Object.fromEntries(Object.entries(config).map(([id, data]) => [id, { id, ...data }]));
+    try {
+      const challengeResponse = await fetch(new URL("../config/challenge-enemy-config.json", import.meta.url), { cache: "no-store" });
+      const challengeCfg = await challengeResponse.json();
+      challengeEnemyConfig = challengeCfg;
+    } catch { /* challenge config optional */ }
   }
-  setSpawnConfigured((id, x, y) => spawnEnemyById(id, x, y));
+  setSpawnConfigured((id, x, y, overrides) => spawnEnemyById(id, x, y, overrides));
 }
 
-export function spawnEnemyById(id, x = null, y = null) {
+export function spawnEnemyById(id, x = null, y = null, overrides = null) {
   const difficulty = currentDifficulty();
   if (world.enemies.length >= (difficulty.enemyLimit || ENEMY_LIMIT)) return null;
-  const cfg = enemyConfig[id];
+  const baseCfg = enemyConfig[id];
+  if (!baseCfg) return null;
+  const challengeOverride = (state.gameMode === "challenge") ? (challengeEnemyConfig[id] || null) : null;
+  const cfg = overrides
+    ? { ...baseCfg, ...(challengeOverride || {}), ...overrides }
+    : (challengeOverride ? { ...baseCfg, ...challengeOverride } : baseCfg);
   const Klass = classes[id] || Zombie;
-  if (!cfg) return null;
+
   if (!canSpawnLimitedEnemy(id)) return null;
   const pos = x == null || y == null ? randomSpawnPosition(cfg.radius) : { x, y };
   const e = new Klass(cfg, pos.x, pos.y);

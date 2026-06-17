@@ -1,12 +1,60 @@
 import { PROJECTILE_LIMIT, TAU, WORLD_SIZE } from "../constants.js";
-import { addCameraShake, state, world } from "../state.js";
+import { addCameraShake, input, state, world } from "../state.js";
 import { angleDiff, circleHit, clamp, distSq } from "../utils.js";
 import { applyKnockback, damageEnemy, nearestEnemy, queryEnemies } from "./entities.js";
 import { burst, pulse, trail } from "../effects.js";
 import { playSfx } from "../audio.js";
+import { ui } from "../ui/ui.js";
 import { addWeaponToInventory, QUALITY_INFO, QUALITY_ORDER, WEAPON_INFO } from "../economy/inventory.js";
 import { attackSpeedMultiplier, weaponProjectileBonus, weaponRangeBonus, weaponRangeScale } from "./items.js";
 
+// --- Manual mode helpers ---
+function weaponSlotIndexForId(weaponId) {
+  const inv = state.inventory;
+  if (!inv) return -1;
+  return inv.weaponSlots.findIndex(function(s) { return s.id === weaponId; });
+}
+function isManualPrimaryById(weaponId) {
+  if (state.controlMode !== "manual" || weaponId === "drone") return false;
+  const inv = state.inventory;
+  if (!inv || state.manualPrimaryIndex == null) return false;
+  const primarySlot = inv.weaponSlots[state.manualPrimaryIndex];
+  return primarySlot && primarySlot.id === weaponId;
+}
+
+function manualDamageScale(weaponId) {
+  if (state.controlMode !== "manual") return 1;
+  if (weaponId === "drone") return 1;
+  const inv = state.inventory;
+  if (!inv || state.manualPrimaryIndex == null) return 1;
+  const primarySlot = inv.weaponSlots[state.manualPrimaryIndex];
+  if (primarySlot && primarySlot.id === weaponId) return 1.5;
+  return 0.5;
+}
+function getManualAimAngle() {
+  if (!input.mouseX && !input.mouseY) return null;
+  var camX = state.cameraX || 0;
+  var camY = state.cameraY || 0;
+  var zoom = 1.28;
+  var canvasW = ui.canvas ? ui.canvas.clientWidth : window.innerWidth;
+  var canvasH = ui.canvas ? ui.canvas.clientHeight : window.innerHeight;
+  var worldX = camX + (input.mouseX - canvasW / 2) / zoom;
+  var worldY = camY + (input.mouseY - canvasH / 2) / zoom;
+  return Math.atan2(worldY - state.player.y, worldX - state.player.x);
+}
+function getManualAimWorldPos() {
+  if (!input.mouseX && !input.mouseY) return null;
+  var camX = state.cameraX || 0;
+  var camY = state.cameraY || 0;
+  var zoom = 1.28;
+  var canvasW = ui.canvas ? ui.canvas.clientWidth : window.innerWidth;
+  var canvasH = ui.canvas ? ui.canvas.clientHeight : window.innerHeight;
+  return {
+    x: camX + (input.mouseX - canvasW / 2) / zoom,
+    y: camY + (input.mouseY - canvasH / 2) / zoom
+  };
+}
+// --- End manual mode helpers ---
 const STARTER_WEAPON_IDS = ["arc", "ice", "missile", "boomerang", "drone", "prism_railgun", "void_singularity", "tesla_mine_chain", "starfall_scepter", "phase_needler", "echo_tuning_fork", "rift_loom"];
 
 export const STARTER_WEAPONS = [];
@@ -207,9 +255,30 @@ function weaponViewForQuality(w, quality) {
 
 function updateArcWeapon(dt) {
   const w = state.weapons.arc;
-  if (!tickWeapon(w, dt)) return;
+  if (!w || w.level <= 0) return;
+  const manual = isManualPrimaryById("arc");
+  const useManualTick = manual ? tickWeaponManual(w, dt, "arc") : tickWeapon(w, dt);
+  if (!useManualTick) return;
   const p = state.player;
-  const first = nearestEnemy(p.x, p.y, effectiveWeaponRange(w.range));
+  const dmgScale = manualDamageScale("arc");
+  const aimAngle = manual ? getManualAimAngle() : null;
+  var first;
+  if (manual && aimAngle != null) {
+    var hits = [];
+    queryEnemies(p.x, p.y, effectiveWeaponRange(w.range), hits);
+    var bestD = 1e9;
+    for (var i = 0; i < hits.length; i++) {
+      var e = hits[i];
+      var a = Math.atan2(e.y - p.y, e.x - p.x);
+      var diff = Math.abs(angleDiff(a, aimAngle));
+      if (diff < 0.35 && distSq(p.x, p.y, e.x, e.y) < bestD) {
+        bestD = distSq(p.x, p.y, e.x, e.y);
+        first = e;
+      }
+    }
+  } else {
+    first = nearestEnemy(p.x, p.y, effectiveWeaponRange(w.range));
+  }
   if (!first) return;
 
   const rank = qualityRank(w);
@@ -218,7 +287,7 @@ function updateArcWeapon(dt) {
   const segments = [];
   let source = { x: p.x, y: p.y };
   let target = first;
-  let damage = weaponPower(w, w.damage);
+  let damage = weaponPower(w, w.damage) * dmgScale;
   const chains = w.chains + (rank >= 1 ? 1 : 0) + weaponSplitBonus(w);
 
   for (let i = 0; i < chains && target; i++) {
@@ -307,11 +376,21 @@ function nextChainTarget(source, range, visited) {
 
 function updateIceWeapon(dt) {
   const w = state.weapons.ice;
-  if (!tickWeapon(w, dt)) return;
+  if (!w || w.level <= 0) return;
+  const manual = isManualPrimaryById("ice");
+  const useManualTick = manual ? tickWeaponManual(w, dt, "ice") : tickWeapon(w, dt);
+  if (!useManualTick) return;
   const p = state.player;
+  const dmgScale = manualDamageScale("ice");
+  var base;
+  if (manual) {
+    var aim = getManualAimAngle();
+    base = aim != null ? aim : Math.atan2(p.dirY, p.dirX);
+  } else {
+    const target = nearestEnemy(p.x, p.y, effectiveWeaponRange(w.range));
+    base = target ? Math.atan2(target.y - p.y, target.x - p.x) : Math.atan2(p.dirY, p.dirX);
+  }
   const rank = qualityRank(w);
-  const target = nearestEnemy(p.x, p.y, effectiveWeaponRange(w.range));
-  const base = target ? Math.atan2(target.y - p.y, target.x - p.x) : Math.atan2(p.dirY, p.dirX);
   const count = w.count + (rank >= 1 ? 1 : 0) + weaponProjectileBonus(w);
   for (let i = 0; i < count; i++) {
     const quality = weaponQualityAt(w, i);
@@ -323,7 +402,7 @@ function updateIceWeapon(dt) {
       variant: shotRank >= 2 ? "iceShard" : "ice",
       quality,
       color,
-      tracking: true,
+      tracking: manual ? false : true,
       turnSpeed: w.turnSpeed,
       pierce: shotRank >= 3 ? 2 : 1,
       radius: shotRank >= 1 ? 5.8 : 5,
@@ -332,7 +411,7 @@ function updateIceWeapon(dt) {
       knockback: 92,
       iceRing: shotRank >= 2,
       frostZone: shotRank >= 4,
-      damage: weaponPower(shot, w.damage),
+      damage: weaponPower(shot, w.damage) * dmgScale,
     });
   }
   playSfx("shoot");
@@ -340,12 +419,22 @@ function updateIceWeapon(dt) {
 
 function updateMissileWeapon(dt) {
   const w = state.weapons.missile;
-  if (!tickWeapon(w, dt)) return;
+  if (!w || w.level <= 0) return;
+  const manual = isManualPrimaryById("missile");
+  const useManualTick = manual ? tickWeaponManual(w, dt, "missile") : tickWeapon(w, dt);
+  if (!useManualTick) return;
   const p = state.player;
+  const dmgScale = manualDamageScale("missile");
   const rank = qualityRank(w);
   const color = qualityColor(w, "#ffb347");
-  const target = nearestEnemy(p.x, p.y, effectiveWeaponRange(w.range));
-  const base = target ? Math.atan2(target.y - p.y, target.x - p.x) : Math.atan2(p.dirY, p.dirX);
+  var base;
+  if (manual) {
+    var aim = getManualAimAngle();
+    base = aim != null ? aim : Math.atan2(p.dirY, p.dirX);
+  } else {
+    const target = nearestEnemy(p.x, p.y, effectiveWeaponRange(w.range));
+    base = target ? Math.atan2(target.y - p.y, target.x - p.x) : Math.atan2(p.dirY, p.dirX);
+  }
   const count = 1 + weaponProjectileBonus(w);
   for (let i = 0; i < count; i++) {
     fireProjectile(base + (i - (count - 1) / 2) * 0.18, w, {
@@ -353,7 +442,7 @@ function updateMissileWeapon(dt) {
       variant: rank >= 4 ? "legendMissile" : rank >= 1 ? "burnMissile" : "missile",
       quality: w.quality,
       color,
-      tracking: true,
+      tracking: manual ? false : true,
       turnSpeed: w.turnSpeed,
       pierce: 1,
       radius: rank >= 1 ? 7 : 6,
@@ -365,6 +454,7 @@ function updateMissileWeapon(dt) {
       splitOnHit: rank >= 2 ? 2 : 0,
       secondaryBurst: rank >= 3 ? 1 : 0,
       microMissiles: rank >= 4 ? 3 : 0,
+      damage: weaponPower(w, w.damage) * dmgScale,
     });
   }
   playSfx("shoot");
@@ -372,10 +462,20 @@ function updateMissileWeapon(dt) {
 
 function updateBoomerangWeapon(dt) {
   const w = state.weapons.boomerang;
-  if (!tickWeapon(w, dt)) return;
+  if (!w || w.level <= 0) return;
+  const manual = isManualPrimaryById("boomerang");
+  const useManualTick = manual ? tickWeaponManual(w, dt, "boomerang") : tickWeapon(w, dt);
+  if (!useManualTick) return;
   const p = state.player;
-  const target = nearestEnemy(p.x, p.y, effectiveWeaponRange(w.range));
-  const base = target ? Math.atan2(target.y - p.y, target.x - p.x) : Math.atan2(p.dirY, p.dirX);
+  const dmgScale = manualDamageScale("boomerang");
+  var base;
+  if (manual) {
+    var aim = getManualAimAngle();
+    base = aim != null ? aim : Math.atan2(p.dirY, p.dirX);
+  } else {
+    const target = nearestEnemy(p.x, p.y, effectiveWeaponRange(w.range));
+    base = target ? Math.atan2(target.y - p.y, target.x - p.x) : Math.atan2(p.dirY, p.dirX);
+  }
   const count = w.count + weaponProjectileBonus(w);
   for (let i = 0; i < count; i++) {
     const quality = weaponQualityAt(w, i);
@@ -398,7 +498,7 @@ function updateBoomerangWeapon(dt) {
       farBurst: shotRank >= 3,
       returnBounceLeft: shotRank >= 4 ? 1 : 0,
       chainHitsLeft: weaponSplitBonus(w),
-      damage: weaponPower(shot, w.damage),
+      damage: weaponPower(shot, w.damage) * dmgScale,
     });
   }
   playSfx("shoot");
@@ -722,27 +822,42 @@ function fireDroneBeam(drone, target, w, color, legendary) {
   });
 }
 
+
 function updatePrismRailgunWeapon(dt) {
   const w = state.weapons.prism_railgun;
-  if (!tickWeapon(w, dt)) return;
+  if (!w || w.level <= 0) return;
+  const manual = isManualPrimaryById("prism_railgun");
+  const useManualTick = manual ? tickWeaponManual(w, dt, "prism_railgun") : tickWeapon(w, dt);
+  if (!useManualTick) return;
   const p = state.player;
+  const dmgScale = manualDamageScale("prism_railgun");
   const count = Math.max(1, w.count || 1);
   const splitBonus = weaponSplitBonus(w);
-  const targets = choosePrismRailTargets(w, count);
-  if (!targets.length) return;
+  var baseAngles;
+  if (manual) {
+    var aim = getManualAimAngle();
+    if (aim != null) {
+      baseAngles = [aim];
+      for (var k = 1; k < count; k++) baseAngles.push(aim);
+    }
+  }
+  if (!baseAngles || !baseAngles.length) {
+    const targets = choosePrismRailTargets(w, count);
+    if (!targets.length) return;
+    baseAngles = targets.map(function(t) { return Math.atan2(t.y - p.y, t.x - p.x); });
+  }
   let fired = 0;
   for (let i = 0; i < count; i++) {
-    const target = targets[i % targets.length];
-    const base = Math.atan2(target.y - p.y, target.x - p.x);
+    const base = baseAngles[i % baseAngles.length];
     const quality = weaponQualityAt(w, i);
     const shot = weaponViewForQuality(w, quality);
     const rank = qualityRank(shot);
     const color = qualityColor(shot, "#7df9ff");
     const spread = (i - (count - 1) / 2) * 0.055;
-    firePrismRail(shot, w, base + spread, color, rank, 1, i, count, false, splitBonus);
+    firePrismRail(shot, w, base + spread, color, rank, 1, i, count, false, splitBonus, dmgScale);
     fired++;
     if (rank >= 4) {
-      firePrismRail(shot, w, base + spread * 0.45, color, rank, 0.46, i + 0.5, count, true, splitBonus);
+      firePrismRail(shot, w, base + spread * 0.45, color, rank, 0.46, i + 0.5, count, true, splitBonus, dmgScale);
       fired++;
     }
   }
@@ -758,24 +873,27 @@ function choosePrismRailTargets(w, count) {
   const candidates = [];
   queryEnemies(p.x, p.y, range, candidates);
   const enemies = candidates
-    .filter((e) => !e.dead)
-    .map((e) => ({ enemy: e, angle: Math.atan2(e.y - p.y, e.x - p.x), dist: Math.hypot(e.x - p.x, e.y - p.y) }))
-    .sort((a, b) => a.dist - b.dist);
+    .filter(function(e) { return !e.dead; })
+    .map(function(e) { return { enemy: e, angle: Math.atan2(e.y - p.y, e.x - p.x), dist: Math.hypot(e.x - p.x, e.y - p.y) }; })
+    .sort(function(a, b) { return a.dist - b.dist; });
   if (!enemies.length) return [];
   const selected = [];
   const minAngle = enemies.length >= count ? 0.42 : 0.18;
-  for (const entry of enemies) {
+  for (var ei = 0; ei < enemies.length; ei++) {
+    var entry = enemies[ei];
     if (selected.length >= count) break;
-    if (selected.every((chosen) => Math.abs(angleDiff(entry.angle, chosen.angle)) >= minAngle)) selected.push(entry);
+    if (selected.every(function(chosen) { return Math.abs(angleDiff(entry.angle, chosen.angle)) >= minAngle; })) selected.push(entry);
   }
-  for (const entry of enemies) {
+  for (var ej = 0; ej < enemies.length; ej++) {
+    var entry2 = enemies[ej];
     if (selected.length >= count) break;
-    if (!selected.includes(entry)) selected.push(entry);
+    if (!selected.includes(entry2)) selected.push(entry2);
   }
-  return selected.map((entry) => entry.enemy);
+  return selected.map(function(entry) { return entry.enemy; });
 }
 
-function firePrismRail(shot, base, angle, color, rank, damageScale, beamIndex, beamCount, secondary, splitBonus = 0) {
+function firePrismRail(shot, base, angle, color, rank, damageScale, beamIndex, beamCount, secondary, splitBonus, dmgScale) {
+  splitBonus = splitBonus || 0; dmgScale = dmgScale != null ? dmgScale : 1;
   const p = state.player;
   const range = effectiveWeaponRange(base.range);
   const width = (base.width + (rank >= 1 ? 4 : 0) + rank * 1.2 + splitBonus * 6) * (secondary ? 0.68 : 1);
@@ -789,16 +907,17 @@ function firePrismRail(shot, base, angle, color, rank, damageScale, beamIndex, b
   const candidates = [];
   const nearby = [];
   queryEnemies(p.x, p.y, range + 160, nearby);
-  for (const e of nearby) {
+  for (var ni = 0; ni < nearby.length; ni++) {
+    var e = nearby[ni];
     if (e.dead) continue;
     const hit = pointSegmentInfo(e.x, e.y, x1, y1, x2, y2);
     if (hit.t < 0 || hit.t > 1 || hit.distance > (e.r || 0) + width) continue;
     candidates.push({ enemy: e, t: hit.t, x: hit.x, y: hit.y, distance: hit.distance });
   }
-  candidates.sort((a, b) => a.t - b.t);
+  candidates.sort(function(a, b) { return a.t - b.t; });
 
   const hitLimit = base.hitLimit + (rank >= 1 ? 1 : 0);
-  const damage = weaponPower(shot, base.damage) * damageScale;
+  const damage = weaponPower(shot, base.damage) * dmgScale * damageScale;
   const hitRecords = candidates.slice(0, hitLimit);
   const hitSet = new Set();
   for (let i = 0; i < hitRecords.length; i++) {
@@ -815,39 +934,23 @@ function firePrismRail(shot, base, angle, color, rank, damageScale, beamIndex, b
 
   world.weaponFx.push({
     kind: "prismChargeGhost",
-    x: x1,
-    y: y1,
-    angle,
-    width,
-    color,
-    rank,
-    secondary,
-    life: secondary ? 0.12 : 0.16,
-    maxLife: secondary ? 0.12 : 0.16,
+    x: x1, y: y1, angle, width, color, rank, secondary,
+    life: secondary ? 0.12 : 0.16, maxLife: secondary ? 0.12 : 0.16,
     seed: Math.random() * 999,
   });
   world.weaponFx.push({
     kind: "prismRail",
-    x1, y1, x2, y2,
-    width,
-    color,
-    rank,
-    secondary,
-    impacts: hitRecords.map((hit) => ({ x: hit.x, y: hit.y })),
-    life: secondary ? 0.2 : 0.27,
-    maxLife: secondary ? 0.2 : 0.27,
+    x1, y1, x2, y2, width, color, rank, secondary,
+    impacts: hitRecords.map(function(hit) { return { x: hit.x, y: hit.y }; }),
+    life: secondary ? 0.2 : 0.27, maxLife: secondary ? 0.2 : 0.27,
     seed: Math.random() * 999,
   });
   if (hitRecords.length) {
     world.weaponFx.push({
       kind: "prismImpact",
-      x: hitRecords[0].x,
-      y: hitRecords[0].y,
-      radius: 34 + rank * 5,
-      color,
-      rank,
-      life: 0.22,
-      maxLife: 0.22,
+      x: hitRecords[0].x, y: hitRecords[0].y,
+      radius: 34 + rank * 5, color, rank,
+      life: 0.22, maxLife: 0.22,
       seed: Math.random() * 999,
     });
   }
@@ -858,7 +961,8 @@ function prismRefraction(sourceHit, shot, base, color, excluded, damage) {
   queryEnemies(sourceHit.x, sourceHit.y, base.refractionRange, hits);
   const arcs = [];
   let count = 0;
-  for (const e of hits) {
+  for (var i = 0; i < hits.length; i++) {
+    var e = hits[i];
     if (e.dead || excluded.has(e) || count >= 3) continue;
     count++;
     excluded.add(e);
@@ -866,7 +970,7 @@ function prismRefraction(sourceHit, shot, base, color, excluded, damage) {
     applyKnockback(e, e.x - sourceHit.x, e.y - sourceHit.y, 58);
     arcs.push({ x1: sourceHit.x, y1: sourceHit.y, x2: e.x, y2: e.y, seed: Math.random() * 999 });
   }
-  if (arcs.length) world.weaponFx.push({ kind: "arc", segments: arcs.map((seg, index) => ({ ...seg, index, power: 0.55 })), life: 0.16, maxLife: 0.16, color });
+  if (arcs.length) world.weaponFx.push({ kind: "arc", segments: arcs.map(function(seg, index) { return { x1: seg.x1, y1: seg.y1, x2: seg.x2, y2: seg.y2, seed: seg.seed, index: index, power: 0.55 }; }), life: 0.16, maxLife: 0.16, color });
 }
 
 function prismRiftDamage(x1, y1, x2, y2, width, damage, color, excluded) {
@@ -874,7 +978,8 @@ function prismRiftDamage(x1, y1, x2, y2, width, damage, color, excluded) {
   const hits = [];
   queryEnemies(p.x, p.y, Math.hypot(x2 - x1, y2 - y1) + 120, hits);
   let count = 0;
-  for (const e of hits) {
+  for (var i = 0; i < hits.length; i++) {
+    var e = hits[i];
     if (e.dead || excluded.has(e) || count >= 5) continue;
     const hit = pointSegmentInfo(e.x, e.y, x1, y1, x2, y2);
     if (hit.t < 0 || hit.t > 1 || hit.distance > (e.r || 0) + width) continue;
@@ -893,31 +998,10 @@ function pointSegmentInfo(px, py, x1, y1, x2, y2) {
   const t = clamp(rawT, 0, 1);
   const x = x1 + dx * t;
   const y = y1 + dy * t;
-  return { t: rawT, x, y, distance: Math.hypot(px - x, py - y) };
+  return { t: rawT, x: x, y: y, distance: Math.hypot(px - x, py - y) };
 }
-
-function updateVoidSingularityWeapon(dt) {
-  const w = state.weapons.void_singularity;
-  if (!tickWeapon(w, dt)) return;
-  const p = state.player;
-  const target = nearestEnemy(p.x, p.y, effectiveWeaponRange(w.range));
-  if (!target) return;
-
-  const base = Math.atan2(target.y - p.y, target.x - p.x);
-  const count = Math.max(1, w.count || 1);
-  const splitBonus = weaponSplitBonus(w);
-  for (let i = 0; i < count; i++) {
-    const quality = weaponQualityAt(w, i);
-    const shot = weaponViewForQuality(w, quality);
-    const rank = qualityRank(shot);
-    const color = qualityColor(shot, "#8b5cf6");
-    const spread = (i - (count - 1) / 2) * 0.2;
-    fireSingularity(base + spread, w, shot, rank, color, i, null, null, splitBonus);
-  }
-  playSfx("shoot");
-}
-
-function fireSingularity(angle, base, shot, rank, color, index, source = null, extra = null, splitBonus = 0) {
+function fireSingularity(angle, base, shot, rank, color, index, source, extra) {
+  var splitBonus = 0; var dmgScale = 1; if (extra) { splitBonus = extra.splitBonus || 0; dmgScale = extra.dmgScale || 1; }
   if (world.projectiles.length >= PROJECTILE_LIMIT) return;
   const p = state.player;
   const speed = base.speed * (rank >= 4 ? 0.92 : 1);
@@ -933,7 +1017,7 @@ function fireSingularity(angle, base, shot, rank, color, index, source = null, e
     vy: Math.sin(angle) * speed,
     speed,
     angle,
-    damage: weaponPower(shot, base.damage),
+    damage: weaponPower(shot, base.damage) * dmgScale,
     pierce: 999,
     r: base.radius + rank * 2,
     life: base.life + rank * 0.18,
@@ -951,7 +1035,7 @@ function fireSingularity(angle, base, shot, rank, color, index, source = null, e
     pullStrength: base.pullStrength * (1 + rank * 0.12),
     pulseInterval: Math.max(0.34, base.pulseInterval - rank * 0.045),
     pulseTimer: base.pulseInterval * 0.55,
-    collapseDamage: weaponPower(shot, base.damage) * (2.1 + rank * 0.26),
+    collapseDamage: weaponPower(shot, base.damage) * dmgScale * (2.1 + rank * 0.26),
     noLifeExpire: true,
     knockback: 0,
     hitIds: new Set(),
@@ -964,22 +1048,69 @@ function fireSingularity(angle, base, shot, rank, color, index, source = null, e
   pulse(x, y, base.pullRadius * 0.38, color, 0.16);
 }
 
+function updateVoidSingularityWeapon(dt) {
+  const w = state.weapons.void_singularity;
+  if (!w || w.level <= 0) return;
+  const manual = isManualPrimaryById("void_singularity");
+  const useManualTick = manual ? tickWeaponManual(w, dt, "void_singularity") : tickWeapon(w, dt);
+  if (!useManualTick) return;
+  const p = state.player;
+  const dmgScale = manualDamageScale("void_singularity");
+  var target;
+  if (manual) {
+    var aim = getManualAimAngle();
+    if (aim != null) {
+      target = { x: p.x + Math.cos(aim) * (w.range || 820) * 0.8, y: p.y + Math.sin(aim) * (w.range || 820) * 0.8 };
+    }
+  }
+  if (!target) target = nearestEnemy(p.x, p.y, effectiveWeaponRange(w.range));
+  if (!target) return;
+
+  const base = Math.atan2(target.y - p.y, target.x - p.x);
+  const count = Math.max(1, w.count || 1);
+  const splitBonus = weaponSplitBonus(w);
+  for (let i = 0; i < count; i++) {
+    const quality = weaponQualityAt(w, i);
+    const shot = weaponViewForQuality(w, quality);
+    const rank = qualityRank(shot);
+    const color = qualityColor(shot, "#8b5cf6");
+    const spread = (i - (count - 1) / 2) * 0.2;
+    fireSingularity(base + spread, w, shot, rank, color, i, null, { splitBonus: splitBonus, dmgScale: dmgScale });
+  }
+  playSfx("shoot");
+}
+
+
 function updateTeslaMineChainWeapon(dt) {
   const w = state.weapons.tesla_mine_chain;
-  if (!tickWeapon(w, dt)) return;
+  if (!w || w.level <= 0) return;
+  const manual = isManualPrimaryById("tesla_mine_chain");
+  const useManualTick = manual ? tickWeaponManual(w, dt, "tesla_mine_chain") : tickWeapon(w, dt);
+  if (!useManualTick) return;
+  const p = state.player;
+  const dmgScale = manualDamageScale("tesla_mine_chain");
   const count = Math.max(1, w.count || 1) + weaponProjectileBonus(w);
-  const anchor = chooseTeslaAnchor(w);
+  var anchor;
+  if (manual) {
+    var pos = getManualAimWorldPos();
+    if (pos) {
+      var dx = pos.x - p.x;
+      var dy = pos.y - p.y;
+      anchor = { x: pos.x, y: pos.y, angle: Math.atan2(dy, dx) };
+    }
+  }
+  if (!anchor) anchor = chooseTeslaAnchor(w);
+  if (!anchor) return;
   for (let i = 0; i < count; i++) {
     const quality = weaponQualityAt(w, i);
     const shot = weaponViewForQuality(w, quality);
     const rank = qualityRank(shot);
     const color = qualityColor(shot, "#42e8ff");
-    placeTeslaNode(w, shot, rank, color, anchor, i, count, false);
-    if (rank >= 4) placeTeslaNode(w, shot, rank, color, anchor, i + 0.5, count, true);
+    placeTeslaNode(w, shot, rank, color, anchor, i, count, false, dmgScale);
+    if (rank >= 4) placeTeslaNode(w, shot, rank, color, anchor, i + 0.5, count, true, dmgScale);
   }
   playSfx("shoot");
 }
-
 function chooseTeslaAnchor(w) {
   const p = state.player;
   const range = effectiveWeaponRange(w.range);
@@ -1004,7 +1135,10 @@ function chooseTeslaAnchor(w) {
   return { x: p.x + Math.cos(angle) * 150, y: p.y + Math.sin(angle) * 150, angle };
 }
 
-function placeTeslaNode(base, shot, rank, color, anchor, index, count, mini) {
+
+
+function placeTeslaNode(base, shot, rank, color, anchor, index, count, mini, dmgScale) {
+  dmgScale = dmgScale != null ? dmgScale : 1;
   const spread = mini ? 46 : 32;
   const a = anchor.angle + Math.PI / 2 + (index - (count - 1) / 2) * 0.7;
   const offset = (index - (count - 1) / 2) * spread + (mini ? 42 : 0);
@@ -1022,7 +1156,7 @@ function placeTeslaNode(base, shot, rank, color, anchor, index, count, mini) {
     qualityRank: rank,
     qualityMult: shot.qualityMult || 1,
     color,
-    damage: weaponPower(shot, base.damage) * damageScale,
+    damage: weaponPower(shot, base.damage) * dmgScale * damageScale,
     triggerRadius: (base.triggerRadius + (rank >= 1 ? 22 : 0) + rank * 4 + weaponRangeBonus() * 0.08) * (mini ? 0.72 : 1),
     chainRange: base.chainRange + (rank >= 1 ? 30 : 0) + rank * 9,
     chainCount: base.chainCount + (rank >= 2 ? 1 : 0) + (rank >= 4 ? 1 : 0),
@@ -1158,22 +1292,35 @@ function teslaFieldDamage(node, visited) {
 
 function updateStarfallScepterWeapon(dt) {
   const w = state.weapons.starfall_scepter;
-  if (!tickWeapon(w, dt)) return;
-  const anchor = chooseStarfallAnchor(w);
-  if (!anchor) return;
+  if (!w || w.level <= 0) return;
+  const manual = isManualPrimaryById("starfall_scepter");
+  const useManualTick = manual ? tickWeaponManual(w, dt, "starfall_scepter") : tickWeapon(w, dt);
+  if (!useManualTick) return;
+  const p = state.player;
+  const dmgScale = manualDamageScale("starfall_scepter");
   const count = Math.max(1, w.count || 1);
-  const bonusStars = weaponProjectileBonus(w);
+  var anchor;
+  if (manual) {
+    var pos = getManualAimWorldPos();
+    if (pos) {
+      var dx = pos.x - p.x;
+      var dy = pos.y - p.y;
+      anchor = { x: pos.x, y: pos.y, angle: Math.atan2(dy, dx) };
+    }
+  }
+  if (!anchor) {
+    anchor = chooseStarfallAnchor(w);
+    if (!anchor) return;
+  }
   for (let i = 0; i < count; i++) {
     const quality = weaponQualityAt(w, i);
     const shot = weaponViewForQuality(w, quality);
     const rank = qualityRank(shot);
     const color = qualityColor(shot, "#ffd166");
-    const stars = w.stars + (rank >= 1 ? 1 : 0) + (i === 0 ? bonusStars : 0);
-    spawnStarfallVolley(w, shot, rank, color, anchor, stars, i);
+    spawnStarfallVolley(w, shot, rank, color, anchor, w.stars + (rank >= 1 ? 1 : 0), i, dmgScale);
   }
   playSfx("shoot");
 }
-
 function chooseStarfallAnchor(w) {
   const p = state.player;
   const range = effectiveWeaponRange(w.range);
@@ -1202,7 +1349,8 @@ function chooseStarfallAnchor(w) {
   return null;
 }
 
-function spawnStarfallVolley(base, shot, rank, color, anchor, stars, volleyIndex) {
+function spawnStarfallVolley(base, shot, rank, color, anchor, stars, volleyIndex, dmgScale) {
+  dmgScale = dmgScale != null ? dmgScale : 1;
   const points = [];
   const spread = 46 + rank * 5;
   const total = Math.min(9, stars);
@@ -1212,13 +1360,13 @@ function spawnStarfallVolley(base, shot, rank, color, anchor, stars, volleyIndex
     const tx = anchor.x + Math.cos(a) * r;
     const ty = anchor.y + Math.sin(a) * r * 0.72;
     points.push({ x: tx, y: ty });
-    spawnStarfallProjectile(base, shot, rank, color, tx, ty, i, false);
+    spawnStarfallProjectile(base, shot, rank, color, tx, ty, i, false, dmgScale);
   }
   if (rank >= 4) {
     const tx = anchor.x + Math.cos(volleyIndex + 0.7) * 38;
     const ty = anchor.y + Math.sin(volleyIndex + 0.7) * 28;
     points.push({ x: tx, y: ty });
-    spawnStarfallProjectile(base, shot, rank, color, tx, ty, total, true);
+    spawnStarfallProjectile(base, shot, rank, color, tx, ty, total, true, dmgScale);
   }
   if (rank >= 3 && points.length >= 3) {
     const delay = base.warningTime + base.fallTime + 0.08 + volleyIndex * 0.04;
@@ -1228,7 +1376,7 @@ function spawnStarfallVolley(base, shot, rank, color, anchor, stars, volleyIndex
       x: anchor.x,
       y: anchor.y,
       radius: base.radius + 36 + rank * 7,
-      damage: weaponPower(shot, base.damage) * 0.32,
+      damage: weaponPower(shot, base.damage) * dmgScale * 0.32,
       color,
       rank,
       delay,
@@ -1240,7 +1388,8 @@ function spawnStarfallVolley(base, shot, rank, color, anchor, stars, volleyIndex
   }
 }
 
-function spawnStarfallProjectile(base, shot, rank, color, targetX, targetY, index, major) {
+function spawnStarfallProjectile(base, shot, rank, color, targetX, targetY, index, major, dmgScale) {
+  dmgScale = dmgScale != null ? dmgScale : 1;
   if (world.projectiles.length >= PROJECTILE_LIMIT) return;
   const fallTime = base.fallTime + (major ? 0.16 : 0) + Math.random() * 0.08;
   const delay = base.warningTime + index * 0.055;
@@ -1250,7 +1399,7 @@ function spawnStarfallProjectile(base, shot, rank, color, targetX, targetY, inde
   const vy = (targetY - startY) / fallTime;
   const radius = (base.radius + rank * 7 + (rank >= 1 ? 10 : 0)) * (major ? 1.42 : 1);
   const scarRadius = (base.scarRadius + rank * 6) * (major ? 1.22 : 1);
-  const damage = weaponPower(shot, base.damage) * (major ? 1.8 : 1);
+  const damage = weaponPower(shot, base.damage) * dmgScale * (major ? 1.8 : 1);
   world.projectiles.push({
     x: startX,
     y: startY,
@@ -1300,12 +1449,25 @@ function spawnStarfallProjectile(base, shot, rank, color, targetX, targetY, inde
   });
 }
 
+
 function updatePhaseNeedlerWeapon(dt) {
   const w = state.weapons.phase_needler;
-  if (!tickWeapon(w, dt)) return;
-  const target = choosePhaseNeedlerTarget(w);
+  if (!w || w.level <= 0) return;
+  const manual = isManualPrimaryById("phase_needler");
+  const useManualTick = manual ? tickWeaponManual(w, dt, "phase_needler") : tickWeapon(w, dt);
+  if (!useManualTick) return;
   const p = state.player;
-  const baseAngle = target ? Math.atan2(target.y - p.y, target.x - p.x) : Math.atan2(p.dirY, p.dirX);
+  const dmgScale = manualDamageScale("phase_needler");
+  var baseAngle;
+  if (manual) {
+    var aim = getManualAimAngle();
+    if (aim != null) baseAngle = aim;
+  }
+  if (baseAngle == null) {
+    const target = choosePhaseNeedlerTarget(w);
+    baseAngle = target ? Math.atan2(target.y - p.y, target.x - p.x) : Math.atan2(p.dirY, p.dirX);
+  }
+  if (baseAngle == null) return;
   const slots = Math.max(1, w.count || 1);
   const bonus = weaponProjectileBonus(w);
   const volleyId = Math.random().toString(36).slice(2);
@@ -1319,13 +1481,12 @@ function updatePhaseNeedlerWeapon(dt) {
     for (let i = 0; i < needleCount; i++) {
       const step = needleCount <= 1 ? 0 : (i - (needleCount - 1) / 2) / (needleCount - 1);
       const jitter = (Math.random() - 0.5) * 0.025;
-      firePhaseNeedle(baseAngle + step * spread + jitter, w, shot, rank, color, i + slot * 17, volleyId, false);
+      firePhaseNeedle(baseAngle + step * spread + jitter, w, shot, rank, color, i + slot * 17, volleyId, false, null, null, dmgScale);
     }
-    if (rank >= 4) firePhaseNeedle(baseAngle, w, shot, rank, color, 99 + slot, volleyId, true);
+    if (rank >= 4) firePhaseNeedle(baseAngle, w, shot, rank, color, 99 + slot, volleyId, true, null, null, dmgScale);
   }
   playSfx("shoot");
 }
-
 function choosePhaseNeedlerTarget(w) {
   const p = state.player;
   const range = effectiveWeaponRange(w.range);
@@ -1349,14 +1510,15 @@ function choosePhaseNeedlerTarget(w) {
   return best || nearestEnemy(p.x, p.y, range);
 }
 
-function firePhaseNeedle(angle, base, shot, rank, color, index, volleyId, major, source = null, sourceWeaponId = null) {
+function firePhaseNeedle(angle, base, shot, rank, color, index, volleyId, major, source, sourceWeaponId, dmgScale) {
+  dmgScale = dmgScale != null ? dmgScale : 1; source = source || null; sourceWeaponId = sourceWeaponId || null;
   if (world.projectiles.length >= PROJECTILE_LIMIT) return;
   const p = source || state.player;
   const speed = base.speed * (rank >= 1 ? 1.08 : 1) * (major ? 0.92 : 1);
   const sx = p.x + Math.cos(angle) * 16 - Math.sin(angle) * (major ? 0 : (index % 3 - 1) * 5);
   const sy = p.y + Math.sin(angle) * 16 + Math.cos(angle) * (major ? 0 : (index % 3 - 1) * 5);
-  const damage = weaponPower(shot, base.damage) * (major ? 1.45 : 1);
-  const phaseDamage = weaponPower(shot, base.phaseDamage) * (major ? 1.65 : 1);
+  const damage = weaponPower(shot, base.damage) * dmgScale * (major ? 1.45 : 1);
+  const phaseDamage = weaponPower(shot, base.phaseDamage) * dmgScale * (major ? 1.65 : 1);
   world.projectiles.push({
     x: sx,
     y: sy,
@@ -1403,19 +1565,29 @@ function firePhaseNeedle(angle, base, shot, rank, color, index, volleyId, major,
 
 function updateEchoTuningForkWeapon(dt) {
   const w = state.weapons.echo_tuning_fork;
-  if (!tickWeapon(w, dt)) return;
+  if (!w || w.level <= 0) return;
+  const manual = isManualPrimaryById("echo_tuning_fork");
+  const useManualTick = manual ? tickWeaponManual(w, dt, "echo_tuning_fork") : tickWeapon(w, dt);
+  if (!useManualTick) return;
   const p = state.player;
-  const target = chooseEchoTarget(w);
-  const baseAngle = target ? Math.atan2(target.y - p.y, target.x - p.x) : Math.atan2(p.dirY, p.dirX);
+  const dmgScale = manualDamageScale("echo_tuning_fork");
+  var baseAngle;
+  if (manual) {
+    var aim = getManualAimAngle();
+    baseAngle = aim != null ? aim : Math.atan2(p.dirY, p.dirX);
+  } else {
+    const target = chooseEchoTarget(w);
+    baseAngle = target ? Math.atan2(target.y - p.y, target.x - p.x) : Math.atan2(p.dirY, p.dirX);
+  }
   const slotBonus = Math.max(0, (w.slotCount || w.count || 1) - 1);
   const splitBonus = weaponSplitBonus(w);
   const enhancement = slotBonus + splitBonus;
   const shot = weaponViewForQuality(w, w.quality || weaponQualityAt(w, 0));
   const rank = qualityRank(shot);
   const color = qualityColor(shot, "#7dfcff");
-  fireEchoCone(baseAngle, w, shot, rank, color, false, 0, 1 + slotBonus * 0.28, 1, null, enhancement);
+  fireEchoCone(baseAngle, w, shot, rank, color, false, 0, 1 + slotBonus * 0.28, 1, null, enhancement, null, dmgScale);
   if (rank >= 4) {
-    fireEchoCone(baseAngle, w, shot, rank, "#ffd166", true, 30, 0.62, 1.2, null, enhancement);
+    fireEchoCone(baseAngle, w, shot, rank, "#ffd166", true, 30, 0.62, 1.2, null, enhancement, null, dmgScale);
   }
   playSfx("shoot");
 }
@@ -1442,12 +1614,13 @@ function chooseEchoTarget(w) {
   return best || nearestEnemy(p.x, p.y, range);
 }
 
-function fireEchoCone(angle, base, shot, rank, color, secondary, index, damageScale = 1, angleScale = 1, source = null, enhancement = 0, sourceWeaponId = null) {
+function fireEchoCone(angle, base, shot, rank, color, secondary, index, damageScale, angleScale, source, enhancement, sourceWeaponId, dmgScale) {
+  dmgScale = dmgScale != null ? dmgScale : 1; damageScale = damageScale != null ? damageScale : 1; angleScale = angleScale != null ? angleScale : 1; source = source || null; enhancement = enhancement || 0; sourceWeaponId = sourceWeaponId || null;
   const p = source || state.player;
   const range = (effectiveWeaponRange(base.range) + (rank >= 1 ? 42 : 0) * weaponRangeScale() + rank * 8 * weaponRangeScale() + enhancement * 58 * weaponRangeScale()) * (secondary ? 0.92 : 1);
   const coneAngle = (base.angle + (rank >= 1 ? 0.08 : 0) + rank * 0.018 + enhancement * 0.085) * angleScale;
-  const damage = weaponPower(shot, base.damage) * damageScale * (1 + enhancement * 0.18) * (secondary ? 0.72 : 1);
-  const echoDamage = weaponPower(shot, base.echoDamage) * damageScale * (1 + enhancement * 0.14) * (secondary ? 0.7 : 1);
+  const damage = weaponPower(shot, base.damage) * dmgScale * damageScale * (1 + enhancement * 0.18) * (secondary ? 0.72 : 1);
+  const echoDamage = weaponPower(shot, base.echoDamage) * dmgScale * damageScale * (1 + enhancement * 0.14) * (secondary ? 0.7 : 1);
   const hits = [];
   const hitPoints = [];
   queryEnemies(p.x, p.y, range + 70, hits);
@@ -1542,24 +1715,37 @@ function echoResonance(x, y, angle, range, coneAngle, damage, color, rank) {
   });
 }
 
+
 function updateRiftLoomWeapon(dt) {
   const w = state.weapons.rift_loom;
-  if (!tickWeapon(w, dt)) return;
-  const anchor = chooseRiftLoomAnchor(w);
-  const slots = Math.max(1, w.count || 1);
+  if (!w || w.level <= 0) return;
+  const manual = isManualPrimaryById("rift_loom");
+  const useManualTick = manual ? tickWeaponManual(w, dt, "rift_loom") : tickWeapon(w, dt);
+  if (!useManualTick) return;
+  const p = state.player;
+  const dmgScale = manualDamageScale("rift_loom");
   const splitBonus = weaponSplitBonus(w);
-  for (let slot = 0; slot < slots; slot++) {
-    const quality = weaponQualityAt(w, slot);
+  var anchor;
+  if (manual) {
+    var pos = getManualAimWorldPos();
+    if (pos) anchor = { x: pos.x, y: pos.y, angle: 0 };
+  }
+  if (!anchor) {
+    anchor = chooseRiftLoomAnchor(w);
+    if (!anchor) return;
+  }
+  const count = Math.max(1, w.count || 1) + splitBonus;
+  for (let i = 0; i < count; i++) {
+    const quality = weaponQualityAt(w, i);
     const shot = weaponViewForQuality(w, quality);
     const rank = qualityRank(shot);
-    const color = qualityColor(shot, "#9d7cff");
-    const offset = (slot - (slots - 1) / 2) * 34;
-    spawnRiftLoom(anchor.x + Math.cos(anchor.angle + Math.PI / 2) * offset, anchor.y + Math.sin(anchor.angle + Math.PI / 2) * offset, w, shot, rank, color, false, slot, 1 + splitBonus * 0.18);
-    if (rank >= 4) spawnRiftLoom(anchor.x, anchor.y, w, shot, rank, "#ffd166", true, slot + 30, 1.22, -1);
+    const color = qualityColor(shot, "#b48cff");
+    const radiusScale = 0.72 + splitBonus * 0.14;
+    const spinDir = i % 2 === 0 ? 1 : -1;
+    spawnRiftLoom(anchor.x, anchor.y, w, shot, rank, color, false, i, radiusScale, spinDir, dmgScale);
   }
   playSfx("shoot");
 }
-
 function chooseRiftLoomAnchor(w) {
   const p = state.player;
   const range = effectiveWeaponRange(w.range);
@@ -1584,7 +1770,8 @@ function chooseRiftLoomAnchor(w) {
   return { x: p.x + Math.cos(angle) * Math.min(260, range * 0.45), y: p.y + Math.sin(angle) * Math.min(260, range * 0.45), angle };
 }
 
-function spawnRiftLoom(x, y, base, shot, rank, color, secondary, index, radiusScale = 1, spinDir = 1) {
+function spawnRiftLoom(x, y, base, shot, rank, color, secondary, index, radiusScale, spinDir, dmgScale) {
+  dmgScale = dmgScale != null ? dmgScale : 1; radiusScale = radiusScale != null ? radiusScale : 1; spinDir = spinDir != null ? spinDir : 1;
   const half = WORLD_SIZE / 2 - 50;
   const anchors = base.anchors + (rank >= 1 ? 1 : 0);
   const radius = (base.radius + rank * 10 + (rank >= 1 ? 14 : 0)) * (secondary ? 0.72 : 1) * radiusScale;
@@ -1597,8 +1784,8 @@ function spawnRiftLoom(x, y, base, shot, rank, color, secondary, index, radiusSc
     radius,
     baseRadius: radius,
     anchors,
-    damage: weaponPower(shot, base.damage) * damageScale,
-    collapseDamage: weaponPower(shot, base.collapseDamage) * damageScale,
+    damage: weaponPower(shot, base.damage) * dmgScale * damageScale,
+    collapseDamage: weaponPower(shot, base.collapseDamage) * dmgScale * damageScale,
     scarDamage: weaponPower(shot, base.scarDamage) * damageScale,
     lineWidth: base.lineWidth + rank * 2.2,
     color,
@@ -1619,6 +1806,18 @@ function tickWeapon(w, dt) {
   if (!w || w.level <= 0) return false;
   w.timer -= dt;
   if (w.timer > 0) return false;
+  w.timer += w.cooldown / attackSpeedMultiplier();
+  return true;
+}
+
+function tickWeaponManual(w, dt, weaponId) {
+  if (!w || w.level <= 0) return false;
+  w.timer -= dt;
+  if (w.timer > 0) return false;
+  if (!input.mouseDown) {
+    w.timer = 0;
+    return false;
+  }
   w.timer += w.cooldown / attackSpeedMultiplier();
   return true;
 }
@@ -1728,7 +1927,7 @@ function updateProjectiles(dt) {
       applyKnockback(e, b.vx, b.vy, b.knockback);
       addProjectileHitShake(b);
       if (b.shape === "phaseNeedle") phaseNeedleHit(b, e);
-      if (b.freezeDuration > 0 && !e.dead && !e.boss && !e.controlImmune) e.freezeTimer = Math.max(e.freezeTimer || 0, b.freezeDuration);
+      if (b.freezeDuration > 0 && !e.dead && !e.boss && !e.controlImmune && !e.immuneFreeze) e.freezeTimer = Math.max(e.freezeTimer || 0, b.freezeDuration);
       burst(b.x, b.y, b.shape === "ice" ? 12 : 8, b.color, b.shape === "missile" ? 220 : 170);
       world.weaponFx.push({ kind: b.shape === "ice" ? "iceHit" : "hit", x: b.x, y: b.y, rank: b.qualityRank || 0, life: 0.18, maxLife: 0.18, color: b.color });
       if (b.shape === "ice" && b.iceRing) iceRingBurst(b);
@@ -1812,14 +2011,14 @@ function updateSingularityProjectile(b, index, dt) {
     const dy = b.y - e.y;
     const dist = Math.max(1, Math.hypot(dx, dy));
     const pullT = clamp(1 - dist / b.pullRadius, 0, 1);
-    const bossPullScale = e.controlImmune ? 0 : e.boss ? 0.08 : 1;
+    const bossPullScale = (e.controlImmune || e.immuneGravity) ? 0 : e.boss ? 0.08 : 1;
     const pull = b.pullStrength * pullT * pullT * bossPullScale * dt;
     e.x += (dx / dist) * pull;
     e.y += (dy / dist) * pull;
     if (dist < b.damageRadius + e.r) {
       const damageScale = 0.35 + pullT * 0.9;
       damageEnemy(e, b.damage * damageScale * dt, b.x, b.y);
-      if (!e.boss && !e.controlImmune) applyKnockback(e, dx, dy, -22 * pullT);
+      if (!e.boss && !e.controlImmune && !e.immuneGravity) applyKnockback(e, dx, dy, -22 * pullT);
       affected++;
     }
   }
@@ -2000,7 +2199,7 @@ function iceRingBurst(b) {
     if (b.hitIds.has(e) || e.dead) continue;
     damageEnemy(e, b.damage * 0.28, b.x, b.y);
     applyKnockback(e, e.x - b.x, e.y - b.y, 52);
-    if (!e.boss && !e.controlImmune) e.freezeTimer = Math.max(e.freezeTimer || 0, b.freezeDuration * 0.55);
+    if (!e.boss && !e.controlImmune && !e.immuneFreeze) e.freezeTimer = Math.max(e.freezeTimer || 0, b.freezeDuration * 0.55);
   }
   world.weaponFx.push({ kind: "shockRing", x: b.x, y: b.y, radius: 78, life: 0.24, maxLife: 0.24, color: b.color });
 }
@@ -2011,7 +2210,7 @@ function frostZone(b) {
   queryEnemies(b.x, b.y, radius, hits);
   for (const e of hits) {
     if (e.dead || e.boss) continue;
-    if (!e.controlImmune) e.freezeTimer = Math.max(e.freezeTimer || 0, b.freezeDuration * 0.75);
+    if (!e.controlImmune && !e.immuneFreeze) e.freezeTimer = Math.max(e.freezeTimer || 0, b.freezeDuration * 0.75);
   }
   world.weaponFx.push({ kind: "frostZone", x: b.x, y: b.y, radius, life: 0.75, maxLife: 0.75, color: b.color });
 }

@@ -4,14 +4,14 @@ import { burst, pulse } from "../effects.js";
 import { clamp } from "../utils.js";
 import { BaseEnemy } from "./BaseEnemy.js";
 
-const IDEAL_RANGE = 360;
-const FIRE_RANGE = 620;
+
+
 
 export class Gunner extends BaseEnemy {
   constructor(config, x, y) {
     super(config, x, y);
     this.behavior = "gunner";
-    this.cooldown = 0.7 + Math.random() * 0.5;
+    this.cooldown = this.cdInitial;
     this.burstLeft = 0;
     this.burstDelay = 0;
     this.angle = 0;
@@ -33,7 +33,7 @@ export class Gunner extends BaseEnemy {
     this.flip = dx < 0 ? -1 : 1;
     this.angle = Math.atan2(dy, dx);
 
-    const dir = d < IDEAL_RANGE * 0.75 ? -1.0 : d > IDEAL_RANGE * 1.25 ? 0.55 : 0;
+    const dir = d < this.idealRange * 0.75 ? -1.0 : d > this.idealRange * 1.25 ? 0.55 : 0;
     const strafe = Math.sin(this.anim * 0.65) * 0.85;
     this.x += (dx / d * dir + -dy / d * strafe) * this.speed * dt;
     this.y += (dy / d * dir + dx / d * strafe) * this.speed * dt;
@@ -41,12 +41,12 @@ export class Gunner extends BaseEnemy {
     if (this.burstLeft > 0 && this.burstDelay <= 0) {
       this.fireShot(this.angle);
       this.burstLeft--;
-      this.burstDelay = 0.12;
-    } else if (this.cooldown <= 0 && d < FIRE_RANGE) {
+      this.burstDelay = this.burstDelayTime;
+    } else if (this.cooldown <= 0 && d < this.fireRange) {
       this.pattern = ["triangle", "square", "hexagon", "circle"][Math.floor(Math.random() * 4)];
       this.burstLeft = 1;
       this.burstDelay = 0.01;
-      this.cooldown = this.elite ? 1.1 : 1.55;
+      this.cooldown = this.elite ? this.cdElite : this.cd + Math.random() * this.cdRandom;
       pulse(this.x, this.y, 24, this.color, 0.12);
     }
 
@@ -61,7 +61,7 @@ export class Gunner extends BaseEnemy {
     const forwardY = Math.sin(angle);
     const sideX = -forwardY;
     const sideY = forwardX;
-    const speed = this.elite ? 245 : 220;
+    const speed = this.elite ? this.bulletSpeedElite : this.bulletSpeed;
     for (const point of points) {
       world.enemyProjectiles.push({
         x: this.x + forwardX * (this.r + 16) + sideX * point.x + forwardX * point.y,
@@ -70,7 +70,7 @@ export class Gunner extends BaseEnemy {
         vy: forwardY * speed,
         r: this.elite ? 4.5 : 4,
         color: point.accent ? "#42e8ff" : "#f3f7ff",
-        damage: this.damage * 0.46,
+        damage: this.damage * this.bulletDamageMul,
         life: 3.1,
         shape: "gunnerShot",
       });
@@ -132,7 +132,7 @@ export class Gunner extends BaseEnemy {
     ctx.fillRect(-6 * z, -5 * z, 12 * z, 2 * z);
 
     ctx.save();
-    const localAngle = normalizeAngle(this.angle) * this.flip;
+    const localAngle = this.flip > 0 ? this.angle : Math.PI - this.angle;
     ctx.rotate(localAngle);
     ctx.fillStyle = dark;
     ctx.fillRect(6 * z, -4 * z, 25 * z, 8 * z);

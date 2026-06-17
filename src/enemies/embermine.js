@@ -4,14 +4,14 @@ import { burst, particle, pulse } from "../effects.js";
 import { clamp } from "../utils.js";
 import { BaseEnemy } from "./BaseEnemy.js";
 
-const MAX_MINES = 16;
+
 
 export class Embermine extends BaseEnemy {
   constructor(config, x, y) {
     super(config, x, y);
     this.behavior = "embermine";
     this.plantTime = 0;
-    this.cooldown = 1.2 + Math.random();
+    this.cooldown = this.cdInitial;
   }
 
   update(dt) {
@@ -34,9 +34,9 @@ export class Embermine extends BaseEnemy {
       const strafe = Math.sin(this.anim * 0.9) * 0.4;
       this.x += (dx / d * dir + -dy / d * strafe) * this.speed * dt;
       this.y += (dy / d * dir + dx / d * strafe) * this.speed * dt;
-      if (this.cooldown <= 0 && d < 430) {
-        this.plantTime = 0.36;
-        this.cooldown = 2.6;
+      if (this.cooldown <= 0 && d < this.armRange) {
+        this.plantTime = this.plantDuration;
+        this.cooldown = this.cd + Math.random() * this.cdRandom;
         pulse(this.x, this.y, 32, this.color, 0.22);
       }
     }
@@ -49,7 +49,7 @@ export class Embermine extends BaseEnemy {
 
   dropMine() {
     const mines = world.hazards.filter((h) => h.kind === "ember_mine");
-    if (mines.length >= MAX_MINES) {
+    if (mines.length >= this.maxMines) {
       const oldest = mines.reduce((a, b) => (a.life < b.life ? a : b));
       const idx = world.hazards.indexOf(oldest);
       if (idx >= 0) world.hazards.splice(idx, 1);

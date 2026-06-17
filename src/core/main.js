@@ -1,10 +1,13 @@
-import { SAVE_KEY, TOTAL_WAVES, waveDurationFor } from "../constants.js";
+import { SAVE_KEY, TOTAL_WAVES, waveDurationFor, GAME_MODE_CHALLENGE } from "../constants.js";
 import { state, world, resetRun } from "../state.js";
 import {
   ui,
   updateHud,
   updateBestText,
+  updateContinueButton,
   showChoices,
+  showModeSelect,
+  hideModeSelect,
   showRunSetup,
   hideRunSetup,
   hideChoices,
@@ -14,6 +17,8 @@ import {
   pickThree,
   showEnd,
   loadGameConfig,
+  showSettings,
+  hideSettings,
 } from "../ui/ui.js";
 import { generateMap } from "../systems/map.js";
 import { bindInput } from "../systems/input.js";
@@ -21,13 +26,17 @@ import { closeInventory, initInventoryUi, isInventoryOpen } from "../ui/inventor
 import { closeCodex, initCodexUi } from "../ui/codexUi.js";
 import { closeShop, initShopUi, openShop } from "../ui/shopUi.js";
 import { isBossWave, setupEnemyRegistry } from "../systems/enemyRegistry.js";
-import { updatePlayer, updateSpawning, updateEnemies, rebuildGrid, updateGems, updateCoins, collectAllExperience, collectAllCoins, clearEnemies } from "../systems/entities.js";
+import { updatePlayer, updateSpawning, updateChallengeSpawning, updateEnemies, rebuildGrid, updateGems, updateCoins, collectAllExperience, collectAllCoins, clearEnemies } from "../systems/entities.js";
 import { updateWeapons, STARTER_WEAPONS, UPGRADE_DEFS, activateWeapon, refreshStarterWeapons } from "../systems/weapons.js";
 import { consumeNextWaveSpawnBonus, startWaveItems, updateItems } from "../systems/items.js";
 import { updateEasterEggs } from "../systems/easterEggs.js";
 import { applyWaveStartScenario, resetWaveScenarioState } from "../systems/waveScenarios.js";
+import { updateDamageTexts, drawDamageTexts } from "../effects.js";
+import { getChallengeTotalWaves } from "../config/challenge-waves.js";
 import { createShopState } from "../economy/shop.js";
 import * as effects from "../effects.js";
+import { autoSave, loadAutoSave, clearAutoSave, hasAutoSave } from "../systems/autosave.js";
+import { initTestTools } from "../systems/testTools.js";
 import { resizeCanvas, updateCamera, render } from "../systems/renderer.js";
 import { playSfx, startMusic, stopMusic, pauseMusic, resumeMusic } from "../audio.js";
 import { CAMERA_ZOOM } from "../constants.js";
@@ -62,25 +71,45 @@ export async function bootGame() {
   function start() {
     closeCodex();
     hideAllOverlays();
-    state.mode = "choosingWeapon";
-    showRunSetup({
-      weapons: STARTER_WEAPONS,
-      onConfirm: startWithLoadout,
+    showModeSelect({
+      onSelect: (gameMode) => {
+        startModeLoadout(gameMode);
+      },
       onBack: returnToMenu,
     });
     playSfx("select");
   }
 
-  function startWithLoadout({ difficulty, weapon }) {
+  function startModeLoadout(gameMode) {
+    closeCodex();
+    hideAllOverlays();
+    state.gameMode = gameMode;
+    state.mode = "choosingWeapon";
+    showRunSetup({
+      weapons: STARTER_WEAPONS,
+      gameMode,
+      onConfirm: (cfg) => startWithLoadout({ ...cfg, gameMode }),
+      onBack: () => {
+        showModeSelect({
+          onSelect: (gm) => startModeLoadout(gm),
+          onBack: returnToMenu,
+        });
+      },
+    });
+  }  function startWithLoadout({ difficulty, weapon, controlMode }) {
     closeCodex();
     selectDifficulty(difficulty.id);
     resetRun(generateMap());
     selectDifficulty(difficulty.id);
     state.shop = createShopState();
+    state.controlMode = controlMode || "auto";
+    state.manualPrimaryIndex = controlMode === "manual" ? 0 : null;
     hideAllOverlays();
     hideRunSetup();
     state.initialWeaponId = weapon.id;
     activateWeapon(weapon.id);
+    clearAutoSave();
+    updateContinueButton(false);
     state.mode = "playing";
     resetWaveScenarioState();
     applyWaveStartScenario();
@@ -163,7 +192,9 @@ export async function bootGame() {
   function completeWave() {
     state.waveTimeLeft = 0;
     state.spawnBudget = 0;
-    state.pendingVictory = state.wave >= TOTAL_WAVES;
+    state.challengeSpawnTime = 0;
+    const totalWaves = state.gameMode === "challenge" ? getChallengeTotalWaves() : TOTAL_WAVES;
+    state.pendingVictory = state.wave >= totalWaves;
     state.pendingNextWave = !state.pendingVictory;
     collectAllExperience();
     clearEnemies();
@@ -193,6 +224,9 @@ export async function bootGame() {
     state.waveDuration = waveDurationFor(state.wave);
     state.waveTimeLeft = state.waveDuration;
     state.spawnBudget = 0;
+    state.challengeSpawnTime = 0;
+    autoSave();
+    updateContinueButton(true);
     consumeNextWaveSpawnBonus();
     startWaveItems();
     state.mode = "playing";
@@ -209,6 +243,8 @@ export async function bootGame() {
     hidePauseMenu();
     closeInventory();
     closeShop();
+    clearAutoSave();
+    updateContinueButton(false);
     showEnd(victory);
     playSfx(victory ? "victory" : "defeat");
     stopMusic();
@@ -236,8 +272,28 @@ export async function bootGame() {
       closeInventory();
       return;
     }
+    if (ui.settingsOverlay?.classList.contains("active")) {
+      hideSettings();
+      return;
+    }
+    if (state.mode === "selectingMode") {
+      hideModeSelect();
+      state.mode = "menu";
+      ui.startOverlay.classList.add("active");
+      return;
+    }
     if (state.mode === "playing") pauseGame();
     else if (state.mode === "paused") resumeGame();
+  }  function continueGame() {
+    if (!loadAutoSave()) return;
+    closeCodex();
+    hideAllOverlays();
+    state.mode = "playing";
+    updateContinueButton(false);
+    startMusic();
+    consumeNextWaveSpawnBonus();
+    startWaveItems();
+    applyWaveStartScenario();
   }
 
   function returnToMenu() {
@@ -248,6 +304,13 @@ export async function bootGame() {
     state.mode = "menu";
     hideAllOverlays();
     ui.startOverlay.classList.add("active");
+    ui.continueButton.disabled = !hasAutoSave();
+    ui.continueButton.classList.toggle("has-save", hasAutoSave());
+  ui.settingsButton?.addEventListener("click", () => {
+    showSettings({ onBack: () => {
+      ui.startOverlay.classList.add("active");
+    }});
+  });
     ui.pauseButton.textContent = "II";
     updateBestText();
   }
@@ -258,13 +321,18 @@ export async function bootGame() {
     const bossWave = isBossWave(state.wave);
     state.bossWaveActive = bossWave;
     state.time += dt;
-    if (!bossWave) state.waveTimeLeft = Math.max(0, state.waveTimeLeft - dt);
+    if (!bossWave && state.gameMode !== "challenge") state.waveTimeLeft = Math.max(0, state.waveTimeLeft - dt);
+    if (!bossWave && state.gameMode === "challenge" && state.waveScenario?.type === "countdown") state.waveTimeLeft = Math.max(0, state.waveTimeLeft - dt);
     state.shake = Math.max(0, state.shake - dt * 20);
     state.flash = Math.max(0, state.flash - dt * 3);
     updateItems(dt);
     updatePlayer(dt);
     updateEasterEggs(dt);
-    if (bossWave || state.waveTimeLeft > 0) updateSpawning(dt);
+    if (state.gameMode === "challenge" && state.waveScenario?.groups) {
+      updateChallengeSpawning(dt);
+    } else if (bossWave || state.waveTimeLeft > 0) {
+      updateSpawning(dt);
+    }
     updateEnemies(dt);
     rebuildGrid();
     updateWeapons(dt);
@@ -272,11 +340,20 @@ export async function bootGame() {
     updateCoins(dt);
     effects.updateAmbientParticles?.(dt, ui.canvas.clientWidth / CAMERA_ZOOM, ui.canvas.clientHeight / CAMERA_ZOOM);
     effects.updateEffects(dt);
+    updateDamageTexts(dt);
     updateCamera(dt);
     checkLevelUps();
     if (state.player.hp <= 0) endGame(false);
     if (state.mode === "playing" && bossWave && !world.boss && state.spawnedBossWaves?.has(state.wave)) completeWave();
     if (state.mode === "playing" && !bossWave && state.waveTimeLeft <= 0) completeWave();
+    if (state.mode === "playing" && state.gameMode === "challenge" && !bossWave && state.waveScenario?.type === "annihilation" && world.enemies.length === 0) {
+      const scenario = state.waveScenario;
+      const allGroupsSpawned = !scenario.groups || scenario.groups.every((_, gi) => {
+        const pre = "challenge_grp_" + state.difficultyId + "_" + state.wave + "_" + gi;
+        return state.spawnedWaveEvents.has(pre);
+      });
+      if (allGroupsSpawned) completeWave();
+    }
   }
 
   function loop(now) {
@@ -303,10 +380,19 @@ export async function bootGame() {
 
   resizeCanvas(ui.canvas, ctx);
   window.addEventListener("resize", () => resizeCanvas(ui.canvas, ctx));
+  initTestTools({ completeWave, finishWaveTransition });
   bindInput({ start, restart: start, togglePause, resume: resumeGame, returnToMenu });
+  ui.continueButton?.addEventListener("click", continueGame);
   resetRun(generateMap());
   state.shop = createShopState();
   state.mode = "menu";
+  ui.continueButton.disabled = !hasAutoSave();
+  ui.continueButton.classList.toggle("has-save", hasAutoSave());
+  ui.settingsButton?.addEventListener("click", () => {
+    showSettings({ onBack: () => {
+      ui.startOverlay.classList.add("active");
+    }});
+  });
   initAi({
     clearTrainingOnStartup: aiTrainingMode.clearTrainingOnStartup,
     ignoreStoredEnabled: aiTrainingMode.enabled,

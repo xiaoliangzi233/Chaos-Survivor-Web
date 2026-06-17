@@ -1,4 +1,4 @@
-﻿import { TAU, WORLD_SIZE } from "../constants.js";
+import { TAU, WORLD_SIZE } from "../constants.js";
 import { state, world } from "../state.js";
 import { burst } from "../effects.js";
 import { clamp } from "../utils.js";
@@ -10,11 +10,11 @@ export class Tank extends BaseEnemy {
   constructor(config, x, y) {
     super(config, x, y);
     this.behavior = "tank";
-    this.armor = 0.42;
+    this.armor = this.armorValue;
     this.stance = 0;
-    this.stanceCooldown = 1.4 + Math.random();
-    this.cooldown = 0.8;
-    this.attackRange = 560;
+    this.stanceCooldown = this.stanceCd + Math.random() * this.stanceCdRandom;
+    this.cooldown = this.cdInitial;
+    this.attackRange = this.attackDist;
     this.knockbackResistance = Math.max(this.knockbackResistance, 0.82);
   }
 
@@ -30,12 +30,12 @@ export class Tank extends BaseEnemy {
     this.cooldown -= dt;
     this.stanceCooldown -= dt;
     if (this.stanceCooldown <= 0) {
-      this.stance = 1.15;
-      this.stanceCooldown = 5.2;
+      this.stance = this.stanceDuration;
+      this.stanceCooldown = this.stanceInterval;
     }
     this.stance = Math.max(0, this.stance - dt);
-    const speedMul = this.stance > 0 ? 0.45 : 0.9;
-    if (this.stance <= 0 && this.cooldown <= 0 && d < this.attackRange) this.fireBurst(Math.atan2(dy, dx));
+    const speedMul = this.stance > 0 ? this.stanceSpeedMul : this.normalSpeedMul;
+    if (this.stance <= 0 && this.cooldown <= 0 && d < this.attackDist) this.fireBurst(Math.atan2(dy, dx));
     this.x += (dx / d) * this.speed * speedMul * dt;
     this.y += (dy / d) * this.speed * speedMul * dt;
     const half = WORLD_SIZE / 2;
@@ -51,15 +51,15 @@ export class Tank extends BaseEnemy {
   }
 
   takeDamage(amount, x, y, options = {}) {
-    const reduction = this.stance > 0 ? 0.9 : this.armor;
+    const reduction = this.stance > 0 ? this.stanceDefenseMul : this.armorValue;
     super.takeDamage(amount * (1 - reduction), x, y, options);
     if (!options.statusEffect && Math.random() < 0.6) burst(x, y, 2, "#ffd166", 160);
   }
 
   fireBurst(angle) {
-    this.cooldown = 2.35;
-    const baseSpeed = 250;
-    for (let i = 0; i < 4; i++) {
+    this.cooldown = this.cd + Math.random() * this.cdRandom;
+    const baseSpeed = this.bulletSpeed;
+    for (let i = 0; i < this.bulletCount; i++) {
       const a = angle + (i - 1.5) * 0.075;
       world.enemyProjectiles.push({
         x: this.x + Math.cos(a) * (this.r + 8),
@@ -68,8 +68,8 @@ export class Tank extends BaseEnemy {
         vy: Math.sin(a) * (baseSpeed + i * 18),
         r: 5.2,
         color: "#ffd166",
-        damage: this.damage * 0.42,
-        life: 3.2,
+        damage: this.damage * this.bulletDamageMul,
+        life: this.bulletLife,
         shape: "gunnerShot",
         source: "tank_burst",
         spin: Math.random() * TAU,

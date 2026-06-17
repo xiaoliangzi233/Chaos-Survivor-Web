@@ -4,7 +4,7 @@ import { burst, particle, pulse } from "../effects.js";
 import { clamp } from "../utils.js";
 import { BaseEnemy } from "./BaseEnemy.js";
 
-const KEEP_DISTANCE = 390;
+
 
 export class Pyromancer extends BaseEnemy {
   constructor(config, x, y) {
@@ -12,7 +12,7 @@ export class Pyromancer extends BaseEnemy {
     this.behavior = "pyromancer";
     this.aimTime = 0;
     this.aimAngle = 0;
-    this.cooldown = 1.2 + Math.random();
+    this.cooldown = this.cdInitial;
   }
 
   update(dt) {
@@ -32,12 +32,12 @@ export class Pyromancer extends BaseEnemy {
       if (Math.random() < dt * 16) particle("ember", this.x, this.y - this.r * 0.8, { color: this.color, life: 0.35, size: 3, alpha: 0.8, vy: -30 });
       if (this.aimTime <= 0) this.shootVolley();
     } else {
-      const dir = d < KEEP_DISTANCE ? -0.8 : 0.28;
+      const dir = d < this.keepDistance ? -0.8 : 0.28;
       const strafe = Math.sin(this.anim * 0.8) * 0.34;
       this.x += (dx / d * dir + -dy / d * strafe) * this.speed * dt;
       this.y += (dy / d * dir + dx / d * strafe) * this.speed * dt;
-      if (this.cooldown <= 0 && d < 700) {
-        this.aimTime = 0.55;
+      if (this.cooldown <= 0 && d < this.fireRange) {
+        this.aimTime = this.aimDuration;
         pulse(this.x, this.y, 46, "#ffd166", 0.28);
       }
     }
@@ -48,21 +48,21 @@ export class Pyromancer extends BaseEnemy {
   }
 
   shootVolley() {
-    this.cooldown = 2.35;
-    const spread = 0.18;
+    this.cooldown = this.cd + Math.random() * this.cdRandom;
+    const spread = this.volleySpread;
     for (const offset of [-spread, 0, spread]) {
       const a = this.aimAngle + offset;
       world.enemyProjectiles.push({
         x: this.x + Math.cos(a) * 18,
         y: this.y + Math.sin(a) * 18,
-        vx: Math.cos(a) * 245,
-        vy: Math.sin(a) * 245,
+        vx: Math.cos(a) * this.bulletSpeed,
+        vy: Math.sin(a) * this.bulletSpeed,
         r: 8,
         color: this.color,
-        damage: this.damage * 0.48,
-        burnDuration: 2.5,
-        burnDps: this.damage * 0.28,
-        life: 4,
+        damage: this.damage * this.bulletDamageMul,
+        burnDuration: this.burnDuration,
+        burnDps: this.damage * this.burnDpsMul,
+        life: this.bulletLife,
         shape: "fireball",
         spin: Math.random() * TAU,
         emberTrail: true,

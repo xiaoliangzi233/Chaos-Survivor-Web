@@ -4,14 +4,14 @@ import { particle, pulse } from "../effects.js";
 import { clamp } from "../utils.js";
 import { BaseEnemy } from "./BaseEnemy.js";
 
-const ABSORB_RANGE = 300;
-const KEEP_DISTANCE = 310;
+
+
 
 export class MagnetRaider extends BaseEnemy {
   constructor(config, x, y) {
     super(config, x, y);
     this.behavior = "magnet_raider";
-    this.cooldown = 1.2;
+    this.cooldown = this.cdInitial;
     this.orbit = Math.random() * TAU;
     this.stolen = 0;
     this.knockbackResistance = Math.max(this.knockbackResistance, 0.34);
@@ -29,14 +29,14 @@ export class MagnetRaider extends BaseEnemy {
     this.hitTimer = Math.max(0, this.hitTimer - dt);
     this.flip = dx < 0 ? -1 : 1;
 
-    const dir = d < KEEP_DISTANCE ? -0.55 : 0.65;
+    const dir = d < this.keepDistance ? -0.55 : 0.65;
     const strafe = Math.sin(this.anim * 0.6) * 0.58;
     this.x += (dx / d * dir + -dy / d * strafe) * this.speed * dt;
     this.y += (dy / d * dir + dx / d * strafe) * this.speed * dt;
     this.pullPickups(dt);
     if (this.cooldown <= 0) {
-      this.cooldown = 2.4;
-      pulse(this.x, this.y, ABSORB_RANGE * 0.22, this.color, 0.1);
+      this.cooldown = this.cd + Math.random() * this.cdRandom;
+      pulse(this.x, this.y, this.absorbRange * 0.22, this.color, 0.1);
     }
 
     const half = WORLD_SIZE / 2;
@@ -50,8 +50,8 @@ export class MagnetRaider extends BaseEnemy {
         const dx = this.x - item.x;
         const dy = this.y - item.y;
         const d = Math.max(1, Math.hypot(dx, dy));
-        if (d > ABSORB_RANGE) continue;
-        const pull = (1 - d / ABSORB_RANGE) * 230 + 45;
+        if (d > this.absorbRange) continue;
+        const pull = (1 - d / this.absorbRange) * this.pullStrength + this.pullBase;
         item.x += dx / d * pull * dt;
         item.y += dy / d * pull * dt;
       }

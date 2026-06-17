@@ -1,0 +1,104 @@
+{
+  "gearfiend": {
+    "damage": 30,
+    "hp": 110,
+    "xp": 22,
+    "speed": 78
+  },
+  "slime_diamond": {
+    "damage": 26,
+    "hp": 140,
+    "xp": 22,
+    "speed": 52
+  },
+  "slime_glow": {
+    "damage": 16,
+    "hp": 60,
+    "xp": 14,
+    "speed": 80
+  },
+  "wisp": {
+    "damage": 18,
+    "hp": 52,
+    "xp": 14,
+    "speed": 74
+  },
+  "slime_small": {
+    "damage": 10,
+    "hp": 60,
+    "xp": 6,
+    "speed": 86
+  },
+  "slime_medium": {
+    "damage": 22,
+    "hp": 180,
+    "xp": 12,
+    "speed": 74
+  },
+  "slime_devil": {
+    "damage": 28,
+    "hp": 95,
+    "xp": 18,
+    "speed": 76
+  },
+  "thief": {
+    "damage": 0,
+    "hp": 999999,
+    "xp": 1,
+    "speed": 580
+  },
+  "slime_large": {
+    "damage": 36,
+    "hp": 210,
+    "xp": 26,
+    "speed": 48
+  },
+  "slime_weeping": {
+    "damage": 22,
+    "hp": 130,
+    "xp": 20,
+    "speed": 60
+  },
+  "exploder": {
+    "damage": 52,
+    "hp": 48,
+    "xp": 14,
+    "speed": 100
+  },
+  "slime_angel": {
+    "damage": 18,
+    "hp": 170,
+    "xp": 22,
+    "speed": 70
+  },
+  "lancer": {
+    "damage": 28,
+    "hp": 200,
+    "xp": 12,
+    "speed": 120
+  },
+  "tank": {
+    "damage": 36,
+    "hp": 360,
+    "xp": 30,
+    "speed": 70
+  },
+  "zombie": {
+    "damage": 22,
+    "hp": 100,
+    "xp": 9,
+    "speed": 100
+  },
+  "razorbat": {
+    "damage": 26,
+    "hp": 68,
+    "xp": 16,
+    "speed": 132
+  },
+  "slime_gold": {
+    "damage": 18,
+    "hp": 110,
+    "xp": 30,
+    "speed": 68
+  }
+}

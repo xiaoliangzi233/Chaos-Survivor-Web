@@ -6,16 +6,16 @@ import { BaseEnemy } from "./BaseEnemy.js";
 import { applyPlayerDamage } from "../systems/items.js";
 
 const MAP_HALF = WORLD_SIZE / 2;
-const DASH_SPEED = 760;
-const WARNING_TIME = 0.9;
-const COOLDOWN_TIME = 1.35;
+
+
+
 
 export class LineRaider extends BaseEnemy {
   constructor(config, x, y) {
     super(config, x, y);
     this.behavior = "line_raider";
     this.state = "drift";
-    this.timer = 1 + Math.random();
+    this.timer = this.initialTimer + Math.random() * this.initialTimerRandom;
     this.angle = 0;
     this.lineStart = { x, y };
     this.lineEnd = { x, y };
@@ -39,7 +39,7 @@ export class LineRaider extends BaseEnemy {
       if (Math.random() < dt * 16) particle("scan", this.x, this.y, { color: "#ffffff", life: 0.22, size: 2, alpha: 0.75 });
       if (this.timer <= 0) this.beginDash();
     } else if (this.state === "dash") {
-      this.dashT += (DASH_SPEED * dt) / Math.max(1, distance(this.lineStart, this.lineEnd));
+      this.dashT += (this.dashSpeed * dt) / Math.max(1, distance(this.lineStart, this.lineEnd));
       const t = Math.min(1, this.dashT);
       const px = this.x;
       const py = this.y;
@@ -49,7 +49,7 @@ export class LineRaider extends BaseEnemy {
       this.damagePlayerAlongLine(px, py);
       if (t >= 1) {
         this.state = "drift";
-        this.timer = COOLDOWN_TIME;
+        this.timer = this.cooldownTime;
         this.hitPlayer = false;
         pulse(this.x, this.y, 30, "#ffffff", 0.16);
       }
@@ -74,7 +74,7 @@ export class LineRaider extends BaseEnemy {
     this.x = this.lineStart.x;
     this.y = this.lineStart.y;
     this.state = "warn";
-    this.timer = WARNING_TIME;
+    this.timer = this.warningTime;
     this.dashT = 0;
     pulse(leadX, leadY, 50, "#ffffff", 0.18);
   }
@@ -102,7 +102,7 @@ export class LineRaider extends BaseEnemy {
 
   takeDamage(amount, x, y, options = {}) {
     if (this.state === "dash" || this.state === "warn") {
-      amount *= this.state === "dash" ? 0.05 : 0.35;
+      amount *= this.state === "dash" ? this.dashDefenseMul : this.warnDefenseMul;
     }
     super.takeDamage(amount, x, y, options);
   }
@@ -132,7 +132,7 @@ export class LineRaider extends BaseEnemy {
 }
 
 function drawWarningLine(ctx, e) {
-  const k = Math.max(0, e.timer / WARNING_TIME);
+  const k = Math.max(0, e.timer / this.warningTime);
   ctx.save();
   ctx.strokeStyle = `rgba(255,255,255,${0.25 + (1 - k) * 0.32})`;
   ctx.lineWidth = 18 + Math.sin(state.time * 18) * 2;

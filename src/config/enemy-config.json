@@ -34,7 +34,13 @@
           19
         ]
       }
-    }
+    },
+    "cd": 0.8,
+    "cdRandom": 1.2,
+    "cdInitial": 1.4,
+    "scale": 1.0,
+    "immuneFreeze": false,
+    "immuneGravity": false
   },
   "lancer": {
     "name": "突刺者",
@@ -69,7 +75,23 @@
           19
         ]
       }
-    }
+    },
+    "cd": 0.8,
+    "cdRandom": 1.2,
+    "cdInitial": 1.4,
+    "dashTriggerRange": 330,
+    "dashSpeed": 760,
+    "dashDamageMul": 1.35,
+    "attackCd": 1.35,
+    "attackCdRandom": 0,
+    "attackCdInitial": 0.75,
+    "attackCdInitialRandom": 0.65,
+    "dashDuration": 0.58,
+    "recoverDuration": 0.34,
+    "windupDuration": 0.52,
+    "scale": 1.0,
+    "immuneFreeze": false,
+    "immuneGravity": false
   },
   "wisp": {
     "name": "冰霜幽灵",
@@ -99,7 +121,26 @@
           19
         ]
       }
-    }
+    },
+    "cd": 0.8,
+    "cdRandom": 1.2,
+    "cdInitial": 1.4,
+    "fireRange": 720,
+    "shootCd": 1.08,
+    "shootCdElite": 0.78,
+    "bulletSpeed": 185,
+    "bulletSpeedElite": 220,
+    "bulletCount": 1,
+    "bulletCountElite": 3,
+    "bulletDamageMul": 0.68,
+    "preferredDist": 350,
+    "closeDist": 270,
+    "farDist": 460,
+    "shootInitialCd": 0.7,
+    "shootInitialCdRandom": 0.6,
+    "scale": 1.0,
+    "immuneFreeze": false,
+    "immuneGravity": false
   },
   "slime_large": {
     "name": "大型史莱姆",
@@ -132,7 +173,13 @@
           19
         ]
       }
-    }
+    },
+    "cd": 0.8,
+    "cdRandom": 1.2,
+    "cdInitial": 1.4,
+    "scale": 1.0,
+    "immuneFreeze": false,
+    "immuneGravity": false
   },
   "slime_medium": {
     "name": "中型史莱姆",
@@ -165,7 +212,13 @@
           19
         ]
       }
-    }
+    },
+    "cd": 0.8,
+    "cdRandom": 1.2,
+    "cdInitial": 1.4,
+    "scale": 1.0,
+    "immuneFreeze": false,
+    "immuneGravity": false
   },
   "slime_small": {
     "name": "小型史莱姆",
@@ -198,7 +251,13 @@
           19
         ]
       }
-    }
+    },
+    "cd": 0.8,
+    "cdRandom": 1.2,
+    "cdInitial": 1.4,
+    "scale": 1.0,
+    "immuneFreeze": false,
+    "immuneGravity": false
   },
   "blackhole_mage": {
     "name": "黑洞法师",
@@ -230,7 +289,17 @@
       }
     },
     "desc": "原来负责微引力实验的研究员，实验失败后把实验室变成了他的小型黑洞靶场。别在他面前提“奇点稳定性”，他会用黑洞把你吸过去理论。",
-    "tip": "看到黑洞立刻离开边缘，别在黑洞与怪潮之间停留。"
+    "tip": "看到黑洞立刻离开边缘，别在黑洞与怪潮之间停留。",
+    "cd": 4.2,
+    "cdRandom": 1.2,
+    "cdInitial": 2.8,
+    "channelTime": 0.55,
+    "recoverTime": 0.55,
+    "channelDuration": 1.5,
+    "recoverDuration": 0.55,
+    "scale": 1.0,
+    "immuneFreeze": false,
+    "immuneGravity": false
   },
   "mech_worm": {
     "name": "机械蠕虫",
@@ -248,7 +317,24 @@
     "color": "#ff65d8",
     "behavior": "mech_worm",
     "desc": "本应被销毁的纳米机械蠕虫原型机，逃出储存柜后靠吃电缆长大。行动轨迹参考了贪吃蛇游戏，冲刺起来就像地铁早高峰的插队者。",
-    "tip": "不要沿直线后撤，横向绕开它蓄力后的冲刺路线。"
+    "tip": "不要沿直线后撤，横向绕开它蓄力后的冲刺路线。",
+    "cd": 1.65,
+    "cdRandom": 0,
+    "cdInitial": 1.45,
+    "strikeRange": 360,
+    "segmentCount": 8,
+    "segmentGap": 12,
+    "coastTimeBase": 0.46,
+    "coastTurnRateBase": 0.95,
+    "strikeSpeedMul": 3.25,
+    "segmentCountBase": 8,
+    "segmentGapBase": 12,
+    "speedMul": 1.08,
+    "chargeDuration": 0.46,
+    "strikeDuration": 0.62,
+    "scale": 1.0,
+    "immuneFreeze": false,
+    "immuneGravity": false
   },
   "doctor": {
     "name": "战地医生",
@@ -267,7 +353,16 @@
     "behavior": "doctor",
     "spawnWeight": 0.25,
     "desc": "原实验室医疗AI，坚守希波克拉底誓言，即使程序错乱也要给所有活物（包括史莱姆）打肾上腺素。你一靠近他就跑，因为怕被患者家属打。",
-    "tip": "优先击杀，否则怪潮会被持续续航。"
+    "tip": "优先击杀，否则怪潮会被持续续航。",
+    "cd": 2.4,
+    "cdRandom": 0,
+    "cdInitial": 0.8,
+    "healRange": 260,
+    "keepDistance": 330,
+    "channelTime": 2.4,
+    "scale": 1.0,
+    "immuneFreeze": false,
+    "immuneGravity": false
   },
   "embermine": {
     "name": "余烬地雷兽",
@@ -296,7 +391,16 @@
       }
     },
     "desc": "原本是实验室地板清洁机器人，被改造成布雷器后开始疯狂撒“火星跳跳糖”。它坚信地雷是解决走位问题的终极方案。",
-    "tip": "看到地面火芯后及时绕开，不要把怪群拉进雷区中心。"
+    "tip": "看到地面火芯后及时绕开，不要把怪群拉进雷区中心。",
+    "cd": 2.6,
+    "cdRandom": 0,
+    "cdInitial": 1.7,
+    "maxMines": 16,
+    "armRange": 430,
+    "plantDuration": 0.36,
+    "scale": 1.0,
+    "immuneFreeze": false,
+    "immuneGravity": false
   },
   "exploder": {
     "name": "爆裂自毁者",
@@ -326,7 +430,17 @@
       }
     },
     "desc": "实验体#143，因为情感模块短路，见到人就激动到自爆。倒计时的滴滴声代表它那无处安放的热情，炸开前还会膨胀成一只愤怒的河豚。",
-    "tip": "看到它发光膨胀就立刻拉开，在爆炸范围外击杀更安全。"
+    "tip": "看到它发光膨胀就立刻拉开，在爆炸范围外击杀更安全。",
+    "cd": 0.8,
+    "cdRandom": 1.2,
+    "cdInitial": 1.4,
+    "armRange": 92,
+    "explodeRadius": 92,
+    "fuseTime": 1.05,
+    "armedSpeedMul": 0.42,
+    "scale": 1.0,
+    "immuneFreeze": false,
+    "immuneGravity": false
   },
   "tank": {
     "name": "重装坦克",
@@ -344,7 +458,26 @@
     "color": "#b48cff",
     "behavior": "tank",
     "desc": "从材料力学实验室开出来的防爆盾测试机，把整个人行道都穿在了身上。移动慢得像在等退休，但挡路能力一流，是后排脆皮们最爱的肉盾保姆。",
-    "tip": "用持续伤害消耗它，别让它挡住对医生和远程怪的火力。"
+    "tip": "用持续伤害消耗它，别让它挡住对医生和远程怪的火力。",
+    "cd": 2.35,
+    "cdRandom": 0,
+    "cdInitial": 0.8,
+    "stanceCd": 1.4,
+    "stanceCdRandom": 1,
+    "stanceDuration": 1.15,
+    "stanceDefenseMul": 0.9,
+    "stanceSpeedMul": 0.45,
+    "normalSpeedMul": 0.9,
+    "bulletSpeed": 250,
+    "bulletDamageMul": 0.42,
+    "bulletCount": 4,
+    "bulletLife": 3.2,
+    "attackDist": 560,
+    "armorValue": 0.42,
+    "stanceInterval": 5.2,
+    "scale": 1.0,
+    "immuneFreeze": false,
+    "immuneGravity": false
   },
   "pyromancer": {
     "name": "烈焰人",
@@ -362,7 +495,22 @@
     "color": "#ff7a1a",
     "behavior": "pyromancer",
     "desc": "前化学系纵火狂，在废弃酒精灯旁悟道三连发。他的火球警告了所有人：不要在实验室吃烧烤，否则会被烧成串串。",
-    "tip": "看到聚火动作时横向移动，避免被扇形火球封住。"
+    "tip": "看到聚火动作时横向移动，避免被扇形火球封住。",
+    "cd": 2.35,
+    "cdRandom": 0,
+    "cdInitial": 1.7,
+    "keepDistance": 390,
+    "fireRange": 700,
+    "bulletSpeed": 245,
+    "bulletDamageMul": 0.48,
+    "burnDuration": 2.5,
+    "burnDpsMul": 0.28,
+    "bulletLife": 4,
+    "volleySpread": 0.18,
+    "aimDuration": 0.55,
+    "scale": 1.0,
+    "immuneFreeze": false,
+    "immuneGravity": false
   },
   "laser_eye": {
     "difficultyWaves": {
@@ -413,7 +561,27 @@
       "apocalypse",
       "void_crown"
     ],
-    "spawnWeight": 0.3
+    "spawnWeight": 0.3,
+    "cd": 2.4,
+    "cdRandom": 0,
+    "cdAlt": 2.1,
+    "cdAltRandom": 0,
+    "cdInitial": 1.9,
+    "fireRange": 820,
+    "scale": 1.0,
+    "aimDuration": 0.75,
+    "fireDuration": 0.46,
+    "aimTurnSpeed": 2.2,
+    "fireTurnSpeed": 0.7,
+    "beamDamageMul": 1.35,
+    "beamWidthExtra": 10,
+    "keepDistance": 480,
+    "shardVolleyCount": 3,
+    "shardVolleySpeed": 420,
+    "shardVolleyDamageMul": 0.56,
+    "shardVolleyLife": 2.2,
+    "immuneFreeze": false,
+    "immuneGravity": false
   },
   "razorbat": {
     "name": "刃翼蝠",
@@ -441,7 +609,21 @@
           19
         ]
       }
-    }
+    },
+    "cd": 1.75,
+    "cdRandom": 0,
+    "cdElite": 1.15,
+    "cdInitial": 1.4,
+    "orbitRange": 330,
+    "throwRange": 650,
+    "bladeSpeed": 250,
+    "bladeDamageMul": 0.8,
+    "bladeLife": 3.4,
+    "bladeReturnAt": 2.25,
+    "throwWindupTime": 0.28,
+    "scale": 1.0,
+    "immuneFreeze": false,
+    "immuneGravity": false
   },
   "wizard": {
     "name": "奥术巫师",
@@ -459,7 +641,24 @@
     "color": "#b48cff",
     "behavior": "wizard",
     "desc": "实验室档案室管理员，翻到一本假的魔法书后走火入魔。现在他坚信自己是法杖持有者，隔着怪物们搓奥术麻将，专治前排不足恐惧症。",
-    "tip": "看到符文聚拢时立刻横移，同时用追踪或穿透武器处理它。"
+    "tip": "看到符文聚拢时立刻横移，同时用追踪或穿透武器处理它。",
+    "cd": 1.95,
+    "cdRandom": 0,
+    "cdElite": 1.35,
+    "cdInitial": 1.55,
+    "keepDistance": 455,
+    "castRange": 900,
+    "castTime": 0.32,
+    "bulletSpeed": 250,
+    "bulletDamageMul": 0.45,
+    "bulletLife": 3.8,
+    "spellCount": 1,
+    "spellCountElite": 2,
+    "castDuration": 0.68,
+    "castTimeElite": 0.48,
+    "scale": 1.0,
+    "immuneFreeze": false,
+    "immuneGravity": false
   },
   "pentastar": {
     "name": "机械五角星",
@@ -477,7 +676,19 @@
     "color": "#f3f7ff",
     "behavior": "pentastar",
     "desc": "某个完美主义工程师设计的五角星形卫星残骸，每根角都装了炮口，因为“不对称会死”。停下来转圈时就像一场死亡芭蕾，向五个方向撒花瓣般的弹幕。",
-    "tip": "它停转发光时就是开火预警，提前离开五向通道。"
+    "tip": "它停转发光时就是开火预警，提前离开五向通道。",
+    "cd": 2.25,
+    "cdRandom": 0,
+    "cdInitial": 1.6,
+    "stopRange": 560,
+    "windupTime": 0.55,
+    "fireRange": 760,
+    "bulletSpeed": 230,
+    "bulletDamageMul": 0.62,
+    "bulletLife": 3.2,
+    "scale": 1.0,
+    "immuneFreeze": false,
+    "immuneGravity": false
   },
   "gearfiend": {
     "name": "齿轮怪",
@@ -504,7 +715,23 @@
           19
         ]
       }
-    }
+    },
+    "cd": 1.1,
+    "cdRandom": 0,
+    "cdAlt": 1.8,
+    "cdAltRandom": 0,
+    "cdInitial": 1.25,
+    "keepDistance": 410,
+    "fireRange": 760,
+    "fastBulletSpeed": 260,
+    "fastBulletDamageMul": 0.64,
+    "fastBulletLife": 2.4,
+    "trapRadius": 38,
+    "trapDamageMul": 0.82,
+    "trapLife": 3.4,
+    "scale": 1.0,
+    "immuneFreeze": false,
+    "immuneGravity": false
   },
   "prism_medic": {
     "name": "棱镜协助者",
@@ -522,7 +749,22 @@
     "color": "#72ffb4",
     "behavior": "prism_medic",
     "desc": "光学实验室的废弃棱镜与医疗程序结合，诞生了最讨厌的团辅助手。它用棱光给同伴们上“兴奋剂”，自己却怂在怪堆后面喊加油，像极了带团建的行政。",
-    "tip": "看到增幅光束时优先处理，否则怪群的推进和弹幕节奏会明显加快。"
+    "tip": "看到增幅光束时优先处理，否则怪群的推进和弹幕节奏会明显加快。",
+    "cd": 1.85,
+    "cdRandom": 0,
+    "cdInitial": 0.9,
+    "assistRange": 330,
+    "keepDistance": 380,
+    "assistSpeedMul": 1.25,
+    "assistSpeedMulElite": 1.18,
+    "assistAttackSpeedMul": 1.34,
+    "assistAttackSpeedMulElite": 1.22,
+    "assistDuration": 0.42,
+    "maxTargets": 7,
+    "channelDuration": 1.25,
+    "scale": 1.0,
+    "immuneFreeze": false,
+    "immuneGravity": false
   },
   "phase_mirage": {
     "name": "裂相幻影",
@@ -540,7 +782,21 @@
     "color": "#d946ef",
     "behavior": "phase_mirage",
     "desc": "相位传送实验的残渣，留下了会瞬移的二维切片。它从不对你正脸，永远在你回头时来一记空间切割，简直是实验室里的视觉暂留版吓人盒。",
-    "tip": "看到扫描残影后保持移动，不要停在原地等它落点。"
+    "tip": "看到扫描残影后保持移动，不要停在原地等它落点。",
+    "cd": 2.2,
+    "cdRandom": 0,
+    "cdInitial": 1.6,
+    "strikeRange": 360,
+    "windupTime": 0.42,
+    "fireRange": 620,
+    "shardSpeed": 180,
+    "shardCount": 8,
+    "shardDamageMul": 0.34,
+    "shardLife": 0.75,
+    "strikeDuration": 0.34,
+    "scale": 1.0,
+    "immuneFreeze": false,
+    "immuneGravity": false
   },
   "magnet_raider": {
     "name": "磁暴采掠者",
@@ -572,7 +828,17 @@
       }
     },
     "desc": "原本是用于回收金属碎屑的磁力清洁器，报废后染上收藏癖。它四处吸走你的金币和经验，像个贪婪的拾荒老太，口头禅是“我的，都是我的”。",
-    "tip": "它不会造成强火力，但拖太久会让资源堆到危险区域。"
+    "tip": "它不会造成强火力，但拖太久会让资源堆到危险区域。",
+    "cd": 2.4,
+    "cdRandom": 0,
+    "cdInitial": 1.2,
+    "absorbRange": 300,
+    "keepDistance": 310,
+    "pullStrength": 230,
+    "pullBase": 45,
+    "scale": 1.0,
+    "immuneFreeze": false,
+    "immuneGravity": false
   },
   "magma_beetle": {
     "name": "熔核甲虫",
@@ -590,7 +856,19 @@
     "color": "#ff7a1a",
     "behavior": "magma_beetle",
     "desc": "地质实验室里被岩浆浸润过的标本甲虫，复活后成了移动火炉。它冲刺时觉得自己是辆法拉利，但转向比你奶奶倒车还慢，撞墙后只会留下一条滚烫的胎印。",
-    "tip": "它转向慢，看到压低身体时横向躲开冲撞路线。"
+    "tip": "它转向慢，看到压低身体时横向躲开冲撞路线。",
+    "cd": 2.4,
+    "cdRandom": 0,
+    "cdInitial": 1.6,
+    "chargeRange": 450,
+    "windupTime": 0.58,
+    "chargeSpeedMul": 3.55,
+    "trailDamageMul": 0.45,
+    "trailLife": 1.5,
+    "chargeDuration": 0.82,
+    "scale": 1.0,
+    "immuneFreeze": false,
+    "immuneGravity": false
   },
   "siege_pylon": {
     "name": "攻城棱塔",
@@ -609,7 +887,30 @@
     "behavior": "pylon",
     "spawnWeight": 0.18,
     "desc": "废弃监控塔的亡魂，依然执着于执行“远程监控”。移动比树懒快一点，但射程覆盖整个场地，逼得玩家必须亲自去拔掉这个坏掉的摄像头。",
-    "tip": "尽快贴近处理，拖得越久场面越乱。"
+    "tip": "尽快贴近处理，拖得越久场面越乱。",
+    "cd": 1.35,
+    "cdRandom": 0,
+    "cdElite": 1.05,
+    "cdInitial": 1.4,
+    "keepRange": 600,
+    "fireRange": 980,
+    "shieldRange": 260,
+    "chargeTime": 0.4,
+    "chargeTimeElite": 0.28,
+    "volleyCount": 5,
+    "volleyCountElite": 7,
+    "volleyShotsPerBurst": 4,
+    "volleyShotsPerBurstElite": 5,
+    "bulletSpeed": 285,
+    "bulletSpeedElite": 330,
+    "bulletDamageMul": 0.52,
+    "bulletLife": 3.9,
+    "volleySpread": 0.26,
+    "volleySpreadElite": 0.34,
+    "speedMul": 0.34,
+    "scale": 1.0,
+    "immuneFreeze": false,
+    "immuneGravity": false
   },
   "brood_seeder": {
     "name": "巢种播撒者",
@@ -639,7 +940,16 @@
       }
     },
     "desc": "从生物繁殖实验室逃出的播种机器，把战斗变成了它的生育派对。它坚信“人多力量大”，所以不停下单，数量多到让人怀疑它偷了实习生文件夹里的备用试管。",
-    "tip": "看到它优先集火，不然会把局面拖进刷怪雪崩。"
+    "tip": "看到它优先集火，不然会把局面拖进刷怪雪崩。",
+    "cd": 3.2,
+    "cdRandom": 0.8,
+    "cdInitial": 1.85,
+    "summonLimit": 7,
+    "keepRange": 280,
+    "spawnWindupTime": 0.58,
+    "scale": 1.0,
+    "immuneFreeze": false,
+    "immuneGravity": false
   },
   "line_raider": {
     "name": "裂空突袭者",
@@ -657,7 +967,21 @@
     "color": "#ffffff",
     "behavior": "line_raider",
     "desc": "实验室粒子加速器的一截光束管道成精了，酷爱玩“红灯停绿灯行”的游戏。它先用线画好跑道，然后以光速碾过去，碾完还觉得自己是超电磁炮。",
-    "tip": "看到预警通道就立刻离开，绝对不要和它抢线路。"
+    "tip": "看到预警通道就立刻离开，绝对不要和它抢线路。",
+    "cd": 0.8,
+    "cdRandom": 1.2,
+    "cdInitial": 1.4,
+    "dashSpeed": 760,
+    "warningTime": 0.9,
+    "cooldownTime": 1.35,
+    "cooldownRandom": 0,
+    "initialTimer": 1,
+    "initialTimerRandom": 1,
+    "dashDefenseMul": 0.05,
+    "warnDefenseMul": 0.35,
+    "scale": 1.0,
+    "immuneFreeze": false,
+    "immuneGravity": false
   },
   "shield_caster": {
     "name": "护盾施术者",
@@ -676,7 +1000,17 @@
     "behavior": "shield",
     "spawnWeight": 0.25,
     "desc": "来自安全防护测试组的小组长，深谙“安全第一”。它不打架，专给同事套防护罩，就像发放违章建筑许可的官僚，把整个怪群变成了铁桶阵。",
-    "tip": "优先击杀它，否则周围怪物会变得很难处理。"
+    "tip": "优先击杀它，否则周围怪物会变得很难处理。",
+    "cd": 1.1,
+    "cdRandom": 0,
+    "cdInitial": 0.6,
+    "shieldRange": 210,
+    "keepRange": 320,
+    "clusterRange": 420,
+    "channelDuration": 0.35,
+    "scale": 1.0,
+    "immuneFreeze": false,
+    "immuneGravity": false
   },
   "gunner": {
     "name": "几何枪手",
@@ -706,7 +1040,21 @@
       }
     },
     "desc": "实验室武器测试员，总觉得电影里的枪战太假，于是亲自上阵表演走射。边溜达边点射，弹道直得像他的脑回路，想躲？学螃蟹斜着走。",
-    "tip": "斜向移动最容易躲掉它的直线弹道。"
+    "tip": "斜向移动最容易躲掉它的直线弹道。",
+    "cd": 1.55,
+    "cdRandom": 0,
+    "cdElite": 1.1,
+    "cdInitial": 0.95,
+    "idealRange": 360,
+    "fireRange": 620,
+    "bulletSpeed": 220,
+    "bulletSpeedElite": 245,
+    "bulletDamageMul": 0.46,
+    "burstDelay": 0.12,
+    "burstDelayTime": 0.12,
+    "scale": 1.0,
+    "immuneFreeze": false,
+    "immuneGravity": false
   },
   "artillery": {
     "name": "炮击方碑",
@@ -724,7 +1072,18 @@
     "color": "#f97316",
     "behavior": "artillery",
     "desc": "一门从地下室翻出来的古董迫击炮，被幽灵炮手附体。它喜欢在远处下“弹雨”，提前帮你铺设陷阱，并坚信抛物线是宇宙中最美的线条。",
-    "tip": "别停在原地输出，持续移动能让它的大部分炮火落空。"
+    "tip": "别停在原地输出，持续移动能让它的大部分炮火落空。",
+    "cd": 3.35,
+    "cdRandom": 0,
+    "cdElite": 2.7,
+    "cdInitial": 1.8,
+    "keepRange": 680,
+    "fireRange": 1160,
+    "chargeTime": 1.65,
+    "chargeTimeElite": 1.25,
+    "scale": 1.0,
+    "immuneFreeze": false,
+    "immuneGravity": false
   },
   "storm_tyrant": {
     "name": "风暴暴君",
@@ -745,7 +1104,11 @@
       "ember": {
         "bossWave": 10
       }
-    }
+    },
+    "cd": 0.7,
+    "cdRandom": 0.4,
+    "cdInitial": 0.9,
+    "scale": 1.0
   },
   "polar_crystal_wraith": {
     "name": "极霜晶魂",
@@ -766,7 +1129,11 @@
       "ember": {
         "bossWave": 20
       }
-    }
+    },
+    "cd": 0.8,
+    "cdRandom": 1.2,
+    "cdInitial": 1.4,
+    "scale": 1.0
   },
   "storm_rail_devourer": {
     "name": "雷铸吞星者",
@@ -782,7 +1149,11 @@
     "behavior": "boss_storm_rail",
     "boss": true,
     "desc": "原“超级高铁”项目试验蛇，在废弃隧道里靠吞食废弃电缆进化成雷轨巨蛇。它现在到处画轨道线，然后呼啸而过，嘴里还念叨着“准点率100%”。",
-    "tip": "雷轨预警出现时立刻离开线路，二阶段连续冲锋和电网封锁会更频繁。"
+    "tip": "雷轨预警出现时立刻离开线路，二阶段连续冲锋和电网封锁会更频繁。",
+    "cd": 0.8,
+    "cdRandom": 1.2,
+    "cdInitial": 1.4,
+    "scale": 1.0
   },
   "twin_abyssal_eyes": {
     "name": "裂渊双瞳",
@@ -798,7 +1169,11 @@
     "behavior": "boss_twin_eyes",
     "boss": true,
     "desc": "实验室里一对失控的双子安保探头，红色的只会动手，蓝色的只会哔哔。它们共享同一个内核，死一个另一个就彻底发疯，从相爱相杀变成同归于尽模式。",
-    "tip": "不要同时被冲锋和激光夹住。先击杀哪一只会改变后半场节奏。"
+    "tip": "不要同时被冲锋和激光夹住。先击杀哪一只会改变后半场节奏。",
+    "cd": 0.8,
+    "cdRandom": 1.2,
+    "cdInitial": 1.4,
+    "scale": 1.0
   },
   "slime_diamond": {
     "name": "钻石史莱姆",
@@ -820,7 +1195,13 @@
     "behavior": "melee",
     "spawnWeight": 0.8,
     "desc": "晶化培养基里长出的硬壳史莱姆，身体折出冷蓝色高光。",
-    "tip": "血量更高，适合用持续伤害先软化。"
+    "tip": "血量更高，适合用持续伤害先软化。",
+    "cd": 0.8,
+    "cdRandom": 1.2,
+    "cdInitial": 1.4,
+    "scale": 1.0,
+    "immuneFreeze": false,
+    "immuneGravity": false
   },
   "slime_gold": {
     "name": "黄金史莱姆",
@@ -842,7 +1223,13 @@
     "behavior": "melee",
     "spawnWeight": 0.9,
     "desc": "吸附了废弃实验室金币涂层的史莱姆，弹跳时会拖出金色残影。",
-    "tip": "移动不快但会混在史莱姆潮里，优先清出移动空间。"
+    "tip": "移动不快但会混在史莱姆潮里，优先清出移动空间。",
+    "cd": 0.8,
+    "cdRandom": 1.2,
+    "cdInitial": 1.4,
+    "scale": 1.0,
+    "immuneFreeze": false,
+    "immuneGravity": false
   },
   "slime_glow": {
     "name": "荧光史莱姆",
@@ -864,7 +1251,13 @@
     "behavior": "melee",
     "spawnWeight": 1.2,
     "desc": "培养皿照明液泄漏后诞生的发光小型史莱姆，行动轨迹非常醒目。",
-    "tip": "速度较快，利用范围武器在它们贴身前清掉。"
+    "tip": "速度较快，利用范围武器在它们贴身前清掉。",
+    "cd": 0.8,
+    "cdRandom": 1.2,
+    "cdInitial": 1.4,
+    "scale": 1.0,
+    "immuneFreeze": false,
+    "immuneGravity": false
   },
   "slime_weeping": {
     "name": "哭泣的史莱姆",
@@ -886,7 +1279,13 @@
     "behavior": "melee",
     "spawnWeight": 0.8,
     "desc": "不断渗出蓝色凝胶的史莱姆，看起来委屈但会坚定地堵住路线。",
-    "tip": "它们推进慢但耐打，别被拖在密集怪潮边缘。"
+    "tip": "它们推进慢但耐打，别被拖在密集怪潮边缘。",
+    "cd": 0.8,
+    "cdRandom": 1.2,
+    "cdInitial": 1.4,
+    "scale": 1.0,
+    "immuneFreeze": false,
+    "immuneGravity": false
   },
   "slime_devil": {
     "name": "恶魔史莱姆",
@@ -908,7 +1307,13 @@
     "behavior": "melee",
     "spawnWeight": 0.75,
     "desc": "被高温反应液染红的暴躁史莱姆，跳跃短促而凶狠。",
-    "tip": "伤害更高，看到红色残影时优先拉开距离。"
+    "tip": "伤害更高，看到红色残影时优先拉开距离。",
+    "cd": 0.8,
+    "cdRandom": 1.2,
+    "cdInitial": 1.4,
+    "scale": 1.0,
+    "immuneFreeze": false,
+    "immuneGravity": false
   },
   "slime_angel": {
     "name": "天使史莱姆",
@@ -930,7 +1335,13 @@
     "behavior": "melee",
     "spawnWeight": 0.65,
     "desc": "覆盖白色凝胶薄膜的大型史莱姆，像移动的实验室无菌泡泡。",
-    "tip": "体型更大，适合在空旷区域集中火力处理。"
+    "tip": "体型更大，适合在空旷区域集中火力处理。",
+    "cd": 0.8,
+    "cdRandom": 1.2,
+    "cdInitial": 1.4,
+    "scale": 1.0,
+    "immuneFreeze": false,
+    "immuneGravity": false
   },
   "thief": {
     "name": "实验室小偷",
@@ -954,7 +1365,13 @@
     "hitCoinDrop": 2,
     "spawnWeight": 1,
     "desc": "趁实验室断电出来搬金币的游荡目标，击倒后会撒出一串金币。",
-    "tip": "奖励波优先追击它，别让金币散在危险边缘。"
+    "tip": "奖励波优先追击它，别让金币散在危险边缘。",
+    "cd": 0.8,
+    "cdRandom": 1.2,
+    "cdInitial": 1.4,
+    "scale": 1.0,
+    "immuneFreeze": false,
+    "immuneGravity": false
   },
   "slime_king": {
     "name": "史莱姆王",
@@ -974,7 +1391,11 @@
     "behavior": "boss_slime_king",
     "boss": true,
     "desc": "培养池深处凝结出的巨型史莱姆核心，头顶一圈金色凝胶王冠。它会弹跳碾压、喷出环形凝胶弹、在玩家附近制造黏液区，并召唤各种史莱姆护驾。",
-    "tip": "看到它压低身体就是弹跳预警；优先拉开落点，再处理召唤出的史莱姆。"
+    "tip": "看到它压低身体就是弹跳预警；优先拉开落点，再处理召唤出的史莱姆。",
+    "cd": 0.8,
+    "cdRandom": 1.2,
+    "cdInitial": 1.4,
+    "scale": 1.0
   },
   "gear_king": {
     "name": "齿轮王",
@@ -994,7 +1415,11 @@
     "behavior": "boss_gear_king",
     "boss": true,
     "desc": "实验室中央传动井里的总控齿轮获得意识后自封为王。它会发射扇形齿轮弹幕、沿预警方向锯轨冲刺、铺设齿轮陷阱，并召唤齿轮怪维护自己的机械王座。",
-    "tip": "锯轨冲刺会留下短暂齿轮陷阱，别沿冲刺轨迹追击；后半血弹幕会变成红色高速齿轮。"
+    "tip": "锯轨冲刺会留下短暂齿轮陷阱，别沿冲刺轨迹追击；后半血弹幕会变成红色高速齿轮。",
+    "cd": 0.8,
+    "cdRandom": 1.2,
+    "cdInitial": 1.4,
+    "scale": 1.0
   },
   "void_fold_archon": {
     "name": "虚空折叠师",
@@ -1014,7 +1439,11 @@
     "behavior": "boss_void_fold",
     "boss": true,
     "desc": "废弃重力实验室的首席研究员被折叠进奇点后留下的虚空外壳，背后悬浮着三层事件视界圆环，会用奇点、星屑阵列和空间折叠冲刺重写战场距离。",
-    "tip": "奇点预警出现后先脱离牵引路线；它连续施法后会短暂显露核心，适合贴近爆发。"
+    "tip": "奇点预警出现后先脱离牵引路线；它连续施法后会短暂显露核心，适合贴近爆发。",
+    "cd": 0.8,
+    "cdRandom": 1.2,
+    "cdInitial": 1.4,
+    "scale": 1.0
   },
   "magrail_brood_matriarch": {
     "name": "磁轨巢母",
@@ -1034,6 +1463,10 @@
     "behavior": "boss_magrail_brood",
     "boss": true,
     "desc": "磁力回收系统和巢群培养仓融合出的终局实验体，黑色六边形甲片包裹着蓝紫磁轨核心，背部孢囊仓会不断投放巢种、地雷和几何弹幕。",
-    "tip": "距离过远时它会优先磁轨冲刺贴近；清理孢囊和地雷后，趁核心暴露窗口集中输出。"
+    "tip": "距离过远时它会优先磁轨冲刺贴近；清理孢囊和地雷后，趁核心暴露窗口集中输出。",
+    "cd": 0.8,
+    "cdRandom": 1.2,
+    "cdInitial": 1.4,
+    "scale": 1.0
   }
 }

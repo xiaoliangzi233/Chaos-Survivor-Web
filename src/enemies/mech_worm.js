@@ -1,14 +1,15 @@
-﻿import { TAU, WORLD_SIZE } from "../constants.js";
+import { TAU, WORLD_SIZE } from "../constants.js";
 import { state } from "../state.js";
 import { burst, pulse, trail } from "../effects.js";
+const DIFFICULTY_RANK = { ember: 0, neon: 1, overclock: 2, apocalypse: 3 };
 import { angleDiff, clamp } from "../utils.js";
 import { BaseEnemy } from "./BaseEnemy.js";
 import { applyPlayerDamage } from "../systems/items.js";
 
-const BASE_SEGMENT_COUNT = 8;
-const BASE_SEGMENT_GAP = 12;
-const STRIKE_RANGE = 360;
-const DIFFICULTY_RANK = { ember: 0, neon: 1, overclock: 2, apocalypse: 3 };
+
+
+
+
 
 export class MechWorm extends BaseEnemy {
   constructor(config, x, y) {
@@ -17,19 +18,19 @@ export class MechWorm extends BaseEnemy {
     this.trait = "\u86c7\u5f62\u5207\u5165";
     this.behavior = "mech_worm";
     this.r = Math.max(this.r, 16);
-    this.speed *= 1.08;
+    this.speed *= this.speedMul;
     this.knockbackResistance = Math.max(this.knockbackResistance, 0.34);
     this.state = "hunt";
     this.chargeTime = 0;
     this.strikeTime = 0;
-    this.cooldown = 1.1 + Math.random() * 0.7;
+    this.cooldown = this.cdInitial;
     this.strikeAngle = 0;
     this.trailTimer = 0;
     this.coastTime = 0;
     this.difficultyRank = DIFFICULTY_RANK[state.difficulty?.id || state.difficultyId] ?? 1;
-    this.segmentGap = BASE_SEGMENT_GAP + this.difficultyRank * 0.75;
-    this.segmentCount = BASE_SEGMENT_COUNT + Math.floor(this.difficultyRank / 2);
-    this.coastTurnRate = 0.95 + this.difficultyRank * 0.42;
+    this.segmentGap = this.segmentGapBase + this.difficultyRank * 0.75;
+    this.segmentCount = this.segmentCountBase + Math.floor(this.difficultyRank / 2);
+    this.coastTurnRate = this.coastTurnRateBase + this.difficultyRank * 0.42;
     this.path = [];
     this.segments = [];
     for (let i = 0; i < this.segmentCount; i++) {
@@ -84,9 +85,9 @@ export class MechWorm extends BaseEnemy {
     const side = Math.sin(this.anim * 0.65 + this.phase) * 0.18;
     this.x += (dx / d + -dy / d * side) * this.speed * dt;
     this.y += (dy / d + dx / d * side) * this.speed * dt;
-    if (d < STRIKE_RANGE && this.cooldown <= 0) {
+    if (d < this.strikeRange && this.cooldown <= 0) {
       this.state = "charge";
-      this.chargeTime = 0.46;
+      this.chargeTime = this.chargeDuration;
       this.strikeAngle = Math.atan2(dy, dx);
       pulse(this.x, this.y, 48, this.color, 0.24);
     }
@@ -99,14 +100,14 @@ export class MechWorm extends BaseEnemy {
     this.y -= (dy / d) * this.speed * 0.34 * dt;
     if (this.chargeTime <= 0) {
       this.state = "strike";
-      this.strikeTime = 0.62;
+      this.strikeTime = this.strikeDuration;
       burst(this.x, this.y, 10, this.color, 180);
     }
   }
 
   updateStrike(dt) {
     this.strikeTime -= dt;
-    const speed = this.speed * 3.25;
+    const speed = this.speed * this.strikeSpeedMul;
     const weave = Math.sin(this.strikeTime * 22 + this.phase) * 0.045;
     const angle = this.strikeAngle + weave;
     this.strikeAngle = angle;
@@ -119,8 +120,8 @@ export class MechWorm extends BaseEnemy {
     }
     if (this.strikeTime <= 0) {
       this.state = "coast";
-      this.coastTime = 0.46 + this.difficultyRank * 0.05;
-      this.cooldown = 1.65;
+      this.coastTime = this.coastTimeBase + this.difficultyRank * 0.05;
+      this.cooldown = this.cd + Math.random() * this.cdRandom;
     }
   }
 

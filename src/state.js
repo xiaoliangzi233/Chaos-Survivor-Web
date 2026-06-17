@@ -1,8 +1,13 @@
-import { FIRST_WAVE_SECONDS, waveDurationFor } from "./constants.js";
+﻿import { FIRST_WAVE_SECONDS, waveDurationFor } from "./constants.js";
 import { WEAPON_BASE_STATS } from "./config/editableGameData.js";
 
 export const state = {
   mode: "menu",
+  gameMode: "swarm",
+  challengeSpawnTime: 0,
+  challengeRemaining: 0,
+  controlMode: "auto",
+  manualPrimaryIndex: null,
   time: 0,
   wave: 1,
   waveDuration: FIRST_WAVE_SECONDS,
@@ -49,6 +54,7 @@ export const world = {
   grid: new Map(),
   boss: null,
   blackhole: null,
+  damageTexts: [],
 };
 
 export const input = {
@@ -59,6 +65,9 @@ export const input = {
   vx: 0,
   vy: 0,
   pointerId: null,
+  mouseX: 0,
+  mouseY: 0,
+  mouseDown: false,
 };
 
 export function addCameraShake(amount, cap = 18) {
@@ -191,8 +200,12 @@ export function resetRun(map) {
   world.grid.clear();
   world.boss = null;
   world.blackhole = null;
+  world.damageTexts = [];
 
+  state.gameMode = state.gameMode || "swarm";
   state.mode = "choosingWeapon";
+  state.controlMode = state.controlMode || "auto";
+  state.manualPrimaryIndex = state.controlMode === "manual" ? 0 : null;
   state.time = 0;
   state.wave = 1;
   state.waveDuration = waveDurationFor(1);
@@ -220,6 +233,9 @@ export function resetRun(map) {
   state.easterEggs = createEasterEggState();
   state.waveScenario = null;
   state.spawnedWaveEvents = new Set();
+  state.challengeSpawnTime = 0;
+  state.challengeRemaining = 0;
   state.difficultyId = state.difficultyId || "ember";
   state.ai = createAiState(previousAi || {});
 }
+

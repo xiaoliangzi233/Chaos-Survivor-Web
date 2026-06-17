@@ -1,21 +1,21 @@
-﻿import { WORLD_SIZE } from "../constants.js";
+import { WORLD_SIZE } from "../constants.js";
 import { state } from "../state.js";
 import { burst, pulse, trail } from "../effects.js";
 import { clamp } from "../utils.js";
 import { BaseEnemy } from "./BaseEnemy.js";
 import { applyPlayerDamage } from "../systems/items.js";
 
-const DASH_TRIGGER_RANGE = 330;
-const DASH_SPEED = 760;
-const DASH_TIME = 0.58;
-const DASH_DISTANCE = DASH_SPEED * DASH_TIME;
+
+
+
+
 const LANCER_CLOTHING_VARIANTS = ["scavenger", "guard", "hazard", "medic", "courier", "night_ops", "engineer"];
 
 export class Lancer extends BaseEnemy {
   constructor(config, x, y) {
     super(config, x, y);
     this.attackState = "approach";
-    this.attackCooldown = 0.75 + Math.random() * 0.65;
+    this.attackCooldown = this.attackCdInitial + Math.random() * this.attackCdInitialRandom;
     this.windupTime = 0;
     this.dashTime = 0;
     this.recoverTime = 0;
@@ -23,7 +23,11 @@ export class Lancer extends BaseEnemy {
     this.dashVx = 0;
     this.dashVy = 0;
     this.afterimageTimer = 0;
-    this.clothingVariant = LANCER_CLOTHING_VARIANTS[Math.floor(Math.random() * LANCER_CLOTHING_VARIANTS.length)];
+    if (this.variantIndex != null && this.variantIndex >= 0) {
+      this.clothingVariant = LANCER_CLOTHING_VARIANTS[this.variantIndex % LANCER_CLOTHING_VARIANTS.length];
+    } else {
+      this.clothingVariant = LANCER_CLOTHING_VARIANTS[Math.floor(Math.random() * LANCER_CLOTHING_VARIANTS.length)];
+    }
   }
 
   update(dt) {
@@ -46,9 +50,9 @@ export class Lancer extends BaseEnemy {
       this.y -= ny * this.speed * 0.42 * dt;
       if (this.windupTime <= 0) {
         this.attackState = "dashing";
-        this.dashTime = DASH_TIME;
-        this.dashVx = Math.cos(this.lockAngle) * DASH_SPEED;
-        this.dashVy = Math.sin(this.lockAngle) * DASH_SPEED;
+        this.dashTime = this.dashDuration;
+        this.dashVx = Math.cos(this.lockAngle) * this.dashSpeed;
+        this.dashVy = Math.sin(this.lockAngle) * this.dashSpeed;
         burst(this.x, this.y, 7, "#ffe7b0", 150);
       }
     } else if (this.attackState === "dashing") {
@@ -62,8 +66,8 @@ export class Lancer extends BaseEnemy {
       }
       if (this.dashTime <= 0) {
         this.attackState = "recover";
-        this.recoverTime = 0.34;
-        this.attackCooldown = 1.35;
+        this.recoverTime = this.recoverDuration;
+        this.attackCooldown = this.attackCd + Math.random() * this.attackCdRandom;
       }
     } else if (this.attackState === "recover") {
       this.recoverTime -= dt;
@@ -72,9 +76,9 @@ export class Lancer extends BaseEnemy {
       if (this.recoverTime <= 0) this.attackState = "approach";
     } else {
       this.chase(dt, dx, dy, d, 1.02);
-      if (d < DASH_TRIGGER_RANGE && this.attackCooldown <= 0) {
+      if (d < this.dashTriggerRange && this.attackCooldown <= 0) {
         this.attackState = "windup";
-        this.windupTime = 0.52;
+        this.windupTime = this.windupDuration;
         this.lockAngle = Math.atan2(dy, dx);
         pulse(this.x, this.y, 40, "#ffcf8a", 0.28);
       }
@@ -88,7 +92,7 @@ export class Lancer extends BaseEnemy {
     const hitDy = p.y - this.y;
     const hitDist = Math.hypot(hitDx, hitDy);
     if (hitDist < p.r + this.r + (this.attackState === "dashing" ? 14 : 0) && p.invuln <= 0) {
-      applyPlayerDamage(this.attackState === "dashing" ? this.damage * 1.35 : this.damage, this);
+      applyPlayerDamage(this.attackState === "dashing" ? this.damage * this.dashDamageMul : this.damage, this);
       p.invuln = 0.55;
       state.shake = this.attackState === "dashing" ? 11 : 7;
       state.flash = 0.26;
@@ -100,7 +104,7 @@ export class Lancer extends BaseEnemy {
     const charge = this.attackState === "windup";
     const dash = this.attackState === "dashing";
     const recover = this.attackState === "recover";
-    const z = 1.02;
+    const z = this.r / 15;
     const walk = Math.sin(this.anim);
     const run = Math.cos(this.anim);
     const crouch = charge ? 3 : recover ? -1 : Math.abs(run) * -1.6;
@@ -127,7 +131,7 @@ export class Lancer extends BaseEnemy {
 }
 
 function drawLungeTelegraph(ctx, e) {
-  const length = DASH_DISTANCE;
+  const length = e.dashSpeed * e.dashDuration;
   const a = e.lockAngle;
   const pulseAlpha = 0.38 + Math.sin(e.anim * 10) * 0.16;
   ctx.save();

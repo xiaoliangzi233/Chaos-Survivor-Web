@@ -1,7 +1,9 @@
 import { TOTAL_WAVES } from "../constants.js";
+import { getChallengeTotalWaves } from "../config/challenge-waves.js";
 import { state, world } from "../state.js";
 import { choice, formatTime } from "../utils.js";
 import { bestSummaryText, difficultyCards } from "../difficulty.js";
+import { getSettings, toggleSetting } from "../systems/settings.js";
 import {
   findFuseCandidate,
   fuseWeaponSlots,
@@ -39,6 +41,8 @@ export const ui = {
   loadoutWeaponPreview: document.getElementById("loadoutWeaponPreview"),
   loadoutWeaponList: document.getElementById("loadoutWeaponList"),
   loadoutConfirmButton: document.getElementById("loadoutConfirmButton"),
+  loadoutControlAuto: document.getElementById("loadoutControlAuto"),
+  loadoutControlManual: document.getElementById("loadoutControlManual"),
   loadoutBackButton: document.getElementById("loadoutBackButton"),
   loadoutDifficultyName: document.getElementById("loadoutDifficultyName"),
   loadoutWeaponName: document.getElementById("loadoutWeaponName"),
@@ -53,6 +57,7 @@ export const ui = {
   levelTitle: document.querySelector("#levelOverlay h2"),
   choiceList: document.getElementById("choiceList"),
   startButton: document.getElementById("startButton"),
+  continueButton: document.getElementById("continueButton"),
   gameVersionText: document.getElementById("gameVersionText"),
   restartButton: document.getElementById("restartButton"),
   resumeButton: document.getElementById("resumeButton"),
@@ -72,6 +77,12 @@ export const ui = {
   endTitle: document.getElementById("endTitle"),
   endStats: document.getElementById("endStats"),
   touchStick: document.getElementById("touchStick"),
+  settingsOverlay: document.getElementById("settingsOverlay"),
+  settingsButton: document.getElementById("settingsButton"),
+  modeOverlay: document.getElementById("modeOverlay"),
+  modeSwarmButton: document.getElementById("modeSwarmButton"),
+  modeChallengeButton: document.getElementById("modeChallengeButton"),
+  modeDescription: document.getElementById("modeDescription"),
 };
 
 export async function loadGameConfig() {
@@ -99,9 +110,19 @@ export function updateHud(fps) {
   ui.xpBar.parentElement?.style.setProperty("--value", xpRatio);
   ui.hpText.textContent = `${hp}`;
   ui.levelText.textContent = `Lv.${p.level}`;
-  ui.timerText.textContent = state.bossWaveActive ? (world.boss?.name || "BOSS") : formatTime(state.waveTimeLeft);
+  if (state.gameMode === "challenge" && state.waveScenario?.type === "annihilation" && !state.bossWaveActive) {
+    ui.timerText.textContent = `剩余敌怪 ${state.challengeRemaining}`;
+    ui.timerText.style.color = "var(--red)";
+  } else if (state.bossWaveActive) {
+    ui.timerText.textContent = world.boss?.name || "BOSS";
+    ui.timerText.style.color = "";
+  } else {
+    ui.timerText.textContent = formatTime(state.waveTimeLeft);
+    ui.timerText.style.color = "";
+  }
   ui.wavePanel?.classList.toggle("boss-active", state.bossWaveActive);
-  ui.waveText.textContent = `第 ${state.wave}/${TOTAL_WAVES} 波`;
+  const totalWaves = state.gameMode === "challenge" ? getChallengeTotalWaves() : TOTAL_WAVES;
+  ui.waveText.textContent = `第 ${state.wave}/${totalWaves} 波`;
   renderChip(ui.killText, "×", "击败", state.kills);
   renderChip(ui.goldText, "G", "金币", state.gold);
   renderChip(ui.fpsText, "F", "FPS", Math.round(fps));
@@ -156,16 +177,114 @@ export function updateBestText() {
   ui.bestText.textContent = bestSummaryText(formatTime);
 }
 
-export function showRunSetup({ weapons, onConfirm, onBack }) {
+let _modeOnBack = null;
+
+export function showModeSelect({ onSelect, onBack }) {
+  _modeOnBack = onBack || null;
+  hideAllOverlays();
+  ui.modeOverlay.classList.add("active");
+  ui.quickActions?.classList.add("blocked");
+  state.mode = "selectingMode";
+
+  const descriptions = {
+    swarm: "虫潮模式下，敌人会以高频率持续生成。你需要通过消灭敌人获取经验和金币，不断提升实力，在源源不断的虫潮中生存下去。共有多个难度可供选择，逐步解锁更高的挑战。",
+    challenge: "挑战模式下，敌人数量有限，生成逻辑由所选的关卡精确控制。敌人拥有大幅提升的生命值和伤害，但金币掉落也有所增加。波次可能要求歼灭全部敌人才可过关。请做好万全准备！",
+  };
+
+  function updateDescription(mode) {
+    ui.modeDescription.textContent = descriptions[mode] || "";
+    ui.modeDescription.className = `mode-description ${mode}-active`;
+  }
+
+  function selectMode(mode) {
+    hideModeSelect();
+    onSelect(mode);
+  }
+
+  ui.modeSwarmButton.onmouseenter = () => updateDescription("swarm");
+  ui.modeChallengeButton.onmouseenter = () => updateDescription("challenge");
+  ui.modeSwarmButton.onclick = () => selectMode("swarm");
+  ui.modeChallengeButton.onclick = () => selectMode("challenge");
+
+  // Click outside panel to return to main menu  
+  ui.modeOverlay.onclick = (event) => {
+    if (event.target === ui.modeOverlay) {
+      hideModeSelect();
+      state.mode = "menu";
+      ui.startOverlay.classList.add("active");
+    }
+  };
+
+  updateDescription("swarm");
+}
+
+export function hideModeSelect() {
+  ui.modeOverlay.classList.remove("active");
+  ui.quickActions?.classList.remove("blocked");
+}
+
+export function showSettings({ onBack }) {
+  hideAllOverlays();
+  ui.settingsOverlay.classList.add("active");
+  ui.quickActions?.classList.add("blocked");
+
+  function renderToggles() {
+    const s = getSettings();
+    const toggles = [
+      { id: "settingShowEnemyHpBar", key: "showEnemyHpBar" },
+      { id: "settingShowDamageNumbers", key: "showDamageNumbers" },
+    ];
+    for (const t of toggles) {
+      const el = document.getElementById(t.id);
+      if (!el) continue;
+      const checked = s[t.key];
+      el.setAttribute("aria-checked", String(checked));
+      el.onclick = () => {
+        toggleSetting(t.key);
+        renderToggles();
+      };
+    }
+  }
+
+  renderToggles();
+
+  // Click outside panel to close
+  ui.settingsOverlay.onclick = (event) => {
+    if (event.target === ui.settingsOverlay) {
+      hideSettings();
+      if (onBack) onBack();
+    }
+  };
+}
+
+export function hideSettings() {
+  ui.settingsOverlay.classList.remove("active");
+  ui.quickActions?.classList.remove("blocked");
+}
+export function showRunSetup({ weapons, onConfirm, onBack, gameMode }) {
   clearPreview();
   state.ai ||= {};
   ui.quickActions?.classList.add("blocked");
-  const difficulties = difficultyCards();
+  const difficulties = difficultyCards(gameMode || state.gameMode || "swarm");
   let difficultyIndex = Math.max(0, difficulties.findIndex((item) => item.currentHighest));
   let weaponIndex = 0;
   let selectedDifficulty = difficulties[difficultyIndex] || null;
   let selectedWeapon = weapons[weaponIndex] || null;
   let confirmed = false;
+  var savedMode = (function() { try { return localStorage.getItem("survivor_controlMode") || "auto"; } catch(e) { return "auto"; } })(); let selectedControlMode = (savedMode === "manual" ? "manual" : "auto");
+  setupControlModeButtons();
+
+  function setupControlModeButtons() {
+    if (!ui.loadoutControlAuto || !ui.loadoutControlManual) return;
+    ui.loadoutControlAuto.className = selectedControlMode === "auto" ? "loadout-control-btn compact active" : "loadout-control-btn compact";
+    ui.loadoutControlManual.className = selectedControlMode === "manual" ? "loadout-control-btn compact active" : "loadout-control-btn compact";
+    ui.loadoutControlAuto.onclick = function() {
+      selectedControlMode = "auto"; try { localStorage.setItem("survivor_controlMode", "auto"); } catch(e) {} setupControlModeButtons();
+    };
+    ui.loadoutControlManual.onclick = function() {
+      selectedControlMode = "manual"; try { localStorage.setItem("survivor_controlMode", "manual"); } catch(e) {} setupControlModeButtons();
+    };
+  }
 
   ui.loadoutDifficultyList.innerHTML = "";
   ui.loadoutWeaponList.innerHTML = "";
@@ -340,14 +459,14 @@ export function showRunSetup({ weapons, onConfirm, onBack }) {
     if (confirmed || !selectedDifficulty?.unlocked || !selectedWeapon) return;
     confirmed = true;
     ui.loadoutConfirmButton.disabled = true;
-    onConfirm({ difficulty: selectedDifficulty, weapon: selectedWeapon });
+    onConfirm({ difficulty: selectedDifficulty, weapon: selectedWeapon, controlMode: selectedControlMode });
     return true;
   }
 
   ui.loadoutConfirmButton.onclick = confirmLoadout;
   if (ui.loadoutBackButton) {
     ui.loadoutBackButton.onclick = () => {
-      if (confirmed) return;
+    if (confirmed) return;
       hideRunSetup();
       onBack?.();
     };
@@ -513,10 +632,17 @@ export function pickThree(items) {
   return choice(items, 3);
 }
 
+export function updateContinueButton(hasSave) {
+  if (ui.continueButton) {
+    ui.continueButton.disabled = !hasSave;
+    ui.continueButton.classList.toggle("has-save", hasSave);
+  }
+}
 export function showEnd(victory) {
   const p = state.player;
   ui.endEyebrow.textContent = victory ? "VICTORY" : "RUN COMPLETE";
-  ui.endTitle.textContent = victory ? "20 波已完成" : "生存结束";
+  const totalWavesEnd = state.gameMode === "challenge" ? getChallengeTotalWaves() : TOTAL_WAVES;
+  ui.endTitle.textContent = victory ? `${totalWavesEnd} 波已完成` : "生存结束";
   ui.endStats.innerHTML = "";
   [`难度 ${state.difficulty?.name || "未选择"}`, `时间 ${formatTime(state.time)}`, `等级 ${p.level}`, `击败 ${state.kills}`, `金币 ${state.gold}`].forEach((text) => {
     const item = document.createElement("span");

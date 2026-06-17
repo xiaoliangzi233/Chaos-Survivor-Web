@@ -4,13 +4,13 @@ import { burst, particle, pulse } from "../effects.js";
 import { clamp } from "../utils.js";
 import { BaseEnemy } from "./BaseEnemy.js";
 
-const STOP_RANGE = 560;
+
 
 export class Pentastar extends BaseEnemy {
   constructor(config, x, y) {
     super(config, x, y);
     this.behavior = "pentastar";
-    this.cooldown = 1.2 + Math.random() * 0.8;
+    this.cooldown = this.cdInitial;
     this.windup = 0;
     this.spin = Math.random() * TAU;
     this.fireAngle = 0;
@@ -34,12 +34,12 @@ export class Pentastar extends BaseEnemy {
       if (Math.random() < dt * 12) particle("scan", this.x, this.y, { color: this.color, life: 0.26, size: 2.5, alpha: 0.8 });
       if (this.windup <= 0) this.firePentagram();
     } else {
-      const dir = d < STOP_RANGE * 0.72 ? -0.55 : d > STOP_RANGE ? 0.42 : 0;
+      const dir = d < this.stopRange * 0.72 ? -0.55 : d > this.stopRange ? 0.42 : 0;
       const strafe = Math.sin(this.anim * 0.42) * 0.2;
       this.x += (dx / d * dir + -dy / d * strafe) * this.speed * dt;
       this.y += (dy / d * dir + dx / d * strafe) * this.speed * dt;
-      if (this.cooldown <= 0 && d < 760) {
-        this.windup = 0.55;
+      if (this.cooldown <= 0 && d < this.fireRange) {
+        this.windup = this.windupTime;
         this.fireAngle = Math.atan2(dy, dx) + Math.random() * 0.3 - 0.15;
         pulse(this.x, this.y, 42, this.color, 0.24);
       }
@@ -51,18 +51,18 @@ export class Pentastar extends BaseEnemy {
   }
 
   firePentagram() {
-    this.cooldown = 2.25;
+    this.cooldown = this.cd + Math.random() * this.cdRandom;
     for (let i = 0; i < 5; i++) {
       const a = this.fireAngle + i * TAU / 5;
       world.enemyProjectiles.push({
         x: this.x + Math.cos(a) * (this.r + 8),
         y: this.y + Math.sin(a) * (this.r + 8),
-        vx: Math.cos(a) * 230,
-        vy: Math.sin(a) * 230,
+        vx: Math.cos(a) * this.bulletSpeed,
+        vy: Math.sin(a) * this.bulletSpeed,
         r: 5.5,
         color: this.color,
-        damage: this.damage * 0.62,
-        life: 3.2,
+        damage: this.damage * this.bulletDamageMul,
+        life: this.bulletLife,
         shape: "starShard",
         spin: Math.random() * TAU,
       });

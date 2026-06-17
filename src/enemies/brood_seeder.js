@@ -4,14 +4,14 @@ import { burst, particle, pulse } from "../effects.js";
 import { clamp } from "../utils.js";
 import { BaseEnemy, spawnConfigured } from "./BaseEnemy.js";
 
-const SUMMON_LIMIT = 7;
-const KEEP_RANGE = 280;
+
+
 
 export class BroodSeeder extends BaseEnemy {
   constructor(config, x, y) {
     super(config, x, y);
     this.behavior = "summoner";
-    this.cooldown = 1.2 + Math.random() * 1.3;
+    this.cooldown = this.cdInitial;
     this.spawnWindup = 0;
     this.seedPulse = Math.random() * TAU;
     this.knockbackResistance = Math.max(this.knockbackResistance, 0.34);
@@ -34,13 +34,13 @@ export class BroodSeeder extends BaseEnemy {
       if (Math.random() < dt * 12) particle("mote", this.x, this.y, { color: this.color, life: 0.35, size: 3, alpha: 0.7 });
       if (this.spawnWindup <= 0) this.spawnBrood();
     } else {
-      const dir = d < KEEP_RANGE ? -0.85 : 0.35;
+      const dir = d < this.keepRange ? -0.85 : 0.35;
       const strafe = Math.sin(this.anim * 0.75) * 0.45;
       this.x += (dx / d * dir + -dy / d * strafe) * this.speed * dt;
       this.y += (dy / d * dir + dx / d * strafe) * this.speed * dt;
       if (this.cooldown <= 0 && this.canSummon()) {
-        this.spawnWindup = 0.58;
-        this.cooldown = 3.2 + Math.random() * 0.8;
+        this.spawnWindup = this.spawnWindupTime;
+        this.cooldown = this.cd + Math.random() * this.cdRandom;
         pulse(this.x, this.y, 42, this.color, 0.24);
       }
     }

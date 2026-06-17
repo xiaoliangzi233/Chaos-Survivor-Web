@@ -40,8 +40,7 @@ export function loadDifficultyProgress() {
   } catch {
     localStorage.removeItem(DIFFICULTY_SAVE_KEY);
   }
-  progress[difficultyOrder[0]] ||= { unlocked: true, completed: false };
-  progress[difficultyOrder[0]].unlocked = true;
+  unlockFirstDifficultyPerMode(progress);
   state.difficultyProgress = progress;
   return progress;
 }
@@ -112,10 +111,13 @@ export function bestSummaryText(formatTime) {
   return best ? `最高通关 ${best.name} · 最佳纪录 ${timeText}` : `最高通关 未解锁 · 最佳纪录 ${timeText}`;
 }
 
-export function difficultyCards() {
+export function difficultyCards(gameMode) {
   const progress = state.difficultyProgress || loadDifficultyProgress();
-  const highestUnlocked = highestUnlockedIndex(progress);
-  return difficultyOrder.map((id, index) => {
+  const modeOrder = gameMode
+    ? difficultyOrder.filter((id) => (difficultyConfig[id]?.gameMode || "swarm") === gameMode)
+    : difficultyOrder;
+  const highestUnlocked = highestUnlockedIndex(progress, modeOrder);
+  return modeOrder.map((id, index) => {
     const cfg = difficultyConfig[id];
     const record = progress[id] || {};
     return {
@@ -134,19 +136,33 @@ export function difficultyCards() {
 function defaultProgress() {
   const progress = {};
   for (const id of difficultyOrder) progress[id] = { unlocked: false, completed: false };
-  if (difficultyOrder[0]) progress[difficultyOrder[0]].unlocked = true;
+  unlockFirstDifficultyPerMode(progress);
   return progress;
 }
 
-function nextDifficultyId(id) {
-  const index = difficultyOrder.indexOf(id);
-  return index >= 0 && index < difficultyOrder.length - 1 ? difficultyOrder[index + 1] : null;
+function unlockFirstDifficultyPerMode(progress) {
+  const seen = new Set();
+  for (const id of difficultyOrder) {
+    const mode = difficultyConfig[id]?.gameMode || "swarm";
+    if (!seen.has(mode)) {
+      seen.add(mode);
+      progress[id] = progress[id] || { unlocked: false, completed: false };
+      progress[id].unlocked = true;
+    }
+  }
 }
 
-function highestUnlockedIndex(progress) {
+function nextDifficultyId(id) {
+  const currentMode = difficultyConfig[id]?.gameMode || "swarm";
+  const modeOrder = difficultyOrder.filter((did) => (difficultyConfig[did]?.gameMode || "swarm") === currentMode);
+  const index = modeOrder.indexOf(id);
+  return index >= 0 && index < modeOrder.length - 1 ? modeOrder[index + 1] : null;
+}
+
+function highestUnlockedIndex(progress, modeOrder) {
   let best = 0;
-  for (let i = 0; i < difficultyOrder.length; i++) {
-    if (progress[difficultyOrder[i]]?.unlocked) best = i;
+  for (let i = 0; i < modeOrder.length; i++) {
+    if (progress[modeOrder[i]]?.unlocked) best = i;
   }
   return best;
 }

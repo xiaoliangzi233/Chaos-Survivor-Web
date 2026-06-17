@@ -1,5 +1,7 @@
 import { CAMERA_ZOOM, PARTICLE_LIMIT, TAU } from "./constants.js";
+import { getSetting } from "./systems/settings.js";
 import { state, world } from "./state.js";
+import { viewport } from "./systems/renderer.js";
 import { clamp, hexToRgba } from "./utils.js";
 
 const AMBIENT_LIMIT = 56;
@@ -61,7 +63,20 @@ export function trail(x, y, px, py, color, size = 5) {
 }
 
 export function spawnDamageText(amount, target, options = {}) {
-  return;
+  if (!getSetting("showDamageNumbers")) return null;
+  if (!target || target.dead) return null;
+  world.damageTexts.push({
+    x: target.x + (Math.random() - 0.5) * 16,
+    y: target.y - target.r - 4,
+    vx: (Math.random() - 0.5) * 30,
+    vy: -60 - Math.random() * 40,
+    text: String(Math.round(amount)),
+    life: 0.7 + Math.random() * 0.3,
+    maxLife: 0.7 + Math.random() * 0.3,
+    size: options.critical ? 25 : 21,
+    critical: Boolean(options.critical),
+  });
+  return null;
 }
 
 export function dust(x, y, vx, vy) {
@@ -442,3 +457,39 @@ function pointVisible(x, y, camX, camY, viewW, viewH, pad = 0) {
 function rectVisible(x, y, w, h, camX, camY, viewW, viewH, pad = 0) {
   return x + w >= camX - pad && x <= camX + viewW + pad && y + h >= camY - pad && y <= camY + viewH + pad;
 }
+
+export function updateDamageTexts(dt) {
+  if (!world.damageTexts) return;
+  for (let i = world.damageTexts.length - 1; i >= 0; i--) {
+    const dt2 = world.damageTexts[i];
+    dt2.life -= dt;
+    if (dt2.life <= 0) {
+      world.damageTexts.splice(i, 1);
+      continue;
+    }
+    dt2.y += dt2.vy * dt;
+    dt2.x += dt2.vx * dt;
+  }
+}
+
+const DAMAGE_FONT = "'Zpix', 'Fusion Pixel 12px Monospaced SC', 'Cubic 11', 'Press Start 2P', 'Pixelify Sans', 'Silkscreen', 'Courier New', monospace";
+
+export function drawDamageTexts(ctx, cx, cy, zoom) {
+  if (!world.damageTexts) return;
+  for (const dt2 of world.damageTexts) {
+    const alpha = Math.max(0, dt2.life / dt2.maxLife);
+    const screenX = (dt2.x - cx) * zoom;
+    const screenY = (dt2.y - cy) * zoom;
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.font = "bold " + dt2.size + "px " + DAMAGE_FONT;
+    ctx.textAlign = "center";
+    ctx.fillStyle = dt2.critical ? "#ffd166" : "#ffffff";
+    ctx.strokeStyle = "rgba(0,0,0,0.6)";
+    ctx.lineWidth = 2;
+    ctx.strokeText(dt2.text, screenX, screenY);
+    ctx.fillText(dt2.text, screenX, screenY);
+    ctx.restore();
+  }
+}
+

@@ -4,14 +4,14 @@ import { burst, particle, pulse } from "../effects.js";
 import { clamp } from "../utils.js";
 import { BaseEnemy } from "./BaseEnemy.js";
 
-const KEEP_RANGE = 680;
-const FIRE_RANGE = 1160;
+
+
 
 export class Artillery extends BaseEnemy {
   constructor(config, x, y) {
     super(config, x, y);
     this.behavior = "artillery";
-    this.cooldown = 1.4 + Math.random() * 0.8;
+    this.cooldown = this.cdInitial;
     this.charge = 0;
     this.target = { x, y };
     this.knockbackResistance = Math.max(this.knockbackResistance, 0.62);
@@ -33,14 +33,14 @@ export class Artillery extends BaseEnemy {
       if (Math.random() < dt * 12) particle("ember", this.x, this.y - this.r, { color: this.color, life: 0.32, size: 3.5, alpha: 0.88 });
       if (this.charge <= 0) this.launchShell();
     } else {
-      const dir = d < KEEP_RANGE ? -0.82 : d > FIRE_RANGE ? 0.18 : -0.1;
+      const dir = d < this.keepRange ? -0.82 : d > this.fireRange ? 0.18 : -0.1;
       const strafe = Math.sin(this.anim * 0.6) * 0.12;
       this.x += (dx / d * dir + -dy / d * strafe) * this.speed * dt;
       this.y += (dy / d * dir + dx / d * strafe) * this.speed * dt;
-      if (this.cooldown <= 0 && d < FIRE_RANGE) {
+      if (this.cooldown <= 0 && d < this.fireRange) {
         this.target = predictPlayerTarget();
-        this.charge = this.elite ? 1.25 : 1.65;
-        this.cooldown = this.elite ? 2.7 : 3.35;
+        this.charge = this.elite ? this.chargeTimeElite : this.chargeTime;
+        this.cooldown = this.elite ? this.cdElite : this.cd + Math.random() * this.cdRandom;
         pulse(this.target.x, this.target.y, 78, this.color, 0.52);
       }
     }

@@ -14,6 +14,7 @@ export const state = {
   thiefSpawnCount: 0,
   bossWaveActive: false,
   kills: 0,
+  bossKills: 0,
   gold: 0,
   spawnBudget: 0,
   victory: false,
@@ -204,6 +205,7 @@ export function resetRun(map) {
   state.thiefSpawnCount = 0;
   state.bossWaveActive = false;
   state.kills = 0;
+  state.bossKills = 0;
   state.gold = 0;
   state.spawnBudget = 0;
   state.victory = false;

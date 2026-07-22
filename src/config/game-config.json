@@ -1,3 +1,5 @@
 {
-  "version": "beta 0.12"
+  "version": "beta 0.12",
+  "leaderboardApiBaseUrl": "api",
+  "userInfoUrl": "api/v1/survivor/session"
 }

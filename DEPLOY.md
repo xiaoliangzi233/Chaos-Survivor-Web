@@ -74,3 +74,13 @@ http://your-server-ip:5000/
 docker compose down
 docker compose up -d
 ```
+
+---
+
+## 3. 排行榜服务
+
+排行榜由 `backend/server.py` 提供，数据保存在单个 SQLite 文件中。
+
+- 直接使用 Nginx 部署时，先运行 `python backend/server.py --host 127.0.0.1 --port 8000`，再使用 `deploy/nginx/survivor.conf`。Nginx 会把同源 `/api/` 请求代理到该服务。
+- 使用 Docker Compose 部署时，`leaderboard` 服务会自动启动，数据库位于 `leaderboard-data` 命名卷；更新或重建容器不会删除排行榜数据。
+- 排行榜服务需要能够访问文档约定的现有用户信息接口，以便在服务端校验客户端提交的原始 `Authorization` token。

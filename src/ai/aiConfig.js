@@ -2,9 +2,9 @@ export const AI_STORAGE_ENABLED_KEY = "pixel-survivor-ai-enabled";
 
 export const AI_CONFIG = {
   enabled: false,
-  autoStart: true,
-  autoRestart: true,
-  reloadBeforeEachRun: true,
+  autoStart: false,
+  autoRestart: false,
+  reloadBeforeEachRun: false,
   maxTrainingRuns: 50,
   logLevel: "decision",
   storageKey: "pixel-survivor-ai-training",

@@ -14,6 +14,7 @@ import {
   pickThree,
   showEnd,
   loadGameConfig,
+  setBootProgress,
 } from "../ui/ui.js";
 import { generateMap } from "../systems/map.js";
 import { bindInput } from "../systems/input.js";
@@ -36,22 +37,57 @@ import { loadEditableGameData } from "../config/editableGameData.js";
 import { initAi, updateAi } from "../ai/aiController.js";
 import { loadAiRunConfig, loadAiTrainingModeConfig } from "../ai/aiConfigLoader.js";
 import { difficultyCards } from "../difficulty.js";
+import { initializeUserProfile } from "../services/userProfile.js";
+import {
+  beginLeaderboardRun,
+  checkpointLeaderboardRun,
+  configureLeaderboard,
+  finishLeaderboardRun,
+  hasActiveLeaderboardRun,
+  updateLeaderboardRun,
+} from "../systems/leaderboard.js";
+import {
+  closeLeaderboard,
+  initLeaderboardUi,
+  isLeaderboardOpen,
+  setLeaderboardUserSession,
+} from "../ui/leaderboardUi.js";
 
 const LEVEL_CHOICE_REFRESH_COST = 10;
 
 export async function bootGame() {
   const ctx = ui.canvas.getContext("2d", { alpha: false });
+  setBootProgress(6, "正在启动霓虹废墟");
   initInventoryUi();
   initCodexUi();
   initShopUi({ continueToNextWave: finishWaveTransition });
-  await loadGameConfig();
+  setBootProgress(18, "正在同步版本配置");
+  const config = await loadGameConfig();
+  setBootProgress(30, "正在识别玩家身份");
+  let userSession = await initializeUserProfile({ url: config.userInfoUrl });
+  setBootProgress(userSession.status === "ready" ? 42 : 38, userSession.status === "ready" ? "玩家档案已就绪" : "访客模式：排行榜暂不可同步");
+  configureLeaderboard({
+    baseUrl: config.leaderboardApiBaseUrl,
+    token: userSession.token,
+    user: userSession.user,
+  });
+  initLeaderboardUi({
+    session: userSession,
+    onBeforeOpen: closeCodex,
+    onRefreshIdentity: refreshLeaderboardIdentity,
+  });
+  setBootProgress(54, "正在加载武器与道具");
   await loadEditableGameData();
   refreshStarterWeapons();
+  setBootProgress(66, "正在校准难度曲线");
   await setupDifficultyConfig();
   loadDifficultyProgress();
+  setBootProgress(78, "正在生成敌人档案");
   await setupEnemyRegistry();
+  setBootProgress(88, "正在装配智能模块");
   const aiTrainingMode = await loadAiTrainingModeConfig();
   const aiRunConfig = await loadAiRunConfig();
+  setBootProgress(100, "加载完成", { done: true });
   const MAX_FRAME_RATE = 60;
   const FRAME_MS = 1000 / MAX_FRAME_RATE;
   let lastTime = 0;
@@ -59,8 +95,22 @@ export async function bootGame() {
   let fpsAcc = 0;
   let fpsFrames = 0;
 
+  async function refreshLeaderboardIdentity() {
+    userSession = await initializeUserProfile({ force: true, url: config.userInfoUrl });
+    configureLeaderboard({
+      baseUrl: config.leaderboardApiBaseUrl,
+      token: userSession.token,
+      user: userSession.user,
+    });
+    setLeaderboardUserSession(userSession);
+    return userSession;
+  }
+
   function start() {
+    if (isLeaderboardOpen()) return;
+    if (hasActiveLeaderboardRun()) finishLeaderboardRun(leaderboardSnapshot(), "ABANDONED");
     closeCodex();
+    closeLeaderboard();
     hideAllOverlays();
     state.mode = "choosingWeapon";
     showRunSetup({
@@ -82,6 +132,7 @@ export async function bootGame() {
     state.initialWeaponId = weapon.id;
     activateWeapon(weapon.id);
     state.mode = "playing";
+    beginLeaderboardRun(difficulty.id);
     resetWaveScenarioState();
     applyWaveStartScenario();
     playSfx("start");
@@ -161,6 +212,7 @@ export async function bootGame() {
   }
 
   function completeWave() {
+    if (isBossWave(state.wave)) state.bossKills++;
     state.waveTimeLeft = 0;
     state.spawnBudget = 0;
     state.pendingVictory = state.wave >= TOTAL_WAVES;
@@ -201,6 +253,7 @@ export async function bootGame() {
   }
 
   function endGame(victory) {
+    finishLeaderboardRun(leaderboardSnapshot(), victory ? "VICTORY" : "DEFEAT");
     state.mode = "ended";
     state.victory = victory;
     if (victory) recordDifficultyVictory();
@@ -241,7 +294,9 @@ export async function bootGame() {
   }
 
   function returnToMenu() {
+    if (hasActiveLeaderboardRun()) finishLeaderboardRun(leaderboardSnapshot(), "ABANDONED");
     closeCodex();
+    closeLeaderboard();
     stopMusic();
     resetRun(generateMap());
     state.shop = createShopState();
@@ -258,6 +313,7 @@ export async function bootGame() {
     const bossWave = isBossWave(state.wave);
     state.bossWaveActive = bossWave;
     state.time += dt;
+    updateLeaderboardRun(dt, leaderboardSnapshot());
     if (!bossWave) state.waveTimeLeft = Math.max(0, state.waveTimeLeft - dt);
     state.shake = Math.max(0, state.shake - dt * 20);
     state.flash = Math.max(0, state.flash - dt * 3);
@@ -303,6 +359,12 @@ export async function bootGame() {
 
   resizeCanvas(ui.canvas, ctx);
   window.addEventListener("resize", () => resizeCanvas(ui.canvas, ctx));
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "hidden") checkpointLeaderboardRun(leaderboardSnapshot());
+  });
+  window.addEventListener("pagehide", (event) => {
+    if (!event.persisted && hasActiveLeaderboardRun()) finishLeaderboardRun(leaderboardSnapshot(), "ABANDONED");
+  });
   bindInput({ start, restart: start, togglePause, resume: resumeGame, returnToMenu });
   resetRun(generateMap());
   state.shop = createShopState();
@@ -325,4 +387,12 @@ export async function bootGame() {
   });
   updateBestText();
   requestAnimationFrame(loop);
+
+  function leaderboardSnapshot() {
+    return {
+      time: state.time,
+      kills: state.kills,
+      bossKills: state.bossKills,
+    };
+  }
 }

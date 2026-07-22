@@ -16,6 +16,12 @@ let stopPreview = null;
 const hudLast = { hp: null, xp: null, kills: null, gold: null, level: null };
 const FALLBACK_VERSION = "v0.1.0";
 
+export const gameConfig = {
+  version: FALLBACK_VERSION,
+  leaderboardApiBaseUrl: "api",
+  userInfoUrl: "api/v1/survivor/session",
+};
+
 export const ui = {
   canvas: document.getElementById("gameCanvas"),
   quickActions: document.querySelector(".quick-actions"),
@@ -54,6 +60,9 @@ export const ui = {
   choiceList: document.getElementById("choiceList"),
   startButton: document.getElementById("startButton"),
   gameVersionText: document.getElementById("gameVersionText"),
+  bootProgress: document.getElementById("bootProgress"),
+  bootProgressText: document.getElementById("bootProgressText"),
+  bootProgressBar: document.getElementById("bootProgressBar"),
   restartButton: document.getElementById("restartButton"),
   resumeButton: document.getElementById("resumeButton"),
   pauseRestartButton: document.getElementById("pauseRestartButton"),
@@ -79,9 +88,30 @@ export async function loadGameConfig() {
     const response = await fetch(new URL("../config/game-config.json", import.meta.url), { cache: "no-store" });
     if (!response.ok) throw new Error(`game config ${response.status}`);
     const config = await response.json();
-    if (ui.gameVersionText) ui.gameVersionText.textContent = config.version || FALLBACK_VERSION;
+    Object.assign(gameConfig, config);
+    if (ui.gameVersionText) ui.gameVersionText.textContent = gameConfig.version || FALLBACK_VERSION;
   } catch {
     if (ui.gameVersionText) ui.gameVersionText.textContent = FALLBACK_VERSION;
+  }
+  return gameConfig;
+}
+
+export function setBootProgress(progress, label, { done = false } = {}) {
+  const normalized = Math.max(0, Math.min(100, Number(progress) || 0));
+  document.body.classList.toggle("is-booting", !done);
+  if (ui.bootProgress) {
+    ui.bootProgress.classList.toggle("done", done);
+    ui.bootProgress.setAttribute("aria-label", `${label || "加载中"} ${Math.round(normalized)}%`);
+  }
+  if (ui.bootProgressText && label) ui.bootProgressText.textContent = label;
+  if (ui.bootProgressBar) ui.bootProgressBar.style.setProperty("--boot-progress", `${normalized}%`);
+  if (ui.startButton) {
+    ui.startButton.disabled = !done;
+    ui.startButton.setAttribute("aria-busy", done ? "false" : "true");
+    const labelNode = ui.startButton.querySelector("span");
+    const subLabelNode = ui.startButton.querySelector("i");
+    if (labelNode) labelNode.textContent = done ? "开始" : "加载";
+    if (subLabelNode) subLabelNode.textContent = done ? "START" : `${Math.round(normalized)}%`;
   }
 }
 

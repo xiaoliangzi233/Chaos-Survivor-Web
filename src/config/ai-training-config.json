@@ -1,5 +1,5 @@
 {
-  "enabled": true,
-  "clearTrainingOnStartup": true,
-  "openLoadoutOnStartup": true
+  "enabled": false,
+  "clearTrainingOnStartup": false,
+  "openLoadoutOnStartup": false
 }

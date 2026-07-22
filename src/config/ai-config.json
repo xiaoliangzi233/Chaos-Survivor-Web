@@ -1,8 +1,8 @@
 {
-  "enabled": true,
-  "autoStart": true,
-  "autoRestart": true,
-  "reloadBeforeEachRun": true,
+  "enabled": false,
+  "autoStart": false,
+  "autoRestart": false,
+  "reloadBeforeEachRun": false,
   "maxTrainingRuns": "infinite",
   "logLevel": "decision",
   "storageKey": "pixel-survivor-ai-training",

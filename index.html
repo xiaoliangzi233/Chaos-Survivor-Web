@@ -7,10 +7,10 @@
     <meta http-equiv="Pragma" content="no-cache" />
     <meta http-equiv="Expires" content="0" />
     <title>混乱幸存者</title>
-    <link rel="icon" href="./favicon.ico" type="image/x-icon" />
+    <link rel="icon" href="./assets/survivor-app-icon.png" type="image/png" />
     <link rel="stylesheet" href="./styles.css" />
   </head>
-  <body>
+  <body class="is-menu is-booting">
     <main id="gameRoot">
       <canvas id="gameCanvas" aria-label="混乱幸存者游戏区域"></canvas>
 
@@ -62,15 +62,58 @@
           <span>NEON RUINS Survivor</span>
           <h1>混乱幸存者</h1>
         </div>
-        <button id="startButton" type="button" class="menu-start-button" aria-label="开始游戏">
-          <span>开始</span>
-          <i>START</i>
+        <button id="startButton" type="button" class="menu-start-button" aria-label="开始游戏" aria-busy="true" disabled>
+          <span>加载</span>
+          <i>0%</i>
         </button>
         <p id="bestText" class="menu-best">最佳纪录 00:00</p>
+        <div id="bootProgress" class="menu-boot-progress" role="status" aria-live="polite">
+          <span id="bootProgressText">正在同步配置</span>
+          <div><i id="bootProgressBar"></i></div>
+        </div>
+        <p id="gameVersionText" class="menu-version">v0.1.0</p>
+      </section>
+
+      <nav class="menu-actions" aria-label="主菜单功能">
         <button id="codexButton" type="button" class="menu-codex-button" aria-label="打开图鉴">
           <span>图鉴</span>
         </button>
-        <p id="gameVersionText" class="menu-version">v0.1.0</p>
+        <button id="leaderboardButton" type="button" class="menu-leaderboard-button" aria-label="打开排行榜" aria-controls="leaderboardOverlay" aria-expanded="false">
+          <span>排行榜</span>
+        </button>
+      </nav>
+
+      <section id="leaderboardOverlay" class="overlay leaderboard-overlay" aria-hidden="true">
+        <div class="leaderboard-panel" role="dialog" aria-modal="true" aria-labelledby="leaderboardTitle">
+          <header class="leaderboard-head">
+            <div>
+              <h2 id="leaderboardTitle">幸存者排行榜</h2>
+              <p><i></i> 认证用户 · 共享排行</p>
+            </div>
+            <button id="leaderboardCloseButton" type="button" class="leaderboard-close" aria-label="关闭排行榜">×</button>
+          </header>
+
+          <section id="leaderboardProfile" class="leaderboard-profile" aria-live="polite"></section>
+
+          <nav id="leaderboardTabs" class="leaderboard-tabs" role="tablist" aria-label="排行榜分类">
+            <button type="button" role="tab" data-metric="TOTAL_PLAY_SECONDS" aria-selected="true">总时长</button>
+            <button type="button" role="tab" data-metric="TOTAL_KILLS" aria-selected="false">总击杀</button>
+            <button type="button" role="tab" data-metric="TOTAL_BOSS_KILLS" aria-selected="false">Boss击杀</button>
+            <button type="button" role="tab" data-metric="HIGHEST_DIFFICULTY" aria-selected="false">最高难度</button>
+          </nav>
+
+          <div class="leaderboard-table-wrap">
+            <div class="leaderboard-table-head" aria-hidden="true">
+              <span>排名</span><span>玩家名称</span><span>工号</span><span id="leaderboardMetricLabel">总时长</span><span>最高难度</span><span>战局</span><span>胜局 / 胜率</span><span>最后游玩</span>
+            </div>
+            <div id="leaderboardRows" class="leaderboard-rows" role="tabpanel" aria-live="polite"></div>
+          </div>
+
+          <footer class="leaderboard-footer">
+            <p id="leaderboardStatus">仅统计已通过用户接口识别并完成同步的战局</p>
+            <button id="leaderboardRefreshButton" type="button">刷新排行榜</button>
+          </footer>
+        </div>
       </section>
 
       <section id="codexOverlay" class="overlay codex-overlay" aria-hidden="true">

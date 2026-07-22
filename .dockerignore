@@ -1,8 +1,8 @@
 .git
-.gitignore
-.superpowers
-.VSCodeCounter
+.edge-ai-test
+backend
+scripts
 tests
+**/__pycache__
+*.pyc
 *.md
-Dockerfile*
-docker-compose*.yml

@@ -290,7 +290,7 @@ def player_response(row: Dict[str, Any], total_players: int, current_user: bool)
         "rank": row["rank_no"],
         "totalPlayers": total_players,
         "username": row["username"],
-        "employeeIdMasked": mask_employee_id(row["employee_id"]),
+        "employeeId": display_employee_id(row["employee_id"]),
         "totalPlaySeconds": row["total_play_seconds"],
         "totalKills": row["total_kills"],
         "totalBossKills": row["total_boss_kills"],
@@ -304,9 +304,9 @@ def player_response(row: Dict[str, Any], total_players: int, current_user: bool)
     }
 
 
-def mask_employee_id(value: Optional[str]) -> str:
+def display_employee_id(value: Optional[str]) -> str:
     text = str(value or "").strip()
-    return f"••••{text[-4:]}" if text else "—"
+    return text or "—"
 
 
 def run_response(run_id: str, status: str, accepted_at: str) -> Dict[str, Any]:

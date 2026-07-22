@@ -88,7 +88,6 @@
           <header class="leaderboard-head">
             <div>
               <h2 id="leaderboardTitle">幸存者排行榜</h2>
-              <p><i></i> 认证用户 · 共享排行</p>
             </div>
             <button id="leaderboardCloseButton" type="button" class="leaderboard-close" aria-label="关闭排行榜">×</button>
           </header>
@@ -193,6 +192,42 @@
               <button id="loadoutConfirmButton" type="button" class="primary" disabled>开始作战</button>
             </div>
           </footer>
+        </div>
+      </section>
+
+      <section id="storyOverlay" class="overlay story-overlay" aria-hidden="true" tabindex="-1">
+        <div class="story-stage" role="dialog" aria-modal="true" aria-labelledby="storyTitle" aria-describedby="storyText">
+          <div class="story-atmosphere" aria-hidden="true">
+            <i></i><i></i><i></i><i></i><i></i><i></i>
+          </div>
+          <div class="story-scan" aria-hidden="true"></div>
+
+          <button id="storySkipButton" type="button" class="story-skip-button" aria-label="跳过当前难度剧情">
+            <svg viewBox="0 0 34 24" aria-hidden="true">
+              <path d="M3 4l8 8-8 8M14 4l8 8-8 8M28 5v14" />
+            </svg>
+            <span>跳过剧情</span>
+          </button>
+
+          <article class="story-panel">
+            <p id="storyArchive" class="story-archive">档案 01 / 再生舱</p>
+            <h2 id="storyTitle">苏醒协议</h2>
+            <div class="story-rule" aria-hidden="true"></div>
+            <p class="story-speaker-line">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M4 10v4h4l5 4V6L8 10H4Zm12.5-2.5a6 6 0 0 1 0 9M18.8 5a9.5 9.5 0 0 1 0 14" />
+              </svg>
+              <span id="storySpeaker">实验室广播</span>
+            </p>
+            <p id="storyText" class="story-text"></p>
+            <p id="storyAnnouncement" class="sr-only" aria-live="polite" aria-atomic="true"></p>
+            <footer class="story-panel-footer">
+              <div id="storyProgressTrack" class="story-progress-track" aria-hidden="true"></div>
+              <span id="storyProgress" class="story-progress">01 / 04</span>
+            </footer>
+          </article>
+
+          <p class="story-hint">点击画面或按 <kbd>Space</kbd> 加速</p>
         </div>
       </section>
 

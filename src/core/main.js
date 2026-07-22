@@ -52,6 +52,7 @@ import {
   isLeaderboardOpen,
   setLeaderboardUserSession,
 } from "../ui/leaderboardUi.js";
+import { cancelStoryPlayback, initStoryUi, playDifficultyStoryIfNeeded } from "../ui/storyUi.js";
 
 const LEVEL_CHOICE_REFRESH_COST = 10;
 
@@ -61,11 +62,23 @@ export async function bootGame() {
   initInventoryUi();
   initCodexUi();
   initShopUi({ continueToNextWave: finishWaveTransition });
+  initStoryUi();
   setBootProgress(18, "正在同步版本配置");
   const config = await loadGameConfig();
+  const skipLocalTokenValidation = Boolean(config.skipTokenValidationOnLocalhost) && isLocalDevelopmentHost();
   setBootProgress(30, "正在识别玩家身份");
-  let userSession = await initializeUserProfile({ url: config.userInfoUrl });
-  setBootProgress(userSession.status === "ready" ? 42 : 38, userSession.status === "ready" ? "玩家档案已就绪" : "访客模式：排行榜暂不可同步");
+  let userSession = await initializeUserProfile({
+    url: config.userInfoUrl,
+    skipTokenValidation: skipLocalTokenValidation,
+  });
+  setBootProgress(
+    userSession.status === "ready" || userSession.status === "local" ? 42 : 38,
+    userSession.status === "ready"
+      ? "玩家档案已就绪"
+      : userSession.status === "local"
+        ? "本地调试模式：已跳过身份校验"
+        : "访客模式：排行榜暂不可同步",
+  );
   configureLeaderboard({
     baseUrl: config.leaderboardApiBaseUrl,
     token: userSession.token,
@@ -96,7 +109,11 @@ export async function bootGame() {
   let fpsFrames = 0;
 
   async function refreshLeaderboardIdentity() {
-    userSession = await initializeUserProfile({ force: true, url: config.userInfoUrl });
+    userSession = await initializeUserProfile({
+      force: true,
+      url: config.userInfoUrl,
+      skipTokenValidation: skipLocalTokenValidation,
+    });
     configureLeaderboard({
       baseUrl: config.leaderboardApiBaseUrl,
       token: userSession.token,
@@ -121,22 +138,32 @@ export async function bootGame() {
     playSfx("select");
   }
 
-  function startWithLoadout({ difficulty, weapon }) {
+  async function startWithLoadout({ difficulty, weapon }) {
+    if (!difficulty?.id || !weapon?.id || state.mode === "story") return false;
     closeCodex();
+    hideAllOverlays();
+    hideRunSetup();
     selectDifficulty(difficulty.id);
     resetRun(generateMap());
     selectDifficulty(difficulty.id);
     state.shop = createShopState();
-    hideAllOverlays();
-    hideRunSetup();
     state.initialWeaponId = weapon.id;
     activateWeapon(weapon.id);
+    state.mode = "story";
+
+    await playDifficultyStoryIfNeeded({
+      difficultyId: difficulty.id,
+      playerId: userSession.status === "ready" ? userSession.user?.id : "local-dev",
+    });
+
+    if (state.mode !== "story") return false;
     state.mode = "playing";
     beginLeaderboardRun(difficulty.id);
     resetWaveScenarioState();
     applyWaveStartScenario();
     playSfx("start");
     startMusic();
+    return true;
   }
 
   function showLevelChoices() {
@@ -294,6 +321,7 @@ export async function bootGame() {
   }
 
   function returnToMenu() {
+    cancelStoryPlayback();
     if (hasActiveLeaderboardRun()) finishLeaderboardRun(leaderboardSnapshot(), "ABANDONED");
     closeCodex();
     closeLeaderboard();
@@ -395,4 +423,9 @@ export async function bootGame() {
       bossKills: state.bossKills,
     };
   }
+}
+
+function isLocalDevelopmentHost() {
+  const host = window.location.hostname.trim().toLowerCase();
+  return host === "localhost" || host === "127.0.0.1" || host === "[::1]" || host === "::1";
 }

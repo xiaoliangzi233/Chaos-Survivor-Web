@@ -1,4 +1,4 @@
-import { maskedEmployeeId } from "../services/userProfile.js";
+import { formatEmployeeId } from "../services/userProfile.js";
 import { fetchLeaderboard, LEADERBOARD_METRICS } from "../systems/leaderboard.js";
 
 const dom = {};
@@ -132,7 +132,7 @@ function renderProfile(player) {
   const name = document.createElement("strong");
   name.textContent = user?.username || (currentSession.status === "loading" ? "正在识别玩家" : "未识别玩家");
   const employee = document.createElement("span");
-  employee.textContent = `工号：${maskedEmployeeId(user?.employeeId)}`;
+  employee.textContent = `工号：${formatEmployeeId(user?.employeeId)}`;
   identity.append(name, employee);
 
   const stats = document.createElement("div");
@@ -159,7 +159,7 @@ function renderRows(rows) {
     row.append(
       cell(player.rank || "—", "leaderboard-rank"),
       cell(player.username || "未知玩家", "leaderboard-player"),
-      cell(player.employeeIdMasked || "—"),
+      cell(player.employeeId || "—"),
       cell(primaryValue(player), "leaderboard-primary"),
       cell(player.highestDifficultyName || "未通关", "leaderboard-difficulty"),
       cell(String(player.runCount || 0)),

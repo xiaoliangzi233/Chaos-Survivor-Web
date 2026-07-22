@@ -20,7 +20,22 @@ export function subscribeUserSession(listener) {
   return () => listeners.delete(listener);
 }
 
-export async function initializeUserProfile({ force = false, timeoutMs = 6000, url = "api/v1/survivor/session" } = {}) {
+export async function initializeUserProfile({
+  force = false,
+  timeoutMs = 6000,
+  url = "api/v1/survivor/session",
+  skipTokenValidation = false,
+} = {}) {
+  if (skipTokenValidation) {
+    setSession({
+      status: "local",
+      token: "",
+      user: null,
+      error: "本地开发模式已跳过 token 校验，排行榜不可用",
+    });
+    return session;
+  }
+
   const token = captureToken();
   if (!token) {
     setSession({ status: "missing", token: "", user: null, error: "未检测到登录 token" });
@@ -51,9 +66,9 @@ export async function initializeUserProfile({ force = false, timeoutMs = 6000, u
   return session;
 }
 
-export function maskedEmployeeId(employeeId) {
+export function formatEmployeeId(employeeId) {
   const value = String(employeeId || "").trim();
-  return value ? `••••${value.slice(-4)}` : "—";
+  return value || "—";
 }
 
 function captureToken() {

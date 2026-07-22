@@ -1,8 +1,12 @@
 .git
 .edge-ai-test
+.agents/
+.VSCodeCounter/
 backend
 scripts
 tests
 **/__pycache__
 *.pyc
 *.md
+*.tar
+*.zip

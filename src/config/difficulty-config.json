@@ -16,8 +16,8 @@
   "neon": {
     "name": "废弃实验室 难度2",
     "desc": "标准体验，按照当前平衡运行。",
-    "enemyLimit": 340,
-    "spawnRate": 0.8,
+    "enemyLimit": 300,
+    "spawnRate": 0.68,
     "enemyHp": 1,
     "enemyDamage": 1,
     "enemySpeed": 1,

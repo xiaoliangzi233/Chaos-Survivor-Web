@@ -1,4 +1,4 @@
-import { CELL_SIZE, ENEMY_LIMIT, GEM_LIMIT, TAU, WORLD_SIZE } from "../constants.js";
+import { CELL_SIZE, ENEMY_LIMIT, TAU, WORLD_SIZE } from "../constants.js";
 import { state, world, input } from "../state.js";
 import { clamp, distSq, circleHit } from "../utils.js";
 import { burst, dust, pulse } from "../effects.js";
@@ -6,12 +6,15 @@ import { playSfx } from "../audio.js";
 import { isBossWave, randomEnemyForWave, spawnEnemyById, spawnWaveBoss } from "./enemyRegistry.js";
 import { updateBlackhole } from "../blackhole.js";
 import { difficultyMultiplier, currentDifficulty } from "../difficulty.js";
-import { applyPlayerDamage, coinDropMultiplier, onWeaponHit, rollWeaponDamage, waveSpawnMultiplier } from "./items.js";
+import { applyPlayerDamage, onWeaponHit, rollWeaponDamage, waveSpawnMultiplier } from "./items.js";
 import { spawnDamageText } from "../effects.js";
 import { waveScenarioSpawnRate } from "../config/wave-scenario-config.js";
 import { activeWaveEffect } from "./waveScenarios.js";
 export { applyFrostMark } from "./statusEffects.js";
 import { applyFrostMark } from "./statusEffects.js";
+import { coinAmountForEnemy, dropCoin, dropGem } from "./rewards.js";
+
+export { coinAmountForEnemy, dropCoin, dropGem } from "./rewards.js";
 
 export function updatePlayer(dt) {
   const p = state.player;
@@ -166,40 +169,6 @@ export function applyKnockback(e, dx, dy, force) {
   e.knockbackY = (e.knockbackY || 0) + (dy / len) * applied;
 }
 
-export function dropGem(x, y, value) {
-  if (world.gems.length >= GEM_LIMIT) world.gems.shift();
-  world.gems.push({ x, y, value: Math.max(1, Math.round(value * difficultyMultiplier("xpGain"))), phase: Math.random() * TAU });
-}
-
-export function dropCoin(x, y, amount) {
-  const value = Math.max(1, Math.round(amount));
-  const count = Math.min(5, value);
-  let remaining = value;
-  for (let i = 0; i < count; i++) {
-    const angle = Math.random() * TAU;
-    const spread = 8 + Math.random() * 18;
-    const stack = i === count - 1 ? remaining : Math.max(1, Math.floor(value / count));
-    remaining -= stack;
-    world.coins.push({
-      x: x + Math.cos(angle) * spread,
-      y: y + Math.sin(angle) * spread,
-      value: stack,
-      phase: Math.random() * TAU,
-    });
-  }
-  while (world.coins.length > GEM_LIMIT) world.coins.shift();
-}
-
-export function coinAmountForEnemy(enemy) {
-  if (!enemy || enemy.elite || (enemy.category !== "小怪" && !enemy.boss)) return 0;
-  if (enemy.boss) {
-    const amount = enemy.coinDrop ?? Math.max(90, Math.round((enemy.xp || 100) * 0.55));
-    return Math.max(30, Math.round(amount * (enemy.rewardScale ?? 1) * difficultyMultiplier("coinGain") * coinDropMultiplier()));
-  }
-  const amount = 1 + Math.floor(Math.random() * 3) + Math.floor((enemy.xp || 1) / 10) + Math.floor(state.wave / 7);
-  return Math.min(24, Math.max(1, Math.round(amount * difficultyMultiplier("coinGain") * coinDropMultiplier())));
-}
-
 export function updateGems(dt) {
   const p = state.player;
   for (let i = world.gems.length - 1; i >= 0; i--) {
@@ -226,11 +195,14 @@ export function updateCoins(dt) {
     const c = world.coins[i];
     const dx = p.x - c.x;
     const dy = p.y - c.y;
-    const dist = Math.max(1, Math.hypot(dx, dy));
-    if (dist < p.magnet * 0.92) {
-      const pull = (1 - dist / (p.magnet * 0.92)) * 440 + 105;
-      c.x += (dx / dist) * pull * dt;
-      c.y += (dy / dist) * pull * dt;
+    let dist = Math.max(1, Math.hypot(dx, dy));
+    const magnetRadius = p.magnet * 1.12;
+    if (dist < magnetRadius) {
+      const pull = coinPullSpeed(p.speed, dist, magnetRadius);
+      const step = Math.min(dist, pull * dt);
+      c.x += (dx / dist) * step;
+      c.y += (dy / dist) * step;
+      dist = Math.hypot(p.x - c.x, p.y - c.y);
     }
     if (dist < p.r + 12) {
       state.gold += c.value;
@@ -238,6 +210,11 @@ export function updateCoins(dt) {
       playSfx("coin");
     }
   }
+}
+
+export function coinPullSpeed(playerSpeed, distance, magnetRadius) {
+  const edgeRatio = Math.max(0, Math.min(1, 1 - distance / Math.max(1, magnetRadius)));
+  return Math.max(720, Math.max(0, playerSpeed || 0) * 2.8) + edgeRatio * 900;
 }
 
 export function rebuildGrid() {
@@ -534,6 +511,7 @@ function releaseElitePulse(e) {
   const speed = e.eliteVariant === "giant" ? 245 : 285;
   const radius = e.eliteVariant === "giant" ? 7 : 5.5;
   const damage = Math.max(1, e.damage * (e.eliteVariant === "giant" ? 0.38 : 0.32));
+  const visual = eliteProjectileVisualFor(e);
   for (let i = 0; i < count; i++) {
     const a = offset + (i / count) * TAU;
     world.enemyProjectiles.push({
@@ -542,18 +520,41 @@ function releaseElitePulse(e) {
       vx: Math.cos(a) * speed,
       vy: Math.sin(a) * speed,
       r: radius,
-      color: e.eliteVariant === "giant" ? "#ffb86b" : "#ffe08a",
+      color: visual.color,
       damage,
       life: 4.2,
-      shape: "starShard",
+      shape: visual.shape,
+      slimePalette: visual.slimePalette,
       spin: Math.random() * TAU,
     });
   }
-  burst(e.x, e.y, e.eliteVariant === "giant" ? 24 : 16, "#ffd166", 210);
-  pulse(e.x, e.y, e.r * 3.6, "#ffd166", 0.42);
-  world.weaponFx.push({ kind: "shockRing", x: e.x, y: e.y, radius: e.r * 3.2, life: 0.34, maxLife: 0.34, color: "#ffd166" });
+  burst(e.x, e.y, e.eliteVariant === "giant" ? 24 : 16, visual.color, 210);
+  pulse(e.x, e.y, e.r * 3.6, visual.color, 0.42);
+  world.weaponFx.push({ kind: "shockRing", x: e.x, y: e.y, radius: e.r * 3.2, life: 0.34, maxLife: 0.34, color: visual.color });
   state.shake = Math.max(state.shake, e.eliteVariant === "giant" ? 7 : 4);
   e.eliteSkillCooldown = e.eliteSkillInterval;
+}
+
+export function eliteProjectileVisualFor(enemy) {
+  if (!enemy?.type?.startsWith("slime_")) {
+    return {
+      shape: "starShard",
+      color: enemy?.eliteVariant === "giant" ? "#ffb86b" : "#ffe08a",
+      slimePalette: null,
+    };
+  }
+  const colors = enemy.slimeColors || {};
+  const body = colors.body || enemy.color || "#77ff8a";
+  return {
+    shape: "slimeOrb",
+    color: body,
+    slimePalette: {
+      body,
+      dark: colors.dark || "#143d35",
+      light: colors.light || "#d9fff2",
+      core: colors.core || colors.light || "#ffffff",
+    },
+  };
 }
 
 function releaseEliteFireballs(e) {
@@ -889,7 +890,7 @@ function updateSpecialEnemyProjectile(b, dt) {
       b.vx += (dx / d * speed - b.vx) * Math.min(1, dt * 6.5);
       b.vy += (dy / d * speed - b.vy) * Math.min(1, dt * 6.5);
     }
-  } else if (b.shape === "fastGear" || b.shape === "starShard" || b.shape === "phaseShard" || b.shape === "arcaneOrb") {
+  } else if (b.shape === "fastGear" || b.shape === "starShard" || b.shape === "phaseShard" || b.shape === "arcaneOrb" || b.shape === "slimeOrb") {
     b.spin = (b.spin || 0) + dt * (b.shape === "fastGear" ? 18 : 6);
   }
 }

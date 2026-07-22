@@ -11,9 +11,10 @@ export function resetWaveScenarioState() {
 
 export function applyWaveStartScenario() {
   state.waveScenario = waveScenarioFor(state.difficultyId, state.wave);
-  if (!state.waveScenario) return;
+  if (!state.waveScenario) return null;
   spawnScenarioElite(state.waveScenario);
   spawnScenarioEvent(state.waveScenario);
+  return state.waveScenario;
 }
 
 export function activeWaveEffect(effect) {

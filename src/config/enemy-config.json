@@ -86,6 +86,9 @@
     "radius": 13,
     "color": "#9ff4ff",
     "behavior": "ranged",
+    "difficultyWeights": {
+      "neon": 0.5
+    },
     "desc": "实验室制冷系统泄漏后凝成的幽怨冰灵。总是保持社交距离，并朝你丢冰棍，嘴里念叨着“空调太贵，一起凉凉”。",
     "tip": "优先处理，避免远程弹幕在场上越积越多。",
     "difficultyWaves": {
@@ -430,6 +433,9 @@
     "radius": 12,
     "color": "#c7d2ff",
     "behavior": "razorbat",
+    "difficultyWeights": {
+      "neon": 0.5
+    },
     "desc": "原本是仿生扑翼无人机，被乌鸦教会了耍飞镖。它会绕着你头转圈，扔出去的回旋镖总是让人怀疑物理定律是否还在正常工作。",
     "tip": "留意弧线返回的翼刃，不要只躲第一段飞行轨迹。",
     "difficultyWaves": {
@@ -458,6 +464,9 @@
     "radius": 15,
     "color": "#b48cff",
     "behavior": "wizard",
+    "difficultyWeights": {
+      "neon": 0.5
+    },
     "desc": "实验室档案室管理员，翻到一本假的魔法书后走火入魔。现在他坚信自己是法杖持有者，隔着怪物们搓奥术麻将，专治前排不足恐惧症。",
     "tip": "看到符文聚拢时立刻横移，同时用追踪或穿透武器处理它。"
   },
@@ -476,6 +485,9 @@
     "radius": 15,
     "color": "#f3f7ff",
     "behavior": "pentastar",
+    "difficultyWeights": {
+      "neon": 0.5
+    },
     "desc": "某个完美主义工程师设计的五角星形卫星残骸，每根角都装了炮口，因为“不对称会死”。停下来转圈时就像一场死亡芭蕾，向五个方向撒花瓣般的弹幕。",
     "tip": "它停转发光时就是开火预警，提前离开五向通道。"
   },

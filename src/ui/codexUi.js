@@ -40,14 +40,23 @@ export function openCodex() {
   if (!dom.overlay) return;
   renderCodex();
   dom.overlay.classList.add("active");
+  document.body.classList.add("codex-open");
   dom.overlay.setAttribute("aria-hidden", "false");
+  dom.openButton?.setAttribute("aria-expanded", "true");
+  dom.openButton?.classList.add("active");
+  dom.closeButton?.focus({ preventScroll: true });
 }
 
 export function closeCodex() {
   if (!dom.overlay) return;
+  const wasOpen = dom.overlay.classList.contains("active");
   stopPreview();
   dom.overlay.classList.remove("active");
+  document.body.classList.remove("codex-open");
   dom.overlay.setAttribute("aria-hidden", "true");
+  dom.openButton?.setAttribute("aria-expanded", "false");
+  dom.openButton?.classList.remove("active");
+  if (wasOpen) dom.openButton?.focus({ preventScroll: true });
 }
 
 function renderTabs() {

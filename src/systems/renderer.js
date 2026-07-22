@@ -2388,6 +2388,10 @@ function drawEnemyProjectiles(ctx) {
       drawStormProjectile(ctx, b);
       continue;
     }
+    if (b.shape === "slimeOrb") {
+      drawSlimeOrbProjectile(ctx, b);
+      continue;
+    }
     if (b.shape === "pylonBolt" || b.shape === "gunnerShot" || b.shape === "laserShard") {
       drawEnemyBolt(ctx, b);
       continue;
@@ -2468,6 +2472,61 @@ function drawSpecialEnemyProjectile(ctx, b) {
   } else if (b.shape === "fastGear") {
     drawMiniGear(ctx, 0, 0, b.r * 1.8, 10, b.color);
   }
+  ctx.restore();
+}
+
+function drawSlimeOrbProjectile(ctx, b) {
+  const palette = b.slimePalette || {};
+  const body = palette.body || b.color || "#77ff8a";
+  const dark = palette.dark || "#143d35";
+  const light = palette.light || "#d9fff2";
+  const core = palette.core || "#ffffff";
+  const angle = Math.atan2(b.vy, b.vx);
+  const wobble = Math.sin(state.time * 16 + (b.spin || 0));
+  const r = b.r;
+
+  ctx.save();
+  ctx.translate(b.x, b.y);
+  ctx.rotate(angle);
+  if (enemyProjectileHasHalo(b)) glow(ctx, -r * 0.2, 0, r * 2.25, 0.22, body);
+
+  ctx.fillStyle = hexToRgba(body, 0.2);
+  ctx.beginPath();
+  ctx.ellipse(-r * 2.15, wobble * r * 0.18, r * 0.62, r * 0.38, 0, 0, TAU);
+  ctx.ellipse(-r * 3.05, -wobble * r * 0.14, r * 0.32, r * 0.24, 0, 0, TAU);
+  ctx.fill();
+
+  ctx.scale(1.08 + wobble * 0.055, 0.94 - wobble * 0.04);
+  ctx.beginPath();
+  ctx.moveTo(r * 1.28, 0);
+  ctx.bezierCurveTo(r * 1.04, -r * 0.92, r * 0.28, -r * 1.22, -r * 0.48, -r * 0.9);
+  ctx.bezierCurveTo(-r * 1.14, -r * 0.62, -r * 1.34, r * 0.25, -r * 0.72, r * 0.82);
+  ctx.bezierCurveTo(-r * 0.2, r * 1.24, r * 0.76, r * 0.88, r * 1.28, 0);
+  ctx.closePath();
+  ctx.fillStyle = body;
+  ctx.fill();
+  ctx.strokeStyle = dark;
+  ctx.lineWidth = Math.max(1.2, r * 0.2);
+  ctx.stroke();
+
+  ctx.fillStyle = hexToRgba(core, 0.5);
+  ctx.beginPath();
+  ctx.ellipse(r * 0.08, r * 0.12, r * 0.48, r * 0.4, -0.18, 0, TAU);
+  ctx.fill();
+  ctx.strokeStyle = hexToRgba(dark, 0.52);
+  ctx.lineWidth = Math.max(0.8, r * 0.1);
+  ctx.beginPath();
+  ctx.arc(-r * 0.05, r * 0.1, r * 0.34, 0.2, Math.PI - 0.16);
+  ctx.stroke();
+
+  ctx.fillStyle = light;
+  ctx.beginPath();
+  ctx.ellipse(r * 0.34, -r * 0.42, r * 0.25, r * 0.14, -0.42, 0, TAU);
+  ctx.fill();
+  ctx.fillStyle = hexToRgba("#ffffff", 0.78);
+  ctx.beginPath();
+  ctx.arc(r * 0.53, -r * 0.45, Math.max(1, r * 0.09), 0, TAU);
+  ctx.fill();
   ctx.restore();
 }
 

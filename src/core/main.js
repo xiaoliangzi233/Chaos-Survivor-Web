@@ -65,6 +65,8 @@ import {
   isFeedbackOpen,
   setFeedbackUserSession,
 } from "../ui/feedbackUi.js";
+import { closeHelp, initHelpUi, isHelpOpen } from "../ui/helpUi.js";
+import { clearWaveEventNotice, initWaveEventUi, showWaveEventNotice } from "../ui/waveEventUi.js";
 
 const LEVEL_CHOICE_REFRESH_COST = 10;
 
@@ -75,6 +77,14 @@ export async function bootGame() {
   initCodexUi();
   initShopUi({ continueToNextWave: finishWaveTransition });
   initStoryUi();
+  initWaveEventUi();
+  initHelpUi({
+    onBeforeOpen: () => {
+      closeCodex();
+      closeLeaderboard();
+      closeFeedback();
+    },
+  });
   setBootProgress(18, "正在同步版本配置");
   const config = await loadGameConfig();
   const skipLocalTokenValidation = Boolean(config.skipTokenValidationOnLocalhost) && isLocalDevelopmentHost();
@@ -112,6 +122,7 @@ export async function bootGame() {
     onBeforeOpen: () => {
       closeCodex();
       closeFeedback();
+      closeHelp();
     },
     onRefreshIdentity: refreshLeaderboardIdentity,
   });
@@ -120,6 +131,7 @@ export async function bootGame() {
     onBeforeOpen: () => {
       closeCodex();
       closeLeaderboard();
+      closeHelp();
     },
     onRefreshIdentity: refreshLeaderboardIdentity,
   });
@@ -175,11 +187,13 @@ export async function bootGame() {
   }
 
   function start() {
-    if (isLeaderboardOpen() || isFeedbackOpen()) return;
+    if (isLeaderboardOpen() || isFeedbackOpen() || isHelpOpen()) return;
     if (hasActiveLeaderboardRun()) finishLeaderboardRun(leaderboardSnapshot(), "ABANDONED");
     closeCodex();
     closeLeaderboard();
     closeFeedback();
+    closeHelp();
+    clearWaveEventNotice();
     hideAllOverlays();
     state.mode = "choosingWeapon";
     showRunSetup({
@@ -193,6 +207,8 @@ export async function bootGame() {
   async function startWithLoadout({ difficulty, weapon }) {
     if (!difficulty?.id || !weapon?.id || state.mode === "story") return false;
     closeCodex();
+    closeHelp();
+    clearWaveEventNotice();
     hideAllOverlays();
     hideRunSetup();
     selectDifficulty(difficulty.id);
@@ -212,7 +228,8 @@ export async function bootGame() {
     state.mode = "playing";
     beginLeaderboardRun(difficulty.id);
     resetWaveScenarioState();
-    applyWaveStartScenario();
+    const scenario = applyWaveStartScenario();
+    showWaveEventNotice({ wave: state.wave, scenario, boss: isBossWave(state.wave) });
     playSfx("start");
     startMusic();
     return true;
@@ -291,6 +308,7 @@ export async function bootGame() {
   }
 
   function completeWave() {
+    clearWaveEventNotice();
     if (isBossWave(state.wave)) state.bossKills++;
     state.waveTimeLeft = 0;
     state.spawnBudget = 0;
@@ -327,11 +345,13 @@ export async function bootGame() {
     consumeNextWaveSpawnBonus();
     startWaveItems();
     state.mode = "playing";
-    applyWaveStartScenario();
+    const scenario = applyWaveStartScenario();
+    showWaveEventNotice({ wave: state.wave, scenario, boss: isBossWave(state.wave) });
     playSfx("wave");
   }
 
   function endGame(victory) {
+    clearWaveEventNotice();
     finishLeaderboardRun(leaderboardSnapshot(), victory ? "VICTORY" : "DEFEAT");
     state.mode = "ended";
     state.victory = victory;
@@ -377,6 +397,8 @@ export async function bootGame() {
     closeCodex();
     closeLeaderboard();
     closeFeedback();
+    closeHelp();
+    clearWaveEventNotice();
     stopMusic();
     resetRun(generateMap());
     state.shop = createShopState();

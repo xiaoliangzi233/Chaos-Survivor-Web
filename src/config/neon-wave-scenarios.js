@@ -25,7 +25,7 @@ export const NEON_WAVE_SCENARIOS = [
   { wave: 10, pool: [], spawnRate: 0, boss: "slime_king" },
   { wave: 11, pool: ["magma_beetle", "pentastar", "wisp", "zombie"], spawnRate: 1.06 },
   { wave: 12, pool: ["magma_beetle", "mech_worm", "gearfiend", ...BASIC_SLIMES], spawnRate: 1.18, effect: "invisible_brain_eaters" },
-  { wave: 13, pool: ["thief", "doctor"], spawnRate: 0.72, reward: true, event: { type: "hazard_field", count: 18, kind: "gear_trap", color: "#ffd166", radius: 42, life: 999, fullWave: true, minPlayerDistance: 240 } },
+  { wave: 13, pool: ["thief", "doctor", "zombie", "lancer", "mech_worm", "magma_beetle", ...BASIC_SLIMES], spawnRate: 0.72, reward: true, event: { type: "hazard_field", count: 18, kind: "gear_trap", color: "#ffd166", radius: 42, life: 999, fullWave: true, minPlayerDistance: 240 } },
   { wave: 14, pool: ["shield_caster", "doctor", "zombie", "lancer", ...ALL_SLIMES], spawnRate: 1.34 },
   { wave: 15, pool: ["shield_caster", "razorbat", "pentastar", "magma_beetle", ...BASIC_SLIMES], spawnRate: 1.18, elite: { id: "shield_caster", variant: "elite", count: 1 } },
   { wave: 16, pool: ["wizard", "wisp", "pentastar", "shield_caster"], spawnRate: 1.08, effect: "mini_overdrive" },

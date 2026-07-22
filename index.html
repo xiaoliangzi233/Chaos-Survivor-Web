@@ -39,6 +39,7 @@
         <div id="wavePanel" class="hud-center">
           <strong id="timerText">00:30</strong>
           <span id="waveText">第 1/20 波</span>
+          <span id="waveEventBadge" class="wave-event-badge" aria-hidden="true"></span>
         </div>
 
         <div class="hud-right">
@@ -49,8 +50,16 @@
         </div>
       </section>
 
+      <section id="waveEventNotice" class="wave-event-notice" aria-hidden="true" aria-live="polite">
+        <div class="wave-event-frame">
+          <span id="waveEventEyebrow" class="wave-event-eyebrow">WAVE EVENT</span>
+          <strong id="waveEventTitle">特殊事件</strong>
+          <p id="waveEventDescription"></p>
+        </div>
+      </section>
+
       <nav class="quick-actions" aria-label="游戏操作">
-        <button id="inventoryButton" type="button" title="背包">背包</button>
+        <button id="inventoryButton" type="button" title="按 E 打开背包" aria-label="背包，快捷键 E"><span>背包</span><kbd>E</kbd></button>
         <button id="pauseButton" type="button" title="暂停/继续">II</button>
         <button id="muteButton" type="button" title="音效开关">♪</button>
       </nav>
@@ -75,7 +84,7 @@
       </section>
 
       <nav class="menu-actions" aria-label="主菜单功能">
-        <button id="codexButton" type="button" class="menu-codex-button" aria-label="打开图鉴">
+        <button id="codexButton" type="button" class="menu-codex-button" aria-label="打开图鉴" aria-controls="codexOverlay" aria-expanded="false">
           <span>图鉴</span>
         </button>
         <button id="leaderboardButton" type="button" class="menu-leaderboard-button" aria-label="打开排行榜" aria-controls="leaderboardOverlay" aria-expanded="false">
@@ -83,6 +92,9 @@
         </button>
         <button id="feedbackButton" type="button" class="menu-feedback-button" aria-label="打开用户反馈" aria-controls="feedbackOverlay" aria-expanded="false">
           <span>反馈</span>
+        </button>
+        <button id="helpButton" type="button" class="menu-help-button" aria-label="打开游戏帮助" aria-controls="helpOverlay" aria-expanded="false">
+          <span>帮助</span>
         </button>
       </nav>
 
@@ -182,6 +194,67 @@
               </div>
             </div>
           </div>
+        </div>
+      </section>
+
+      <section id="helpOverlay" class="overlay help-overlay" aria-hidden="true">
+        <div class="help-panel" role="dialog" aria-modal="true" aria-labelledby="helpTitle">
+          <header class="help-head">
+            <div>
+              <p class="eyebrow">SURVIVOR FIELD MANUAL</p>
+              <h2 id="helpTitle">实验体生存手册</h2>
+              <p>掌握移动、战斗与实验室资源循环。</p>
+            </div>
+            <button id="helpCloseButton" type="button" class="help-close" aria-label="关闭游戏帮助">×</button>
+          </header>
+
+          <nav id="helpTabs" class="help-tabs" role="tablist" aria-label="帮助分类">
+            <button id="helpTabControls" type="button" role="tab" data-help-tab="controls" aria-controls="helpPanelControls" aria-selected="true" tabindex="0"><span>01</span><strong>操作</strong></button>
+            <button id="helpTabCombat" type="button" role="tab" data-help-tab="combat" aria-controls="helpPanelCombat" aria-selected="false" tabindex="-1"><span>02</span><strong>战斗规则</strong></button>
+            <button id="helpTabGrowth" type="button" role="tab" data-help-tab="growth" aria-controls="helpPanelGrowth" aria-selected="false" tabindex="-1"><span>03</span><strong>商店与成长</strong></button>
+          </nav>
+
+          <div class="help-content">
+            <section id="helpPanelControls" class="help-tab-panel active" role="tabpanel" aria-labelledby="helpTabControls" data-help-panel="controls">
+              <article class="help-feature-card help-feature-primary">
+                <span class="help-card-index">MOVE</span>
+                <div class="help-key-cluster" aria-label="WASD 或方向键">
+                  <kbd>W</kbd><kbd>↑</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd><kbd>←</kbd><kbd>↓</kbd><kbd>→</kbd>
+                </div>
+                <h3>移动与走位</h3>
+                <p>使用 WASD 或方向键穿过实验场。武器会自动锁定目标，走位决定生存空间。</p>
+              </article>
+              <div class="help-card-grid">
+                <article class="help-feature-card"><kbd>E</kbd><h3>背包</h3><p>随时查看属性、武器、道具并进行合成或出售。</p></article>
+                <article class="help-feature-card"><div><kbd>P</kbd><kbd>Esc</kbd></div><h3>暂停</h3><p>暂停战局或从背包返回战场。</p></article>
+                <article class="help-feature-card"><kbd>Space</kbd><h3>快速开始</h3><p>在主菜单直接进入作战配置。</p></article>
+              </div>
+            </section>
+
+            <section id="helpPanelCombat" class="help-tab-panel" role="tabpanel" aria-labelledby="helpTabCombat" data-help-panel="combat" hidden>
+              <div class="help-protocol-list">
+                <article><span>01</span><div><h3>自动火力</h3><p>已装备武器自动寻找射程内目标。不同武器拥有独立射程、弹道与攻击节奏。</p></div></article>
+                <article><span>02</span><div><h3>经验强化</h3><p>击败敌人收集经验，升级时从三个强化选项中选择一项构筑本局能力。</p></div></article>
+                <article><span>03</span><div><h3>二十波逃生</h3><p>完成当前波次后进入商店整备；特殊事件会在开波时发出警报并常驻提示。</p></div></article>
+                <article><span>04</span><div><h3>首领与结局</h3><p>首领波没有普通倒计时。击败最终首领并完成第 20 波即可通关当前难度。</p></div></article>
+              </div>
+            </section>
+
+            <section id="helpPanelGrowth" class="help-tab-panel" role="tabpanel" aria-labelledby="helpTabGrowth" data-help-panel="growth" hidden>
+              <div class="help-growth-layout">
+                <article class="help-growth-card"><i>G</i><div><h3>购买与刷新</h3><p>金币可购买武器和道具。刷新会消耗金币，且连续刷新价格逐步提高。</p></div></article>
+                <article class="help-growth-card"><i>◇</i><div><h3>锁定商品</h3><p>锁定后的商品不会被刷新，也会保留到下一次波次商店。</p></div></article>
+                <article class="help-growth-card"><i>↑</i><div><h3>品质合成</h3><p>两件同类型、同品质武器可以合成为更高品质，传说品质无法继续合成。</p></div></article>
+                <article class="help-growth-card"><i>¥</i><div><h3>出售武器</h3><p>背包和商店武器栏均可出售武器，但必须至少保留一件武器。</p></div></article>
+                <article class="help-growth-card help-growth-wide"><i>▣</i><div><h3>账号进度</h3><p>难度解锁、最佳纪录和图鉴进度跟随当前认证玩家保存，切换账号不会共享。</p></div></article>
+              </div>
+            </section>
+          </div>
+
+          <footer class="help-footer">
+            <span>按 <kbd>Esc</kbd> 返回主菜单</span>
+            <em>H-07 FIELD GUIDE // REV.12</em>
+          </footer>
         </div>
       </section>
 

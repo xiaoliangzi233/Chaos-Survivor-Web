@@ -20,6 +20,18 @@ class NoCacheRequestHandler(SimpleHTTPRequestHandler):
             return
         self.send_error(404)
 
+    def do_PUT(self):
+        if self.path.startswith("/api/"):
+            self.proxy_api_request()
+            return
+        self.send_error(404)
+
+    def do_DELETE(self):
+        if self.path.startswith("/api/"):
+            self.proxy_api_request()
+            return
+        self.send_error(404)
+
     def do_OPTIONS(self):
         if self.path.startswith("/api/"):
             self.proxy_api_request()
@@ -65,10 +77,10 @@ class NoCacheRequestHandler(SimpleHTTPRequestHandler):
             self.write_proxy_response(exc.code, exc.headers, exc.read())
         except (error.URLError, TimeoutError) as exc:
             payload = json.dumps(
-                {"code": "LEADERBOARD_UNAVAILABLE", "message": "排行榜服务暂时不可用"},
+                {"code": "SURVIVOR_API_UNAVAILABLE", "message": "游戏数据服务暂时不可用"},
                 ensure_ascii=False,
             ).encode("utf-8")
-            self.log_error("Leaderboard proxy failed: %s", exc)
+            self.log_error("Survivor API proxy failed: %s", exc)
             self.write_proxy_response(502, {"Content-Type": "application/json; charset=utf-8"}, payload)
 
     def write_proxy_response(self, status, headers, body):

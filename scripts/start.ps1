@@ -40,7 +40,7 @@ $backendJob = $null
 Write-Host "Project Root : $projectRoot"
 Write-Host "Python       : $($launcher.Command) $($launcher.Args -join ' ')"
 Write-Host "Serving URL  : $url"
-Write-Host "Leaderboard : $apiBase/api"
+Write-Host "Data API     : $apiBase/api"
 Write-Host "Cache        : disabled for local development"
 
 if ($finalPort -ne $Port) {
@@ -64,7 +64,7 @@ if (-not $backendInUse) {
   Start-Sleep -Milliseconds 500
   if ($backendJob.State -ne "Running") {
     Receive-Job -Job $backendJob -Keep
-    throw "Leaderboard service failed to start. Run backend/server.py directly to inspect the error."
+    throw "Survivor data service failed to start. Run backend/server.py directly to inspect the error."
   }
   Write-Host "Backend      : started (job $($backendJob.Id))"
 } else {
@@ -90,6 +90,6 @@ try {
   if ($backendJob) {
     Stop-Job -Job $backendJob -ErrorAction SilentlyContinue
     Remove-Job -Job $backendJob -Force -ErrorAction SilentlyContinue
-    Write-Host "Leaderboard backend stopped."
+    Write-Host "Survivor data backend stopped."
   }
 }

@@ -1,4 +1,4 @@
-import { SAVE_KEY, TOTAL_WAVES, waveDurationFor } from "../constants.js";
+import { TOTAL_WAVES, waveDurationFor } from "../constants.js";
 import { state, world, resetRun } from "../state.js";
 import {
   ui,
@@ -32,7 +32,7 @@ import * as effects from "../effects.js";
 import { resizeCanvas, updateCamera, render } from "../systems/renderer.js";
 import { playSfx, startMusic, stopMusic, pauseMusic, resumeMusic } from "../audio.js";
 import { CAMERA_ZOOM } from "../constants.js";
-import { loadDifficultyProgress, recordDifficultyVictory, selectDifficulty, setupDifficultyConfig } from "../difficulty.js";
+import { difficultyOrder, loadDifficultyProgress, recordDifficultyVictory, selectDifficulty, setupDifficultyConfig } from "../difficulty.js";
 import { loadEditableGameData } from "../config/editableGameData.js";
 import { initAi, updateAi } from "../ai/aiController.js";
 import { loadAiRunConfig, loadAiTrainingModeConfig } from "../ai/aiConfigLoader.js";
@@ -53,6 +53,18 @@ import {
   setLeaderboardUserSession,
 } from "../ui/leaderboardUi.js";
 import { cancelStoryPlayback, initStoryUi, playDifficultyStoryIfNeeded } from "../ui/storyUi.js";
+import { configureFeedback } from "../systems/feedback.js";
+import {
+  configurePlayerProgress,
+  loadPlayerProgress,
+  recordBestSurvivalSeconds,
+} from "../systems/playerProgress.js";
+import {
+  closeFeedback,
+  initFeedbackUi,
+  isFeedbackOpen,
+  setFeedbackUserSession,
+} from "../ui/feedbackUi.js";
 
 const LEVEL_CHOICE_REFRESH_COST = 10;
 
@@ -84,9 +96,31 @@ export async function bootGame() {
     token: userSession.token,
     user: userSession.user,
   });
+  configureFeedback({
+    baseUrl: config.leaderboardApiBaseUrl,
+    token: userSession.token,
+    user: userSession.user,
+  });
+  configurePlayerProgress({
+    baseUrl: config.leaderboardApiBaseUrl,
+    token: userSession.token,
+    user: userSession.user,
+    localMode: userSession.status === "local",
+  });
   initLeaderboardUi({
     session: userSession,
-    onBeforeOpen: closeCodex,
+    onBeforeOpen: () => {
+      closeCodex();
+      closeFeedback();
+    },
+    onRefreshIdentity: refreshLeaderboardIdentity,
+  });
+  initFeedbackUi({
+    session: userSession,
+    onBeforeOpen: () => {
+      closeCodex();
+      closeLeaderboard();
+    },
     onRefreshIdentity: refreshLeaderboardIdentity,
   });
   setBootProgress(54, "正在加载武器与道具");
@@ -94,6 +128,8 @@ export async function bootGame() {
   refreshStarterWeapons();
   setBootProgress(66, "正在校准难度曲线");
   await setupDifficultyConfig();
+  setBootProgress(72, "正在同步玩家进度");
+  await loadPlayerProgress({ difficultyIds: difficultyOrder });
   loadDifficultyProgress();
   setBootProgress(78, "正在生成敌人档案");
   await setupEnemyRegistry();
@@ -119,15 +155,31 @@ export async function bootGame() {
       token: userSession.token,
       user: userSession.user,
     });
+    configureFeedback({
+      baseUrl: config.leaderboardApiBaseUrl,
+      token: userSession.token,
+      user: userSession.user,
+    });
+    configurePlayerProgress({
+      baseUrl: config.leaderboardApiBaseUrl,
+      token: userSession.token,
+      user: userSession.user,
+      localMode: userSession.status === "local",
+    });
+    await loadPlayerProgress({ difficultyIds: difficultyOrder });
+    loadDifficultyProgress();
+    updateBestText();
     setLeaderboardUserSession(userSession);
+    setFeedbackUserSession(userSession);
     return userSession;
   }
 
   function start() {
-    if (isLeaderboardOpen()) return;
+    if (isLeaderboardOpen() || isFeedbackOpen()) return;
     if (hasActiveLeaderboardRun()) finishLeaderboardRun(leaderboardSnapshot(), "ABANDONED");
     closeCodex();
     closeLeaderboard();
+    closeFeedback();
     hideAllOverlays();
     state.mode = "choosingWeapon";
     showRunSetup({
@@ -284,8 +336,7 @@ export async function bootGame() {
     state.mode = "ended";
     state.victory = victory;
     if (victory) recordDifficultyVictory();
-    const best = Number(localStorage.getItem(SAVE_KEY) || 0);
-    if (state.time > best) localStorage.setItem(SAVE_KEY, String(Math.floor(state.time)));
+    recordBestSurvivalSeconds(Math.floor(state.time));
     hidePauseMenu();
     closeInventory();
     closeShop();
@@ -325,6 +376,7 @@ export async function bootGame() {
     if (hasActiveLeaderboardRun()) finishLeaderboardRun(leaderboardSnapshot(), "ABANDONED");
     closeCodex();
     closeLeaderboard();
+    closeFeedback();
     stopMusic();
     resetRun(generateMap());
     state.shop = createShopState();

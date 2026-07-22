@@ -99,15 +99,23 @@ export function purchaseDisabledReason(offer) {
 
 export function sellWeaponSlot(uid) {
   const inv = state.inventory;
-  if (!inv) return { ok: false, reason: "背包不存在" };
+  const disabledReason = weaponSellDisabledReason(uid);
+  if (disabledReason) return { ok: false, reason: disabledReason };
   const idx = inv.weaponSlots.findIndex((slot) => slot.uid === uid);
-  if (idx < 0) return { ok: false, reason: "武器不存在" };
   const [slot] = inv.weaponSlots.splice(idx, 1);
   state.gold += weaponSellPrice(slot);
   if (inv.selectedWeaponUid === uid) inv.selectedWeaponUid = inv.weaponSlots[0]?.uid ?? null;
   recomputeAllWeapons();
   playSfx("coin");
   return { ok: true };
+}
+
+export function weaponSellDisabledReason(uid) {
+  const inv = state.inventory;
+  if (!inv) return "背包不存在";
+  if (!inv.weaponSlots.some((slot) => slot.uid === uid)) return "武器不存在";
+  if (inv.weaponSlots.length <= 1) return "至少保留一件武器";
+  return "";
 }
 
 export function sellInventoryItem(id) {

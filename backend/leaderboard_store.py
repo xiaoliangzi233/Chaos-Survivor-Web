@@ -1,3 +1,4 @@
+import json
 import sqlite3
 from datetime import datetime, timezone
 from pathlib import Path
@@ -22,6 +23,7 @@ METRIC_COLUMNS = {
 
 FINAL_STATUSES = {"VICTORY", "DEFEAT", "ABANDONED"}
 ALL_STATUSES = FINAL_STATUSES | {"RUNNING"}
+CODEX_TYPES = ("enemies", "weapons", "items")
 
 
 class StoreError(Exception):
@@ -206,6 +208,457 @@ class LeaderboardStore:
             "rows": [player_response(row, total_players, row["user_id"] == current_user_id) for row in page_rows],
             "currentPlayer": player_response(current, total_players, True) if current else None,
         }
+
+    def list_feedback(
+        self,
+        scope: str,
+        current_user_id: str,
+        page: int,
+        page_size: int,
+    ) -> Dict[str, Any]:
+        normalized_scope = str(scope or "ALL").strip().upper()
+        if normalized_scope not in {"ALL", "MINE"}:
+            raise StoreError(400, "INVALID_FEEDBACK_SCOPE", "反馈筛选仅支持 ALL 或 MINE")
+        page = max(1, page)
+        page_size = min(20, max(1, page_size))
+        offset = (page - 1) * page_size
+        where_sql = "WHERE user_id = ?" if normalized_scope == "MINE" else ""
+        parameters = (current_user_id,) if normalized_scope == "MINE" else ()
+
+        connection = self.connect()
+        try:
+            total_items = connection.execute(
+                f"SELECT COUNT(*) FROM survivor_feedback {where_sql}",
+                parameters,
+            ).fetchone()[0]
+            rows = connection.execute(
+                f"""
+                SELECT id, user_id, username, employee_id, content, created_at, updated_at
+                FROM survivor_feedback
+                {where_sql}
+                ORDER BY created_at DESC, id DESC
+                LIMIT ? OFFSET ?
+                """,
+                parameters + (page_size, offset),
+            ).fetchall()
+        finally:
+            connection.close()
+
+        return {
+            "scope": normalized_scope,
+            "page": page,
+            "pageSize": page_size,
+            "totalItems": total_items,
+            "totalPages": max(1, (total_items + page_size - 1) // page_size),
+            "items": [feedback_response(row, current_user_id) for row in rows],
+        }
+
+    def create_feedback(self, user: Dict[str, str], payload: Dict[str, Any]) -> Dict[str, Any]:
+        content = validate_feedback_payload(payload)
+        now = utc_now()
+        connection = self.connect()
+        try:
+            connection.execute("BEGIN IMMEDIATE")
+            cursor = connection.execute(
+                """
+                INSERT INTO survivor_feedback
+                    (user_id, username, employee_id, content, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                (user["id"], user["username"], user.get("employeeId", ""), content, now, now),
+            )
+            row = connection.execute(
+                "SELECT * FROM survivor_feedback WHERE id = ?",
+                (cursor.lastrowid,),
+            ).fetchone()
+            connection.commit()
+            return feedback_response(row, user["id"])
+        except Exception:
+            connection.rollback()
+            raise
+        finally:
+            connection.close()
+
+    def update_feedback(
+        self,
+        user: Dict[str, str],
+        feedback_id: int,
+        payload: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        content = validate_feedback_payload(payload)
+        connection = self.connect()
+        try:
+            connection.execute("BEGIN IMMEDIATE")
+            existing = require_owned_feedback(connection, feedback_id, user["id"])
+            now = next_feedback_update_time(existing["created_at"])
+            connection.execute(
+                """
+                UPDATE survivor_feedback
+                SET username = ?, employee_id = ?, content = ?, updated_at = ?
+                WHERE id = ?
+                """,
+                (user["username"], user.get("employeeId", ""), content, now, feedback_id),
+            )
+            row = connection.execute(
+                "SELECT * FROM survivor_feedback WHERE id = ?",
+                (feedback_id,),
+            ).fetchone()
+            connection.commit()
+            return feedback_response(row, user["id"])
+        except Exception:
+            connection.rollback()
+            raise
+        finally:
+            connection.close()
+
+    def delete_feedback(self, user: Dict[str, str], feedback_id: int) -> Dict[str, Any]:
+        connection = self.connect()
+        try:
+            connection.execute("BEGIN IMMEDIATE")
+            require_owned_feedback(connection, feedback_id, user["id"])
+            connection.execute("DELETE FROM survivor_feedback WHERE id = ?", (feedback_id,))
+            connection.commit()
+            return {"id": feedback_id, "deleted": True}
+        except Exception:
+            connection.rollback()
+            raise
+        finally:
+            connection.close()
+
+    def get_player_progress(self, user: Dict[str, str]) -> Dict[str, Any]:
+        now = utc_now()
+        connection = self.connect()
+        try:
+            connection.execute("BEGIN IMMEDIATE")
+            row = ensure_progress_row(connection, user, now)
+            stored = progress_from_row(row)
+            derived = derive_run_progress(connection, user["id"])
+            merged = merge_player_progress(stored, derived)
+            write_progress_row(connection, user, merged, now)
+            connection.commit()
+            return progress_response(merged, now)
+        except Exception:
+            connection.rollback()
+            raise
+        finally:
+            connection.close()
+
+    def sync_player_progress(self, user: Dict[str, str], payload: Dict[str, Any]) -> Dict[str, Any]:
+        incoming = validate_player_progress_payload(payload)
+        now = utc_now()
+        connection = self.connect()
+        try:
+            connection.execute("BEGIN IMMEDIATE")
+            row = ensure_progress_row(connection, user, now)
+            stored = progress_from_row(row)
+            derived = derive_run_progress(connection, user["id"])
+            merged = merge_player_progress(stored, derived, incoming)
+            write_progress_row(connection, user, merged, now)
+            connection.commit()
+            return progress_response(merged, now)
+        except Exception:
+            connection.rollback()
+            raise
+        finally:
+            connection.close()
+
+
+def default_player_progress() -> Dict[str, Any]:
+    difficulty_progress = {
+        difficulty_id: {"unlocked": index == 0, "completed": False}
+        for index, difficulty_id in enumerate(DIFFICULTIES)
+    }
+    return {
+        "bestSurvivalSeconds": 0,
+        "difficultyProgress": difficulty_progress,
+        "codex": {kind: [] for kind in CODEX_TYPES},
+    }
+
+
+def ensure_progress_row(
+    connection: sqlite3.Connection,
+    user: Dict[str, str],
+    now: str,
+) -> sqlite3.Row:
+    defaults = default_player_progress()
+    connection.execute(
+        """
+        INSERT OR IGNORE INTO survivor_player_progress
+            (user_id, username, employee_id, best_survival_seconds,
+             difficulty_progress_json, codex_json, created_at, updated_at)
+        VALUES (?, ?, ?, 0, ?, ?, ?, ?)
+        """,
+        (
+            user["id"],
+            user["username"],
+            user.get("employeeId", ""),
+            json_text(defaults["difficultyProgress"]),
+            json_text(defaults["codex"]),
+            now,
+            now,
+        ),
+    )
+    row = connection.execute(
+        "SELECT * FROM survivor_player_progress WHERE user_id = ?",
+        (user["id"],),
+    ).fetchone()
+    if row is None:
+        raise StoreError(500, "PROGRESS_CREATE_FAILED", "玩家进度创建失败")
+    return row
+
+
+def write_progress_row(
+    connection: sqlite3.Connection,
+    user: Dict[str, str],
+    progress: Dict[str, Any],
+    now: str,
+) -> None:
+    connection.execute(
+        """
+        UPDATE survivor_player_progress
+        SET username = ?, employee_id = ?, best_survival_seconds = ?,
+            difficulty_progress_json = ?, codex_json = ?, updated_at = ?
+        WHERE user_id = ?
+        """,
+        (
+            user["username"],
+            user.get("employeeId", ""),
+            progress["bestSurvivalSeconds"],
+            json_text(progress["difficultyProgress"]),
+            json_text(progress["codex"]),
+            now,
+            user["id"],
+        ),
+    )
+
+
+def progress_from_row(row: sqlite3.Row) -> Dict[str, Any]:
+    return {
+        "bestSurvivalSeconds": row["best_survival_seconds"],
+        "difficultyProgress": parse_json_object(row["difficulty_progress_json"]),
+        "codex": parse_json_object(row["codex_json"]),
+    }
+
+
+def derive_run_progress(connection: sqlite3.Connection, user_id: str) -> Dict[str, Any]:
+    progress = default_player_progress()
+    best_row = connection.execute(
+        "SELECT MAX(played_seconds) FROM survivor_run_record WHERE user_id = ?",
+        (user_id,),
+    ).fetchone()
+    progress["bestSurvivalSeconds"] = int(best_row[0] or 0)
+    victories = connection.execute(
+        """
+        SELECT difficulty_id,
+               MIN(CASE WHEN played_seconds > 0 THEN played_seconds END) AS best_time,
+               MAX(kills) AS best_kills,
+               MIN(finished_at) AS completed_at
+        FROM survivor_run_record
+        WHERE user_id = ? AND status = 'VICTORY'
+        GROUP BY difficulty_id
+        """,
+        (user_id,),
+    ).fetchall()
+    difficulty_ids = list(DIFFICULTIES)
+    for row in victories:
+        difficulty_id = row["difficulty_id"]
+        if difficulty_id not in DIFFICULTIES:
+            continue
+        record = progress["difficultyProgress"][difficulty_id]
+        record.update({
+            "unlocked": True,
+            "completed": True,
+            "bestTime": int(row["best_time"] or 0),
+            "bestKills": int(row["best_kills"] or 0),
+        })
+        if row["completed_at"]:
+            record["completedAt"] = row["completed_at"]
+        index = difficulty_ids.index(difficulty_id)
+        if index + 1 < len(difficulty_ids):
+            progress["difficultyProgress"][difficulty_ids[index + 1]]["unlocked"] = True
+    return progress
+
+
+def validate_player_progress_payload(payload: Dict[str, Any]) -> Dict[str, Any]:
+    if not isinstance(payload, dict):
+        raise StoreError(400, "INVALID_JSON", "请求体必须是 JSON 对象")
+    best_survival_seconds = bounded_integer(payload.get("bestSurvivalSeconds", 0), 0, 86400, "bestSurvivalSeconds")
+    raw_difficulty = payload.get("difficultyProgress", {})
+    if not isinstance(raw_difficulty, dict):
+        raise StoreError(400, "INVALID_PROGRESS", "difficultyProgress 必须是对象")
+    difficulty_progress = {}
+    for difficulty_id, value in raw_difficulty.items():
+        if difficulty_id not in DIFFICULTIES:
+            continue
+        if not isinstance(value, dict):
+            raise StoreError(400, "INVALID_PROGRESS", "难度进度必须是对象")
+        record = {
+            "unlocked": bool(value.get("unlocked", False)),
+            "completed": bool(value.get("completed", False)),
+            "bestTime": bounded_integer(value.get("bestTime", 0), 0, 86400, "bestTime"),
+            "bestKills": bounded_integer(value.get("bestKills", 0), 0, 10_000_000, "bestKills"),
+            "bestGold": bounded_integer(value.get("bestGold", 0), 0, 1_000_000_000, "bestGold"),
+        }
+        completed_at = value.get("completedAt")
+        if completed_at is not None:
+            if not isinstance(completed_at, str) or len(completed_at) > 64:
+                raise StoreError(400, "INVALID_PROGRESS", "completedAt 格式不正确")
+            if completed_at:
+                record["completedAt"] = completed_at
+        difficulty_progress[difficulty_id] = record
+
+    raw_codex = payload.get("codex", {})
+    if not isinstance(raw_codex, dict):
+        raise StoreError(400, "INVALID_PROGRESS", "codex 必须是对象")
+    codex = {}
+    for kind in CODEX_TYPES:
+        values = raw_codex.get(kind, [])
+        if not isinstance(values, list) or len(values) > 500:
+            raise StoreError(400, "INVALID_PROGRESS", f"codex.{kind} 格式不正确")
+        normalized = []
+        seen = set()
+        for value in values:
+            if not isinstance(value, str) or not value.strip() or len(value.strip()) > 64:
+                raise StoreError(400, "INVALID_PROGRESS", f"codex.{kind} 包含无效条目")
+            entry = value.strip()
+            if entry not in seen:
+                normalized.append(entry)
+                seen.add(entry)
+        codex[kind] = normalized
+    return {
+        "bestSurvivalSeconds": best_survival_seconds,
+        "difficultyProgress": difficulty_progress,
+        "codex": codex,
+    }
+
+
+def merge_player_progress(*values: Dict[str, Any]) -> Dict[str, Any]:
+    merged = default_player_progress()
+    for value in values:
+        if not isinstance(value, dict):
+            continue
+        merged["bestSurvivalSeconds"] = max(
+            merged["bestSurvivalSeconds"],
+            safe_integer(value.get("bestSurvivalSeconds"), 0, 86400),
+        )
+        source_difficulty = value.get("difficultyProgress", {})
+        if isinstance(source_difficulty, dict):
+            for difficulty_id in DIFFICULTIES:
+                source = source_difficulty.get(difficulty_id)
+                if not isinstance(source, dict):
+                    continue
+                target = merged["difficultyProgress"][difficulty_id]
+                target["unlocked"] = target["unlocked"] or bool(source.get("unlocked"))
+                target["completed"] = target["completed"] or bool(source.get("completed"))
+                target["bestTime"] = minimum_positive(target.get("bestTime"), source.get("bestTime"))
+                target["bestKills"] = max(
+                    safe_integer(target.get("bestKills"), 0, 10_000_000),
+                    safe_integer(source.get("bestKills"), 0, 10_000_000),
+                )
+                target["bestGold"] = max(
+                    safe_integer(target.get("bestGold"), 0, 1_000_000_000),
+                    safe_integer(source.get("bestGold"), 0, 1_000_000_000),
+                )
+                completed_at = str(source.get("completedAt") or "").strip()
+                if completed_at and (not target.get("completedAt") or completed_at < target["completedAt"]):
+                    target["completedAt"] = completed_at
+        source_codex = value.get("codex", {})
+        if isinstance(source_codex, dict):
+            for kind in CODEX_TYPES:
+                for entry in source_codex.get(kind, []) if isinstance(source_codex.get(kind, []), list) else []:
+                    text = str(entry or "").strip()
+                    if text and text not in merged["codex"][kind]:
+                        merged["codex"][kind].append(text)
+
+    difficulty_ids = list(DIFFICULTIES)
+    merged["difficultyProgress"][difficulty_ids[0]]["unlocked"] = True
+    for index, difficulty_id in enumerate(difficulty_ids):
+        record = merged["difficultyProgress"][difficulty_id]
+        if record.get("completed"):
+            record["unlocked"] = True
+            if index + 1 < len(difficulty_ids):
+                merged["difficultyProgress"][difficulty_ids[index + 1]]["unlocked"] = True
+    return merged
+
+
+def progress_response(progress: Dict[str, Any], updated_at: str) -> Dict[str, Any]:
+    return {
+        "bestSurvivalSeconds": progress["bestSurvivalSeconds"],
+        "difficultyProgress": progress["difficultyProgress"],
+        "codex": progress["codex"],
+        "updatedAt": updated_at,
+    }
+
+
+def minimum_positive(first: Any, second: Any) -> int:
+    values = [safe_integer(value, 0, 86400) for value in (first, second)]
+    positive = [value for value in values if value > 0]
+    return min(positive) if positive else 0
+
+
+def safe_integer(value: Any, minimum: int, maximum: int) -> int:
+    if isinstance(value, bool):
+        return minimum
+    try:
+        number = int(value)
+    except (TypeError, ValueError):
+        return minimum
+    return min(maximum, max(minimum, number))
+
+
+def parse_json_object(value: str) -> Dict[str, Any]:
+    try:
+        parsed = json.loads(value or "{}")
+        return parsed if isinstance(parsed, dict) else {}
+    except (TypeError, ValueError):
+        return {}
+
+
+def json_text(value: Dict[str, Any]) -> str:
+    return json.dumps(value, ensure_ascii=False, separators=(",", ":"))
+
+
+def validate_feedback_payload(payload: Dict[str, Any]) -> str:
+    if not isinstance(payload, dict):
+        raise StoreError(400, "INVALID_JSON", "请求体必须是 JSON 对象")
+    content = payload.get("content")
+    if not isinstance(content, str):
+        raise StoreError(400, "INVALID_FEEDBACK_CONTENT", "反馈内容必须是字符串")
+    normalized = content.strip()
+    if not 1 <= len(normalized) <= 100:
+        raise StoreError(400, "INVALID_FEEDBACK_CONTENT", "反馈内容必须为 1 到 100 个字符")
+    return normalized
+
+
+def require_owned_feedback(connection: sqlite3.Connection, feedback_id: int, user_id: str) -> sqlite3.Row:
+    row = connection.execute(
+        "SELECT * FROM survivor_feedback WHERE id = ?",
+        (feedback_id,),
+    ).fetchone()
+    if row is None:
+        raise StoreError(404, "FEEDBACK_NOT_FOUND", "反馈不存在")
+    if row["user_id"] != user_id:
+        raise StoreError(403, "FEEDBACK_FORBIDDEN", "不能修改或删除其他用户的反馈")
+    return row
+
+
+def feedback_response(row: sqlite3.Row, current_user_id: str) -> Dict[str, Any]:
+    return {
+        "id": row["id"],
+        "username": row["username"],
+        "employeeId": row["employee_id"] or "—",
+        "content": row["content"],
+        "createdAt": row["created_at"],
+        "updatedAt": row["updated_at"],
+        "currentUser": row["user_id"] == current_user_id,
+    }
+
+
+def next_feedback_update_time(created_at: str) -> str:
+    now = utc_now()
+    if now != created_at:
+        return now
+    return datetime.now(timezone.utc).isoformat(timespec="microseconds")
 
 
 def validate_run_payload(payload: Dict[str, Any]) -> Dict[str, Any]:

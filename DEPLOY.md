@@ -3,11 +3,11 @@
 本文对应当前项目的生产部署方式：
 
 - 游戏前端：Docker + Nginx 静态容器，监听服务器 `5000` 端口。
-- 排行榜：宿主机 Python 3 服务，由 systemd 常驻运行，监听 Docker 网桥地址的 `8000` 端口。
+- 数据服务：宿主机 Python 3 服务，由 systemd 常驻运行，负责排行榜、战绩、玩家进度和反馈，监听 Docker 网桥地址的 `8000` 端口。
 - 数据库：宿主机 `/opt/survivor-data/leaderboard.db` 单文件 SQLite 数据库。
-- 对外入口：已有的 `sszl-nginx` 容器监听 `80` 端口，将 `/survivor/` 和 `/survivor/api/` 代理到游戏与排行榜服务。
+- 对外入口：已有的 `sszl-nginx` 容器监听 `80` 端口，将 `/survivor/` 和 `/survivor/api/` 代理到游戏与数据服务。
 
-生产环境不建议把排行榜 SQLite 放在当前服务器的 Docker 卷中。该服务器曾出现 SQLite `disk I/O error`，而宿主机目录中的 SQLite 已验证可以正常写入。
+生产环境不建议把 SQLite 放在当前服务器的 Docker 卷中。该服务器曾出现 SQLite `disk I/O error`，而宿主机目录中的 SQLite 已验证可以正常写入。
 
 ## 1. 部署后的访问结构
 
@@ -16,11 +16,11 @@
   └─ http://服务器IP/survivor/
        └─ sszl-nginx:80
             ├─ /survivor/      -> 宿主机 172.17.0.1:5000 -> survivor 前端容器:80
-            └─ /survivor/api/  -> 宿主机 172.17.0.1:8000 -> Python 排行榜服务
+            └─ /survivor/api/  -> 宿主机 172.17.0.1:8000 -> Python 数据服务
                                                         └─ /opt/survivor-data/leaderboard.db
 ```
 
-前端会从 URL 的 `token` 参数或浏览器 `localStorage.token` 读取登录凭证，并以 `Authorization` 请求排行榜服务。没有 token 或 token 校验失败时，会跳转到：
+前端会从 URL 的 `token` 参数或浏览器 `localStorage.token` 读取登录凭证，并以 `Authorization` 请求数据服务。没有 token 或 token 校验失败时，会跳转到：
 
 ```text
 http://8.130.41.52/login
@@ -31,15 +31,15 @@ http://8.130.41.52/login
 | 目录 / 文件 | 用途 |
 | --- | --- |
 | `assets/` | 游戏音乐、图标和图片等静态资源；`survivor-app-icon.png` 是应用图标。 |
-| `backend/` | 排行榜 Python 服务、SQLite 建表脚本、接口协议和后端测试。 |
+| `backend/` | Python 数据服务、SQLite 建表脚本、接口协议和后端测试。 |
 | `backend/server.py` | HTTP API、用户 token 转发校验、CORS 与错误日志。 |
-| `backend/leaderboard_store.py` | SQLite 初始化、战绩同步、排行榜查询。 |
-| `backend/schema.sql` | `survivor_player_stats`、`survivor_run_record` 表及索引定义。 |
+| `backend/leaderboard_store.py` | SQLite 初始化、战绩同步、排行榜、账户进度和反馈读写。 |
+| `backend/schema.sql` | 排行榜统计、战局、账户进度、反馈数据表及索引定义。 |
 | `data/` | 本地开发默认 SQLite 数据目录；生产环境改用 `/opt/survivor-data/`。 |
 | `deploy/` | 镜像内 Nginx 配置等部署资源。 |
 | `deploy/nginx/docker.conf` | `survivor` 前端容器内部的 Nginx 配置；包含 `/survivor/` 静态路径与 API 转发规则。 |
 | `scripts/` | 本地启动工具；`no_cache_server.py` 会关闭缓存并把本地 `/api/` 转发给排行榜服务。 |
-| `src/` | 原生 ES Module 游戏源码：主循环、UI、战斗、配置、排行榜前端逻辑等。 |
+| `src/` | 原生 ES Module 游戏源码：主循环、UI、战斗、配置、排行榜与账户进度同步等。 |
 | `tests/` | 前端或通用验证脚本。 |
 | `tools/` | 独立开发工具，例如敌人配置编辑器。 |
 | `.agents/`、`.cocoindex_code/`、`.VSCodeCounter/` | 本地开发工具生成的辅助目录，不参与游戏运行和生产部署。 |
@@ -106,7 +106,7 @@ scp .\survivor-frontend.tar root@8.130.41.52:/root/
 
 镜像 tar 文件只用于传输；服务器上 `docker load` 完成后可以保留，便于回滚，也可以在确认稳定后手工删除。
 
-## 5. 首次部署：准备 Python 排行榜服务
+## 5. 首次部署：准备 Python 数据服务
 
 ### 5.1 上传后端文件
 
@@ -132,7 +132,7 @@ mkdir -p /opt/survivor-backend /opt/survivor-data
 
 ### 5.2 初始化 SQLite 数据库
 
-排行榜服务首次启动时会自动创建数据库、两张数据表和索引，无需手工执行 SQL。
+数据服务首次启动时会自动创建数据库、排行榜统计、战局、玩家进度、反馈数据表和索引，无需手工执行 SQL。已有数据库升级时也会增量创建缺少的表。
 
 先确认宿主机目录可写：
 
@@ -354,7 +354,7 @@ docker exec sszl-nginx nginx -s reload
 docker exec survivor grep -n "8.130.41.52/login" /usr/share/nginx/html/src/services/userProfile.js
 ```
 
-### 8.2 仅更新排行榜后端
+### 8.2 仅更新数据服务后端
 
 先备份数据库：
 
@@ -382,7 +382,7 @@ systemctl status survivor-leaderboard --no-pager
 curl http://172.17.0.1:8000/api/health
 ```
 
-数据库建表脚本使用 `CREATE TABLE IF NOT EXISTS`，普通后端更新不会清空已有排行榜数据。表结构升级时必须先备份数据库并单独编写迁移 SQL；不要删除 `leaderboard.db` 作为更新手段。
+数据库建表脚本使用 `CREATE TABLE IF NOT EXISTS`，本次更新会增量创建 `survivor_player_progress`，不会清空已有排行榜或战局数据。涉及已有字段变更的后续升级仍应先备份数据库并单独编写迁移 SQL；不要删除 `leaderboard.db` 作为更新手段。
 
 ### 8.3 同时更新前后端
 
@@ -448,6 +448,8 @@ curl -i -X POST \
 2. 游戏加载完成后，确认显示已识别用户信息和排行榜入口。
 3. 清理 `localStorage.token` 与 `sessionStorage.pixel-survivor-user-token` 后访问 `/survivor/`，应跳转 `/login`。
 4. 开始并结束一局游戏，打开排行榜，确认总时长、总击杀等数据已写入。
+5. 通关难度1并解锁图鉴后切换到另一个账号，确认新账号仍只有难度1可选且图鉴为空；切回原账号后进度应恢复。
+6. 使用有效 token 请求 `GET /survivor/api/v1/survivor/progress`，确认返回当前用户的 `difficultyProgress` 和 `codex`。
 
 ## 10. 常见问题排查
 
@@ -568,6 +570,6 @@ $env:SURVIVOR_USER_INFO_URL = 'http://127.0.0.1/sszl/user/simple-info'
 "skipTokenValidationOnLocalhost": true
 ```
 
-该开关只在浏览器地址为 `localhost`、`127.0.0.1` 或 `::1` 时有效。本地启动游戏时不读取、不请求也不校验 token，可直接进入游戏；排行榜和战绩同步会保持禁用。
+该开关只在浏览器地址为 `localhost`、`127.0.0.1` 或 `::1` 时有效。本地启动游戏时不读取、不请求也不校验 token，可直接进入游戏；排行榜、战绩和服务端进度同步会保持禁用。本地进度使用独立的 `local-dev` 缓存，不会写入或继承任何正式用户进度。
 
 生产服务器域名/IP 不会受这个开关影响，仍必须具备有效 token，缺少 token 或接口返回 `401` 时会跳转登录页。若希望本地也模拟生产身份校验，将此值改为 `false` 后刷新页面即可。

@@ -8,7 +8,13 @@ import {
   selectWeaponSlot,
   selectedWeaponSlot,
 } from "../economy/inventory.js";
-import { itemSellPrice, sellInventoryItem, sellWeaponSlot, weaponSellPrice } from "../economy/shop.js";
+import {
+  itemSellPrice,
+  sellInventoryItem,
+  sellWeaponSlot,
+  weaponSellDisabledReason,
+  weaponSellPrice,
+} from "../economy/shop.js";
 
 let initialized = false;
 let previousMode = "playing";
@@ -257,6 +263,7 @@ function renderWeaponDetail() {
   const fuseCheck = canFuseWeapons(slot, material);
   const nextQuality = fuseCheck.nextQuality ? QUALITY_INFO[fuseCheck.nextQuality] : null;
   const sellPrice = weaponSellPrice(slot);
+  const sellDisabledReason = weaponSellDisabledReason(slot.uid);
   dom.detail.innerHTML = `
     <div class="weapon-detail-card">
       <div class="weapon-detail-title">
@@ -269,7 +276,7 @@ function renderWeaponDetail() {
       <p>${info.desc}</p>
       <div class="weapon-tags detail-tags">${(info.tags || []).map((tag) => `<span>${tag}</span>`).join("")}</div>
       <p>${text.qualityMult}: ${Math.round(quality.mult * 100)}%</p>
-      <button class="inventory-sell-button" type="button">${text.sellWeapon} +${sellPrice} ${text.coin}</button>
+      <button class="inventory-sell-button" type="button" ${sellDisabledReason ? "disabled" : ""} title="${sellDisabledReason}">${sellDisabledReason || `${text.sellWeapon} +${sellPrice} ${text.coin}`}</button>
       ${renderFusePreview(slot, material, fuseCheck, nextQuality)}
     </div>`;
 

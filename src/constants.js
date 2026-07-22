@@ -9,7 +9,6 @@ export const PROJECTILE_LIMIT = 360;
 export const GEM_LIMIT = 360;
 export const PARTICLE_LIMIT = 520;
 export const CELL_SIZE = 128;
-export const SAVE_KEY = "pixel-survivor-best";
 
 export function waveDurationFor(wave) {
   return Math.min(MAX_WAVE_SECONDS, FIRST_WAVE_SECONDS + (wave - 1) * 2);

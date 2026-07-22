@@ -1,6 +1,6 @@
-# 混乱幸存者排行榜服务
+# 混乱幸存者数据服务
 
-这是一个只使用 Python 标准库的轻量服务，数据保存在单个 SQLite 文件中，不需要安装第三方依赖。
+这是一个只使用 Python 标准库的轻量服务，为游戏提供排行榜、战绩同步、账户进度和用户反馈 CRUD。数据保存在单个 SQLite 文件中，不需要安装第三方依赖。
 
 ## 启动
 
@@ -47,4 +47,4 @@ python -m unittest discover -s backend/tests -v
 
 从项目根目录执行 `start.cmd` 时，会自动启动本服务，并由无缓存静态服务器把同源 `/api/` 请求转发到 `127.0.0.1:8000`。
 
-项目根目录的 `docker compose up -d --build` 会同时启动 Nginx 前端和本服务，SQLite 文件保存在 `leaderboard-data` 命名卷中，重建容器不会丢失排行数据。
+项目根目录的 `docker compose up -d --build` 会同时启动 Nginx 前端和本服务，SQLite 文件保存在 `leaderboard-data` 命名卷中，重建容器不会丢失排行榜、玩家进度或反馈数据。服务启动时会自动执行 `schema.sql`，已有数据库会增量创建缺少的数据表，无需手工清空或重建数据库。

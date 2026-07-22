@@ -7,7 +7,10 @@ import {
   purchaseOffer,
   refreshCost,
   refreshShopOffers,
+  sellWeaponSlot,
   toggleOfferLock,
+  weaponSellDisabledReason,
+  weaponSellPrice,
 } from "../economy/shop.js";
 
 const dom = {};
@@ -31,6 +34,9 @@ const text = {
   weaponSlots: "\u6b66\u5668\u69fd",
   emptySlot: "\u7a7a\u69fd\u4f4d",
   unknownWeapon: "\u672a\u77e5\u6b66\u5668",
+  sell: "\u51fa\u552e",
+  soldWeapon: "\u5df2\u51fa\u552e",
+  gained: "\uff0c\u83b7\u5f97",
 };
 
 export function initShopUi({ continueToNextWave }) {
@@ -178,6 +184,8 @@ function renderShopWeaponSlots(container, weaponSlots) {
     row.innerHTML = `
       <i style="color:${quality.color}">${info.icon}</i>
       <span><strong>${info.name}</strong><small style="color:${quality.color}">${quality.name}</small></span>`;
+    const actions = document.createElement("div");
+    actions.className = "shop-slot-actions";
     const material = findFuseCandidate(slot);
     if (material) {
       const fuse = document.createElement("button");
@@ -190,8 +198,30 @@ function renderShopWeaponSlots(container, weaponSlots) {
         const result = currentMaterial && fuseWeaponSlots(slot.uid, currentMaterial.uid);
         renderShop(result ? text.fuseSuccess : text.fuseHint);
       });
-      row.appendChild(fuse);
+      actions.appendChild(fuse);
     }
+    const sellPrice = weaponSellPrice(slot);
+    const sellDisabledReason = weaponSellDisabledReason(slot.uid);
+    const sell = document.createElement("button");
+    sell.type = "button";
+    sell.className = "shop-slot-sell";
+    sell.textContent = sellDisabledReason || `${text.sell} +${sellPrice}`;
+    sell.disabled = Boolean(sellDisabledReason);
+    sell.title = sellDisabledReason || `${text.sell} ${info.name}${text.gained} ${sellPrice} ${text.coin}`;
+    sell.addEventListener("click", () => {
+      const current = state.inventory?.weaponSlots.find((entry) => entry.uid === slot.uid);
+      if (!current) {
+        renderShop(text.unknownWeapon);
+        return;
+      }
+      const currentPrice = weaponSellPrice(current);
+      const result = sellWeaponSlot(current.uid);
+      renderShop(result.ok
+        ? `${text.soldWeapon} ${info.name}${text.gained} ${currentPrice} ${text.coin}\u3002`
+        : result.reason);
+    });
+    actions.appendChild(sell);
+    row.appendChild(actions);
     container.appendChild(row);
   }
 }

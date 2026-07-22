@@ -1,7 +1,9 @@
-import { SAVE_KEY } from "./constants.js";
 import { state } from "./state.js";
-
-export const DIFFICULTY_SAVE_KEY = "pixel-survivor-difficulty-progress";
+import {
+  getBestSurvivalSeconds,
+  getPlayerDifficultyProgress,
+  savePlayerDifficultyProgress,
+} from "./systems/playerProgress.js";
 
 export let difficultyConfig = {};
 export let difficultyOrder = [];
@@ -32,13 +34,9 @@ export async function setupDifficultyConfig() {
 
 export function loadDifficultyProgress() {
   const progress = defaultProgress();
-  try {
-    const parsed = JSON.parse(localStorage.getItem(DIFFICULTY_SAVE_KEY) || "{}");
-    for (const id of difficultyOrder) {
-      progress[id] = { ...progress[id], ...(parsed[id] || {}) };
-    }
-  } catch {
-    localStorage.removeItem(DIFFICULTY_SAVE_KEY);
+  const stored = getPlayerDifficultyProgress();
+  for (const id of difficultyOrder) {
+    progress[id] = { ...progress[id], ...(stored[id] || {}) };
   }
   progress[difficultyOrder[0]] ||= { unlocked: true, completed: false };
   progress[difficultyOrder[0]].unlocked = true;
@@ -47,7 +45,7 @@ export function loadDifficultyProgress() {
 }
 
 export function saveDifficultyProgress() {
-  localStorage.setItem(DIFFICULTY_SAVE_KEY, JSON.stringify(state.difficultyProgress || defaultProgress()));
+  savePlayerDifficultyProgress(state.difficultyProgress || defaultProgress());
 }
 
 export function selectDifficulty(id) {
@@ -97,7 +95,7 @@ export function recordDifficultyVictory() {
     bestTime: record.bestTime ? Math.min(record.bestTime, bestTime) : bestTime,
     bestKills: Math.max(record.bestKills || 0, state.kills || 0),
     bestGold: Math.max(record.bestGold || 0, state.gold || 0),
-    completedAt: new Date().toISOString(),
+    completedAt: record.completedAt || new Date().toISOString(),
   };
   const nextId = nextDifficultyId(cfg.id);
   if (nextId) progress[nextId] = { ...(progress[nextId] || {}), unlocked: true };
@@ -107,7 +105,7 @@ export function recordDifficultyVictory() {
 
 export function bestSummaryText(formatTime) {
   const best = highestCompletedDifficulty();
-  const bestTime = Number(localStorage.getItem(SAVE_KEY) || 0);
+  const bestTime = getBestSurvivalSeconds();
   const timeText = formatTime(bestTime);
   return best ? `最高通关 ${best.name} · 最佳纪录 ${timeText}` : `最高通关 未解锁 · 最佳纪录 ${timeText}`;
 }

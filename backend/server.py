@@ -18,7 +18,7 @@ DEFAULT_USER_INFO_URL = "http://127.0.0.1/sszl/user/simple-info"
 
 
 class LeaderboardHandler(BaseHTTPRequestHandler):
-    server_version = "SurvivorLeaderboard/1.0"
+    server_version = "SurvivorData/1.1"
 
     def do_OPTIONS(self):
         self.send_response(HTTPStatus.NO_CONTENT)
@@ -30,6 +30,10 @@ class LeaderboardHandler(BaseHTTPRequestHandler):
             return self.handle_session()
         if parsed.path == "/api/v1/survivor/leaderboard":
             return self.handle_leaderboard(parse_qs(parsed.query))
+        if parsed.path == "/api/v1/survivor/feedback":
+            return self.handle_feedback_list(parse_qs(parsed.query))
+        if parsed.path == "/api/v1/survivor/progress":
+            return self.handle_player_progress()
         if parsed.path == "/api/health":
             return self.write_json(HTTPStatus.OK, {"status": "ok"})
         self.write_error(HTTPStatus.NOT_FOUND, "NOT_FOUND", "接口不存在")
@@ -47,6 +51,30 @@ class LeaderboardHandler(BaseHTTPRequestHandler):
         parsed = urlparse(self.path)
         if parsed.path == "/api/v1/survivor/runs/sync":
             return self.handle_run_sync()
+        if parsed.path == "/api/v1/survivor/feedback":
+            return self.handle_feedback_create()
+        self.write_error(HTTPStatus.NOT_FOUND, "NOT_FOUND", "接口不存在")
+
+    def do_PUT(self):
+        parsed = urlparse(self.path)
+        if parsed.path == "/api/v1/survivor/progress":
+            return self.handle_player_progress_sync()
+        try:
+            feedback_id = parse_feedback_id(parsed.path)
+        except StoreError as error:
+            return self.write_error(error.status, error.code, error.message)
+        if feedback_id is not None:
+            return self.handle_feedback_update(feedback_id)
+        self.write_error(HTTPStatus.NOT_FOUND, "NOT_FOUND", "接口不存在")
+
+    def do_DELETE(self):
+        parsed = urlparse(self.path)
+        try:
+            feedback_id = parse_feedback_id(parsed.path)
+        except StoreError as error:
+            return self.write_error(error.status, error.code, error.message)
+        if feedback_id is not None:
+            return self.handle_feedback_delete(feedback_id)
         self.write_error(HTTPStatus.NOT_FOUND, "NOT_FOUND", "接口不存在")
 
     def handle_leaderboard(self, query):
@@ -74,6 +102,75 @@ class LeaderboardHandler(BaseHTTPRequestHandler):
         except Exception as error:
             self.log_error("run sync failed: %s\n%s", error, traceback.format_exc())
             self.write_error(HTTPStatus.INTERNAL_SERVER_ERROR, "INTERNAL_ERROR", "战绩同步异常")
+
+    def handle_feedback_list(self, query):
+        try:
+            user = self.require_user()
+            scope = query.get("scope", ["ALL"])[0]
+            page = parse_integer(query.get("page", ["1"])[0], 1, 1_000_000, "page")
+            page_size = parse_integer(query.get("pageSize", ["5"])[0], 1, 20, "pageSize")
+            payload = self.server.store.list_feedback(scope, user["id"], page, page_size)
+            self.write_json(HTTPStatus.OK, payload)
+        except StoreError as error:
+            self.write_error(error.status, error.code, error.message)
+        except Exception as error:
+            self.log_error("feedback list failed: %s\n%s", error, traceback.format_exc())
+            self.write_error(HTTPStatus.INTERNAL_SERVER_ERROR, "INTERNAL_ERROR", "反馈列表加载异常")
+
+    def handle_feedback_create(self):
+        try:
+            user = self.require_user()
+            payload = self.server.store.create_feedback(user, self.read_json())
+            self.write_json(HTTPStatus.CREATED, payload)
+        except StoreError as error:
+            self.write_error(error.status, error.code, error.message)
+        except Exception as error:
+            self.log_error("feedback create failed: %s\n%s", error, traceback.format_exc())
+            self.write_error(HTTPStatus.INTERNAL_SERVER_ERROR, "INTERNAL_ERROR", "反馈提交异常")
+
+    def handle_feedback_update(self, feedback_id):
+        try:
+            user = self.require_user()
+            payload = self.server.store.update_feedback(user, feedback_id, self.read_json())
+            self.write_json(HTTPStatus.OK, payload)
+        except StoreError as error:
+            self.write_error(error.status, error.code, error.message)
+        except Exception as error:
+            self.log_error("feedback update failed: %s\n%s", error, traceback.format_exc())
+            self.write_error(HTTPStatus.INTERNAL_SERVER_ERROR, "INTERNAL_ERROR", "反馈修改异常")
+
+    def handle_feedback_delete(self, feedback_id):
+        try:
+            user = self.require_user()
+            payload = self.server.store.delete_feedback(user, feedback_id)
+            self.write_json(HTTPStatus.OK, payload)
+        except StoreError as error:
+            self.write_error(error.status, error.code, error.message)
+        except Exception as error:
+            self.log_error("feedback delete failed: %s\n%s", error, traceback.format_exc())
+            self.write_error(HTTPStatus.INTERNAL_SERVER_ERROR, "INTERNAL_ERROR", "反馈删除异常")
+
+    def handle_player_progress(self):
+        try:
+            user = self.require_user()
+            payload = self.server.store.get_player_progress(user)
+            self.write_json(HTTPStatus.OK, payload)
+        except StoreError as error:
+            self.write_error(error.status, error.code, error.message)
+        except Exception as error:
+            self.log_error("player progress load failed: %s\n%s", error, traceback.format_exc())
+            self.write_error(HTTPStatus.INTERNAL_SERVER_ERROR, "INTERNAL_ERROR", "玩家进度加载异常")
+
+    def handle_player_progress_sync(self):
+        try:
+            user = self.require_user()
+            payload = self.server.store.sync_player_progress(user, self.read_json())
+            self.write_json(HTTPStatus.OK, payload)
+        except StoreError as error:
+            self.write_error(error.status, error.code, error.message)
+        except Exception as error:
+            self.log_error("player progress sync failed: %s\n%s", error, traceback.format_exc())
+            self.write_error(HTTPStatus.INTERNAL_SERVER_ERROR, "INTERNAL_ERROR", "玩家进度同步异常")
 
     def require_user(self) -> Dict[str, str]:
         token = self.headers.get("Authorization", "").strip()
@@ -127,7 +224,7 @@ class LeaderboardHandler(BaseHTTPRequestHandler):
             self.send_header("Access-Control-Allow-Origin", origin)
             self.send_header("Vary", "Origin")
             self.send_header("Access-Control-Allow-Headers", "Authorization, Content-Type")
-            self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+            self.send_header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
         super().end_headers()
 
 
@@ -151,9 +248,19 @@ def parse_integer(value: str, minimum: int, maximum: int, field: str) -> int:
     return number
 
 
+def parse_feedback_id(path: str):
+    prefix = "/api/v1/survivor/feedback/"
+    if not path.startswith(prefix):
+        return None
+    raw_id = path[len(prefix):]
+    if not raw_id.isdigit() or int(raw_id) <= 0:
+        raise StoreError(400, "INVALID_FEEDBACK_ID", "反馈 ID 必须是正整数")
+    return int(raw_id)
+
+
 def main():
     root = Path(__file__).resolve().parent
-    parser = argparse.ArgumentParser(description="混乱幸存者轻量排行榜服务")
+    parser = argparse.ArgumentParser(description="混乱幸存者轻量数据服务")
     parser.add_argument("--host", default=os.getenv("SURVIVOR_API_HOST", "127.0.0.1"))
     parser.add_argument("--port", type=int, default=int(os.getenv("SURVIVOR_API_PORT", "8000")))
     parser.add_argument("--database", default=os.getenv("SURVIVOR_DB_PATH", str(root / "data" / "leaderboard.db")))
@@ -165,7 +272,7 @@ def main():
     ).split(",") if item.strip()]
     store = LeaderboardStore(args.database)
     server = LeaderboardServer((args.host, args.port), store, args.user_info_url, allowed_origins)
-    print(f"Leaderboard API listening on http://{args.host}:{args.port}/api")
+    print(f"Survivor data API listening on http://{args.host}:{args.port}/api")
     print(f"User info URL: {args.user_info_url}")
     print(f"SQLite database: {Path(args.database).resolve()}")
     try:

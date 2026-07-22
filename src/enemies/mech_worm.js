@@ -8,7 +8,7 @@ import { applyPlayerDamage } from "../systems/items.js";
 const BASE_SEGMENT_COUNT = 8;
 const BASE_SEGMENT_GAP = 12;
 const STRIKE_RANGE = 360;
-const DIFFICULTY_RANK = { ember: 0, neon: 1, overclock: 2, apocalypse: 3 };
+const DIFFICULTY_RANK = { ember: 0, neon: 1, overclock: 2, singularity: 3, apocalypse: 4, void_crown: 5 };
 
 export class MechWorm extends BaseEnemy {
   constructor(config, x, y) {
@@ -34,6 +34,15 @@ export class MechWorm extends BaseEnemy {
     this.segments = [];
     for (let i = 0; i < this.segmentCount; i++) {
       this.segments.push({ x: x - (i + 1) * this.segmentGap, y, angle: 0, phase: Math.random() * TAU });
+    }
+    if (state.waveScenario?.mechWormMode === "colossus") {
+      this.name = "超长机械蠕虫";
+      this.hp *= 4.8;
+      this.maxHp = this.hp;
+      this.damage *= 1.28;
+      this.speed *= 0.78;
+      this.knockbackResistance = Math.max(this.knockbackResistance, 0.7);
+      this.extendSegments(4.4);
     }
   }
 

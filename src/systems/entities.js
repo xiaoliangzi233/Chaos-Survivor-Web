@@ -431,7 +431,9 @@ function updateHazards(dt) {
     if (h.kind === "gravity_well") updateGravityWell(h, dt);
     if (h.kind === "magnetic_node") updateMagneticNode(h, dt);
     if (h.kind === "brood_pod") updateBroodPod(h, dt);
-    if (h.kind === "storm_laser_net" && h.armTime > 0) h.armTime = Math.max(0, h.armTime - dt);
+    if (h.kind === "storm_laser_net") updateStormLaserNet(h, dt);
+    if (h.kind === "phase_tear") updatePhaseTear(h, dt);
+    if (h.kind === "inferno_beacon") updateInfernoBeacon(h, dt);
     if (h.kind === "artillery_blast") updateArtilleryBlast(h, dt);
     if (h.kind === "ice_spike" || h.kind === "ice_seal") updateIceHazard(h, dt);
     if (distSq(h.x, h.y, p.x, p.y) < ((h.triggerRadius || h.r) + p.r) ** 2 && h.kind === "ember_mine") h.triggered = true;
@@ -501,6 +503,8 @@ function releaseEliteSkill(e) {
   if (e.eliteCollapseSkill) return releaseEliteCollapse(e);
   if (e.eliteMagnetDashSkill) return releaseEliteMagnetDash(e);
   if (e.eliteBroodPodSkill) return releaseEliteBroodPods(e);
+  if (e.eliteEmberMineRingSkill) return releaseEliteEmberMineRing(e);
+  if (e.eliteInfernoConductorSkill) return releaseEliteInfernoConductor(e);
   releaseElitePulse(e);
 }
 
@@ -665,6 +669,62 @@ function releaseEliteBroodPods(e) {
   e.eliteSkillCooldown = e.eliteSkillInterval;
 }
 
+function releaseEliteEmberMineRing(e) {
+  const count = 10;
+  const base = Math.atan2(state.player.y - e.y, state.player.x - e.x);
+  for (let i = 0; i < count; i++) {
+    const a = base + i / count * TAU;
+    const dist = 74 + (i % 2) * 34;
+    world.hazards.push({
+      kind: "ember_mine",
+      x: clamp(e.x + Math.cos(a) * dist, -WORLD_SIZE / 2 + 90, WORLD_SIZE / 2 - 90),
+      y: clamp(e.y + Math.sin(a) * dist, -WORLD_SIZE / 2 + 90, WORLD_SIZE / 2 - 90),
+      r: 15,
+      baseRadius: 15,
+      triggerRadius: 48,
+      explodeRadius: 92,
+      color: "#ff7a1a",
+      damage: e.damage * 0.82,
+      life: 8.5,
+      maxLife: 8.5,
+      armTime: 0.62 + (i % 3) * 0.1,
+      triggered: false,
+    });
+  }
+  burst(e.x, e.y, 18, "#ff7a1a", 180);
+  pulse(e.x, e.y, e.r * 3.2, "#ffd166", 0.3);
+  e.eliteSkillCooldown = e.eliteSkillInterval;
+}
+
+function releaseEliteInfernoConductor(e) {
+  const count = 12;
+  const offset = Math.atan2(state.player.y - e.y, state.player.x - e.x) + (e.eliteInfernoCast || 0) * 0.22;
+  e.eliteInfernoCast = (e.eliteInfernoCast || 0) + 1;
+  for (let i = 0; i < count; i++) {
+    const a = offset + i / count * TAU;
+    const speed = i % 2 === 0 ? 190 : 255;
+    world.enemyProjectiles.push({
+      x: e.x + Math.cos(a) * e.r * 0.72,
+      y: e.y + Math.sin(a) * e.r * 0.72,
+      vx: Math.cos(a) * speed,
+      vy: Math.sin(a) * speed,
+      r: i % 2 === 0 ? 8 : 6,
+      color: i % 2 === 0 ? "#ff7a1a" : "#ffd166",
+      damage: Math.max(1, e.damage * 0.3),
+      burnDuration: 2.8,
+      burnDps: e.damage * 0.2,
+      life: 4.2,
+      shape: "fireball",
+      spin: Math.random() * TAU,
+      emberTrail: true,
+    });
+  }
+  burst(e.x, e.y, 24, "#ff7a1a", 230);
+  pulse(e.x, e.y, e.r * 3.8, "#ffd166", 0.38);
+  state.shake = Math.max(state.shake, 5);
+  e.eliteSkillCooldown = e.eliteSkillInterval;
+}
+
 function updateEliteDashTrap(e, dt) {
   if ((e.eliteDashTime || 0) <= 0) return false;
   e.eliteDashTime = Math.max(0, e.eliteDashTime - dt);
@@ -783,6 +843,61 @@ function updateBroodPod(h, dt) {
     spawnEnemyById(i % 2 ? "slime_small" : "zombie", h.x + Math.cos(a) * 34, h.y + Math.sin(a) * 34);
   }
   burst(h.x, h.y, 10, h.color, 120);
+}
+
+function updateStormLaserNet(h, dt) {
+  if (h.armTime > 0) h.armTime = Math.max(0, h.armTime - dt);
+  h.x += (h.vx || 0) * dt;
+  h.y += (h.vy || 0) * dt;
+  const half = WORLD_SIZE / 2 + 180;
+  if (h.fullWave && h.x < -half) h.x = half;
+  if (h.fullWave && h.x > half) h.x = -half;
+  if (h.fullWave && h.y < -half) h.y = half;
+  if (h.fullWave && h.y > half) h.y = -half;
+}
+
+function updatePhaseTear(h, dt) {
+  h.spin = (h.spin || 0) + dt * 4.8;
+  const p = state.player;
+  const dx = p.x - h.x;
+  const dy = p.y - h.y;
+  const d = Math.max(1, Math.hypot(dx, dy));
+  if (d > h.r || (h.armTime || 0) > 0) return;
+  const force = (1 - d / h.r) * 125;
+  p.x += -dy / d * force * dt;
+  p.y += dx / d * force * dt;
+}
+
+function updateInfernoBeacon(h, dt) {
+  h.spin = (h.spin || 0) + dt * 3.8;
+  h.armTime = Math.max(0, (h.armTime || 0) - dt);
+  h.cooldown = Math.max(0, (h.cooldown || 0) - dt);
+  h.charge = h.armTime > 0
+    ? 1 - h.armTime / Math.max(0.01, h.armDuration || h.armTime)
+    : h.cooldown <= 0.48 ? 1 - h.cooldown / 0.48 : 0;
+  if (h.armTime > 0 || h.cooldown > 0) return;
+  h.cooldown = 1.65 + Math.random() * 0.45;
+  const base = Math.atan2(state.player.y - h.y, state.player.x - h.x);
+  for (const offset of [-0.2, 0, 0.2]) {
+    const a = base + offset;
+    world.enemyProjectiles.push({
+      x: h.x + Math.cos(a) * h.r * 0.34,
+      y: h.y + Math.sin(a) * h.r * 0.34,
+      vx: Math.cos(a) * 245,
+      vy: Math.sin(a) * 245,
+      r: offset === 0 ? 8 : 6.5,
+      color: offset === 0 ? "#ffd166" : "#ff7a1a",
+      damage: 11,
+      burnDuration: 2.6,
+      burnDps: 7,
+      life: 3.8,
+      shape: "fireball",
+      spin: Math.random() * TAU,
+      emberTrail: true,
+    });
+  }
+  burst(h.x, h.y, 8, "#ff7a1a", 130);
+  pulse(h.x, h.y, h.r * 0.9, "#ffd166", 0.18);
 }
 
 function pullBody(body, h, dt, strength, falloffPower) {

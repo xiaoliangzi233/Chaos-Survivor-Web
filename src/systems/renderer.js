@@ -2802,6 +2802,14 @@ function drawHazards(ctx) {
       drawBroodPodHazard(ctx, h, alpha);
       continue;
     }
+    if (h.kind === "phase_tear") {
+      drawPhaseTearHazard(ctx, h, alpha);
+      continue;
+    }
+    if (h.kind === "inferno_beacon") {
+      drawInfernoBeaconHazard(ctx, h, alpha);
+      continue;
+    }
     ctx.save();
     ctx.translate(h.x, h.y);
     ctx.globalCompositeOperation = "lighter";
@@ -2920,6 +2928,94 @@ function drawBroodPodHazard(ctx, h, alpha) {
     ctx.lineTo(Math.cos(a) * h.r * 0.5, Math.sin(a) * h.r * 0.64);
     ctx.stroke();
   }
+  ctx.restore();
+}
+
+function drawPhaseTearHazard(ctx, h, alpha) {
+  const spin = (h.spin || 0) + state.time * 2.8;
+  ctx.save();
+  ctx.translate(h.x, h.y);
+  ctx.rotate(spin * 0.18);
+  ctx.globalCompositeOperation = "lighter";
+  glow(ctx, 0, 0, h.r * 0.82, 0.18 * alpha, h.color);
+  ctx.strokeStyle = hexToRgba(h.color, 0.62 * alpha);
+  ctx.lineWidth = 2;
+  for (let i = 0; i < 4; i++) {
+    const a = spin + i * TAU / 4;
+    ctx.beginPath();
+    ctx.ellipse(0, 0, h.r * (0.28 + i * 0.09), h.r * 0.12, a, 0, TAU);
+    ctx.stroke();
+  }
+  ctx.fillStyle = hexToRgba("#d946ef", 0.12 * alpha);
+  ctx.beginPath();
+  ctx.moveTo(0, -h.r * 0.72);
+  ctx.lineTo(h.r * 0.24, -h.r * 0.12);
+  ctx.lineTo(-h.r * 0.18, h.r * 0.1);
+  ctx.lineTo(0, h.r * 0.72);
+  ctx.lineTo(-h.r * 0.28, h.r * 0.1);
+  ctx.lineTo(h.r * 0.14, -h.r * 0.12);
+  ctx.closePath();
+  ctx.fill();
+  ctx.strokeStyle = hexToRgba("#ffffff", 0.38 * alpha);
+  ctx.stroke();
+  ctx.restore();
+}
+
+function drawInfernoBeaconHazard(ctx, h, alpha) {
+  const spin = (h.spin || 0) + state.time * 2.4;
+  const charge = Math.max(0, Math.min(1, h.charge || 0));
+  ctx.save();
+  ctx.translate(h.x, h.y);
+  ctx.globalCompositeOperation = "lighter";
+  glow(ctx, 0, 0, h.r * (0.84 + charge * 0.28), (0.18 + charge * 0.18) * alpha, "#ff7a1a");
+  ctx.rotate(spin * 0.18);
+  for (let layer = 0; layer < 3; layer++) {
+    const radius = h.r * (0.42 + layer * 0.16);
+    ctx.strokeStyle = hexToRgba(layer === 1 ? "#ffd166" : "#ff7a1a", (0.58 - layer * 0.11 + charge * 0.2) * alpha);
+    ctx.lineWidth = layer === 0 ? 3 : 1.5;
+    ctx.beginPath();
+    for (let i = 0; i < 8; i++) {
+      const a = i * TAU / 8 + layer * Math.PI / 8;
+      const r = radius * (i % 2 ? 0.72 : 1);
+      const x = Math.cos(a) * r;
+      const y = Math.sin(a) * r * 0.72;
+      if (i === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    }
+    ctx.closePath();
+    ctx.stroke();
+  }
+  ctx.rotate(-spin * 0.42);
+  for (let i = 0; i < 5; i++) {
+    const a = i * TAU / 5;
+    ctx.save();
+    ctx.rotate(a);
+    ctx.strokeStyle = hexToRgba(i % 2 ? "#ff4d1f" : "#ffd166", (0.34 + charge * 0.34) * alpha);
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(h.r * 0.22, 0);
+    ctx.quadraticCurveTo(h.r * 0.48, -h.r * 0.14, h.r * (0.7 + charge * 0.08), 0);
+    ctx.stroke();
+    ctx.restore();
+  }
+  const flame = 1 + Math.sin(state.time * 9 + h.x * 0.01) * 0.08 + charge * 0.18;
+  ctx.fillStyle = hexToRgba("#ff4d1f", (0.72 + charge * 0.2) * alpha);
+  ctx.beginPath();
+  ctx.moveTo(0, -h.r * 0.62 * flame);
+  ctx.lineTo(h.r * 0.24, -h.r * 0.08);
+  ctx.lineTo(h.r * 0.12, h.r * 0.28);
+  ctx.lineTo(-h.r * 0.18, h.r * 0.25);
+  ctx.lineTo(-h.r * 0.28, -h.r * 0.12);
+  ctx.closePath();
+  ctx.fill();
+  ctx.fillStyle = hexToRgba("#fff2a8", (0.82 + charge * 0.18) * alpha);
+  ctx.beginPath();
+  ctx.moveTo(0, -h.r * 0.42 * flame);
+  ctx.lineTo(h.r * 0.11, -h.r * 0.04);
+  ctx.lineTo(0, h.r * 0.18);
+  ctx.lineTo(-h.r * 0.12, -h.r * 0.04);
+  ctx.closePath();
+  ctx.fill();
   ctx.restore();
 }
 

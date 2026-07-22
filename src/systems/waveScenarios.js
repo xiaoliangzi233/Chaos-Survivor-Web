@@ -56,6 +56,11 @@ function spawnScenarioEvent(scenario) {
   if (event.type === "prism_refraction") spawnScenarioNodeField(event, "prism_reflector", "#f3f7ff");
   if (event.type === "magnetic_drift") spawnScenarioNodeField(event, "magnetic_node", "#42e8ff");
   if (event.type === "nest_spore_bloom") spawnScenarioNodeField(event, "brood_pod", "#a3e635");
+  if (event.type === "long_mech_worms") spawnLongMechWorms(event);
+  if (event.type === "sweeping_laser_maze") spawnSweepingLaserMaze(event);
+  if (event.type === "mirror_laser_gate") spawnMirrorLaserGate(event);
+  if (event.type === "phase_tear_grid") spawnScenarioNodeField(event, "phase_tear", "#d946ef");
+  if (event.type === "inferno_resonance") spawnScenarioNodeField(event, "inferno_beacon", "#ff7a1a");
   state.spawnedWaveEvents.add(key);
 }
 
@@ -160,6 +165,65 @@ function spawnEmberMineRain(event) {
   }
 }
 
+function spawnLongMechWorms(event) {
+  const count = event.count || 3;
+  for (let i = 0; i < count; i++) spawnEnemyById("mech_worm");
+}
+
+function spawnSweepingLaserMaze(event) {
+  const horizontal = Math.random() < 0.5;
+  const fromNegative = Math.random() < 0.5;
+  const span = WORLD_SIZE * 1.34;
+  const startEdge = (fromNegative ? -1 : 1) * (WORLD_SIZE / 2 + 120);
+  const target = horizontal ? state.player.y : state.player.x;
+  const direction = Math.sign(target - startEdge) || (fromNegative ? 1 : -1);
+  world.hazards.push({
+    kind: "storm_laser_net",
+    x: horizontal ? 0 : startEdge,
+    y: horizontal ? startEdge : 0,
+    vx: horizontal ? 0 : direction * (event.speed || 150),
+    vy: horizontal ? direction * (event.speed || 150) : 0,
+    angle: horizontal ? 0 : Math.PI / 2,
+    length: span,
+    width: event.width || 34,
+    color: event.color || "#ff4d6d",
+    damage: event.damage || 24,
+    life: event.life || 999,
+    maxLife: event.life || 999,
+    armTime: event.armTime || 1.1,
+    armDuration: event.armTime || 1.1,
+    fullWave: Boolean(event.fullWave),
+    surgeTime: 0.32,
+  });
+}
+
+function spawnMirrorLaserGate(event) {
+  const count = event.count || 4;
+  for (let i = 0; i < count; i++) {
+    const vertical = i % 2 === 0;
+    const side = i < 2 ? -1 : 1;
+    const offset = side * (180 + i * 46);
+    world.hazards.push({
+      kind: "storm_laser_net",
+      x: vertical ? state.player.x + offset : 0,
+      y: vertical ? 0 : state.player.y + offset,
+      vx: vertical ? Math.sin(i) * (event.speed || 22) : 0,
+      vy: vertical ? 0 : Math.cos(i) * (event.speed || 22),
+      angle: vertical ? Math.PI / 2 : 0,
+      length: WORLD_SIZE * 1.15,
+      width: event.width || 24,
+      color: event.color || "#f3f7ff",
+      damage: event.damage || 18,
+      life: event.life || 999,
+      maxLife: event.life || 999,
+      armTime: 0.9 + i * 0.16,
+      armDuration: 0.9 + i * 0.16,
+      fullWave: Boolean(event.fullWave),
+      surgeTime: 0.2,
+    });
+  }
+}
+
 function addScenarioHazard(x, y, event, angle) {
   const half = WORLD_SIZE / 2 - 80;
   world.hazards.push({
@@ -174,6 +238,7 @@ function addScenarioHazard(x, y, event, angle) {
     poisonDps: event.poisonDps || 0,
     poisonDuration: event.poisonDuration || 0,
     armTime: event.armTime || 0,
+    armDuration: event.armTime || 0,
     triggerRadius: event.triggerRadius || 0,
     explodeRadius: event.explodeRadius || 0,
     triggered: Boolean(event.triggered),
@@ -234,5 +299,18 @@ function markElite(enemy, variant) {
     enemy.eliteSkillInterval = 4.2;
     enemy.eliteSkillCooldown = 1.4;
     enemy.speed *= 0.86;
+  }
+  if (variant === "embermine_overlord") {
+    enemy.name = "精英余烬地雷兽";
+    enemy.eliteEmberMineRingSkill = true;
+    enemy.eliteSkillInterval = 3.4;
+    enemy.eliteSkillCooldown = 1.2;
+    enemy.speed *= 1.1;
+  }
+  if (variant === "inferno_conductor") {
+    enemy.name = "精英烈焰司祭";
+    enemy.eliteInfernoConductorSkill = true;
+    enemy.eliteSkillInterval = 3.6;
+    enemy.eliteSkillCooldown = 1.1;
   }
 }

@@ -13,6 +13,10 @@ const EFFECT_INFO = {
   magnetic_drift: { label: "磁力漂移", description: "磁力节点正在牵引资源与低速弹幕。", tone: "cyan" },
   nest_spore_bloom: { label: "孢子增殖", description: "巢核孢子正在孵化新的实验体。", tone: "toxic" },
   overclock_pulse: { label: "过载脉冲", description: "周期性脉冲会让敌群短暂加速。", tone: "danger" },
+  laser_disaster: { label: "激光灾难", description: "高能激光束正在缓慢扫场，安全缝隙会越来越珍贵。", tone: "danger" },
+  phase_tear_grid: { label: "裂相撕裂", description: "相位裂隙会扭曲移动路线，别在裂口边缘恋战。", tone: "violet" },
+  mirror_laser_gate: { label: "镜面光闸", description: "镜像激光门正在交错校准，观察预警线后穿过空档。", tone: "cyan" },
+  inferno_resonance: { label: "炎脉共鸣", description: "烈焰信标正在蓄能并发射灼烧火球，观察火光脉冲后变向。", tone: "danger" },
 };
 
 const EVENT_INFO = {
@@ -23,6 +27,11 @@ const EVENT_INFO = {
   prism_refraction: EFFECT_INFO.prism_refraction,
   magnetic_drift: EFFECT_INFO.magnetic_drift,
   nest_spore_bloom: EFFECT_INFO.nest_spore_bloom,
+  long_mech_worms: { label: "蠕虫巨化", description: "少量超长机械蠕虫已释放，体节更长且生命极高。", tone: "danger" },
+  sweeping_laser_maze: EFFECT_INFO.laser_disaster,
+  mirror_laser_gate: EFFECT_INFO.mirror_laser_gate,
+  phase_tear_grid: EFFECT_INFO.phase_tear_grid,
+  inferno_resonance: EFFECT_INFO.inferno_resonance,
 };
 
 const HAZARD_INFO = {

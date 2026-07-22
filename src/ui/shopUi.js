@@ -25,7 +25,6 @@ const text = {
   buy: "\u8d2d\u4e70",
   bought: "\u8d2d\u4e70\u6210\u529f\u3002",
   quantity: "\u6570\u91cf",
-  directFuse: "\u8d2d\u4e70\u540e\u76f4\u63a5\u5408\u6210",
   fuseNow: "\u76f4\u63a5\u5408\u6210",
   fuseHint: "\u5728\u6b66\u5668\u69fd\u4e2d\u9009\u62e9\u53ef\u5408\u6210\u7684\u6b66\u5668",
   fuseSuccess: "\u6b66\u5668\u5408\u6210\u6210\u529f\u3002",
@@ -134,7 +133,6 @@ function renderOffer(offer) {
       <span>${text.quantity} x${offer.quantity}</span>
       <span>${offer.purchaseCount}/${offer.maxPurchases}</span>
       <span>${offer.price} ${text.coin}</span>
-      ${fuseTarget ? `<span>${text.directFuse}</span>` : ""}
     </div>
   `;
   const actions = document.createElement("div");

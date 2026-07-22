@@ -19,20 +19,21 @@ let previewStop = null;
 
 export function initCodexUi() {
   dom.overlay = document.getElementById("codexOverlay");
+  dom.panel = dom.overlay?.querySelector(".codex-panel");
   dom.openButton = document.getElementById("codexButton");
   dom.closeButton = document.getElementById("codexCloseButton");
   dom.tabs = document.getElementById("codexTabs");
   dom.list = document.getElementById("codexList");
   dom.detail = document.getElementById("codexDetail");
-  if (!dom.overlay || !dom.openButton || !dom.closeButton || !dom.tabs || !dom.list || !dom.detail) return;
+  dom.footerStatus = document.getElementById("codexFooterStatus");
+  if (!dom.overlay || !dom.panel || !dom.openButton || !dom.closeButton || !dom.tabs || !dom.list || !dom.detail) return;
+  dom.list.setAttribute("role", "tabpanel");
   dom.openButton.addEventListener("click", openCodex);
   dom.closeButton.addEventListener("click", closeCodex);
   dom.overlay.addEventListener("click", (event) => {
     if (event.target === dom.overlay) closeCodex();
   });
-  document.addEventListener("keydown", (event) => {
-    if (event.key === "Escape" && dom.overlay.classList.contains("active")) closeCodex();
-  });
+  document.addEventListener("keydown", handleKeydown);
   renderTabs();
 }
 
@@ -61,11 +62,15 @@ export function closeCodex() {
 
 function renderTabs() {
   dom.tabs.innerHTML = "";
+  dom.tabs.setAttribute("role", "tablist");
   for (const category of CATEGORIES) {
     const button = document.createElement("button");
     button.type = "button";
+    button.id = `codexTab-${category.id}`;
     button.dataset.type = category.id;
-    button.innerHTML = `<span>${category.eyebrow}</span><strong>${category.label}</strong>`;
+    button.setAttribute("role", "tab");
+    button.setAttribute("aria-controls", "codexList");
+    button.innerHTML = `<span>${category.eyebrow}</span>`;
     button.addEventListener("click", () => {
       activeType = category.id;
       selectedId = null;
@@ -80,6 +85,7 @@ function renderCodex() {
   stopPreview();
   renderTabsState();
   const entries = entriesFor(activeType);
+  updateFooterStatus(entries.length, totalEntriesFor(activeType));
   const pageCount = Math.max(1, Math.ceil(entries.length / CODEX_PAGE_SIZE));
   codexPage = Math.max(0, Math.min(pageCount - 1, codexPage));
   const pageEntries = pagedEntries(entries);
@@ -90,7 +96,11 @@ function renderCodex() {
 
 function renderTabsState() {
   for (const button of dom.tabs.querySelectorAll("button")) {
-    button.classList.toggle("active", button.dataset.type === activeType);
+    const selected = button.dataset.type === activeType;
+    button.classList.toggle("active", selected);
+    button.setAttribute("aria-selected", String(selected));
+    button.tabIndex = selected ? 0 : -1;
+    if (selected) dom.list.setAttribute("aria-labelledby", button.id);
   }
 }
 
@@ -129,6 +139,18 @@ function entriesFor(type) {
     .filter((item) => unlocked.has(item.id))
     .map((item) => itemCodexEntry(item, type))
     .sort(compareItemCodexEntries);
+}
+
+function totalEntriesFor(type) {
+  if (type === "enemies") return Object.keys(enemyConfig).length;
+  if (type === "weapons") return Object.keys(WEAPON_INFO).length;
+  return ITEM_DEFS.length;
+}
+
+function updateFooterStatus(unlocked, total) {
+  if (!dom.footerStatus) return;
+  const label = CATEGORIES.find((category) => category.id === activeType)?.label || "档案";
+  dom.footerStatus.textContent = `${label} 解锁 ${unlocked} / ${total} // ARCHIVE ${activeType.toUpperCase()}`;
 }
 
 function itemCodexEntry(item, type) {
@@ -392,4 +414,38 @@ function hexToRgba(hex, alpha) {
   const g = (num >> 8) & 255;
   const b = num & 255;
   return `rgba(${r},${g},${b},${alpha})`;
+}
+
+function handleKeydown(event) {
+  if (!dom.overlay?.classList.contains("active")) return;
+  if (event.key === "Escape") {
+    event.preventDefault();
+    closeCodex();
+    return;
+  }
+  if (["ArrowLeft", "ArrowRight"].includes(event.key) && event.target.closest("#codexTabs")) {
+    event.preventDefault();
+    const currentIndex = CATEGORIES.findIndex((category) => category.id === activeType);
+    const direction = event.key === "ArrowRight" ? 1 : -1;
+    const nextCategory = CATEGORIES[(currentIndex + direction + CATEGORIES.length) % CATEGORIES.length];
+    activeType = nextCategory.id;
+    selectedId = null;
+    codexPage = 0;
+    renderCodex();
+    dom.tabs.querySelector(`[data-type="${activeType}"]`)?.focus();
+    return;
+  }
+  if (event.key !== "Tab") return;
+  const focusable = [...dom.panel.querySelectorAll("button:not(:disabled), [href], [tabindex]:not([tabindex='-1'])")]
+    .filter((element) => element.getClientRects().length);
+  if (!focusable.length) return;
+  const first = focusable[0];
+  const last = focusable[focusable.length - 1];
+  if (event.shiftKey && document.activeElement === first) {
+    event.preventDefault();
+    last.focus();
+  } else if (!event.shiftKey && document.activeElement === last) {
+    event.preventDefault();
+    first.focus();
+  }
 }

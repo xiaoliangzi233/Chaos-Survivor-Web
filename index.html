@@ -259,11 +259,11 @@
       </section>
 
       <section id="codexOverlay" class="overlay codex-overlay" aria-hidden="true">
-        <div class="codex-panel">
+        <div class="codex-panel" role="dialog" aria-modal="true" aria-labelledby="codexTitle">
           <header class="codex-head">
             <div>
               <p class="eyebrow">SURVIVOR ARCHIVE</p>
-              <h2>图鉴</h2>
+              <h2 id="codexTitle">图鉴</h2>
             </div>
             <button id="codexCloseButton" type="button" aria-label="关闭图鉴">×</button>
           </header>
@@ -272,6 +272,10 @@
             <section id="codexList" class="codex-list" aria-label="图鉴条目"></section>
             <aside id="codexDetail" class="codex-detail" aria-label="图鉴详情"></aside>
           </div>
+          <footer class="codex-footer">
+            <span>按 <kbd>Esc</kbd> 返回主菜单</span>
+            <em id="codexFooterStatus">ARCHIVE SYNC // 0 / 0</em>
+          </footer>
         </div>
       </section>
 

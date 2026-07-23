@@ -3,7 +3,18 @@ import { ui } from "../ui/ui.js";
 import { setMuted, isMuted, nextMusicTrack } from "../audio.js";
 import { handleEasterEggKey } from "./easterEggs.js";
 
-export function bindInput({ start, restart, togglePause, resume, returnToMenu, openDebugShop }) {
+export function bindInput({
+  start,
+  restart,
+  togglePause,
+  resume,
+  returnToMenu,
+  openDebugShop,
+  interactLobby,
+  interactLobbyPointer,
+  hoverLobbyPointer,
+  cancelLobbyAction,
+}) {
   const keys = new Map([
     ["KeyW", "up"], ["ArrowUp", "up"],
     ["KeyS", "down"], ["ArrowDown", "down"],
@@ -20,7 +31,13 @@ export function bindInput({ start, restart, togglePause, resume, returnToMenu, o
       event.preventDefault();
     }
     const key = event.key?.toLowerCase();
-    if ((event.code === "KeyP" || event.code === "Escape") && !event.repeat) {
+    if (event.code === "Escape" && !event.repeat && state.mode === "lobby" && state.lobby?.pendingLaunch) {
+      event.__survivorHandled = true;
+      event.preventDefault();
+      cancelLobbyAction?.();
+      return;
+    }
+    if ((event.code === "KeyP" || event.code === "Escape") && !event.repeat && ["playing", "paused", "inventory"].includes(state.mode)) {
       event.__survivorHandled = true;
       event.preventDefault();
       togglePause();
@@ -34,6 +51,12 @@ export function bindInput({ start, restart, togglePause, resume, returnToMenu, o
     if ((event.code === "KeyO" || key === "o") && !event.repeat && openDebugShop?.()) {
       event.__survivorHandled = true;
       event.preventDefault();
+      return;
+    }
+    if ((event.code === "KeyE" || key === "e") && state.mode === "lobby" && !event.repeat) {
+      event.__survivorHandled = true;
+      event.preventDefault();
+      interactLobby?.();
       return;
     }
     if (event.code === "Space" && state.mode === "menu") {
@@ -53,6 +76,13 @@ export function bindInput({ start, restart, togglePause, resume, returnToMenu, o
   }, { capture: true });
 
   ui.canvas.addEventListener("pointerdown", (event) => {
+    if (state.mode === "lobby") {
+      if (event.pointerType !== "touch" && event.button === 0) {
+        event.preventDefault();
+        interactLobbyPointer?.(event);
+      }
+      return;
+    }
     if (state.mode === "menu" || state.mode === "inventory") return;
     if (event.pointerType !== "touch") return;
     input.pointerId = event.pointerId;
@@ -60,7 +90,14 @@ export function bindInput({ start, restart, togglePause, resume, returnToMenu, o
     ui.canvas.setPointerCapture(event.pointerId);
   });
   ui.canvas.addEventListener("pointermove", (event) => {
+    if (state.mode === "lobby" && event.pointerType !== "touch") {
+      hoverLobbyPointer?.(event);
+      return;
+    }
     if (event.pointerId === input.pointerId) setStick(event);
+  });
+  ui.canvas.addEventListener("pointerleave", () => {
+    if (state.mode === "lobby") hoverLobbyPointer?.(null);
   });
   ui.canvas.addEventListener("pointerup", clearStick);
   ui.canvas.addEventListener("pointercancel", clearStick);
@@ -68,6 +105,7 @@ export function bindInput({ start, restart, togglePause, resume, returnToMenu, o
 
   ui.startButton.addEventListener("click", start);
   ui.restartButton.addEventListener("click", restart);
+  ui.endLobbyButton?.addEventListener("click", returnToMenu);
   ui.pauseRestartButton.addEventListener("click", restart);
   ui.resumeButton.addEventListener("click", resume);
   ui.menuButton.addEventListener("click", returnToMenu);

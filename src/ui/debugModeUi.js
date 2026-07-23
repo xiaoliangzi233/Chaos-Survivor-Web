@@ -12,7 +12,7 @@ const MIN_PASSWORD_LENGTH = 6;
 
 let debugUi = null;
 
-export function initDebugModeUi({ onQuickStart, onTaintRun, onPauseForDebug, onResumeFromDebug } = {}) {
+export function initDebugModeUi({ onQuickStart, onTaintRun, onPauseForDebug, onResumeFromDebug, onOverlayChange } = {}) {
   const elements = collectElements();
   if (!elements.menuButton || !elements.authOverlay || !elements.panelOverlay) return null;
 
@@ -31,7 +31,15 @@ export function initDebugModeUi({ onQuickStart, onTaintRun, onPauseForDebug, onR
     resumeOnClose = Boolean(onPauseForDebug?.());
   }
 
-  function openGateway() {
+  function notifyOverlay(open) {
+    onOverlayChange?.(Boolean(open));
+  }
+
+  function openGateway(options = {}) {
+    const preferredWeaponId = typeof options === "string" ? options : options?.weaponId;
+    if (preferredWeaponId && STARTER_WEAPONS.some((weapon) => weapon.id === preferredWeaponId)) {
+      elements.weaponSelect.value = preferredWeaponId;
+    }
     if (sessionUnlocked) return openPanel();
     pauseForOverlay();
     authMode = readCredentials() ? "unlock" : "setup";
@@ -41,6 +49,7 @@ export function initDebugModeUi({ onQuickStart, onTaintRun, onPauseForDebug, onR
     elements.authOverlay.setAttribute("aria-hidden", "false");
     elements.menuButton.setAttribute("aria-expanded", "true");
     document.body.classList.add("debug-auth-open");
+    notifyOverlay(true);
     window.setTimeout(() => elements.passwordInput.focus({ preventScroll: true }), 0);
   }
 
@@ -51,6 +60,7 @@ export function initDebugModeUi({ onQuickStart, onTaintRun, onPauseForDebug, onR
     document.body.classList.remove("debug-auth-open");
     elements.authForm.reset();
     setAuthError(elements, "");
+    if (resume) notifyOverlay(false);
     if (resume) resumeAfterOverlay();
   }
 
@@ -65,6 +75,7 @@ export function initDebugModeUi({ onQuickStart, onTaintRun, onPauseForDebug, onR
     elements.panelOverlay.setAttribute("aria-hidden", "false");
     document.body.classList.add("debug-panel-open");
     elements.menuButton.setAttribute("aria-expanded", "true");
+    notifyOverlay(true);
   }
 
   function closePanel({ resume = true } = {}) {
@@ -72,6 +83,7 @@ export function initDebugModeUi({ onQuickStart, onTaintRun, onPauseForDebug, onR
     elements.panelOverlay.setAttribute("aria-hidden", "true");
     document.body.classList.remove("debug-panel-open");
     elements.menuButton.setAttribute("aria-expanded", "false");
+    notifyOverlay(false);
     if (resume) resumeAfterOverlay();
   }
 

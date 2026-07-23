@@ -41,6 +41,42 @@ export function getBestRandomEndlessWave() {
   return progress.bestRandomEndlessWave;
 }
 
+export function getLobbyFirstClearReactions() {
+  return cloneValue(progress.lobbyFirstClearReactions);
+}
+
+export function queueLobbyFirstClearReactions(difficultyId, npcIds = []) {
+  const normalizedDifficultyId = String(difficultyId || "").trim();
+  if (!difficultyIds.includes(normalizedDifficultyId)) return false;
+  let changed = false;
+  for (const npcId of uniqueStrings(npcIds)) {
+    const queue = progress.lobbyFirstClearReactions[npcId] ||= [];
+    if (!queue.includes(normalizedDifficultyId)) {
+      queue.push(normalizedDifficultyId);
+      changed = true;
+    }
+  }
+  if (changed) persistCurrentProgress();
+  return changed;
+}
+
+export function peekLobbyFirstClearReaction(npcId) {
+  const queue = progress.lobbyFirstClearReactions[String(npcId || "").trim()];
+  return Array.isArray(queue) ? queue[0] || null : null;
+}
+
+export function consumeLobbyFirstClearReaction(npcId, difficultyId = null) {
+  const normalizedNpcId = String(npcId || "").trim();
+  const queue = progress.lobbyFirstClearReactions[normalizedNpcId];
+  if (!Array.isArray(queue) || !queue.length) return false;
+  const index = difficultyId ? queue.indexOf(String(difficultyId)) : 0;
+  if (index < 0) return false;
+  queue.splice(index, 1);
+  if (!queue.length) delete progress.lobbyFirstClearReactions[normalizedNpcId];
+  persistCurrentProgress();
+  return true;
+}
+
 export function savePlayerDifficultyProgress(value) {
   progress = mergeProgress(progress, { difficultyProgress: value });
   persistCurrentProgress();
@@ -106,6 +142,7 @@ function normalizeProgress(value) {
     bestRandomEndlessWave: boundedInteger(value?.bestRandomEndlessWave, 0, 1_000_000),
     difficultyProgress: normalizedDifficulty,
     codex: Object.fromEntries(CODEX_TYPES.map((type) => [type, uniqueStrings(value?.codex?.[type])])),
+    lobbyFirstClearReactions: normalizeReactionQueues(value?.lobbyFirstClearReactions),
   };
 }
 
@@ -129,6 +166,12 @@ function mergeProgress(...values) {
     }
     for (const type of CODEX_TYPES) {
       merged.codex[type] = uniqueStrings([...merged.codex[type], ...source.codex[type]]);
+    }
+    for (const [npcId, queue] of Object.entries(source.lobbyFirstClearReactions)) {
+      merged.lobbyFirstClearReactions[npcId] = uniqueStrings([
+        ...(merged.lobbyFirstClearReactions[npcId] || []),
+        ...queue,
+      ]).filter((id) => difficultyIds.includes(id));
     }
   }
   return normalizeProgress(merged);
@@ -175,6 +218,17 @@ function cloneValue(value) {
 function uniqueStrings(value) {
   if (!Array.isArray(value)) return [];
   return Array.from(new Set(value.map((entry) => String(entry || "").trim()).filter(Boolean)));
+}
+
+function normalizeReactionQueues(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+  const result = {};
+  for (const [npcId, queue] of Object.entries(value)) {
+    const normalizedNpcId = String(npcId || "").trim();
+    const normalizedQueue = uniqueStrings(queue).filter((id) => difficultyIds.includes(id));
+    if (normalizedNpcId && normalizedQueue.length) result[normalizedNpcId] = normalizedQueue;
+  }
+  return result;
 }
 
 function boundedInteger(value, minimum, maximum) {

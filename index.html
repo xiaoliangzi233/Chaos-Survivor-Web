@@ -66,6 +66,25 @@
 
       <div id="touchStick" class="touch-stick" aria-hidden="true"><i></i></div>
 
+      <section id="lobbyHud" class="lobby-hud" aria-hidden="true">
+        <div id="lobbyInteractionPrompt" class="lobby-interaction-prompt" hidden>
+          <kbd>E</kbd>
+          <div>
+            <strong id="lobbyInteractionTitle">交互</strong>
+            <span id="lobbyInteractionHint"></span>
+          </div>
+        </div>
+        <div id="lobbyLaunchStatus" class="lobby-launch-status" hidden>
+          <div>
+            <strong id="lobbyLaunchText">稳定航线充能 0%</strong>
+            <span>离开传送范围或按 <kbd>ESC</kbd> 取消</span>
+          </div>
+          <i id="lobbyLaunchBar"></i>
+        </div>
+        <div id="lobbyToast" class="lobby-toast" aria-live="polite" hidden></div>
+        <p class="lobby-control-hint"><kbd>WASD</kbd> / 方向键移动　面向目标按 <kbd>E</kbd>，或近距离鼠标点击交互</p>
+      </section>
+
       <section id="startOverlay" class="overlay active">
         <div class="menu-title" aria-label="游戏名称">
           <span>NEON RUINS Survivor</span>
@@ -83,7 +102,7 @@
         <p id="gameVersionText" class="menu-version">v0.1.0</p>
       </section>
 
-      <nav class="menu-actions" aria-label="主菜单功能">
+      <nav class="menu-actions" aria-label="主菜单功能" hidden>
         <button id="codexButton" type="button" class="menu-codex-button" aria-label="打开图鉴" aria-controls="codexOverlay" aria-expanded="false">
           <span>图鉴</span>
         </button>
@@ -94,6 +113,30 @@
           <span>调试</span>
         </button>
       </nav>
+
+      <section id="lobbyDialogueOverlay" class="overlay lobby-dialogue-overlay" aria-hidden="true">
+        <div class="lobby-dialogue-panel" role="dialog" aria-modal="true" aria-labelledby="lobbyDialogueTitle">
+          <header>
+            <div>
+              <p id="lobbyDialogueRole" class="eyebrow">TRANSIT HUB</p>
+              <h2 id="lobbyDialogueTitle">中转站通讯</h2>
+            </div>
+            <button id="lobbyDialogueCloseButton" type="button" aria-label="关闭对话">×</button>
+          </header>
+          <div class="lobby-dialogue-body">
+            <div id="lobbyDialoguePortrait" class="lobby-dialogue-portrait" aria-hidden="true"><i></i><b></b><em></em></div>
+            <div class="lobby-dialogue-copy">
+              <strong id="lobbyDialogueSpeaker">向导 · 伊芙</strong>
+              <p id="lobbyDialogueText"></p>
+              <nav id="lobbyDialogueTopics" class="lobby-dialogue-topics" aria-label="对话主题"></nav>
+            </div>
+          </div>
+          <footer>
+            <span>选择主题继续阅读</span>
+            <button id="lobbyDialogueConfirmButton" type="button">结束交谈</button>
+          </footer>
+        </div>
+      </section>
 
       <button id="debugQuickButton" type="button" class="debug-quick-button" aria-label="打开调试面板，快捷键 F8" hidden>
         <span>DBG</span><kbd>F8</kbd>
@@ -354,7 +397,7 @@
               <span>武器 <strong id="loadoutSelectedWeaponName">未选择</strong></span>
             </div>
             <div class="loadout-actions">
-              <button id="loadoutBackButton" type="button" class="secondary">返回主菜单</button>
+              <button id="loadoutBackButton" type="button" class="secondary">返回大厅</button>
               <button id="loadoutConfirmButton" type="button" class="primary" disabled>开始作战</button>
             </div>
           </footer>
@@ -447,7 +490,7 @@
           <div class="pause-actions">
             <button id="resumeButton" type="button" class="primary">返回游戏</button>
             <button id="pauseRestartButton" type="button">重新开始</button>
-            <button id="menuButton" type="button">返回主菜单</button>
+            <button id="menuButton" type="button">返回大厅</button>
           </div>
           <p class="subtle">暂停期间游戏音乐会停止，返回游戏后继续播放。</p>
         </div>
@@ -494,7 +537,10 @@
           <p id="endEyebrow" class="eyebrow">RUN COMPLETE</p>
           <h2 id="endTitle">生存结束</h2>
           <div id="endStats" class="end-stats"></div>
-          <button id="restartButton" type="button" class="primary">再来一局</button>
+          <div class="end-actions">
+            <button id="restartButton" type="button" class="primary">再来一局</button>
+            <button id="endLobbyButton" type="button">返回大厅</button>
+          </div>
         </div>
       </section>
     </main>

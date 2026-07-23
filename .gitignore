@@ -5,6 +5,7 @@ tests/
 /tests/*
 !/tests/apocalypseWaveScenarios.test.mjs
 !/tests/apocalypseScenarioEvents.test.mjs
+!/tests/lobby.test.mjs
 
 # Local notes
 AGENTS.md

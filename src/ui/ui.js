@@ -67,6 +67,7 @@ export const ui = {
   bootProgressText: document.getElementById("bootProgressText"),
   bootProgressBar: document.getElementById("bootProgressBar"),
   restartButton: document.getElementById("restartButton"),
+  endLobbyButton: document.getElementById("endLobbyButton"),
   resumeButton: document.getElementById("resumeButton"),
   pauseRestartButton: document.getElementById("pauseRestartButton"),
   menuButton: document.getElementById("menuButton"),
@@ -236,7 +237,7 @@ export function updateBestText() {
   ui.bestText.textContent = bestSummaryText(formatTime);
 }
 
-export function showRunSetup({ weapons, onConfirm, onBack }) {
+export function showRunSetup({ weapons, onConfirm, onBack, fixedRunMode = null, fixedWeapon = null }) {
   clearPreview();
   state.ai ||= {};
   ui.quickActions?.classList.add("blocked");
@@ -251,16 +252,36 @@ export function showRunSetup({ weapons, onConfirm, onBack }) {
   ];
   let difficultyIndex = Math.max(0, difficulties.findIndex((item) => item.currentHighest));
   let weaponIndex = 0;
-  let selectedRunMode = runModes[0];
+  let selectedRunMode = runModes.find((item) => item.id === fixedRunMode) || runModes[0];
   let selectedRandomGoal = randomGoals[0];
   let selectedDifficulty = difficulties[difficultyIndex] || null;
-  let selectedWeapon = weapons[weaponIndex] || null;
+  let selectedWeapon = fixedWeapon || weapons[weaponIndex] || null;
+  weaponIndex = Math.max(0, weapons.findIndex((item) => item.id === selectedWeapon?.id));
   let confirmed = false;
 
   if (ui.loadoutModeList) ui.loadoutModeList.innerHTML = "";
   if (ui.loadoutRandomGoalList) ui.loadoutRandomGoalList.innerHTML = "";
   ui.loadoutDifficultyList.innerHTML = "";
   ui.loadoutWeaponList.innerHTML = "";
+  const modeSection = ui.loadoutModeList?.closest(".loadout-mode-section");
+  const weaponSection = ui.loadoutWeaponList?.closest(".loadout-weapon-section");
+  if (modeSection) modeSection.hidden = Boolean(fixedRunMode && fixedRunMode !== "random");
+  if (ui.loadoutModeList) ui.loadoutModeList.hidden = Boolean(fixedRunMode);
+  if (weaponSection) weaponSection.hidden = Boolean(fixedWeapon);
+  const modeHeading = modeSection?.querySelector(".loadout-section-title h3");
+  const modeDescription = modeSection?.querySelector(".loadout-section-title p");
+  if (modeHeading) modeHeading.textContent = fixedRunMode === "random" ? "选择随机任务目标" : "选择运行模式";
+  if (modeDescription) {
+    modeDescription.textContent = fixedRunMode === "random"
+      ? "完成二十波后撤离，或在无限模式中挑战最高波次。"
+      : "标准战役使用固定波次；随机模式会从已解锁图鉴中生成每一波。";
+  }
+  const setupIntro = ui.loadoutOverlay?.querySelector(".loadout-head > p");
+  if (setupIntro) {
+    setupIntro.textContent = fixedRunMode
+      ? `${selectedRunMode.name}出击配置。确认难度与任务目标后，将使用大厅中选择的开场武器。`
+      : "同时选择作战难度与开场武器。确认后立即进入战场。";
+  }
 
   function renderRunModeList() {
     if (!ui.loadoutModeList) return;
@@ -271,6 +292,7 @@ export function showRunSetup({ weapons, onConfirm, onBack }) {
       button.className = `loadout-mode-card terminal-card${selectedRunMode.id === item.id ? " selected" : ""}`;
       button.innerHTML = `<strong>${item.name}</strong><p>${item.desc}</p>`;
       button.addEventListener("click", () => {
+        if (fixedRunMode) return;
         selectedRunMode = item;
         renderRunModeList();
         renderRandomGoalList();
@@ -336,6 +358,7 @@ export function showRunSetup({ weapons, onConfirm, onBack }) {
         <i>${item.icon}</i>
         <strong>${item.name}</strong>`;
       button.addEventListener("click", () => {
+        if (fixedWeapon) return;
         weaponIndex = index;
         selectedWeapon = item;
         renderWeaponList();
@@ -443,7 +466,7 @@ export function showRunSetup({ weapons, onConfirm, onBack }) {
   }
 
   function cycleWeapon(direction) {
-    if (!weapons.length) return;
+    if (!weapons.length || fixedWeapon) return;
     weaponIndex = cycleCarouselIndex(weaponIndex, direction, weapons.length);
     selectedWeapon = weapons[weaponIndex];
     renderWeaponList();
@@ -546,7 +569,7 @@ export function showRunSetup({ weapons, onConfirm, onBack }) {
   renderWeaponList();
   updateWeaponPreviewInfo();
   updateSummary();
-  stopPreview = startWeaponPreview(ui.loadoutWeaponPreview, () => selectedWeapon);
+  if (!fixedWeapon) stopPreview = startWeaponPreview(ui.loadoutWeaponPreview, () => selectedWeapon);
   ui.loadoutOverlay.classList.add("active");
   ui.loadoutOverlay.setAttribute("aria-hidden", "false");
   ui.loadoutOverlay.tabIndex = -1;
@@ -558,6 +581,11 @@ export function hideRunSetup() {
   if (state.ai?.loadoutPanel) state.ai.loadoutPanel = null;
   ui.loadoutOverlay?.classList.remove("active");
   ui.loadoutOverlay?.setAttribute("aria-hidden", "true");
+  const modeSection = ui.loadoutModeList?.closest(".loadout-mode-section");
+  const weaponSection = ui.loadoutWeaponList?.closest(".loadout-weapon-section");
+  if (modeSection) modeSection.hidden = false;
+  if (ui.loadoutModeList) ui.loadoutModeList.hidden = false;
+  if (weaponSection) weaponSection.hidden = false;
   ui.quickActions?.classList.remove("blocked");
 }
 

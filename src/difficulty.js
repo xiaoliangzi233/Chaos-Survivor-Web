@@ -85,9 +85,10 @@ export function highestCompletedDifficulty() {
 
 export function recordDifficultyVictory() {
   const cfg = currentDifficulty();
-  if (!cfg?.id) return;
+  if (!cfg?.id) return { firstClear: false, difficultyId: null, nextDifficultyId: null };
   const progress = state.difficultyProgress || loadDifficultyProgress();
   const record = progress[cfg.id] || { unlocked: true, completed: false };
+  const firstClear = !record.completed;
   const bestTime = Math.floor(state.time);
   progress[cfg.id] = {
     ...record,
@@ -102,6 +103,7 @@ export function recordDifficultyVictory() {
   if (nextId) progress[nextId] = { ...(progress[nextId] || {}), unlocked: true };
   state.difficultyProgress = progress;
   saveDifficultyProgress();
+  return { firstClear, difficultyId: cfg.id, nextDifficultyId: nextId || null };
 }
 
 export function bestSummaryText(formatTime) {

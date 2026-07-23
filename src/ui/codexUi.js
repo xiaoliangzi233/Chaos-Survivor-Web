@@ -18,8 +18,12 @@ let activeType = "enemies";
 let selectedId = null;
 let codexPage = 0;
 let previewStop = null;
+let onOpen = null;
+let onClose = null;
 
-export function initCodexUi() {
+export function initCodexUi(options = {}) {
+  onOpen = options.onOpen || null;
+  onClose = options.onClose || null;
   dom.overlay = document.getElementById("codexOverlay");
   dom.panel = dom.overlay?.querySelector(".codex-panel");
   dom.openButton = document.getElementById("codexButton");
@@ -48,6 +52,7 @@ export function openCodex() {
   dom.openButton?.setAttribute("aria-expanded", "true");
   dom.openButton?.classList.add("active");
   dom.closeButton?.focus({ preventScroll: true });
+  onOpen?.();
 }
 
 export function closeCodex() {
@@ -60,6 +65,7 @@ export function closeCodex() {
   dom.openButton?.setAttribute("aria-expanded", "false");
   dom.openButton?.classList.remove("active");
   if (wasOpen) dom.openButton?.focus({ preventScroll: true });
+  if (wasOpen) onClose?.();
 }
 
 function renderTabs() {

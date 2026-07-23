@@ -41,6 +41,7 @@ export const state = {
   difficultyProgress: null,
   ai: null,
   debug: createDebugState(),
+  lobby: createLobbyState(),
 };
 
 export const world = {
@@ -193,6 +194,53 @@ export function createDebugState(previous = {}) {
     doubleSpeed: Boolean(previous.doubleSpeed),
     freezeWave: previous.freezeWave !== false,
     runTainted: Boolean(previous.enabled),
+  };
+}
+
+export function createLobbyState(previous = {}) {
+  return {
+    initialized: Boolean(previous.initialized),
+    active: Boolean(previous.active),
+    time: Number(previous.time) || 0,
+    shipTime: Number(previous.shipTime) || 0,
+    player: {
+      x: Number(previous.player?.x) || 120,
+      y: Number(previous.player?.y) || 150,
+      r: 15,
+      speed: 210,
+      vx: Number(previous.player?.vx) || 0,
+      vy: Number(previous.player?.vy) || 0,
+      dirX: Number(previous.player?.dirX) || 0,
+      dirY: Number(previous.player?.dirY) || -1,
+      tilt: Number(previous.player?.tilt) || 0,
+      stride: Number(previous.player?.stride) || 0,
+      moving: false,
+    },
+    cameraX: Number(previous.cameraX) || 80,
+    cameraY: Number(previous.cameraY) || 105,
+    selectedWeaponId: previous.selectedWeaponId || "",
+    selectedDifficultyId: previous.selectedDifficultyId || "",
+    randomGoal: previous.randomGoal === "endless" ? "endless" : "twenty_waves",
+    weaponPage: Math.max(0, Math.min(2, Math.floor(Number(previous.weaponPage) || 0))),
+    currentRoomId: previous.currentRoomId || null,
+    roomReveal: { ...(previous.roomReveal || {}) },
+    doors: { ...(previous.doors || {}) },
+    npcs: { ...(previous.npcs || {}) },
+    pet: previous.pet ? { ...previous.pet } : null,
+    navigationReservations: {},
+    hoveredInteractionId: null,
+    pointerWorldX: 0,
+    pointerWorldY: 0,
+    mobileLightPhase: Number(previous.mobileLightPhase) || 0,
+    talkingNpcId: null,
+    pendingLaunch: null,
+    lastLaunchConfig: previous.lastLaunchConfig ? { ...previous.lastLaunchConfig } : null,
+    nearbyInteractionId: null,
+    interactionLockTime: 0,
+    modalOpen: false,
+    toast: null,
+    leverPulse: 0,
+    selectionPulse: 0,
   };
 }
 

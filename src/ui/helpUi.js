@@ -2,6 +2,8 @@ const TAB_IDS = ["controls", "combat", "growth"];
 const dom = {};
 let activeTab = "controls";
 let onBeforeOpen = null;
+let onOpen = null;
+let onClose = null;
 
 export function initHelpUi(options = {}) {
   dom.overlay = document.getElementById("helpOverlay");
@@ -14,6 +16,8 @@ export function initHelpUi(options = {}) {
   if (!dom.overlay || !dom.panel || !dom.openButton || !dom.closeButton || !dom.tabs) return;
 
   onBeforeOpen = options.onBeforeOpen || null;
+  onOpen = options.onOpen || null;
+  onClose = options.onClose || null;
   dom.openButton.addEventListener("click", toggleHelp);
   dom.closeButton.addEventListener("click", closeHelp);
   dom.overlay.addEventListener("click", (event) => {
@@ -49,6 +53,7 @@ export function openHelp() {
   dom.openButton.classList.add("active");
   selectHelpTab(activeTab);
   dom.closeButton.focus({ preventScroll: true });
+  onOpen?.();
   return true;
 }
 
@@ -61,6 +66,7 @@ export function closeHelp() {
   dom.openButton?.setAttribute("aria-expanded", "false");
   dom.openButton?.classList.remove("active");
   if (wasOpen) dom.openButton?.focus({ preventScroll: true });
+  if (wasOpen) onClose?.();
   return wasOpen;
 }
 

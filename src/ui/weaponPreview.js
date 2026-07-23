@@ -58,7 +58,22 @@ export function drawWeaponPreview(ctx, canvas, weapon, t) {
   ctx.save();
   ctx.translate(cx, cy);
   ctx.scale(scale, scale);
-  drawPlayerHead(ctx, 0, 0, t);
+  drawWeaponHologram(ctx, weapon, t, { drawPlayer: true, rank, color });
+  ctx.restore();
+}
+
+export function drawWeaponHologram(ctx, weapon, t, options = {}) {
+  if (!weapon) return null;
+  const rank = options.rank ?? qualityRank(weapon);
+  const color = options.color || weaponPreviewColor(weapon);
+  const x = Number(options.x) || 0;
+  const y = Number(options.y) || 0;
+  const scale = Number(options.scale) || 1;
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.scale(scale, scale);
+  ctx.globalAlpha *= options.alpha ?? 1;
+  if (options.drawPlayer) drawPlayerHead(ctx, 0, 0, t);
   if (weapon.id === "arc") drawArc(ctx, 0, 0, t, rank, color);
   else if (weapon.id === "ice") drawIce(ctx, 0, 0, t, rank, color);
   else if (weapon.id === "missile") drawMissile(ctx, 0, 0, t, rank, color);
@@ -72,6 +87,25 @@ export function drawWeaponPreview(ctx, canvas, weapon, t) {
   else if (weapon.id === "echo_tuning_fork") drawEchoTuningFork(ctx, 0, 0, t, rank, color);
   else if (weapon.id === "rift_loom") drawRiftLoom(ctx, 0, 0, t, rank, color);
   ctx.restore();
+  return { rank, color };
+}
+
+export function weaponPreviewColor(weapon) {
+  const baseColor = {
+    arc: "#42e8ff",
+    ice: "#9ff4ff",
+    missile: "#ffb347",
+    boomerang: "#ff65d8",
+    drone: "#77ff8a",
+    prism_railgun: "#7df9ff",
+    void_singularity: "#8b5cf6",
+    tesla_mine_chain: "#42e8ff",
+    starfall_scepter: "#ffd166",
+    phase_needler: "#b48cff",
+    echo_tuning_fork: "#7dfcff",
+    rift_loom: "#9d7cff",
+  }[weapon?.id] || "#42e8ff";
+  return qualityColor(weapon, baseColor);
 }
 
 function drawGrid(ctx, w, h, t) {

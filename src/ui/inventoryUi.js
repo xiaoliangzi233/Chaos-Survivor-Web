@@ -140,7 +140,7 @@ export function renderInventory() {
 function handleKeyDown(event) {
   if (event.__survivorHandled) return;
   const key = event.key?.toLowerCase();
-  if ((event.code === "KeyE" || key === "e") && !event.repeat) {
+  if ((event.code === "KeyE" || key === "e") && !event.repeat && (isInventoryOpen() || canOpenInventory())) {
     event.__survivorHandled = true;
     event.preventDefault();
     event.stopPropagation();

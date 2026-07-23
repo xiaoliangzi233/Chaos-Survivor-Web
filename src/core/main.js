@@ -19,7 +19,7 @@ import {
 import { generateMap } from "../systems/map.js";
 import { bindInput } from "../systems/input.js";
 import { closeInventory, initInventoryUi, isInventoryOpen } from "../ui/inventoryUi.js";
-import { closeCodex, initCodexUi } from "../ui/codexUi.js";
+import { closeCodex, initCodexUi, openCodex } from "../ui/codexUi.js";
 import { closeShop, initShopUi, openShop } from "../ui/shopUi.js";
 import { isBossWave, setupEnemyRegistry } from "../systems/enemyRegistry.js";
 import { updatePlayer, updateSpawning, updateEnemies, rebuildGrid, updateGems, updateCoins, collectAllExperience, collectAllCoins, clearEnemies } from "../systems/entities.js";
@@ -29,7 +29,7 @@ import { updateEasterEggs } from "../systems/easterEggs.js";
 import { applyWaveStartScenario, resetWaveScenarioState, updateWaveScenario } from "../systems/waveScenarios.js";
 import { createShopState } from "../economy/shop.js";
 import * as effects from "../effects.js";
-import { resizeCanvas, updateCamera, render } from "../systems/renderer.js";
+import { resizeCanvas, updateCamera, render, viewport } from "../systems/renderer.js";
 import { playSfx, startMusic, stopMusic, pauseMusic, resumeMusic } from "../audio.js";
 import { CAMERA_ZOOM } from "../constants.js";
 import { difficultyOrder, loadDifficultyProgress, recordDifficultyVictory, selectDifficulty, setupDifficultyConfig } from "../difficulty.js";
@@ -40,7 +40,9 @@ import { difficultyCards } from "../difficulty.js";
 import { cancelStoryPlayback, initStoryUi, playDifficultyStoryIfNeeded } from "../ui/storyUi.js";
 import {
   configurePlayerProgress,
+  consumeLobbyFirstClearReaction,
   loadPlayerProgress,
+  queueLobbyFirstClearReactions,
   recordBestSurvivalSeconds,
   recordBestRandomEndlessWave,
 } from "../systems/playerProgress.js";
@@ -57,6 +59,28 @@ import {
   randomModeCompletionReached,
   randomWaveDurationFor,
 } from "../systems/randomMode.js";
+import {
+  cancelLobbyLaunch,
+  configureLobbyDifficulties,
+  configureLobbyWeapons,
+  enterLobby,
+  findLobbyInteractionAtWorld,
+  interactWithLobby,
+  leaveLobby,
+  lobbyNpcDialogue,
+  selectedLobbyWeapon,
+  setLobbyHoveredInteraction,
+  setLobbyModalOpen,
+  updateLobby,
+} from "../systems/lobby.js";
+import { lobbyScreenToWorld } from "../systems/lobbyRenderer.js";
+import {
+  closeLobbyDialogue,
+  initLobbyUi,
+  openLobbyMessage,
+  openNpcDialogue,
+  updateLobbyUi,
+} from "../ui/lobbyUi.js";
 
 const LEVEL_CHOICE_REFRESH_COST = 10;
 
@@ -64,13 +88,27 @@ export async function bootGame() {
   const ctx = ui.canvas.getContext("2d", { alpha: false });
   setBootProgress(6, "正在启动霓虹废墟");
   initInventoryUi();
-  initCodexUi();
+  initLobbyUi();
+  initCodexUi({
+    onOpen: () => {
+      if (state.lobby.active) setLobbyModalOpen(true);
+    },
+    onClose: () => {
+      if (state.lobby.active) setLobbyModalOpen(false);
+    },
+  });
   initShopUi({ continueToNextWave: finishWaveTransition });
   initStoryUi();
   initWaveEventUi();
   initHelpUi({
     onBeforeOpen: () => {
       closeCodex();
+    },
+    onOpen: () => {
+      if (state.lobby.active) setLobbyModalOpen(true);
+    },
+    onClose: () => {
+      if (state.lobby.active) setLobbyModalOpen(false);
     },
   });
   setBootProgress(18, "正在同步版本配置");
@@ -80,11 +118,13 @@ export async function bootGame() {
   setBootProgress(54, "正在加载武器与道具");
   await loadEditableGameData();
   refreshStarterWeapons();
+  configureLobbyWeapons(STARTER_WEAPONS);
   setBootProgress(66, "正在校准难度曲线");
   await setupDifficultyConfig();
   setBootProgress(72, "正在同步玩家进度");
   await loadPlayerProgress({ difficultyIds: difficultyOrder });
   loadDifficultyProgress();
+  configureLobbyDifficulties(difficultyCards());
   setBootProgress(78, "正在生成敌人档案");
   await setupEnemyRegistry();
   setBootProgress(88, "正在装配智能模块");
@@ -97,29 +137,49 @@ export async function bootGame() {
   let fps = 60;
   let fpsAcc = 0;
   let fpsFrames = 0;
+  let debugUi = null;
 
   function start() {
     if (isHelpOpen()) return;
     closeCodex();
     closeHelp();
+    closeLobbyDialogue();
     clearWaveEventNotice();
     hideAllOverlays();
+    enterLobby({ resetPosition: true });
+    playSfx("select");
+  }
+
+  function openAiLoadout() {
+    closeCodex();
+    closeHelp();
+    closeLobbyDialogue();
+    clearWaveEventNotice();
+    hideAllOverlays();
+    leaveLobby();
     state.mode = "choosingWeapon";
     showRunSetup({
       weapons: STARTER_WEAPONS,
       onConfirm: startWithLoadout,
-      onBack: returnToMenu,
+      onBack: returnToLobby,
     });
-    playSfx("select");
+    return true;
   }
 
   async function startWithLoadout({ difficulty, weapon, runMode = "standard", randomGoal = RANDOM_GOAL_TWENTY_WAVES }) {
     if (!difficulty?.id || !weapon?.id || state.mode === "story") return false;
+    state.lobby.lastLaunchConfig = {
+      difficultyId: difficulty.id,
+      weaponId: weapon.id,
+      runMode: runMode === RUN_MODE_RANDOM ? RUN_MODE_RANDOM : "standard",
+      randomGoal: randomGoal === RANDOM_GOAL_ENDLESS ? RANDOM_GOAL_ENDLESS : RANDOM_GOAL_TWENTY_WAVES,
+    };
     closeCodex();
     closeHelp();
     clearWaveEventNotice();
     hideAllOverlays();
     hideRunSetup();
+    leaveLobby();
     selectDifficulty(difficulty.id);
     resetRun(generateMap());
     selectDifficulty(difficulty.id);
@@ -284,7 +344,15 @@ export async function bootGame() {
     resetWaveScenarioState();
     state.mode = "ended";
     state.victory = victory;
-    if (victory && !state.debug?.runTainted && !isRandomMode()) recordDifficultyVictory();
+    if (victory && !state.debug?.runTainted && !isRandomMode()) {
+      const result = recordDifficultyVictory();
+      if (result?.firstClear && result.difficultyId) {
+        queueLobbyFirstClearReactions(result.difficultyId, [
+          "guide", "tactician", "statistician", "archivist", "geneticist", "engineer",
+          "quartermaster", "story-attendant", "random-attendant", "trial-attendant", "home-attendant",
+        ]);
+      }
+    }
     if (!state.debug?.runTainted) recordBestSurvivalSeconds(Math.floor(state.time));
     if (isRandomEndlessMode() && !state.debug?.runTainted) recordBestRandomEndlessWave(state.wave);
     hidePauseMenu();
@@ -321,19 +389,36 @@ export async function bootGame() {
     else if (state.mode === "paused") resumeGame();
   }
 
-  function returnToMenu() {
+  function returnToLobby() {
     cancelStoryPlayback();
     closeCodex();
     closeHelp();
+    closeLobbyDialogue();
     clearWaveEventNotice();
     stopMusic();
     resetRun(generateMap());
     state.shop = createShopState();
-    state.mode = "menu";
     hideAllOverlays();
-    ui.startOverlay.classList.add("active");
     ui.pauseButton.textContent = "II";
     updateBestText();
+    configureLobbyDifficulties(difficultyCards());
+    enterLobby({ resetPosition: true });
+  }
+
+  function restartRun() {
+    const previous = state.lobby.lastLaunchConfig;
+    const difficulty = difficultyCards().find((entry) => entry.id === previous?.difficultyId && entry.unlocked !== false);
+    const weapon = STARTER_WEAPONS.find((entry) => entry.id === previous?.weaponId);
+    if (!difficulty || !weapon) {
+      returnToLobby();
+      return false;
+    }
+    return startWithLoadout({
+      difficulty,
+      weapon,
+      runMode: previous.runMode,
+      randomGoal: previous.randomGoal,
+    });
   }
 
   function startDebugRun({ difficultyId, weaponId, wave = 1 }) {
@@ -345,6 +430,7 @@ export async function bootGame() {
     clearWaveEventNotice();
     hideAllOverlays();
     hideRunSetup();
+    leaveLobby();
     selectDifficulty(difficultyId);
     resetRun(generateMap());
     selectDifficulty(difficultyId);
@@ -386,8 +472,105 @@ export async function bootGame() {
     if (state.mode === "paused") resumeGame();
   }
 
+  function handleLobbyInteraction(targetId = null) {
+    const interaction = interactWithLobby(targetId);
+    if (!interaction) return false;
+    if (["weapon-page", "weapon-select", "difficulty", "random-goal", "launch-charge", "pet"].includes(interaction.action)) {
+      playSfx("select");
+      return true;
+    }
+    if (interaction.action === "trial") {
+      setLobbyModalOpen(true);
+      debugUi?.open({ weaponId: selectedLobbyWeapon()?.id });
+      playSfx("select");
+      return true;
+    }
+    if (interaction.action === "codex") {
+      setLobbyModalOpen(true);
+      openCodex();
+      playSfx("select");
+      return true;
+    }
+    if (interaction.action === "npc-talk") {
+      const dialogue = lobbyNpcDialogue(interaction.npcId);
+      if (dialogue && openNpcDialogue(dialogue) && dialogue.firstClearDifficultyId) {
+        consumeLobbyFirstClearReaction(interaction.npcId, dialogue.firstClearDifficultyId);
+      }
+      playSfx("select");
+      return true;
+    }
+    const messages = {
+      home: {
+        role: "ACCESS DENIED // HABITAT LINK",
+        title: "家园通道封锁",
+        speaker: "通道管理员 · 赫塔",
+        text: "家园区的空间坐标仍在漂移。等稳定锚点修复后，我会重新开放这条通道；现在强行接入只会把你送进墙里。",
+        color: "#77ff8a",
+      },
+      recorder: {
+        role: "ADVENTURE LEDGER // OFFLINE",
+        title: "冒险记录仪",
+        speaker: "统计员 · 米洛",
+        text: "记录仪的计数核心还能亮，但统计阵列尚未接回主网。本阶段仅保留设备与值守终端，冒险次数和详细统计不会被读取或写入。",
+        color: "#ffd166",
+      },
+      gene: {
+        role: "GENE FORGE // CALIBRATION",
+        title: "基因改造器",
+        speaker: "生物工程师 · 赛恩",
+        text: "培养舱已经完成净化，强化序列却还缺最后一组校准样本。局外强化功能暂未开放，别碰那根绿色导管。",
+        color: "#77ff8a",
+      },
+      rift: {
+        role: "RIFT ANCHOR // STANDBY",
+        title: "裂隙稳定器",
+        speaker: "维护工程师 · 洛克",
+        text: "这是给未来远征准备的裂隙锚。外环、相位锁和冷却泵都在待机，本阶段不会产生任何额外功能或战斗加成。",
+        color: "#b48cff",
+      },
+      "ship-status": {
+        role: "TRANSIT ARK // NOMINAL",
+        title: "霓虹中转舰状态",
+        speaker: "星舰任务核心",
+        text: "导航、动力、生命维持、医疗、门禁与通讯系统均在运行。家园坐标和远征裂隙锚仍处于校准状态，不会影响当前出击。",
+        color: "#42e8ff",
+      },
+    };
+    const message = messages[interaction.action];
+    if (message) {
+      openLobbyMessage(message);
+      playSfx("select");
+      return true;
+    }
+    return false;
+  }
+
+  function lobbyPointerInteraction(event, activate = false) {
+    if (state.mode !== "lobby" || state.lobby.modalOpen || !event) {
+      setLobbyHoveredInteraction(null);
+      ui.canvas.style.cursor = "";
+      return false;
+    }
+    const rect = ui.canvas.getBoundingClientRect();
+    const screenX = (event.clientX - rect.left) / Math.max(1, rect.width) * viewport.width;
+    const screenY = (event.clientY - rect.top) / Math.max(1, rect.height) * viewport.height;
+    const worldPoint = lobbyScreenToWorld(screenX, screenY, viewport);
+    state.lobby.pointerWorldX = worldPoint.x;
+    state.lobby.pointerWorldY = worldPoint.y;
+    const target = findLobbyInteractionAtWorld(worldPoint.x, worldPoint.y);
+    setLobbyHoveredInteraction(target?.id || null);
+    ui.canvas.style.cursor = target ? "pointer" : "";
+    if (!activate || !target) return Boolean(target);
+    return handleLobbyInteraction(target.id);
+  }
+
   function update(dt) {
     updateAi(dt);
+    if (state.lobby.active) {
+      const lobbyEvent = updateLobby(dt);
+      if (lobbyEvent?.type === "launch") startWithLoadout(lobbyEvent.config);
+      return;
+    }
     if (state.mode === "shop") {
       state.time += dt;
       return;
@@ -438,21 +621,36 @@ export async function bootGame() {
     update(dt);
     render(ctx);
     updateHud(fps);
+    updateLobbyUi();
     updateDebugModeUi();
     requestAnimationFrame(loop);
   }
 
   resizeCanvas(ui.canvas, ctx);
   window.addEventListener("resize", () => resizeCanvas(ui.canvas, ctx));
-  bindInput({ start, restart: start, togglePause, resume: resumeGame, returnToMenu, openDebugShop });
+  bindInput({
+    start,
+    restart: restartRun,
+    togglePause,
+    resume: resumeGame,
+    returnToMenu: returnToLobby,
+    openDebugShop,
+    interactLobby: handleLobbyInteraction,
+    interactLobbyPointer: (event) => lobbyPointerInteraction(event, true),
+    hoverLobbyPointer: (event) => lobbyPointerInteraction(event, false),
+    cancelLobbyAction: cancelLobbyLaunch,
+  });
   resetRun(generateMap());
   state.shop = createShopState();
   state.mode = "menu";
-  initDebugModeUi({
+  debugUi = initDebugModeUi({
     onQuickStart: startDebugRun,
     onTaintRun: taintRunForDebug,
     onPauseForDebug: pauseForDebug,
     onResumeFromDebug: resumeFromDebug,
+    onOverlayChange: (open) => {
+      if (state.lobby.active) setLobbyModalOpen(open);
+    },
   });
   initAi({
     clearTrainingOnStartup: aiTrainingMode.clearTrainingOnStartup,
@@ -462,11 +660,11 @@ export async function bootGame() {
       enabled: aiTrainingMode.enabled === true,
     },
     actions: {
-      openLoadout: start,
+      openLoadout: openAiLoadout,
       startWithLoadout,
-      restart: start,
+      restart: openAiLoadout,
       continueToNextWave: finishWaveTransition,
-      returnToMenu,
+      returnToMenu: returnToLobby,
       getLoadoutOptions: () => ({
         difficulties: difficultyCards(),
         weapons: STARTER_WEAPONS,

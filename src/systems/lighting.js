@@ -40,6 +40,39 @@ export function renderLighting(ctx, camera, viewport) {
   ctx.restore();
 }
 
+export function renderScreenLighting(ctx, screenLights, viewport, options = {}) {
+  ensureLightBuffer(viewport);
+  const w = lightCanvas.width;
+  const h = lightCanvas.height;
+  const maxLights = Math.max(1, Math.floor(options.maxLights || 32));
+  const lights = screenLights.slice(0, maxLights).map((light) => ({
+    x: light.x * LIGHT_SCALE,
+    y: light.y * LIGHT_SCALE,
+    radius: light.radius * LIGHT_SCALE,
+    color: light.color || "#ffffff",
+    strength: light.strength ?? 0.5,
+    core: light.core ?? 0.18,
+  }));
+
+  lightCtx.setTransform(1, 0, 0, 1, 0, 0);
+  lightCtx.clearRect(0, 0, w, h);
+  lightCtx.fillStyle = options.darkness || "rgba(1,4,11,0.52)";
+  lightCtx.fillRect(0, 0, w, h);
+  lightCtx.globalCompositeOperation = "destination-out";
+  for (const light of lights) carveLight(lightCtx, light);
+  lightCtx.globalCompositeOperation = "source-over";
+  for (const light of lights) tintLight(lightCtx, light);
+  drawVignette(lightCtx, w, h);
+  lightCtx.globalCompositeOperation = "source-over";
+
+  ctx.save();
+  ctx.setTransform(viewport.dpr, 0, 0, viewport.dpr, 0, 0);
+  ctx.imageSmoothingEnabled = true;
+  ctx.drawImage(lightCanvas, 0, 0, viewport.width, viewport.height);
+  ctx.imageSmoothingEnabled = false;
+  ctx.restore();
+}
+
 function ensureLightBuffer(viewport) {
   lightCanvas ||= document.createElement("canvas");
   lightCtx ||= lightCanvas.getContext("2d", { alpha: true });

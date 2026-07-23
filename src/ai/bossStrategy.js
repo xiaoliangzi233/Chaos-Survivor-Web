@@ -22,7 +22,7 @@ export function bossContext(state, world) {
   const riftbladeSkill = boss.currentSkill || "";
   const riftbladeDash = riftbladeSkill === "flash_draw" || riftbladeSkill === "mirror_combo" || riftbladeSkill === "final_combo";
   const dashLike = mode.includes("dash") || (mode === "windup" && riftbladeDash) || boss.dashing || boss.eliteDashTime > 0 || boss.portalState === "burst";
-  const chainPressure = mode.includes("convict_sweep") || mode.includes("convict_garrote") || mode.includes("convict_triple") || mode.includes("convict_bounce") || mode.includes("convict_scene");
+  const chainPressure = mode.includes("convict_sweep") || mode.includes("convict_garrote") || mode.includes("convict_triple") || mode.includes("convict_bounce") || mode.includes("convict_command") || mode.includes("convict_scene");
   const scientistPressure = mode.includes("scientist_scene")
     || mode === "scientist_cast"
     || ["entropy_bloom", "memory_excision", "void_culture", "gravity_inversion", "event_horizon", "host_displacement", "abyss_mitosis", "living_shadow", "manifestation"].includes(boss.currentSkill);

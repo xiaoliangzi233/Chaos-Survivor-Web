@@ -1257,7 +1257,7 @@ function updateSpecialEnemyProjectile(b, dt) {
         b.vy = b.launchVy || 0;
         b.hidden = false;
         b.nonColliding = false;
-        burst(b.x, b.y, 4, b.color, 90);
+        if (b.activationFx) burst(b.x, b.y, 4, b.color, 90);
       }
     }
   } else if (b.shape === "convictBall") {

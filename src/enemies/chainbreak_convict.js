@@ -8,17 +8,26 @@ import { BaseEnemy } from "./BaseEnemy.js";
 
 export const CHAINBREAK_PHASE_THRESHOLDS = [0.7, 0.35];
 export const CHAINBREAK_SAFE_CORRIDORS = { prison: 150, collapse: 150 };
+export const CHAINBREAK_BALL_COUNTS = [1, 2, 3];
+export const CHAINBREAK_JUDGMENT_GRACE = 0.3;
+export const CHAINBREAK_PHASE_SKILLS = Object.freeze({
+  1: Object.freeze(["evidence_rewind", "cross_examination"]),
+  2: Object.freeze(["dual_interrogation", "shackle_exchange"]),
+  3: Object.freeze(["trinity_verdict", "broken_constellation"]),
+});
 export const CHAINBREAK_SCREEN_PRESSURE = Object.freeze({
-  sweepRadius: 720,
+  sweepRadius: 504,
   prisonWaves: 5,
-  bounceImpacts: 10,
+  bounceImpacts: 8,
   collapsePaths: 5,
-  peakShrapnel: 96,
+  peakShrapnel: 72,
 });
 
 const HALF_WORLD = WORLD_SIZE / 2;
+const SMALL_PROJECTILE_SPEED_MULTIPLIER = 1.22;
 const PHASE_COLORS = ["#d89a52", "#b68cff", "#ff5a52"];
 const PHASE_CORES = ["#42e8ff", "#f3f7ff", "#ffd166"];
+const BALL_ROLES = ["hunter", "warden", "breaker"];
 
 export class ChainbreakConvict extends BaseEnemy {
   constructor(config, x, y) {
@@ -48,12 +57,17 @@ export class ChainbreakConvict extends BaseEnemy {
       turn: 0,
       lastHeading: 0,
     };
+    this.playerHistory = [];
+    this.historyTimer = 0;
+    this.chainBallAgents = [];
+    this.syncChainBallAgents();
   }
 
   update(dt) {
     const p = state.player;
     if (!p) return;
     this.trackPlayerMotion(dt);
+    this.updateChainBallAgents(dt);
     this.tickCooldowns(dt);
     this.anim += dt * (this.phaseLevel === 3 ? 5.1 : this.phaseLevel === 2 ? 4.3 : 3.6);
     this.sceneSpin += dt * (0.6 + this.phaseLevel * 0.34);
@@ -142,6 +156,14 @@ export class ChainbreakConvict extends BaseEnemy {
       if (this.modeTimer <= 0) this.finishAttack(1);
       return;
     }
+    if (this.mode === "convict_command" || this.mode === "convict_scene_constellation") {
+      this.driftToRange(dt, this.mode === "convict_scene_constellation" ? 0.03 : 0.08);
+      if (this.modeTimer <= 0) {
+        if (this.mode === "convict_scene_constellation") this.clearOwnedEffects();
+        this.finishAttack(this.mode === "convict_scene_constellation" ? 1.35 : 0.9, this.mode === "convict_scene_constellation");
+      }
+      return;
+    }
     if (this.mode === "convict_scene_collapse") {
       this.moveToward(0, 0, this.speed * 0.78, dt);
       if (this.modeTimer <= 0) {
@@ -164,16 +186,22 @@ export class ChainbreakConvict extends BaseEnemy {
       prison_sweep: 4.4 + (distance < 430 ? 2 : 0) + Math.abs(this.motion.turn) * 2.4,
       sentence_throw: 4.5 + (distance > 360 ? 2.6 : 0) + this.motion.straightness * 2.8,
       shackle_reposition: 1.4 + (distance < 175 ? 6 : 0) + (edge > 0.8 ? 5 : 0),
+      evidence_rewind: 4.7 + Math.abs(this.motion.turn) * 2.2,
+      cross_examination: 4.5 + (distance < 520 ? 1.3 : 0),
     };
     if (this.phaseLevel >= 2) {
       scores.convict_triple = 4.8 + (speed > 100 ? 1.2 : 0) + this.motion.straightness * 1.8;
       scores.garrote_lane = 4.6 + Math.abs(this.motion.turn) * 3 + (distance < 560 ? 1 : 0);
       scores.prison_lockdown = 1.8 + (edge > 0.72 ? 1.8 : 0);
+      scores.dual_interrogation = 5.2 + this.motion.straightness * 2;
+      scores.shackle_exchange = 4.9 + Math.abs(this.motion.turn) * 2.4;
     }
     if (this.phaseLevel >= 3) {
       scores.breakout_combo = 5.2 + (distance > 260 ? 1.6 : 0) + this.motion.straightness;
       scores.death_bounce = 5 + (speed > 90 ? 1.8 : 0);
       scores.collapse = 2.1 + (edge > 0.72 ? 1.2 : 0);
+      scores.trinity_verdict = 5.5 + speed / 180;
+      scores.broken_constellation = 2.4 + (edge < 0.62 ? 1.7 : 0);
     }
 
     let best = "shackle_reposition";
@@ -201,9 +229,15 @@ export class ChainbreakConvict extends BaseEnemy {
     if (this.currentSkill === "convict_triple") return this.startTriple();
     if (this.currentSkill === "garrote_lane") return this.startGarrote();
     if (this.currentSkill === "prison_lockdown") return this.startPrisonLockdown();
+    if (this.currentSkill === "evidence_rewind") return this.startEvidenceRewind();
+    if (this.currentSkill === "cross_examination") return this.startCrossExamination();
+    if (this.currentSkill === "dual_interrogation") return this.startDualInterrogation();
+    if (this.currentSkill === "shackle_exchange") return this.startShackleExchange();
     if (this.currentSkill === "breakout_combo") return this.startBreakoutCombo();
     if (this.currentSkill === "death_bounce") return this.startDeathBounce();
     if (this.currentSkill === "collapse") return this.startCollapse();
+    if (this.currentSkill === "trinity_verdict") return this.startTrinityVerdict();
+    if (this.currentSkill === "broken_constellation") return this.startBrokenConstellation();
     this.startPrisonSweep();
   }
 
@@ -221,7 +255,7 @@ export class ChainbreakConvict extends BaseEnemy {
       width: 22,
       damage: this.damage * 0.68,
       ballDamage: this.damage * 0.78,
-      chainDamage: false,
+      chainDamage: true,
       style: "sweep",
     });
     this.spawnLinkedBall(hazard, 31);
@@ -242,21 +276,31 @@ export class ChainbreakConvict extends BaseEnemy {
 
   startSentenceThrow() {
     const target = this.predictedPlayer(0.4, 180);
-    const judgmentTime = 1.28;
-    const hazard = this.createSlamHazard(target.x, target.y, 112, judgmentTime, 0.22, this.damage * 0.85, "sentence");
-    this.spawnLinkedBall(hazard, 31, { drop: true });
-    const escapeAngle = Math.atan2(state.player.y - target.y, state.player.x - target.x);
-    this.spawnShrapnelRing(target.x, target.y, {
-      count: 16,
-      speed: 270,
-      damage: this.damage * 0.25,
-      gapAngle: escapeAngle,
-      gapWidth: 0.68,
-      delay: judgmentTime,
+    const judgmentTime = 0.78 + CHAINBREAK_JUDGMENT_GRACE;
+    const heading = Math.atan2(this.motion.vy || state.player.dirY, this.motion.vx || state.player.dirX);
+    const sideX = -Math.sin(heading);
+    const sideY = Math.cos(heading);
+    const targets = [-1, 0, 1].map((side) => ({
+      x: clamp(target.x + sideX * side * 150, -HALF_WORLD + 120, HALF_WORLD - 120),
+      y: clamp(target.y + sideY * side * 150, -HALF_WORLD + 120, HALF_WORLD - 120),
+    }));
+    targets.forEach((point, index) => {
+      const armTime = judgmentTime;
+      const hazard = this.createSlamHazard(point.x, point.y, 94, armTime, 0.22, this.damage * 0.78, "sentence");
+      hazard.judgmentGrace = CHAINBREAK_JUDGMENT_GRACE;
+      this.spawnLinkedBall(hazard, 29, { drop: true, agentIndex: index % this.chainBallAgents.length });
+      this.spawnShrapnelRing(point.x, point.y, {
+        count: 8,
+        speed: 285,
+        damage: this.damage * 0.2,
+        gapAngle: Math.atan2(state.player.y - point.y, state.player.x - point.x),
+        gapWidth: 0.82,
+        delay: armTime,
+      });
     });
     this.ballDetached = true;
     this.mode = "convict_throw";
-    this.modeTimer = 1.54;
+    this.modeTimer = 1.34;
     this.skillCooldowns.sentence_throw = 4.8;
     playSfx("wave");
   }
@@ -485,6 +529,182 @@ export class ChainbreakConvict extends BaseEnemy {
     playSfx("wave");
   }
 
+  startEvidenceRewind() {
+    const fallback = this.predictedPlayer(0.2, 90);
+    const history = this.playerHistory.length ? this.playerHistory : [fallback];
+    const sampleIndexes = [history.length - 1, Math.floor(history.length * 0.55), Math.floor(history.length * 0.15)];
+    const points = sampleIndexes.map((index) => {
+      const point = history[clamp(index, 0, history.length - 1)] || fallback;
+      return {
+        x: clamp(point.x, -HALF_WORLD + 100, HALF_WORLD - 100),
+        y: clamp(point.y, -HALF_WORLD + 100, HALF_WORLD - 100),
+      };
+    });
+    points.forEach((point, index) => {
+      const armTime = 0.72 + index * 0.36;
+      const hazard = this.createSlamHazard(point.x, point.y, 82, armTime, 0.18, this.damage * 0.58, "evidence_rewind");
+      hazard.rewindIndex = index;
+      this.spawnLinkedBall(hazard, 26, { drop: true, agentIndex: 0 });
+    });
+    const path = this.createPathHazard(points, 1.58, 0.34, 20, this.damage * 0.52, "evidence_rewind_path");
+    path.movingBall = true;
+    this.spawnLinkedBall(path, 25, { agentIndex: 0 });
+    this.startCommand(2.02, 5.8);
+  }
+
+  startCrossExamination() {
+    const target = this.predictedPlayer(0.26, 120);
+    const heading = Math.atan2(this.motion.vy || state.player.dirY, this.motion.vx || state.player.dirX);
+    const full = 780;
+    [heading, heading + Math.PI / 2].forEach((angle, index) => {
+      const hazard = this.createLineHazard(
+        target.x - Math.cos(angle) * full,
+        target.y - Math.sin(angle) * full,
+        target.x + Math.cos(angle) * full,
+        target.y + Math.sin(angle) * full,
+        0.76 + index * 0.62,
+        0.3,
+        22,
+        this.damage * 0.6,
+        `cross_examination_${index}`,
+      );
+      hazard.movingBall = true;
+      this.spawnLinkedBall(hazard, 27, { agentIndex: 0 });
+    });
+    this.spawnShrapnelRing(target.x, target.y, {
+      count: 10,
+      speed: 292,
+      damage: this.damage * 0.18,
+      gapAngle: heading + Math.PI / 4,
+      gapWidth: 1.02,
+      delay: 1.42,
+    });
+    this.startCommand(1.86, 5.5);
+  }
+
+  startDualInterrogation() {
+    this.syncChainBallAgents();
+    const agents = this.chainBallAgents.slice(0, 2);
+    agents.forEach((agent, index) => {
+      const target = this.chainBallTarget(agent, index === 0 ? 0.42 : 0.18);
+      agent.lastTarget = target;
+      const armTime = 0.84 + index * 0.34;
+      const hazard = this.createSlamHazard(target.x, target.y, index === 0 ? 96 : 84, armTime, 0.22, this.damage * 0.68, `dual_interrogation_${agent.role}`);
+      hazard.agentRole = agent.role;
+      this.spawnLinkedBall(hazard, 28, { drop: true, agentIndex: agent.index });
+      this.spawnShrapnelRing(target.x, target.y, {
+        count: 9,
+        speed: 305 + index * 12,
+        damage: this.damage * 0.18,
+        gapAngle: Math.atan2(state.player.y - target.y, state.player.x - target.x) + index * Math.PI,
+        gapWidth: 0.92,
+        delay: armTime,
+      });
+    });
+    this.startCommand(1.76, 6.2);
+  }
+
+  startShackleExchange() {
+    this.syncChainBallAgents();
+    const agents = this.chainBallAgents.slice(0, 2);
+    const target = this.predictedPlayer(0.3, 130);
+    const angle = Math.atan2(target.y - this.y, target.x - this.x);
+    const sideX = -Math.sin(angle);
+    const sideY = Math.cos(angle);
+    const points = [
+      { x: target.x + sideX * 430, y: target.y + sideY * 430 },
+      { x: target.x - sideX * 430, y: target.y - sideY * 430 },
+    ].map((point) => ({
+      x: clamp(point.x, -HALF_WORLD + 100, HALF_WORLD - 100),
+      y: clamp(point.y, -HALF_WORLD + 100, HALF_WORLD - 100),
+    }));
+    agents.forEach((agent, index) => {
+      const start = points[index];
+      const end = points[1 - index];
+      agent.lastTarget = end;
+      const bend = index ? -210 : 210;
+      const path = sampleCubicPath(
+        start,
+        { x: start.x + Math.cos(angle) * 160, y: start.y + Math.sin(angle) * 160 + bend },
+        { x: end.x - Math.cos(angle) * 160, y: end.y - Math.sin(angle) * 160 - bend },
+        end,
+        12,
+      );
+      const hazard = this.createPathHazard(path, 0.92 + index * 0.28, 0.54, 22, this.damage * 0.62, `shackle_exchange_${agent.role}`);
+      hazard.agentRole = agent.role;
+      this.spawnLinkedBall(hazard, 28, { agentIndex: agent.index });
+    });
+    this.startCommand(1.82, 6.8);
+  }
+
+  startTrinityVerdict() {
+    this.syncChainBallAgents();
+    const agents = this.chainBallAgents.slice(0, 3);
+    agents.forEach((agent, index) => {
+      const target = this.chainBallTarget(agent, 0.46 - index * 0.1);
+      agent.lastTarget = target;
+      const armTime = 0.76 + index * 0.32;
+      const hazard = this.createSlamHazard(target.x, target.y, 88, armTime, 0.2, this.damage * 0.7, `trinity_verdict_${agent.role}`);
+      hazard.agentRole = agent.role;
+      this.spawnLinkedBall(hazard, 29, { drop: true, agentIndex: agent.index });
+      this.spawnShrapnelRing(target.x, target.y, {
+        count: 8,
+        speed: 325 + index * 16,
+        damage: this.damage * 0.19,
+        gapAngle: Math.atan2(state.player.y - target.y, state.player.x - target.x) + index * TAU / 3,
+        gapWidth: 0.86,
+        delay: armTime,
+      });
+    });
+    this.startCommand(1.9, 6.6);
+  }
+
+  startBrokenConstellation() {
+    this.clearOwnedEffects();
+    this.syncChainBallAgents();
+    const p = state.player;
+    const base = Math.atan2(p.y - this.y, p.x - this.x) + Math.PI / 6;
+    const radius = 560;
+    const points = [0, 1, 2].map((index) => ({
+      x: clamp(p.x + Math.cos(base + index * TAU / 3) * radius, -HALF_WORLD + 100, HALF_WORLD - 100),
+      y: clamp(p.y + Math.sin(base + index * TAU / 3) * radius, -HALF_WORLD + 100, HALF_WORLD - 100),
+    }));
+    points.forEach((point, index) => {
+      const next = points[(index + 1) % points.length];
+      const agent = this.chainBallAgents[index];
+      agent.lastTarget = next;
+      const hazard = this.createLineHazard(
+        point.x,
+        point.y,
+        next.x,
+        next.y,
+        0.96 + index * 0.72,
+        0.34,
+        25,
+        this.damage * 0.66,
+        `broken_constellation_${agent.role}`,
+        true,
+      );
+      hazard.movingBall = true;
+      hazard.safeVertex = points[(index + 2) % points.length];
+      this.spawnLinkedBall(hazard, 30, { agentIndex: agent.index });
+    });
+    this.ballDetached = true;
+    this.mode = "convict_scene_constellation";
+    this.modeTimer = 3.02;
+    this.skillCooldowns.broken_constellation = 13.5;
+    pulse(p.x, p.y, 210, this.phaseColor(), 0.42);
+    playSfx("wave");
+  }
+
+  startCommand(duration, cooldown) {
+    this.ballDetached = true;
+    this.mode = "convict_command";
+    this.modeTimer = duration;
+    this.skillCooldowns[this.currentSkill] = cooldown;
+    playSfx("wave");
+  }
+
   startBreakoutCombo() {
     const target = this.predictedPlayer(0.32, 160);
     const dx = target.x - this.x;
@@ -623,12 +843,13 @@ export class ChainbreakConvict extends BaseEnemy {
       const hazard = this.createSlamHazard(point.x, point.y, 78, armTime, 0.2, this.damage * 0.68, "bounce");
       hazard.bounceIndex = index;
       if (index === 0) hazard.bouncePoints = points;
-      this.spawnShrapnelFan(point.x, point.y, heading + (index % 2 ? 1 : -1) * Math.PI / 2, {
-        count: 5,
-        spread: 1.45,
-        speed: 255,
+      this.spawnShrapnelRing(point.x, point.y, {
+        count: 6,
+        speed: 275,
         damage: this.damage * 0.16,
         delay: armTime,
+        gapWidth: 0,
+        spinOffset: index * Math.PI / 8,
       });
       return hazard;
     });
@@ -656,7 +877,7 @@ export class ChainbreakConvict extends BaseEnemy {
       );
       const hazard = this.createPathHazard(points, 1 + index * 0.72, 0.68, 27, this.damage * 0.58, `collapse_${index}`);
       hazard.safeCorridor = CHAINBREAK_SAFE_CORRIDORS.collapse;
-      this.spawnLinkedBall(hazard, 31, { armedOnly: true });
+      this.spawnLinkedBall(hazard, 31, { armedOnly: true, agentIndex: index % this.chainBallAgents.length });
     });
     const movementAngle = Math.atan2(this.motion.vy || p.dirY, this.motion.vx || p.dirX);
     const full = WORLD_SIZE * 1.15;
@@ -848,6 +1069,9 @@ export class ChainbreakConvict extends BaseEnemy {
   }
 
   spawnLinkedBall(hazard, radius, options = {}) {
+    this.syncChainBallAgents();
+    const agent = this.chainBallAgents[clamp(options.agentIndex || 0, 0, this.chainBallAgents.length - 1)];
+    if (agent) agent.detached = true;
     world.enemyProjectiles.push({
       x: hazard.ballX ?? hazard.x,
       y: hazard.ballY ?? hazard.y,
@@ -867,11 +1091,16 @@ export class ChainbreakConvict extends BaseEnemy {
       bossProjectile: true,
       expireWithLife: true,
       convictOwner: this,
+      chainAgentId: agent?.id,
+      agentRole: agent?.role,
     });
   }
 
   spawnBounceBall(hazards, radius) {
     const life = Math.max(0.1, ...hazards.map((hazard) => hazard.maxLife || 0)) + 0.05;
+    this.syncChainBallAgents();
+    const agent = this.chainBallAgents[this.chainBallAgents.length - 1];
+    if (agent) agent.detached = true;
     world.enemyProjectiles.push({
       x: hazards[0]?.x || this.x,
       y: hazards[0]?.y || this.y,
@@ -890,6 +1119,8 @@ export class ChainbreakConvict extends BaseEnemy {
       bossProjectile: true,
       expireWithLife: true,
       convictOwner: this,
+      chainAgentId: agent?.id,
+      agentRole: agent?.role,
     });
   }
 
@@ -898,29 +1129,28 @@ export class ChainbreakConvict extends BaseEnemy {
     const gapAngle = options.gapAngle ?? Math.atan2(state.player.y - y, state.player.x - x);
     const gapWidth = options.gapWidth ?? 0.62;
     const spinOffset = options.spinOffset || 0;
+    const budget = { count: this.ownedShrapnelCount() };
     for (let i = 0; i < count; i++) {
       const angle = i / count * TAU + spinOffset;
       if (Math.abs(wrapAngle(angle - gapAngle)) < gapWidth * 0.5) continue;
-      this.spawnShrapnel(x, y, angle, options);
+      this.spawnShrapnel(x, y, angle, options, budget);
     }
   }
 
   spawnShrapnelFan(x, y, baseAngle, options = {}) {
     const count = Math.max(3, options.count || 7);
     const spread = options.spread || 1.5;
+    const budget = { count: this.ownedShrapnelCount() };
     for (let i = 0; i < count; i++) {
       const angle = baseAngle - spread * 0.5 + i / Math.max(1, count - 1) * spread;
-      this.spawnShrapnel(x, y, angle, options);
+      this.spawnShrapnel(x, y, angle, options, budget);
     }
   }
 
-  spawnShrapnel(x, y, angle, options = {}) {
-    const ownedShrapnel = world.enemyProjectiles.reduce(
-      (count, projectile) => count + (projectile.convictOwner === this && projectile.shape === "convictShrapnel" ? 1 : 0),
-      0,
-    );
-    if (ownedShrapnel >= CHAINBREAK_SCREEN_PRESSURE.peakShrapnel) return;
-    const speed = options.speed || 260;
+  spawnShrapnel(x, y, angle, options = {}, budget = null) {
+    const ownedShrapnel = budget?.count ?? this.ownedShrapnelCount();
+    if (ownedShrapnel >= CHAINBREAK_SCREEN_PRESSURE.peakShrapnel) return false;
+    const speed = (options.speed || 260) * SMALL_PROJECTILE_SPEED_MULTIPLIER;
     const delay = Math.max(0, options.delay || 0);
     world.enemyProjectiles.push({
       x,
@@ -939,10 +1169,81 @@ export class ChainbreakConvict extends BaseEnemy {
       spin: angle,
       hidden: delay > 0,
       nonColliding: delay > 0,
+      activationFx: ownedShrapnel % 4 === 0,
       bossProjectile: true,
       expireWithLife: true,
       convictOwner: this,
     });
+    if (budget) budget.count++;
+    return true;
+  }
+
+  ownedShrapnelCount() {
+    let count = 0;
+    for (const projectile of world.enemyProjectiles) {
+      if (projectile.convictOwner === this && projectile.shape === "convictShrapnel") count++;
+    }
+    return count;
+  }
+
+  syncChainBallAgents() {
+    const desired = CHAINBREAK_BALL_COUNTS[this.phaseLevel - 1] || 1;
+    while (this.chainBallAgents.length < desired) {
+      const index = this.chainBallAgents.length;
+      this.chainBallAgents.push({
+        id: `chainbreak_ball_${index}`,
+        index,
+        role: BALL_ROLES[index],
+        orbitAngle: this.chainAngle + index * TAU / desired,
+        orbitSpeed: [0.78, -0.63, 0.92][index],
+        detached: false,
+        decisionClock: 0.35 + index * 0.23,
+        lastTarget: { x: this.x, y: this.y },
+      });
+    }
+    if (this.chainBallAgents.length > desired) this.chainBallAgents.length = desired;
+    this.chainBallAgents.forEach((agent, index) => {
+      agent.index = index;
+      agent.role = BALL_ROLES[index];
+    });
+  }
+
+  updateChainBallAgents(dt) {
+    this.syncChainBallAgents();
+    for (const agent of this.chainBallAgents) agent.detached = false;
+    for (const projectile of world.enemyProjectiles) {
+      if (projectile.convictOwner !== this || projectile.shape !== "convictBall" || !projectile.chainAgentId) continue;
+      const agent = this.chainBallAgents.find((candidate) => candidate.id === projectile.chainAgentId);
+      if (agent) agent.detached = true;
+    }
+    for (const agent of this.chainBallAgents) {
+      agent.orbitAngle = wrapAngle(agent.orbitAngle + agent.orbitSpeed * dt);
+      agent.decisionClock -= dt;
+      if (agent.decisionClock <= 0) {
+        agent.lastTarget = this.chainBallTarget(agent, 0.24 + agent.index * 0.08);
+        agent.decisionClock = 0.38 + agent.index * 0.17;
+      }
+    }
+  }
+
+  chainBallTarget(agent, lead = 0.3) {
+    const p = state.player;
+    if (agent.role === "hunter") return this.predictedPlayer(lead, 210);
+    const speed = Math.max(1, Math.hypot(this.motion.vx, this.motion.vy));
+    const forwardX = this.motion.vx / speed;
+    const forwardY = this.motion.vy / speed;
+    if (agent.role === "warden") {
+      const side = this.motion.turn >= 0 ? -1 : 1;
+      return {
+        x: clamp(p.x - forwardY * side * 230, -HALF_WORLD + 100, HALF_WORLD - 100),
+        y: clamp(p.y + forwardX * side * 230, -HALF_WORLD + 100, HALF_WORLD - 100),
+      };
+    }
+    const turnSide = this.motion.turn >= 0 ? 1 : -1;
+    return {
+      x: clamp(p.x - forwardX * 135 + -forwardY * turnSide * 115, -HALF_WORLD + 100, HALF_WORLD - 100),
+      y: clamp(p.y - forwardY * 135 + forwardX * turnSide * 115, -HALF_WORLD + 100, HALF_WORLD - 100),
+    };
   }
 
   predictedPlayer(seconds, maxDistance) {
@@ -994,6 +1295,12 @@ export class ChainbreakConvict extends BaseEnemy {
     this.motion.lastHeading = heading;
     this.motion.lastX = p.x;
     this.motion.lastY = p.y;
+    this.historyTimer -= dt;
+    if (this.historyTimer <= 0) {
+      this.playerHistory.push({ x: p.x, y: p.y });
+      if (this.playerHistory.length > 18) this.playerHistory.shift();
+      this.historyTimer = 0.12;
+    }
   }
 
   tickCooldowns(dt) {
@@ -1022,7 +1329,7 @@ export class ChainbreakConvict extends BaseEnemy {
   }
 
   isSceneSkill(skill) {
-    return skill === "prison_lockdown" || skill === "collapse";
+    return skill === "prison_lockdown" || skill === "collapse" || skill === "broken_constellation";
   }
 
   hasOwnedDanger() {
@@ -1055,6 +1362,7 @@ export class ChainbreakConvict extends BaseEnemy {
 
   startPhaseTransition(nextPhase) {
     this.phaseLevel = nextPhase;
+    this.syncChainBallAgents();
     this.mode = "phase_transition";
     this.modeTimer = 1.15;
     this.currentSkill = "";
@@ -1102,8 +1410,14 @@ export class ChainbreakConvict extends BaseEnemy {
 }
 
 function drawSceneVeil(ctx, boss) {
-  if (boss.mode !== "convict_scene_prison" && boss.mode !== "convict_scene_collapse" && boss.mode !== "phase_transition") return;
-  const alpha = boss.mode === "convict_scene_collapse" ? 0.2 : boss.mode === "convict_scene_prison" ? 0.11 : 0.07;
+  if (boss.mode !== "convict_scene_prison" && boss.mode !== "convict_scene_collapse" && boss.mode !== "convict_scene_constellation" && boss.mode !== "phase_transition") return;
+  const alpha = boss.mode === "convict_scene_collapse"
+    ? 0.2
+    : boss.mode === "convict_scene_constellation"
+      ? 0.16
+      : boss.mode === "convict_scene_prison"
+        ? 0.11
+        : 0.07;
   ctx.save();
   ctx.fillStyle = `rgba(2,3,8,${alpha})`;
   ctx.fillRect(-HALF_WORLD - boss.x, -HALF_WORLD - boss.y, WORLD_SIZE, WORLD_SIZE);
@@ -1164,7 +1478,7 @@ function drawChainbreakConvict(ctx, boss) {
   drawExecutionCollar(ctx, boss, color, core);
   drawConvictMarkings(ctx, boss, core);
   drawShackleArm(ctx, boss, color);
-  if (!boss.ballDetached) drawHeldChainBall(ctx, boss, color, core);
+  drawChainBallFormation(ctx, boss, color, core);
 
   if (boss.phasePulse > 0) {
     ctx.strokeStyle = rgba(core, boss.phasePulse * 0.9);
@@ -1242,15 +1556,20 @@ function drawShackleArm(ctx, boss, color) {
   ctx.fillRect(64, 17, 8, 7);
 }
 
-function drawHeldChainBall(ctx, boss, color, core) {
-  const radius = boss.phaseLevel === 3 ? 106 : boss.phaseLevel === 2 ? 96 : 88;
-  const angle = boss.chainAngle + Math.sin(boss.anim * 0.85) * 0.14;
+function drawChainBallFormation(ctx, boss, color, core) {
+  const orbitRadius = boss.phaseLevel === 3 ? 112 : boss.phaseLevel === 2 ? 102 : 88;
   const handX = 65;
   const handY = 22;
-  const ballX = handX + Math.cos(angle) * radius;
-  const ballY = handY + Math.sin(angle) * radius;
-  drawChainLinks(ctx, handX, handY, ballX, ballY, color, boss.phaseLevel);
-  drawBall(ctx, ballX, ballY, boss.phaseLevel === 3 ? 29 : 25, color, core, boss.sceneSpin);
+  for (const agent of boss.chainBallAgents) {
+    if (agent.detached) continue;
+    const roleOffset = agent.index * 0.18;
+    const angle = agent.orbitAngle + Math.sin(boss.anim * (0.72 + agent.index * 0.11) + roleOffset) * 0.12;
+    const radius = orbitRadius + agent.index * 16;
+    const ballX = handX + Math.cos(angle) * radius;
+    const ballY = handY + Math.sin(angle) * radius * 0.78;
+    drawChainLinks(ctx, handX, handY, ballX, ballY, agent.index === 2 ? core : color, boss.phaseLevel);
+    drawBall(ctx, ballX, ballY, boss.phaseLevel === 3 ? 28 : 25, agent.index === 1 ? core : color, agent.index === 2 ? "#ffffff" : core, boss.sceneSpin * agent.orbitSpeed);
+  }
 }
 
 function drawChainLinks(ctx, x1, y1, x2, y2, color, phase) {

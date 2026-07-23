@@ -23,7 +23,7 @@ METRIC_COLUMNS = {
 
 FINAL_STATUSES = {"VICTORY", "DEFEAT", "ABANDONED"}
 ALL_STATUSES = FINAL_STATUSES | {"RUNNING"}
-CODEX_TYPES = ("enemies", "weapons", "items")
+CODEX_TYPES = ("enemies", "weapons", "items", "events")
 
 
 class StoreError(Exception):

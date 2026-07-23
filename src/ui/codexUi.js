@@ -1,4 +1,5 @@
 import { QUALITY_INFO, QUALITY_ORDER, WEAPON_INFO } from "../economy/inventory.js";
+import { EVENT_CODEX_ENTRIES } from "../config/event-codex-config.js";
 import { createDecorativeEnemy, enemyConfig } from "../systems/enemyRegistry.js";
 import { getCodexEntries } from "../systems/codex.js";
 import { ITEM_DEFS, itemDescription } from "../systems/items.js";
@@ -8,6 +9,7 @@ const CATEGORIES = [
   { id: "enemies", label: "敌人", eyebrow: "遭遇记录" },
   { id: "weapons", label: "武器", eyebrow: "武装记录" },
   { id: "items", label: "道具", eyebrow: "道具记录" },
+  { id: "events", label: "事件", eyebrow: "事件记录" },
 ];
 
 const dom = {};
@@ -135,6 +137,20 @@ function entriesFor(type) {
         raw: info,
       }));
   }
+  if (type === "events") {
+    return EVENT_CODEX_ENTRIES
+      .filter((event) => unlocked.has(event.id))
+      .map((event) => ({
+        type,
+        id: event.id,
+        icon: event.icon,
+        name: event.name,
+        tag: event.category,
+        desc: event.desc,
+        color: event.color,
+        raw: event,
+      }));
+  }
   return ITEM_DEFS
     .filter((item) => unlocked.has(item.id))
     .map((item) => itemCodexEntry(item, type))
@@ -144,6 +160,7 @@ function entriesFor(type) {
 function totalEntriesFor(type) {
   if (type === "enemies") return Object.keys(enemyConfig).length;
   if (type === "weapons") return Object.keys(WEAPON_INFO).length;
+  if (type === "events") return EVENT_CODEX_ENTRIES.length;
   return ITEM_DEFS.length;
 }
 
@@ -203,7 +220,10 @@ function renderList(entries) {
   if (!entries.length) {
     const empty = document.createElement("div");
     empty.className = "codex-empty";
-    empty.innerHTML = `<strong>暂无记录</strong><span>在游戏中遇到敌人、获得武器或购买道具后会解锁图鉴。</span>`;
+    const hint = activeType === "events"
+      ? "在游戏中亲历特殊波次事件后会自动归档。"
+      : "在游戏中遇到敌人、获得武器或购买道具后会解锁图鉴。";
+    empty.innerHTML = `<strong>暂无记录</strong><span>${hint}</span>`;
     dom.list.appendChild(empty);
     return;
   }
@@ -290,6 +310,7 @@ function startPreview(canvas, entry) {
     const t = now / 1000;
     if (entry.type === "weapons") drawWeaponPreview(ctx, canvas, { id: entry.id, quality: "rare" }, t);
     else if (entry.type === "enemies") drawEnemyPreview(ctx, canvas, enemy, entry, t);
+    else if (entry.type === "events") drawEventPreview(ctx, canvas, entry, t);
     else drawItemPreview(ctx, canvas, entry, t);
     raf = requestAnimationFrame(frame);
   };
@@ -351,6 +372,50 @@ function drawItemPreview(ctx, canvas, entry, t) {
   ctx.restore();
 }
 
+function drawEventPreview(ctx, canvas, entry, t) {
+  const { w, h } = setupPreviewCanvas(ctx, canvas);
+  drawPreviewGrid(ctx, w, h, t * 0.72, entry.color);
+  const cx = w / 2;
+  const cy = h / 2;
+  const radius = Math.min(w, h) * 0.28;
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.globalCompositeOperation = "lighter";
+  const glow = ctx.createRadialGradient(0, 0, 0, 0, 0, radius * 1.8);
+  glow.addColorStop(0, hexToRgba(entry.color, 0.24));
+  glow.addColorStop(0.46, hexToRgba(entry.color, 0.08));
+  glow.addColorStop(1, "rgba(0,0,0,0)");
+  ctx.fillStyle = glow;
+  ctx.fillRect(-w / 2, -h / 2, w, h);
+  for (let ring = 0; ring < 3; ring++) {
+    const spin = t * (ring % 2 ? -0.72 : 0.58) + ring * 0.8;
+    ctx.strokeStyle = hexToRgba(ring === 1 ? "#ffffff" : entry.color, 0.24 + ring * 0.1);
+    ctx.lineWidth = ring === 0 ? 3 : 1.5;
+    for (let segment = 0; segment < 7 + ring * 2; segment++) {
+      const start = spin + segment / (7 + ring * 2) * Math.PI * 2;
+      ctx.beginPath();
+      ctx.arc(0, 0, radius * (0.62 + ring * 0.28), start, start + 0.3 + ring * 0.04);
+      ctx.stroke();
+    }
+  }
+  for (let i = 0; i < 12; i++) {
+    const a = t * 0.9 + i / 12 * Math.PI * 2;
+    const orbit = radius * (1.05 + (i % 3) * 0.18);
+    const size = 3 + (i % 2) * 2;
+    ctx.fillStyle = hexToRgba(i % 3 === 0 ? "#ffffff" : entry.color, 0.35 + (i % 3) * 0.16);
+    ctx.fillRect(Math.cos(a) * orbit - size / 2, Math.sin(a) * orbit - size / 2, size, size);
+  }
+  ctx.rotate(Math.sin(t * 1.3) * 0.04);
+  ctx.shadowColor = entry.color;
+  ctx.shadowBlur = 28;
+  ctx.fillStyle = "#f8fbff";
+  ctx.font = "700 68px 'Zpix', 'Courier New', monospace";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText(entry.icon || "E", 0, 2);
+  ctx.restore();
+}
+
 function setupPreviewCanvas(ctx, canvas) {
   const dpr = Math.min(window.devicePixelRatio || 1, 2);
   const w = Math.max(260, canvas.clientWidth || 360);
@@ -390,6 +455,7 @@ function metaLabels(entry) {
     return [`生命 ${Math.round(e.hp || 0)}`, `伤害 ${Math.round(e.damage || 0)}`, `速度 ${Math.round(e.speed || 0)}`];
   }
   if (entry.type === "weapons") return entry.raw.tags || ["武器"];
+  if (entry.type === "events") return [entry.raw.category, "遭遇后归档", "账号进度同步"];
   const quality = QUALITY_INFO[entry.qualityId] || QUALITY_INFO.common;
   return [entry.raw.unique ? "唯一" : "可叠加", entry.raw.singleQuality ? `固定品质：${quality.name}` : "多品质", `基础价 ${entry.raw.basePrice}`];
 }

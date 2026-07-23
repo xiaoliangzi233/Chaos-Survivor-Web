@@ -1,7 +1,9 @@
 import { WORLD_SIZE, TAU } from "../constants.js";
 import { state, world } from "../state.js";
 import { pulse } from "../effects.js";
+import { eventCodexIdsForScenario } from "../config/event-codex-config.js";
 import { waveScenarioFor } from "../config/wave-scenario-config.js";
+import { recordCodexEntry } from "./codex.js";
 import { spawnEnemyById } from "./enemyRegistry.js";
 
 export function resetWaveScenarioState() {
@@ -12,6 +14,7 @@ export function resetWaveScenarioState() {
 export function applyWaveStartScenario() {
   state.waveScenario = waveScenarioFor(state.difficultyId, state.wave);
   if (!state.waveScenario) return null;
+  for (const eventId of eventCodexIdsForScenario(state.waveScenario)) recordCodexEntry("events", eventId);
   spawnScenarioElite(state.waveScenario);
   spawnScenarioEvent(state.waveScenario);
   return state.waveScenario;

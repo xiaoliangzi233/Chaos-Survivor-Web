@@ -4,7 +4,7 @@ const LEGACY_STORAGE_KEYS = [
   "pixel-survivor-difficulty-progress",
   "pixel-survivor-codex",
 ];
-const CODEX_TYPES = ["enemies", "weapons", "items"];
+const CODEX_TYPES = ["enemies", "weapons", "items", "events"];
 
 let apiBaseUrl = "api";
 let identity = createIdentity();

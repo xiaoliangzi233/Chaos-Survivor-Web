@@ -1130,7 +1130,7 @@ body.is-booting #startOverlay .menu-boot-progress {
 .codex-tabs {
   grid-column: 1 / -1;
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 6px;
   padding: 8px;
   border-color: rgba(66, 232, 255, 0.2);
@@ -1202,6 +1202,12 @@ body.is-booting #startOverlay .menu-boot-progress {
   border-color: rgba(119, 255, 138, 0.38);
 }
 
+.codex-tabs button:nth-child(4)::before {
+  content: "E";
+  color: #ff65d8;
+  border-color: rgba(255, 101, 216, 0.42);
+}
+
 .codex-tabs button:hover::after,
 .codex-tabs button.active::after {
   left: 120%;
@@ -1230,6 +1236,7 @@ body.is-booting #startOverlay .menu-boot-progress {
 
 .codex-tabs button:nth-child(2) span { color: var(--gold); }
 .codex-tabs button:nth-child(3) span { color: var(--green); }
+.codex-tabs button:nth-child(4) span { color: #ff65d8; }
 
 .codex-list {
   display: grid;

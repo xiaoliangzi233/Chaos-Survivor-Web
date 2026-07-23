@@ -48,7 +48,7 @@ CREATE TABLE IF NOT EXISTS survivor_player_progress (
     employee_id                 TEXT NOT NULL DEFAULT '',
     best_survival_seconds       INTEGER NOT NULL DEFAULT 0 CHECK (best_survival_seconds BETWEEN 0 AND 86400),
     difficulty_progress_json    TEXT NOT NULL DEFAULT '{}',
-    codex_json                  TEXT NOT NULL DEFAULT '{"enemies":[],"weapons":[],"items":[]}',
+    codex_json                  TEXT NOT NULL DEFAULT '{"enemies":[],"weapons":[],"items":[],"events":[]}',
     created_at                  TEXT NOT NULL,
     updated_at                  TEXT NOT NULL
 );

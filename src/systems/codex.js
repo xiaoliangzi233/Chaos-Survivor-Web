@@ -1,6 +1,6 @@
 import { getPlayerCodex, recordPlayerCodexEntry } from "./playerProgress.js";
 
-const VALID_TYPES = new Set(["enemies", "weapons", "items"]);
+const VALID_TYPES = new Set(["enemies", "weapons", "items", "events"]);
 
 export function recordCodexEntry(type, id) {
   return VALID_TYPES.has(type) ? recordPlayerCodexEntry(type, id) : false;

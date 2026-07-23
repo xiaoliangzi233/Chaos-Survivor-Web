@@ -215,6 +215,7 @@ function unlockedEnemyIds(catalog, { boss }) {
   const unlocked = getCodexEntries("enemies");
   const ids = unlocked
     .filter((id) => catalog[id] && Boolean(catalog[id].boss) === boss)
+    .filter((id) => boss || id !== "thief")
     .filter(Boolean);
   if (!boss && !ids.length && catalog.zombie) return ["zombie"];
   if (!boss && !ids.length) return ["zombie"];

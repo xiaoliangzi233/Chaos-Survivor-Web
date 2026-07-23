@@ -2412,6 +2412,10 @@ function drawEnemyProjectiles(ctx) {
       drawConvictShrapnelProjectile(ctx, b);
       continue;
     }
+    if (b.shape === "convictSeeker") {
+      drawConvictSeekerProjectile(ctx, b);
+      continue;
+    }
     if (b.shape === "scientistAbyssShard") {
       drawScientistAbyssShardProjectile(ctx, b);
       continue;
@@ -2750,6 +2754,45 @@ function drawConvictShrapnelProjectile(ctx, b) {
   ctx.moveTo(-radius * 0.65, 0);
   ctx.lineTo(radius * 1.05, 0);
   ctx.stroke();
+  ctx.restore();
+}
+
+function drawConvictSeekerProjectile(ctx, b) {
+  if (b.hidden) return;
+  const angle = Math.atan2(b.vy, b.vx);
+  const radius = b.r || 8;
+  ctx.save();
+  ctx.translate(b.x, b.y);
+  ctx.rotate(angle);
+  ctx.globalCompositeOperation = "lighter";
+  glow(ctx, 0, 0, radius * 2.9, 0.24, b.color);
+  ctx.strokeStyle = hexToRgba(b.coreColor || "#ffffff", 0.34);
+  ctx.lineWidth = radius * 1.05;
+  ctx.lineCap = "round";
+  ctx.beginPath();
+  ctx.moveTo(-radius * 4.4, 0);
+  ctx.lineTo(-radius * 0.7, 0);
+  ctx.stroke();
+  ctx.globalCompositeOperation = "source-over";
+  ctx.shadowColor = b.color;
+  ctx.shadowBlur = 14;
+  ctx.fillStyle = "#070a10";
+  ctx.strokeStyle = b.color;
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(radius * 1.85, 0);
+  ctx.lineTo(radius * 0.18, -radius * 1.05);
+  ctx.lineTo(-radius * 1.25, -radius * 0.55);
+  ctx.lineTo(-radius * 1.05, radius * 0.55);
+  ctx.lineTo(radius * 0.18, radius * 1.05);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+  ctx.shadowBlur = 0;
+  ctx.fillStyle = b.coreColor || "#ffffff";
+  ctx.fillRect(-radius * 0.2, -radius * 0.28, radius * 0.58, radius * 0.56);
+  ctx.fillStyle = "rgba(255,255,255,0.82)";
+  ctx.fillRect(radius * 0.5, -radius * 0.42, radius * 0.28, radius * 0.22);
   ctx.restore();
 }
 

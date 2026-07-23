@@ -2,7 +2,7 @@
   "ember": {
     "name": "废弃实验室 难度1",
     "desc": "适合熟悉武器、商店和怪物机制。",
-    "enemyLimit": 240,
+    "enemyLimit": 250,
     "spawnRate": 0.66,
     "enemyHp": 0.85,
     "enemyDamage": 0.8,
@@ -30,7 +30,7 @@
   "overclock": {
     "name": "废弃实验室 难度3",
     "desc": "怪潮更密集，远程压力更明显。",
-    "enemyLimit": 400,
+    "enemyLimit": 350,
     "spawnRate": 0.94,
     "enemyHp": 1.16,
     "enemyDamage": 1.15,

@@ -83,7 +83,7 @@ export function createPlayer() {
     speed: 210,
     level: 1,
     xp: 0,
-    xpNeed: 24,
+    xpNeed: xpNeedForLevel(1),
     magnet: 92,
     dodge: 0,
     defense: 0,
@@ -194,6 +194,14 @@ export function createDebugState(previous = {}) {
     freezeWave: previous.freezeWave !== false,
     runTainted: Boolean(previous.enabled),
   };
+}
+
+export function xpNeedForLevel(level) {
+  const normalized = Math.max(1, Math.floor(Number(level) || 1));
+  const early = 14 + normalized * 6 + normalized ** 1.35 * 4.1;
+  const mid = Math.max(0, normalized - 8) ** 2 * 3.2;
+  const late = Math.max(0, normalized - 18) ** 2.35 * 5.4;
+  return Math.floor(early + mid + late);
 }
 
 export function createRandomRunState() {

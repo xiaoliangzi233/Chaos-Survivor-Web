@@ -108,6 +108,8 @@ const WAVE_SPAWN_LIMITS = {
   thief: 3,
 };
 const LAB_THIEF_UNLOCK_KEY = "pixel-survivor-lab-thief-unlocked-v1";
+const LAB_THIEF_RARE_ROLL = 0.012;
+const LAB_THIEF_RARE_WEIGHT = 0.04;
 
 export let enemyConfig = {};
 
@@ -214,7 +216,8 @@ function appendUnlockedLabThief(weighted) {
   if (!isLabThiefUnlocked()) return;
   if (weighted.some((entry) => entry.id === "thief")) return;
   if (!enemyConfig.thief || !canSpawnLimitedEnemy("thief")) return;
-  weighted.push({ id: "thief", weight: 0.16 });
+  if (Math.random() > LAB_THIEF_RARE_ROLL) return;
+  weighted.push({ id: "thief", weight: LAB_THIEF_RARE_WEIGHT });
 }
 
 function recordLabThiefUnlocked() {

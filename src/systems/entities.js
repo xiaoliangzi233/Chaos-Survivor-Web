@@ -1537,6 +1537,16 @@ function updateSpecialEnemyProjectile(b, dt) {
         if (b.activationFx) burst(b.x, b.y, 4, b.color, 90);
       }
     }
+  } else if (b.shape === "convictSeeker") {
+    const speed = Math.max(1, Math.hypot(b.vx, b.vy));
+    const desired = Math.atan2(state.player.y - b.y, state.player.x - b.x);
+    const current = Math.atan2(b.vy, b.vx);
+    const maxTurn = (b.maxTurnRate || 2.2) * Math.max(0.2, b.homingStrength || 1) * dt;
+    const turn = clamp(wrapAngle(desired - current), -maxTurn, maxTurn);
+    const next = current + turn;
+    b.vx = Math.cos(next) * speed;
+    b.vy = Math.sin(next) * speed;
+    b.spin = next;
   } else if (b.shape === "convictBall") {
     b.spin = (b.spin || 0) + dt * 8;
     let linked = b.linkedHazard;
@@ -1580,6 +1590,12 @@ function quadraticPoint(start, control, end, t) {
     x: inverse * inverse * start.x + 2 * inverse * t * control.x + t * t * end.x,
     y: inverse * inverse * start.y + 2 * inverse * t * control.y + t * t * end.y,
   };
+}
+
+function wrapAngle(angle) {
+  while (angle > Math.PI) angle -= TAU;
+  while (angle < -Math.PI) angle += TAU;
+  return angle;
 }
 
 function updateRiftbladeHazard(h, dt) {

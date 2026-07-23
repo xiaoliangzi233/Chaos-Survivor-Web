@@ -873,7 +873,7 @@
     "category": "Boss",
     "trait": "雷冕统御·三阶段",
     "bossWave": 10,
-    "hp": 22000,
+    "hp": 40000,
     "speed": 70,
     "damage": 32,
     "defense": 2,

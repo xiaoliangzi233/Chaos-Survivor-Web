@@ -1,5 +1,5 @@
 import { TOTAL_WAVES, waveDurationFor } from "../constants.js";
-import { state, world, resetRun } from "../state.js";
+import { state, world, resetRun, xpNeedForLevel } from "../state.js";
 import {
   ui,
   updateHud,
@@ -216,7 +216,7 @@ export async function bootGame() {
     if (p.xp < p.xpNeed) return false;
     p.xp -= p.xpNeed;
     p.level++;
-    p.xpNeed = Math.floor(p.xpNeed * 1.3 + 14 + p.level * 1.6);
+    p.xpNeed = xpNeedForLevel(p.level);
     playSfx("level");
     showLevelChoices();
     return true;

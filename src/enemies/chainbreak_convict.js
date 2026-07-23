@@ -45,6 +45,7 @@ export class ChainbreakConvict extends BaseEnemy {
     this.sceneSpin = Math.random() * TAU;
     this.chainAngle = -0.35;
     this.ballDetached = false;
+    this.garroteVolleyTimer = 0;
     this.sequenceStep = 0;
     this.reposition = null;
     this.dash = null;
@@ -124,6 +125,7 @@ export class ChainbreakConvict extends BaseEnemy {
       return;
     }
     if (this.mode === "convict_sweep" || this.mode === "convict_garrote") {
+      if (this.mode === "convict_garrote") this.updateGarroteVolley(dt);
       if (this.modeTimer <= 0) this.finishAttack(this.mode === "convict_garrote" ? 0.9 : 0.65);
       return;
     }
@@ -259,6 +261,7 @@ export class ChainbreakConvict extends BaseEnemy {
       style: "sweep",
     });
     this.spawnLinkedBall(hazard, 31);
+    this.spawnSweepAssistChains(target, direction);
     this.spawnShrapnelRing(this.x, this.y, {
       count: 16,
       speed: 250,
@@ -381,7 +384,7 @@ export class ChainbreakConvict extends BaseEnemy {
     const target = this.predictedPlayer(this.sequenceStep === 0 ? 0.28 : 0.18, this.sequenceStep === 0 ? 125 : 90);
     if (this.sequenceStep === 0) {
       const hazard = this.createSlamHazard(target.x, target.y, 104, 0.68, 0.2, this.damage * 0.58, "triple_slam");
-      this.spawnLinkedBall(hazard, 27, { drop: true });
+      this.spawnLinkedBall(hazard, 27, { drop: true, agentIndex: this.sequenceStep % Math.max(1, this.chainBallAgents.length) });
       this.spawnShrapnelRing(target.x, target.y, {
         count: 12,
         speed: 245,
@@ -407,7 +410,7 @@ export class ChainbreakConvict extends BaseEnemy {
         "triple_drag",
       );
       hazard.movingBall = true;
-      this.spawnLinkedBall(hazard, 27);
+      this.spawnLinkedBall(hazard, 27, { agentIndex: this.sequenceStep % Math.max(1, this.chainBallAgents.length) });
       this.spawnShrapnelFan(target.x, target.y, angle + Math.PI / 2, {
         count: 9,
         spread: 1.55,
@@ -431,7 +434,7 @@ export class ChainbreakConvict extends BaseEnemy {
         ballDamage: this.damage * 0.72,
         style: "triple_back",
       });
-      this.spawnLinkedBall(hazard, 30);
+      this.spawnLinkedBall(hazard, 30, { agentIndex: this.sequenceStep % Math.max(1, this.chainBallAgents.length) });
       this.spawnShrapnelRing(this.x, this.y, {
         count: 14,
         speed: 275,
@@ -471,6 +474,7 @@ export class ChainbreakConvict extends BaseEnemy {
       style: "garrote",
     });
     this.spawnLinkedBall(hazard, 31);
+    this.spawnGarroteAssistChains(targetAngle, direction, radius);
     this.spawnShrapnelFan(this.x, this.y, targetAngle + direction * Math.PI / 2, {
       count: 10,
       spread: 1.75,
@@ -479,9 +483,108 @@ export class ChainbreakConvict extends BaseEnemy {
       delay: 0.9,
     });
     this.ballDetached = true;
+    this.garroteVolleyTimer = 1.08;
     this.mode = "convict_garrote";
     this.modeTimer = 0.9 + activeTime;
     this.skillCooldowns.garrote_lane = 6.2;
+  }
+
+  spawnSweepAssistChains(targetAngle, direction) {
+    if (this.phaseLevel < 2) return;
+    this.syncChainBallAgents();
+    const agents = this.chainBallAgents.slice(1);
+    agents.forEach((agent, index) => {
+      const target = this.chainBallTarget(agent, 0.22 + index * 0.08);
+      const angle = targetAngle + direction * (Math.PI / 2 + index * 0.42);
+      const half = this.phaseLevel >= 3 ? 760 : 620;
+      const hazard = this.createLineHazard(
+        target.x - Math.cos(angle) * half,
+        target.y - Math.sin(angle) * half,
+        target.x + Math.cos(angle) * half,
+        target.y + Math.sin(angle) * half,
+        0.96 + index * 0.24,
+        0.32,
+        22,
+        this.damage * (this.phaseLevel >= 3 ? 0.5 : 0.42),
+        `sweep_assist_${agent.role}`,
+      );
+      hazard.movingBall = true;
+      hazard.agentRole = agent.role;
+      this.spawnLinkedBall(hazard, 27, { agentIndex: agent.index });
+    });
+  }
+
+  spawnGarroteAssistChains(targetAngle, direction, radius) {
+    if (this.phaseLevel < 2) return;
+    this.syncChainBallAgents();
+    const agents = this.chainBallAgents.slice(1);
+    agents.forEach((agent, index) => {
+      const target = this.chainBallTarget(agent, 0.28 - index * 0.06);
+      const sweep = -direction * (46 + index * 18) * Math.PI / 180;
+      const assistRadius = clamp(radius - 120 + index * 105, 420, 760);
+      const hazard = this.createArcHazard({
+        armTime: 1.04 + index * 0.22,
+        activeTime: 0.92 + index * 0.18,
+        radius: assistRadius,
+        startAngle: Math.atan2(target.y - this.y, target.x - this.x) - sweep * 0.5,
+        sweep,
+        width: 20,
+        damage: this.damage * 0.42,
+        ballDamage: this.damage * 0.5,
+        style: `garrote_assist_${agent.role}`,
+      });
+      hazard.agentRole = agent.role;
+      this.spawnLinkedBall(hazard, 27, { agentIndex: agent.index });
+    });
+    this.spawnShrapnelFan(this.x, this.y, targetAngle - direction * Math.PI / 2, {
+      count: this.phaseLevel >= 3 ? 8 : 5,
+      spread: 1.35,
+      speed: 245,
+      damage: this.damage * 0.17,
+      delay: 1.04,
+    });
+  }
+
+  updateGarroteVolley(dt) {
+    this.garroteVolleyTimer = Math.max(0, (this.garroteVolleyTimer || 0) - dt);
+    if (this.garroteVolleyTimer > 0) return;
+    const arc = world.hazards.find((hazard) => hazard.convictOwner === this && hazard.kind === "convict_chain_arc" && hazard.style === "garrote");
+    if (!arc || (arc.armTime || 0) > 0) return;
+    this.garroteVolleyTimer = this.phaseLevel >= 3 ? 0.38 : 0.48;
+    const sources = world.enemyProjectiles
+      .filter((projectile) => projectile.convictOwner === this && projectile.shape === "convictBall" && !projectile.hidden)
+      .slice(0, this.phaseLevel);
+    const fallback = sources.length ? sources : [{ x: arc.ballX, y: arc.ballY, agentRole: "hunter" }];
+    fallback.forEach((source, index) => {
+      const angle = Math.atan2(state.player.y - source.y, state.player.x - source.x) + (index - (fallback.length - 1) / 2) * 0.16;
+      this.spawnSeekerBullet(source.x, source.y, angle, source.agentRole || "hunter");
+    });
+  }
+
+  spawnSeekerBullet(x, y, angle, role = "hunter") {
+    const owned = world.enemyProjectiles.filter((projectile) => projectile.convictOwner === this && projectile.shape === "convictSeeker").length;
+    if (owned >= 18) return false;
+    const speed = role === "warden" ? 205 : role === "breaker" ? 230 : 218;
+    world.enemyProjectiles.push({
+      x,
+      y,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed,
+      r: role === "breaker" ? 9 : 8,
+      damage: this.damage * (role === "breaker" ? 0.34 : 0.3),
+      life: 3.1,
+      shape: "convictSeeker",
+      color: this.phaseColor(),
+      coreColor: this.coreColor(),
+      spin: angle,
+      homingStrength: role === "warden" ? 3.1 : 3.65,
+      maxTurnRate: role === "breaker" ? 2.65 : 2.35,
+      bossProjectile: true,
+      expireWithLife: true,
+      convictOwner: this,
+      agentRole: role,
+    });
+    return true;
   }
 
   startPrisonLockdown() {

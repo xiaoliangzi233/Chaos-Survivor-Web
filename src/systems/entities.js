@@ -445,6 +445,7 @@ function updateHazards(dt) {
     if (h.kind === "magnetic_node") updateMagneticNode(h, dt);
     if (h.kind === "brood_pod") updateBroodPod(h, dt);
     if (h.kind === "storm_laser_net") updateStormLaserNet(h, dt);
+    if (h.kind === "storm_strike") updateStormStrike(h, dt);
     if (h.kind === "riftblade_slash" || h.kind === "riftblade_bladefall") updateRiftbladeHazard(h, dt);
     if (h.kind === "convict_chain_arc" || h.kind === "convict_ball_slam" || h.kind === "convict_chain_line" || h.kind === "convict_chain_path") updateConvictHazard(h, dt);
     if (isScientistHazard(h)) updateScientistHazard(h, dt);
@@ -466,11 +467,14 @@ function updateHazards(dt) {
       ((h.kind === "convict_chain_arc" || h.kind === "convict_ball_slam" || h.kind === "convict_chain_line" || h.kind === "convict_chain_path") && !h.noDamage && (h.armTime || 0) <= 0) ||
       (isScientistHazard(h) && !h.noDamage) ||
       (h.kind === "storm_laser_net" && (h.armTime || 0) <= 0) ||
+      (h.kind === "storm_strike" && (h.armTime || 0) <= 0) ||
       h.kind === "frost_zone" ||
       h.kind === "blizzard_core" ||
       ((h.kind === "ice_spike" || h.kind === "ice_seal") && h.exploding);
     const convictHazard = h.kind === "convict_chain_arc" || h.kind === "convict_ball_slam" || h.kind === "convict_chain_line" || h.kind === "convict_chain_path";
     const scientistHazard = isScientistHazard(h);
+    const stormStrike = h.kind === "storm_strike";
+    const stormTyrantHazard = Boolean(h.stormTyrantOwner);
     const riftbladeBladeCorridor = h.kind === "riftblade_bladefall" && Array.isArray(h.lines);
     const hit = riftbladeBladeCorridor
       ? h.lines.some((line) => pointSegmentDistance(p.x, p.y, line.x1, line.y1, line.x2, line.y2) < p.r + (h.width || 31))
@@ -483,7 +487,7 @@ function updateHazards(dt) {
         : distSq(h.x, h.y, p.x, p.y) < (h.r + p.r) ** 2;
     if (hit && p.invuln <= 0 && canDamage && !h.playerHit) {
       const result = applyPlayerDamage(convictHazard ? convictHazardDamage(h, p) : h.damage, h);
-      if (convictHazard || scientistHazard || riftbladeBladeCorridor) h.playerHit = true;
+      if (convictHazard || scientistHazard || riftbladeBladeCorridor || stormStrike || stormTyrantHazard) h.playerHit = true;
       p.invuln = 0.35;
       if (result.damaged && h.frostDuration > 0) {
         if (h.frostMarks) applyFrostMark(p, { duration: h.frostDuration, slow: h.frostSlow || 0.18, freezeDuration: h.freezeDuration || 5 });
@@ -1082,6 +1086,17 @@ function updateStormLaserNet(h, dt) {
   if (h.fullWave && h.x > half) h.x = -half;
   if (h.fullWave && h.y < -half) h.y = half;
   if (h.fullWave && h.y > half) h.y = -half;
+}
+
+function updateStormStrike(h, dt) {
+  if (h.armTime > 0) h.armTime = Math.max(0, h.armTime - dt);
+  h.spin = (h.spin || 0) + dt * ((h.armTime || 0) > 0 ? 3.8 : 14);
+  if ((h.armTime || 0) <= 0 && !h.impactFx) {
+    h.impactFx = true;
+    burst(h.x, h.y, 16, h.color, 210);
+    pulse(h.x, h.y, h.r * 1.16, h.color, 0.2);
+    state.shake = Math.max(state.shake, 6);
+  }
 }
 
 function updatePhaseTear(h, dt) {

@@ -1,4 +1,4 @@
-﻿import { TAU, WORLD_SIZE } from "../constants.js";
+import { TAU, WORLD_SIZE } from "../constants.js";
 import { state, world } from "../state.js";
 import { burst, pulse, trail } from "../effects.js";
 import { clamp } from "../utils.js";
@@ -6,101 +6,784 @@ import { playSfx } from "../audio.js";
 import { BaseEnemy } from "./BaseEnemy.js";
 import { applyPlayerDamage } from "../systems/items.js";
 
-const MODES = ["fan", "ring", "dash", "summon"];
-const FAR_DASH_DISTANCE = 760;
+export const STORM_TYRANT_PHASE_THRESHOLDS = [0.68, 0.34];
+export const STORM_TYRANT_SAFE_CORRIDORS = Object.freeze({
+  cage: 190,
+  enhancedCage: 160,
+  skyfallGapAngle: 0.82,
+});
+export const STORM_TYRANT_SCREEN_PRESSURE = Object.freeze({
+  lanceLength: 1560,
+  cageWaves: 3,
+  throneBeams: [6, 7],
+  peakProjectiles: 84,
+  peakHazards: 18,
+});
+
+const HALF_WORLD = WORLD_SIZE / 2;
+const PHASE_COLORS = ["#42e8ff", "#b48cff", "#ffd166"];
+const PHASE_CORES = ["#e8feff", "#f5edff", "#fff6c7"];
+const SKILL_COOLDOWNS = Object.freeze({
+  thunder_lance: 2.5,
+  crown_volley: 2.8,
+  storm_step: 3.2,
+  echo_lance: 5.4,
+  thunder_cage: 12,
+  skyfall_decree: 6.4,
+  tempest_throne: 16,
+});
 
 export class StormTyrant extends BaseEnemy {
   constructor(config, x, y) {
     super(config, x, y);
-    this.name = "风暴暴君·雷冕核心";
-    this.enhancedProfile = state.waveScenario?.bossProfile === "singularity_three_phase";
+    this.name = "风暴暴君·雷冕";
+    this.enhancedProfile = state.waveScenario?.bossProfile === "singularity_three_phase"
+      || state.difficultyId === "singularity";
     this.mode = "intro";
-    this.modeTimer = 1.0;
+    this.modeTimer = 1.15;
+    this.phaseLevel = 1;
+    this.phasePulse = 0;
+    this.currentSkill = "";
+    this.currentAttack = "";
+    this.lastSkills = [];
+    this.skillCooldowns = Object.create(null);
+    this.attacksSinceLongRecover = 0;
+    this.pendingForcedSkill = "";
     this.attackTimer = 0;
     this.attackCount = 0;
-    this.modeIndex = 0;
     this.lockAngle = 0;
+    this.lockTargetX = x;
+    this.lockTargetY = y;
+    this.dashStartX = x;
+    this.dashStartY = y;
+    this.dashEndX = x;
+    this.dashEndY = y;
     this.dashVx = 0;
     this.dashVy = 0;
     this.dashTrailTimer = 0;
-    this.chainDashesRemaining = 0;
-    this.chainDashState = "idle";
-    this.phaseLevel = 1;
-    this.phase2 = false;
-    this.phase3 = false;
-    this.phasePulse = 0;
-    this.ringSpin = Math.random() * TAU;
-    this.surgeTimer = 4.8;
-    this.eyeBlink = Math.random() * TAU;
+    this.echoPending = false;
+    this.sceneGapAngle = Math.random() * TAU;
+    this.sceneWave = 0;
+    this.sceneSpin = Math.random() * TAU;
+    this.crownSpin = Math.random() * TAU;
+    this.weaponAngle = -0.5;
+    this.stepStartX = x;
+    this.stepStartY = y;
+    this.stepTargetX = x;
+    this.stepTargetY = y;
+    this.stepDuration = 0.42;
+    this.motion = {
+      lastX: state.player.x,
+      lastY: state.player.y,
+      vx: 0,
+      vy: 0,
+      straightness: 0.5,
+      turn: 0,
+    };
   }
 
   update(dt) {
     const p = state.player;
-    const dx = p.x - this.x;
-    const dy = p.y - this.y;
-    const d = Math.max(1, Math.hypot(dx, dy));
-    this.syncPhase();
-    this.anim += dt * (this.phase3 ? 5.1 : this.phase2 ? 4.2 : 3.1);
-    this.ringSpin += dt * (this.phase3 ? 2.45 : this.phase2 ? 1.8 : 1.25);
+    this.trackPlayerMotion(dt);
+    this.tickCooldowns(dt);
+    this.anim += dt * (3.1 + this.phaseLevel * 0.72);
+    this.sceneSpin += dt * (0.68 + this.phaseLevel * 0.34);
+    this.crownSpin += dt * (1.15 + this.phaseLevel * 0.42);
     this.flash = Math.max(0, this.flash - dt * 8);
     this.hitTimer = Math.max(0, this.hitTimer - dt);
-    this.phasePulse = Math.max(0, this.phasePulse - dt * 2.8);
-    this.eyeBlink += dt * 2.2;
-    if ((!this.enhancedProfile && this.hp < this.maxHp * 0.25) || (this.enhancedProfile && this.phase3)) {
-      this.surgeTimer -= dt;
-      if (this.surgeTimer <= 0) {
-        this.surgeTimer = this.enhancedProfile ? 5.4 : 4.2;
-        this.stormSurge();
-      }
-    }
+    this.phasePulse = Math.max(0, this.phasePulse - dt * 2.2);
+    this.flip = p.x < this.x ? -1 : 1;
 
-    this.updateMode(dt, dx, dy, d);
-    this.keepNearArena(dt, dx, dy, d);
+    this.updateMode(dt);
+    this.x = clamp(this.x, -HALF_WORLD + this.r, HALF_WORLD - this.r);
+    this.y = clamp(this.y, -HALF_WORLD + this.r, HALF_WORLD - this.r);
 
-    const half = WORLD_SIZE / 2;
-    this.x = clamp(this.x, -half + this.r, half - this.r);
-    this.y = clamp(this.y, -half + this.r, half - this.r);
-
-    if (d < p.r + this.r && p.invuln <= 0) {
+    const distance = Math.hypot(p.x - this.x, p.y - this.y);
+    if (this.mode !== "phase_transition" && distance < p.r + this.r && p.invuln <= 0) {
       applyPlayerDamage(this.damage, this);
-      p.invuln = 0.65;
-      state.shake = 14;
-      state.flash = 0.32;
-      burst(p.x, p.y, 18, this.phaseColor(), 180);
+      p.invuln = 0.62;
+      state.shake = Math.max(state.shake, 13);
+      state.flash = Math.max(state.flash, 0.28);
+      burst(p.x, p.y, 16, this.phaseColor(), 185);
       playSfx("hurt");
     }
   }
 
-  syncPhase() {
-    if (!this.enhancedProfile) {
-      this.phase2 = this.hp < this.maxHp * 0.55;
-      this.phase3 = false;
-      this.phaseLevel = this.phase2 ? 2 : 1;
+  updateMode(dt) {
+    this.modeTimer -= dt;
+    this.attackTimer -= dt;
+
+    if (this.mode === "intro") {
+      this.driftToIdealRange(dt, 0.08);
+      if (this.modeTimer <= 0) this.chooseSkill();
       return;
     }
-    const next = this.hp < this.maxHp * 0.35 ? 3 : this.hp < this.maxHp * 0.7 ? 2 : 1;
-    if (next > this.phaseLevel) this.startPhaseTransition(next);
+    if (this.mode === "phase_transition") {
+      this.moveToward(0, 0, this.speed * 0.48, dt);
+      if (this.modeTimer <= 0) {
+        const forced = this.pendingForcedSkill;
+        this.pendingForcedSkill = "";
+        this.beginSkill(forced);
+      }
+      return;
+    }
+    if (this.mode === "windup") {
+      this.driftToIdealRange(dt, -0.08);
+      if (this.modeTimer <= 0) this.launchSkill(this.currentSkill);
+      return;
+    }
+    if (this.mode === "storm_lance_dash") return this.updateLanceDash(dt, false);
+    if (this.mode === "storm_echo_windup") {
+      this.weaponAngle += (0.1 - this.weaponAngle) * Math.min(1, dt * 7);
+      if (this.modeTimer <= 0) this.launchEchoReturn();
+      return;
+    }
+    if (this.mode === "storm_echo_dash") return this.updateLanceDash(dt, true);
+    if (this.mode === "storm_volley") return this.updateCrownVolley();
+    if (this.mode === "storm_reposition") return this.updateStormStep(dt);
+    if (this.mode === "storm_cage_scene") {
+      this.moveToward(0, 0, this.speed * 0.52, dt);
+      if (this.modeTimer <= 0) this.finishAttack(1.28, true);
+      return;
+    }
+    if (this.mode === "storm_skyfall_scene") {
+      this.driftToIdealRange(dt, -0.04);
+      if (this.modeTimer <= 0) this.finishAttack(1.08, true);
+      return;
+    }
+    if (this.mode === "storm_tempest_throne") return this.updateTempestThrone(dt);
+    if (this.mode === "storm_recover") {
+      this.weaponAngle += (-0.52 - this.weaponAngle) * Math.min(1, dt * 6);
+      this.driftToIdealRange(dt, 0.06);
+      if (this.modeTimer <= 0) this.chooseSkill();
+    }
   }
 
-  startPhaseTransition(level) {
-    this.phaseLevel = level;
-    this.phase2 = level >= 2;
-    this.phase3 = level >= 3;
-    this.mode = "phase_transition";
-    this.modeTimer = 0.82;
-    this.currentAttack = null;
+  chooseSkill() {
+    const p = state.player;
+    const distance = Math.hypot(p.x - this.x, p.y - this.y);
+    const playerSpeed = Math.hypot(this.motion.vx, this.motion.vy);
+    const edge = Math.max(Math.abs(p.x), Math.abs(p.y)) / HALF_WORLD;
+    const scores = {
+      thunder_lance: 4.6 + (distance > 360 ? 2.8 : 0) + this.motion.straightness * 2.2,
+      crown_volley: 4.8 + (distance >= 260 && distance <= 760 ? 2.1 : 0) + Math.abs(this.motion.turn),
+      storm_step: 1.4 + (distance < 210 ? 4.5 : 0) + (edge > 0.82 ? 3.6 : 0),
+    };
+    if (this.phaseLevel >= 2) {
+      scores.echo_lance = 5.1 + this.motion.straightness * 2.5 + (distance > 310 ? 1.2 : 0);
+      scores.thunder_cage = 2.8 + (edge > 0.7 ? 3.2 : 0) + Math.abs(this.motion.turn) * 1.5;
+    }
+    if (this.phaseLevel >= 3) {
+      scores.skyfall_decree = 5 + (playerSpeed > 85 ? 2.1 : 0) + (1 - this.motion.straightness);
+      scores.tempest_throne = 3.1 + this.motion.straightness * 1.7 + (edge > 0.58 ? 1.4 : 0);
+    }
+
+    let best = "thunder_lance";
+    let bestScore = -Infinity;
+    for (const [skill, baseScore] of Object.entries(scores)) {
+      if ((this.skillCooldowns[skill] || 0) > 0) continue;
+      let score = baseScore + Math.random() * 0.65;
+      if (this.lastSkills[0] === skill) score -= 100;
+      else if (this.lastSkills.includes(skill)) score -= 2;
+      if (this.isSceneSkill(skill) && this.hasOwnedActiveHazards()) score -= 100;
+      if (score > bestScore) {
+        bestScore = score;
+        best = skill;
+      }
+    }
+    this.beginSkill(best);
+  }
+
+  chooseMode() {
+    const distance = Math.hypot(state.player.x - this.x, state.player.y - this.y);
+    if (distance > 760) {
+      this.currentAttack = "dash";
+      this.beginSkill("thunder_lance");
+      return;
+    }
+    this.chooseSkill();
+    this.currentAttack = this.currentSkill;
+  }
+
+  beginSkill(skill) {
+    this.currentSkill = skill || "thunder_lance";
     this.attackCount = 0;
-    this.phasePulse = 1;
-    this.clearOwnedStormEffects();
-    const color = this.phaseColor();
-    burst(this.x, this.y, level === 3 ? 46 : 36, color, 280);
-    pulse(this.x, this.y, this.r + 120, color, 0.48);
-    state.shake = Math.max(state.shake, level === 3 ? 12 : 8);
-    playSfx("wave");
-    if (level === 3) this.summonStormShards(4, true);
+    this.attackTimer = 0;
+    this.mode = "windup";
+    const windups = {
+      thunder_lance: 0.72,
+      crown_volley: 0.62,
+      storm_step: 0.34,
+      echo_lance: 0.78,
+      thunder_cage: 0.95,
+      skyfall_decree: 0.72,
+      tempest_throne: 1.02,
+    };
+    this.modeTimer = windups[this.currentSkill] || 0.62;
+
+    if (this.currentSkill === "thunder_lance" || this.currentSkill === "echo_lance") {
+      this.prepareLance(this.modeTimer);
+    } else if (this.currentSkill === "thunder_cage") {
+      this.prepareThunderCage(this.modeTimer);
+    } else if (this.currentSkill === "skyfall_decree") {
+      this.prepareSkyfall(this.modeTimer);
+    } else if (this.currentSkill === "tempest_throne") {
+      this.prepareTempestThrone(this.modeTimer);
+    } else if (this.currentSkill === "storm_step") {
+      this.prepareStormStep();
+    } else {
+      this.lockAngle = this.angleToPredictedPlayer(0.22);
+    }
+    pulse(this.x, this.y, this.r + 42, this.phaseColor(), 0.24);
   }
 
-  clearOwnedStormEffects() {
+  launchSkill(skill) {
+    this.rememberSkill(skill);
+    if (skill === "thunder_lance" || skill === "echo_lance") return this.launchLance(skill === "echo_lance");
+    if (skill === "crown_volley") return this.launchCrownVolley();
+    if (skill === "storm_step") return this.launchStormStep();
+    if (skill === "thunder_cage") return this.launchThunderCage();
+    if (skill === "skyfall_decree") return this.launchSkyfall();
+    if (skill === "tempest_throne") return this.launchTempestThrone();
+    this.finishAttack();
+  }
+
+  prepareLance(warning) {
+    const target = this.predictedPlayer(0.32);
+    this.lockAngle = Math.atan2(target.y - this.y, target.x - this.x);
+    this.lockTargetX = target.x;
+    this.lockTargetY = target.y;
+    this.dashStartX = this.x;
+    this.dashStartY = this.y;
+    const targetDistance = Math.hypot(target.x - this.x, target.y - this.y);
+    const distance = clamp(targetDistance + 420, 980, STORM_TYRANT_SCREEN_PRESSURE.lanceLength);
+    this.dashEndX = this.x + Math.cos(this.lockAngle) * distance;
+    this.dashEndY = this.y + Math.sin(this.lockAngle) * distance;
+    this.spawnStormLine({
+      x: (this.dashStartX + this.dashEndX) * 0.5,
+      y: (this.dashStartY + this.dashEndY) * 0.5,
+      angle: this.lockAngle,
+      length: distance,
+      width: this.phaseLevel >= 3 ? 30 : 27,
+      armTime: warning,
+      activeTime: 0.48,
+      damage: this.damage * 0.58,
+      style: "lance",
+    });
+  }
+
+  launchLance(echo) {
+    this.echoPending = echo;
+    this.mode = "storm_lance_dash";
+    this.modeTimer = 0.46;
+    const distance = Math.hypot(this.dashEndX - this.dashStartX, this.dashEndY - this.dashStartY);
+    const speed = distance / this.modeTimer;
+    this.dashVx = Math.cos(this.lockAngle) * speed;
+    this.dashVy = Math.sin(this.lockAngle) * speed;
+    this.dashTrailTimer = 0;
+    this.weaponAngle = 0.08;
+    burst(this.x, this.y, 20, this.phaseColor(), 250);
+    playSfx("wave");
+  }
+
+  updateLanceDash(dt, returning) {
+    this.x += this.dashVx * dt;
+    this.y += this.dashVy * dt;
+    this.leaveDashTrail(dt);
+    if (this.modeTimer > 0) return;
+    if (!returning && this.echoPending) {
+      this.echoPending = false;
+      this.mode = "storm_echo_windup";
+      this.modeTimer = 0.68;
+      const angle = this.lockAngle + Math.PI;
+      this.spawnStormLine({
+        x: (this.dashStartX + this.dashEndX) * 0.5,
+        y: (this.dashStartY + this.dashEndY) * 0.5,
+        angle: this.lockAngle,
+        length: Math.hypot(this.dashEndX - this.dashStartX, this.dashEndY - this.dashStartY),
+        width: this.phaseLevel >= 3 ? 32 : 29,
+        armTime: this.modeTimer,
+        activeTime: 0.46,
+        damage: this.damage * 0.62,
+        style: "echo",
+      });
+      this.dashVx = Math.cos(angle);
+      this.dashVy = Math.sin(angle);
+      pulse(this.x, this.y, this.r + 68, this.phaseColor(), 0.3);
+      return;
+    }
+    this.fireDashWake(returning ? 10 : 8);
+    this.finishAttack(returning ? 0.92 : 0.72);
+  }
+
+  launchEchoReturn() {
+    const angle = this.lockAngle + Math.PI;
+    const distance = Math.hypot(this.dashEndX - this.dashStartX, this.dashEndY - this.dashStartY);
+    this.mode = "storm_echo_dash";
+    this.modeTimer = 0.46;
+    this.dashVx = Math.cos(angle) * distance / this.modeTimer;
+    this.dashVy = Math.sin(angle) * distance / this.modeTimer;
+    this.dashTrailTimer = 0;
+    burst(this.x, this.y, 22, this.phaseColor(), 260);
+    playSfx("wave");
+  }
+
+  leaveDashTrail(dt) {
+    this.dashTrailTimer -= dt;
+    if (this.dashTrailTimer > 0) return;
+    this.dashTrailTimer = 0.042;
+    const backX = this.x - this.dashVx * 0.035;
+    const backY = this.y - this.dashVy * 0.035;
+    trail(this.x, this.y, backX, backY, this.phaseColor(), 18);
+  }
+
+  fireDashWake(count) {
+    const gap = Math.atan2(state.player.y - this.y, state.player.x - this.x);
+    for (let i = 0; i < count; i++) {
+      const angle = i / count * TAU + this.crownSpin;
+      if (angleDistance(angle, gap) < 0.42) continue;
+      this.shoot(angle, 225 + (i % 2) * 28, 6, "stormOrb", this.damage * 0.3);
+    }
+  }
+
+  launchCrownVolley() {
+    this.mode = "storm_volley";
+    this.modeTimer = 1.3;
+    this.attackTimer = 0;
+    this.attackCount = 0;
+    this.lockAngle = this.angleToPredictedPlayer(0.28);
+    this.weaponAngle = 0.7;
+  }
+
+  updateCrownVolley() {
+    if (this.attackTimer > 0) return;
+    this.attackTimer = 0.3;
+    this.attackCount++;
+    const count = 10 + (this.phaseLevel - 1) * 2 + (this.enhancedProfile ? 2 : 0);
+    const spread = 1.28 + this.phaseLevel * 0.08;
+    const gap = 0.17;
+    for (let i = 0; i < count; i++) {
+      const offset = -spread * 0.5 + i / Math.max(1, count - 1) * spread;
+      if (Math.abs(offset) < gap) continue;
+      this.shoot(
+        this.lockAngle + offset + Math.sin(this.attackCount * 1.7) * 0.04,
+        315 + (i % 3) * 22,
+        7,
+        "stormCrownShard",
+        this.damage * 0.38,
+      );
+    }
+    pulse(this.x, this.y, this.r + 34 + this.attackCount * 12, this.phaseColor(), 0.16);
+    playSfx("shoot");
+    if (this.attackCount >= (this.phaseLevel >= 3 ? 4 : 3)) this.finishAttack(0.72);
+  }
+
+  prepareStormStep() {
+    const p = state.player;
+    const away = Math.atan2(this.y - p.y, this.x - p.x);
+    const side = this.motion.turn >= 0 ? -1 : 1;
+    const angle = away + side * Math.PI * 0.42;
+    const distance = 290;
+    this.stepStartX = this.x;
+    this.stepStartY = this.y;
+    this.stepTargetX = clamp(this.x + Math.cos(angle) * distance, -HALF_WORLD + 130, HALF_WORLD - 130);
+    this.stepTargetY = clamp(this.y + Math.sin(angle) * distance, -HALF_WORLD + 130, HALF_WORLD - 130);
+    if (this.edgeSafety(this.stepTargetX, this.stepTargetY) < 170) {
+      this.stepTargetX = clamp(p.x + Math.cos(angle + Math.PI) * 360, -HALF_WORLD + 170, HALF_WORLD - 170);
+      this.stepTargetY = clamp(p.y + Math.sin(angle + Math.PI) * 360, -HALF_WORLD + 170, HALF_WORLD - 170);
+    }
+  }
+
+  launchStormStep() {
+    this.mode = "storm_reposition";
+    this.modeTimer = this.stepDuration;
+    this.attackTimer = 0;
+    burst(this.x, this.y, 14, this.phaseColor(), 170);
+    playSfx("wave");
+  }
+
+  updateStormStep(dt) {
+    const progress = 1 - Math.max(0, this.modeTimer) / this.stepDuration;
+    const eased = 1 - Math.pow(1 - progress, 3);
+    this.x = this.stepStartX + (this.stepTargetX - this.stepStartX) * eased;
+    this.y = this.stepStartY + (this.stepTargetY - this.stepStartY) * eased;
+    this.attackTimer -= dt;
+    if (this.attackTimer <= 0) {
+      this.attackTimer = 0.055;
+      trail(this.x, this.y, this.stepStartX, this.stepStartY, this.phaseColor(), 11);
+    }
+    if (this.modeTimer <= 0) {
+      burst(this.x, this.y, 12, this.phaseColor(), 150);
+      this.finishAttack(0.38);
+    }
+  }
+
+  prepareThunderCage(warning) {
+    const p = state.player;
+    const motionAngle = Math.hypot(this.motion.vx, this.motion.vy) > 28
+      ? Math.atan2(this.motion.vy, this.motion.vx)
+      : Math.atan2(p.y - this.y, p.x - this.x);
+    const center = this.predictedPlayer(0.42);
+    const corridor = this.enhancedProfile
+      ? STORM_TYRANT_SAFE_CORRIDORS.enhancedCage
+      : STORM_TYRANT_SAFE_CORRIDORS.cage;
+    const width = this.enhancedProfile ? 28 : 25;
+    const offset = corridor * 0.5 + width + (p.r || 14);
+
+    for (let waveIndex = 0; waveIndex < STORM_TYRANT_SCREEN_PRESSURE.cageWaves; waveIndex++) {
+      const angle = motionAngle + (waveIndex % 2 ? Math.PI / 2 : 0);
+      const normalX = -Math.sin(angle);
+      const normalY = Math.cos(angle);
+      const shift = (waveIndex - 1) * 54;
+      const waveCenterX = center.x + Math.cos(angle) * shift;
+      const waveCenterY = center.y + Math.sin(angle) * shift;
+      const armTime = warning + waveIndex * 0.58;
+      for (const side of [-1, 1]) {
+        this.spawnStormLine({
+          x: waveCenterX + normalX * offset * side,
+          y: waveCenterY + normalY * offset * side,
+          angle,
+          length: WORLD_SIZE + 420,
+          width,
+          armTime,
+          activeTime: 0.28,
+          damage: this.damage * 0.48,
+          style: "cage",
+          cageWave: waveIndex,
+        });
+      }
+    }
+    this.sceneGapAngle = motionAngle;
+  }
+
+  launchThunderCage() {
+    this.mode = "storm_cage_scene";
+    this.modeTimer = 1.78;
+    this.weaponAngle = -1.18;
+    this.attacksSinceLongRecover = 0;
+    burst(this.x, this.y, 28, this.phaseColor(), 220);
+    playSfx("wave");
+  }
+
+  prepareSkyfall(warning) {
+    const center = this.predictedPlayer(0.48);
+    const movementAngle = Math.hypot(this.motion.vx, this.motion.vy) > 25
+      ? Math.atan2(this.motion.vy, this.motion.vx)
+      : this.sceneSpin;
+    const escapeAngle = movementAngle + (this.motion.turn >= 0 ? -1 : 1) * Math.PI * 0.62;
+    this.sceneGapAngle = escapeAngle;
+    const waves = this.enhancedProfile ? 4 : 3;
+    const radius = this.enhancedProfile ? 72 : 68;
+
+    for (let waveIndex = 0; waveIndex < waves; waveIndex++) {
+      const ringRadius = 150 + waveIndex * 52;
+      const count = 5;
+      for (let i = 0; i < count; i++) {
+        const angle = movementAngle + i / count * TAU + waveIndex * 0.34;
+        if (angleDistance(angle, escapeAngle) < STORM_TYRANT_SAFE_CORRIDORS.skyfallGapAngle * 0.5) continue;
+        const x = clamp(center.x + Math.cos(angle) * ringRadius, -HALF_WORLD + 90, HALF_WORLD - 90);
+        const y = clamp(center.y + Math.sin(angle) * ringRadius, -HALF_WORLD + 90, HALF_WORLD - 90);
+        this.spawnStormStrike(x, y, radius, warning + waveIndex * 0.24 + i * 0.035);
+      }
+    }
+  }
+
+  launchSkyfall() {
+    this.mode = "storm_skyfall_scene";
+    this.modeTimer = this.enhancedProfile ? 1.22 : 1.02;
+    this.weaponAngle = -1.35;
+    burst(this.x, this.y, 24, this.phaseColor(), 210);
+    playSfx("wave");
+  }
+
+  prepareTempestThrone(warning) {
+    const beams = STORM_TYRANT_SCREEN_PRESSURE.throneBeams[this.enhancedProfile ? 1 : 0];
+    const base = Math.hypot(this.motion.vx, this.motion.vy) > 24
+      ? Math.atan2(this.motion.vy, this.motion.vx)
+      : this.sceneSpin;
+    this.sceneGapAngle = base + Math.PI / 2;
+    for (let i = 0; i < beams; i++) {
+      const armTime = warning + i * 0.48;
+      this.spawnStormLine({
+        x: 0,
+        y: 0,
+        angle: base + i * Math.PI / beams,
+        length: WORLD_SIZE + 520,
+        width: this.enhancedProfile ? 31 : 28,
+        armTime,
+        activeTime: 0.25,
+        damage: this.damage * 0.56,
+        style: "throne",
+        throneIndex: i,
+      });
+    }
+  }
+
+  launchTempestThrone() {
+    this.mode = "storm_tempest_throne";
+    const beams = STORM_TYRANT_SCREEN_PRESSURE.throneBeams[this.enhancedProfile ? 1 : 0];
+    this.modeTimer = (beams - 1) * 0.48 + 0.42;
+    this.attackTimer = 0;
+    this.attackCount = 0;
+    this.sceneWave = 0;
+    this.weaponAngle = -1.48;
+    this.attacksSinceLongRecover = 0;
+    burst(this.x, this.y, 38, this.phaseColor(), 285);
+    pulse(this.x, this.y, this.r + 180, this.phaseColor(), 0.48);
+    state.shake = Math.max(state.shake, 11);
+    playSfx("wave");
+  }
+
+  updateTempestThrone(dt) {
+    this.moveToward(0, 0, this.speed * 0.76, dt);
+    if (this.attackTimer <= 0) {
+      this.attackTimer = 0.48;
+      this.fireThroneVolley(this.attackCount++);
+    }
+    if (this.modeTimer <= 0) this.finishAttack(1.45, true);
+  }
+
+  fireThroneVolley(waveIndex) {
+    const count = this.enhancedProfile ? 22 : 18;
+    const gapAngle = this.sceneGapAngle + waveIndex * 0.38;
+    const opposite = gapAngle + Math.PI;
+    for (let i = 0; i < count; i++) {
+      const angle = this.crownSpin + i / count * TAU;
+      if (angleDistance(angle, gapAngle) < 0.3 || angleDistance(angle, opposite) < 0.3) continue;
+      this.shoot(angle, 205 + (i % 3) * 26, 6.2, "stormOrb", this.damage * 0.32);
+    }
+    pulse(this.x, this.y, this.r + 70 + waveIndex * 14, this.phaseColor(), 0.2);
+    playSfx("shoot");
+  }
+
+  spawnStormLine({
+    x,
+    y,
+    angle,
+    length,
+    width,
+    armTime,
+    activeTime,
+    damage,
+    style,
+    cageWave = 0,
+    throneIndex = 0,
+  }) {
+    if (this.ownedHazardCount() >= STORM_TYRANT_SCREEN_PRESSURE.peakHazards) return null;
+    const hazard = {
+      kind: "storm_laser_net",
+      x,
+      y,
+      vx: 0,
+      vy: 0,
+      angle,
+      length,
+      width,
+      color: this.phaseColor(),
+      damage,
+      life: armTime + activeTime,
+      maxLife: armTime + activeTime,
+      armTime,
+      armDuration: armTime,
+      surgeTime: 0.1,
+      style,
+      cageWave,
+      throneIndex,
+      bossOwner: this,
+      stormTyrantOwner: this,
+    };
+    world.hazards.push(hazard);
+    return hazard;
+  }
+
+  spawnStormStrike(x, y, radius, armTime) {
+    if (this.ownedHazardCount() >= STORM_TYRANT_SCREEN_PRESSURE.peakHazards) return null;
+    const hazard = {
+      kind: "storm_strike",
+      warningType: "circle",
+      x,
+      y,
+      r: radius,
+      color: this.phaseColor(),
+      damage: this.damage * 0.5,
+      life: armTime + 0.2,
+      maxLife: armTime + 0.2,
+      armTime,
+      armDuration: armTime,
+      spin: Math.random() * TAU,
+      bossOwner: this,
+      stormTyrantOwner: this,
+    };
+    world.hazards.push(hazard);
+    return hazard;
+  }
+
+  shoot(angle, speed, radius, shape, damage) {
+    if (this.ownedProjectileCount() >= STORM_TYRANT_SCREEN_PRESSURE.peakProjectiles) return null;
+    const projectile = {
+      x: this.x + Math.cos(angle) * this.r * 0.72,
+      y: this.y + Math.sin(angle) * this.r * 0.72,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed,
+      r: radius,
+      color: this.phaseColor(),
+      damage,
+      life: 5.2,
+      shape,
+      spin: Math.random() * TAU,
+      bossProjectile: true,
+      expireWithLife: true,
+      bossOwner: this,
+      stormTyrantOwner: this,
+    };
+    world.enemyProjectiles.push(projectile);
+    return projectile;
+  }
+
+  finishAttack(recovery = null, forceLong = false, countAttack = true) {
+    if (countAttack) this.attacksSinceLongRecover++;
+    const long = forceLong || this.attacksSinceLongRecover >= 2;
+    this.mode = "storm_recover";
+    this.modeTimer = recovery ?? (long ? 1.04 : 0.5);
+    if (long) this.attacksSinceLongRecover = 0;
+  }
+
+  rememberSkill(skill) {
+    this.lastSkills.unshift(skill);
+    this.lastSkills.length = Math.min(3, this.lastSkills.length);
+    const profileScale = this.enhancedProfile ? 0.9 : 1;
+    this.skillCooldowns[skill] = Math.max(
+      this.skillCooldowns[skill] || 0,
+      (SKILL_COOLDOWNS[skill] || 2) * profileScale,
+    );
+  }
+
+  tickCooldowns(dt) {
+    for (const skill of Object.keys(this.skillCooldowns)) {
+      this.skillCooldowns[skill] = Math.max(0, this.skillCooldowns[skill] - dt);
+    }
+  }
+
+  trackPlayerMotion(dt) {
+    const p = state.player;
+    const safeDt = Math.max(0.001, dt);
+    const rawVx = clamp((p.x - this.motion.lastX) / safeDt, -520, 520);
+    const rawVy = clamp((p.y - this.motion.lastY) / safeDt, -520, 520);
+    const previousVx = this.motion.vx;
+    const previousVy = this.motion.vy;
+    const blend = Math.min(1, dt * 7);
+    this.motion.vx += (rawVx - this.motion.vx) * blend;
+    this.motion.vy += (rawVy - this.motion.vy) * blend;
+    const oldSpeed = Math.hypot(previousVx, previousVy);
+    const speed = Math.hypot(this.motion.vx, this.motion.vy);
+    if (oldSpeed > 20 && speed > 20) {
+      const dot = (previousVx * this.motion.vx + previousVy * this.motion.vy) / (oldSpeed * speed);
+      const cross = (previousVx * this.motion.vy - previousVy * this.motion.vx) / (oldSpeed * speed);
+      this.motion.straightness += ((dot + 1) * 0.5 - this.motion.straightness) * Math.min(1, dt * 3.5);
+      this.motion.turn += (cross - this.motion.turn) * Math.min(1, dt * 4);
+    }
+    this.motion.lastX = p.x;
+    this.motion.lastY = p.y;
+  }
+
+  predictedPlayer(seconds) {
+    const p = state.player;
+    return {
+      x: clamp(p.x + this.motion.vx * seconds, -HALF_WORLD + 70, HALF_WORLD - 70),
+      y: clamp(p.y + this.motion.vy * seconds, -HALF_WORLD + 70, HALF_WORLD - 70),
+    };
+  }
+
+  angleToPredictedPlayer(seconds) {
+    const target = this.predictedPlayer(seconds);
+    return Math.atan2(target.y - this.y, target.x - this.x);
+  }
+
+  driftToIdealRange(dt, bias = 0) {
+    const p = state.player;
+    const dx = p.x - this.x;
+    const dy = p.y - this.y;
+    const distance = Math.max(1, Math.hypot(dx, dy));
+    const desired = this.phaseLevel >= 3 ? 390 : 430;
+    const radial = distance < desired - 120 ? -0.46 : distance > desired + 160 ? 0.38 : bias;
+    const edgePressure = Math.max(Math.abs(this.x), Math.abs(this.y)) / HALF_WORLD;
+    const orbitSign = this.motion.turn >= 0 ? -1 : 1;
+    const orbit = edgePressure > 0.82 ? 0 : orbitSign * (0.32 + this.phaseLevel * 0.04);
+    this.x += (dx / distance * radial - dy / distance * orbit) * this.speed * dt;
+    this.y += (dy / distance * radial + dx / distance * orbit) * this.speed * dt;
+    if (edgePressure > 0.86) this.moveToward(0, 0, this.speed * 0.44, dt);
+  }
+
+  moveToward(x, y, speed, dt) {
+    const dx = x - this.x;
+    const dy = y - this.y;
+    const distance = Math.max(1, Math.hypot(dx, dy));
+    if (distance < 8) return;
+    this.x += dx / distance * speed * dt;
+    this.y += dy / distance * speed * dt;
+  }
+
+  edgeSafety(x, y) {
+    return Math.min(HALF_WORLD - Math.abs(x), HALF_WORLD - Math.abs(y));
+  }
+
+  isSceneSkill(skill) {
+    return skill === "thunder_cage" || skill === "skyfall_decree" || skill === "tempest_throne";
+  }
+
+  hasOwnedActiveHazards() {
+    return world.hazards.some((hazard) => hazard.stormTyrantOwner === this && (hazard.armTime || 0) <= 0);
+  }
+
+  ownedProjectileCount() {
+    return world.enemyProjectiles.reduce(
+      (count, projectile) => count + (projectile.stormTyrantOwner === this ? 1 : 0),
+      0,
+    );
+  }
+
+  ownedHazardCount() {
+    return world.hazards.reduce(
+      (count, hazard) => count + (hazard.stormTyrantOwner === this ? 1 : 0),
+      0,
+    );
+  }
+
+  takeDamage(amount, x, y, options = {}) {
+    if (this.mode === "phase_transition" || this.dead) return;
+    const threshold = this.phaseLevel <= 2
+      ? this.maxHp * STORM_TYRANT_PHASE_THRESHOLDS[this.phaseLevel - 1]
+      : null;
+    if (threshold != null && this.hp > threshold) {
+      const factor = (this.shielded ? 0.35 : 1) * state.player.damageScale;
+      const maxRawDamage = (this.hp - threshold + (this.defense || 0)) / Math.max(0.001, factor);
+      super.takeDamage(Math.min(amount, maxRawDamage), x, y, options);
+      if (!this.dead && this.hp <= threshold + 0.01) {
+        this.hp = threshold;
+        this.startPhaseTransition(this.phaseLevel + 1);
+      }
+      return;
+    }
+    super.takeDamage(amount, x, y, options);
+  }
+
+  startPhaseTransition(nextPhase) {
+    this.phaseLevel = nextPhase;
+    this.mode = "phase_transition";
+    this.modeTimer = 1.18;
+    this.currentSkill = "";
+    this.pendingForcedSkill = nextPhase === 2 ? "thunder_cage" : "tempest_throne";
+    this.phasePulse = 1;
+    this.attacksSinceLongRecover = 0;
+    this.clearOwnedEffects();
+    burst(this.x, this.y, nextPhase === 3 ? 56 : 42, this.phaseColor(), 310);
+    pulse(this.x, this.y, this.r + 160, this.phaseColor(), 0.52);
+    state.shake = Math.max(state.shake, nextPhase === 3 ? 14 : 10);
+    state.flash = Math.max(state.flash, 0.32);
+    playSfx("wave");
+  }
+
+  clearOwnedEffects() {
     for (let i = world.enemyProjectiles.length - 1; i >= 0; i--) {
       if (world.enemyProjectiles[i].stormTyrantOwner === this) world.enemyProjectiles.splice(i, 1);
     }
@@ -109,638 +792,388 @@ export class StormTyrant extends BaseEnemy {
     }
   }
 
-  updateMode(dt, dx, dy, d) {
-    this.modeTimer -= dt;
-    this.attackTimer -= dt;
-    if (this.mode === "intro") {
-      if (this.modeTimer <= 0) this.chooseMode();
-      return;
-    }
-    if (this.mode === "phase_transition") {
-      this.drift(dx, dy, d, -0.08, dt);
-      if (this.modeTimer <= 0) this.chooseMode();
-      return;
-    }
-    if (this.mode === "windup") {
-      this.drift(dx, dy, d, -0.18, dt);
-      if (this.modeTimer <= 0) this.startAttack();
-      return;
-    }
-    if (this.mode === "fan") return this.updateFan(dt, dx, dy);
-    if (this.mode === "ring") return this.updateRing(dt);
-    if (this.mode === "dash") return this.updateDash(dt);
-    if (this.mode === "chain_dash") return this.updateChainDash(dt);
-    if (this.mode === "thunder_cage") return this.updateThunderCage(dt, dx, dy, d);
-    if (this.mode === "tempest_eye") return this.updateTempestEye(dt);
-    if (this.mode === "summon") return this.updateSummon(dt);
-    if (this.mode === "recover") {
-      this.drift(dx, dy, d, 0.28, dt);
-      if (this.modeTimer <= 0) this.chooseMode();
-    }
-  }
-
-  chooseMode() {
-    this.mode = "windup";
-    const sequence = this.enhancedProfile
-      ? this.phase3
-        ? ["thunder_cage", "tempest_eye", "chain_dash", "fan"]
-        : this.phase2
-          ? ["fan", "thunder_cage", "chain_dash", "ring", "summon"]
-          : MODES
-      : MODES;
-    const scheduledAttack = sequence[this.modeIndex % sequence.length];
-    const d = Math.hypot(state.player.x - this.x, state.player.y - this.y);
-    if (!this.enhancedProfile && d > FAR_DASH_DISTANCE && scheduledAttack !== "dash") {
-      this.currentAttack = "dash";
-    } else {
-      this.currentAttack = scheduledAttack;
-      this.modeIndex++;
-    }
-    this.modeTimer = this.currentAttack === "dash" || this.currentAttack === "chain_dash"
-      ? 0.66
-      : this.currentAttack === "summon" || this.currentAttack === "thunder_cage"
-        ? 0.78
-        : this.currentAttack === "tempest_eye" ? 0.88 : 0.5;
-    this.attackCount = 0;
-    this.lockAngle = Math.atan2(state.player.y - this.y, state.player.x - this.x);
-    pulse(this.x, this.y, this.r + 28, this.phaseColor(), 0.24);
-  }
-
-  startAttack() {
-    this.mode = this.currentAttack;
-    this.attackTimer = 0;
-    if (this.mode === "fan") this.modeTimer = this.phase2 ? 1.62 : 1.28;
-    if (this.mode === "ring") this.modeTimer = this.phase2 ? 1.86 : 1.46;
-    if (this.mode === "summon") this.modeTimer = 0.62;
-    if (this.mode === "thunder_cage") {
-      this.modeTimer = 1.32;
-      this.spawnThunderCage();
-    }
-    if (this.mode === "tempest_eye") this.modeTimer = 2.05;
-    if (this.mode === "chain_dash") {
-      this.chainDashesRemaining = this.phase3 ? 3 : 2;
-      this.beginChainDash();
-    }
-    if (this.mode === "dash") {
-      this.modeTimer = this.phase2 ? 0.46 : 0.4;
-      this.dashVx = Math.cos(this.lockAngle) * (this.phase2 ? 760 : 650);
-      this.dashVy = Math.sin(this.lockAngle) * (this.phase2 ? 760 : 650);
-      burst(this.x, this.y, 16, "#d9fbff", 220);
-      playSfx("wave");
-    }
-  }
-
-  updateFan(dt, dx, dy) {
-    this.drift(dx, dy, Math.max(1, Math.hypot(dx, dy)), 0.24, dt);
-    if (this.attackTimer <= 0) {
-      this.attackTimer = this.phase2 ? 0.2 : 0.23;
-      this.attackCount++;
-      const rounds = this.phase3 ? 5 : this.phase2 ? 6 : 4;
-      const count = this.phase3 ? 12 : this.phase2 ? 11 : 8;
-      const base = Math.atan2(dy, dx) + Math.sin(this.attackCount * 0.9) * 0.13;
-      for (let i = 0; i < count; i++) {
-        const t = i - (count - 1) / 2;
-        this.shoot(base + t * 0.14, 220 + this.attackCount * 11, 6.5, "stormBlade", this.damage * 0.46);
-      }
-      if (this.phase2 && this.attackCount % 2 === 0) {
-        this.shoot(base + Math.PI * 0.5, 178, 5.2, "stormOrb", this.damage * 0.3);
-        this.shoot(base - Math.PI * 0.5, 178, 5.2, "stormOrb", this.damage * 0.3);
-      }
-      playSfx("shoot");
-      if (this.attackCount >= rounds) this.recover(0.42);
-    }
-  }
-
-  updateRing(dt) {
-    if (this.attackTimer <= 0) {
-      this.attackTimer = this.phase2 ? 0.29 : 0.38;
-      this.attackCount++;
-      const count = this.phase3 ? 28 : this.phase2 ? 26 : 18;
-      const offset = this.ringSpin + this.attackCount * 0.22;
-      for (let i = 0; i < count; i++) {
-        const gap = this.attackCount % 2 === 0 && i % 7 === 0;
-        if (!gap) this.shoot(offset + i / count * TAU, this.phase2 ? 205 : 175, 5.7, "stormOrb", this.damage * 0.38);
-      }
-      if (this.phase2) {
-        for (let i = 0; i < 14; i++) this.shoot(offset * -0.7 + i / 14 * TAU, 138, 4.6, "stormOrb", this.damage * 0.3);
-      }
-      pulse(this.x, this.y, this.r + this.attackCount * 22, this.phaseColor(), 0.18);
-      playSfx("shoot");
-      if (this.attackCount >= (this.phase2 ? 4 : 3)) this.recover(0.56);
-    }
-  }
-
-  updateDash(dt) {
-    this.x += this.dashVx * dt;
-    this.y += this.dashVy * dt;
-    this.leaveDashTrail(dt);
-    if (this.modeTimer <= 0) {
-      if (this.phase2) for (let i = 0; i < 10; i++) this.shoot(i / 10 * TAU + this.ringSpin, 210, 5.2, "stormOrb", this.damage * 0.36);
-      this.recover(0.68);
-    }
-  }
-
-  beginChainDash() {
-    this.chainDashState = "dashing";
-    this.lockAngle = Math.atan2(state.player.y - this.y, state.player.x - this.x);
-    const speed = this.phase3 ? 790 : 720;
-    this.dashVx = Math.cos(this.lockAngle) * speed;
-    this.dashVy = Math.sin(this.lockAngle) * speed;
-    this.modeTimer = this.phase3 ? 0.34 : 0.31;
-    this.dashTrailTimer = 0;
-    burst(this.x, this.y, 18, this.phaseColor(), 230);
-    playSfx("wave");
-  }
-
-  updateChainDash(dt) {
-    if (this.chainDashState === "windup") {
-      this.lockAngle = Math.atan2(state.player.y - this.y, state.player.x - this.x);
-      if (this.modeTimer <= 0) this.beginChainDash();
-      return;
-    }
-    this.x += this.dashVx * dt;
-    this.y += this.dashVy * dt;
-    this.leaveDashTrail(dt);
-    if (this.modeTimer > 0) return;
-    this.chainDashesRemaining--;
-    for (let i = 0; i < 8; i++) this.shoot(this.ringSpin + i / 8 * TAU, 190, 4.8, "stormOrb", this.damage * 0.28);
-    if (this.chainDashesRemaining <= 0) {
-      this.chainDashState = "idle";
-      this.recover(0.72);
-      return;
-    }
-    this.chainDashState = "windup";
-    this.modeTimer = 0.48;
-    pulse(this.x, this.y, this.r + 54, this.phaseColor(), 0.28);
-  }
-
-  leaveDashTrail(dt) {
-    this.dashTrailTimer -= dt;
-    if (this.dashTrailTimer > 0) return;
-    this.dashTrailTimer = 0.045;
-    const color = this.phaseColor();
-    trail(this.x, this.y, this.x - this.dashVx * 0.05, this.y - this.dashVy * 0.05, color, 16);
-    world.hazards.push({
-      x: this.x,
-      y: this.y,
-      r: this.phase3 ? 44 : this.phase2 ? 42 : 36,
-      color,
-      damage: this.damage * 0.36,
-      life: 0.72,
-      maxLife: 0.72,
-      stormTyrantOwner: this,
-    });
-  }
-
-  spawnThunderCage() {
-    const p = state.player;
-    const vertical = Math.abs(p.dirX || 0) >= Math.abs(p.dirY || 0);
-    const spread = this.phase3 ? 300 : 340;
-    const speed = this.phase3 ? 82 : 70;
-    for (const side of [-1, 1]) {
-      world.hazards.push({
-        kind: "storm_laser_net",
-        x: vertical ? p.x + side * spread : p.x,
-        y: vertical ? p.y : p.y + side * spread,
-        vx: vertical ? -side * speed : 0,
-        vy: vertical ? 0 : -side * speed,
-        angle: vertical ? Math.PI / 2 : 0,
-        length: 1600,
-        width: this.phase3 ? 24 : 21,
-        color: this.phaseColor(),
-        damage: this.damage * 0.42,
-        life: 3.25,
-        maxLife: 3.25,
-        armTime: 0.9,
-        armDuration: 0.9,
-        surgeTime: 0.24,
-        stormTyrantOwner: this,
-      });
-    }
-    pulse(p.x, p.y, spread, this.phaseColor(), 0.34);
-  }
-
-  updateThunderCage(dt, dx, dy, d) {
-    this.drift(dx, dy, d, -0.12, dt);
-    if (this.modeTimer <= 0) this.recover(0.58);
-  }
-
-  updateTempestEye() {
-    if (this.attackTimer > 0) return;
-    this.attackTimer = 0.38;
-    this.attackCount++;
-    const count = 30;
-    const gap = (this.attackCount * 4) % count;
-    const offset = this.ringSpin + this.attackCount * 0.24;
-    for (let i = 0; i < count; i++) {
-      const opposite = (gap + count / 2) % count;
-      const gapDistance = Math.min(Math.abs(i - gap), count - Math.abs(i - gap));
-      const oppositeDistance = Math.min(Math.abs(i - opposite), count - Math.abs(i - opposite));
-      if (gapDistance <= 2 || oppositeDistance <= 2) continue;
-      this.shoot(offset + i / count * TAU, 158 + this.attackCount * 12, 5.4, "stormOrb", this.damage * 0.34);
-    }
-    pulse(this.x, this.y, this.r + this.attackCount * 34, this.phaseColor(), 0.24);
-    playSfx("shoot");
-    if (this.attackCount >= 4) this.recover(0.66);
-  }
-
-  updateSummon() {
-    if (this.attackCount === 0) {
-      this.attackCount = 1;
-      const count = this.phase2 ? 5 : 3;
-      this.summonStormShards(count, this.phase2);
-      pulse(this.x, this.y, 130, "#9ff4ff", 0.34);
-      playSfx("level");
-    }
-    if (this.modeTimer <= 0) this.recover(0.76);
-  }
-
-  summonStormShards(count, empowered) {
-    for (let i = 0; i < count; i++) {
-      const a = this.ringSpin + i / count * TAU;
-      world.enemies.push(new StormShard(this.x + Math.cos(a) * 105, this.y + Math.sin(a) * 105, empowered));
-    }
-  }
-
-  recover(time) {
-    this.mode = "recover";
-    this.modeTimer = time;
-  }
-
-  keepNearArena(dt, dx, dy, d) {
-    if (this.mode === "dash" || (this.mode === "chain_dash" && this.chainDashState === "dashing")) return;
-    const desired = 430;
-    const dir = d < desired ? -0.34 : 0.22;
-    this.drift(dx, dy, d, dir, dt);
-  }
-
-  drift(dx, dy, d, power, dt) {
-    const orbit = Math.sin(state.time * 1.4) * 0.42;
-    this.x += (dx / d * power + -dy / d * orbit) * this.speed * dt;
-    this.y += (dy / d * power + dx / d * orbit) * this.speed * dt;
-  }
-
-  shoot(angle, speed, radius, shape, damage) {
-    world.enemyProjectiles.push({
-      x: this.x + Math.cos(angle) * (this.r * 0.75),
-      y: this.y + Math.sin(angle) * (this.r * 0.75),
-      vx: Math.cos(angle) * speed,
-      vy: Math.sin(angle) * speed,
-      r: radius,
-      color: this.phaseColor(),
-      damage,
-      life: 4.8,
-      shape,
-      spin: Math.random() * TAU,
-      bossProjectile: true,
-      stormTyrantOwner: this,
-    });
-  }
-
-  takeDamage(amount, x, y, options = {}) {
-    const wasPhase2 = this.phase2;
-    super.takeDamage(amount, x, y, options);
-    if (!this.enhancedProfile && !wasPhase2 && this.hp > 0 && this.hp < this.maxHp * 0.45) {
-      this.phasePulse = 1;
-      burst(this.x, this.y, 34, "#b48cff", 260);
-      playSfx("wave");
-    }
-  }
-
-  stormSurge() {
-    const count = 24;
-    for (let i = 0; i < count; i++) {
-      const a = this.ringSpin + i / count * TAU;
-      this.shoot(a, 185 + (i % 3) * 24, 5.2, "stormOrb", this.damage * 0.34);
-    }
-    pulse(this.x, this.y, this.r + 90, this.phaseColor(), 0.34);
-    burst(this.x, this.y, 22, "#d9fbff", 220);
-    playSfx("wave");
+  kill() {
+    this.clearOwnedEffects();
+    super.kill();
   }
 
   phaseColor() {
-    return this.phase3 ? "#ffd166" : this.phase2 ? "#b48cff" : "#42e8ff";
+    return PHASE_COLORS[this.phaseLevel - 1];
+  }
+
+  coreColor() {
+    return PHASE_CORES[this.phaseLevel - 1];
   }
 
   draw(ctx) {
     ctx.save();
-    ctx.translate(Math.round(this.x), Math.round(this.y + Math.sin(this.anim * 1.4) * 5));
-    drawTelegraph(ctx, this);
-    drawStormMantle(ctx, this);
-    drawWings(ctx, this);
-    drawRings(ctx, this);
-    drawCore(ctx, this);
-    drawCrown(ctx, this);
-    drawFace(ctx, this);
+    ctx.translate(Math.round(this.x), Math.round(this.y));
+    drawSceneVeil(ctx, this);
+    drawSkillTelegraph(ctx, this);
+    drawStormTyrant(ctx, this);
     ctx.restore();
   }
 }
 
-class StormShard {
-  constructor(x, y, empowered) {
-    this.type = "storm_shard";
-    this.name = "风暴碎片";
-    this.x = x;
-    this.y = y;
-    this.r = empowered ? 15 : 13;
-    this.hp = empowered ? 48 : 34;
-    this.maxHp = this.hp;
-    this.speed = empowered ? 105 : 88;
-    this.damage = empowered ? 12 : 9;
-    this.xp = 0;
-    this.color = empowered ? "#b48cff" : "#9ff4ff";
-    this.dead = false;
-    this.flash = 0;
-    this.hitTimer = 0;
-    this.anim = Math.random() * TAU;
-    this.cooldown = 0.7 + Math.random() * 0.4;
-  }
-
-  update(dt) {
-    const p = state.player;
-    const dx = p.x - this.x;
-    const dy = p.y - this.y;
-    const d = Math.max(1, Math.hypot(dx, dy));
-    this.anim += dt * 5;
-    this.cooldown -= dt;
-    this.flash = Math.max(0, this.flash - dt * 8);
-    this.x += dx / d * this.speed * dt;
-    this.y += dy / d * this.speed * dt;
-    if (this.cooldown <= 0 && d < 520) {
-      this.cooldown = 1.1;
-      const a = Math.atan2(dy, dx);
-      world.enemyProjectiles.push({ x: this.x, y: this.y, vx: Math.cos(a) * 160, vy: Math.sin(a) * 160, r: 4, color: this.color, damage: this.damage, life: 3.2, shape: "stormOrb", spin: Math.random() * TAU });
-    }
-    if (d < p.r + this.r && p.invuln <= 0) {
-      applyPlayerDamage(this.damage, this);
-      p.invuln = 0.45;
-      playSfx("hurt");
-    }
-  }
-
-  takeDamage(amount, x, y, options = {}) {
-    this.hp -= amount * state.player.damageScale;
-    if (!options.statusEffect) {
-      this.flash = 1;
-      burst(x, y, 4, this.color, 120);
-    }
-    if (this.hp <= 0) this.kill();
-  }
-
-  kill() {
-    this.dead = true;
-    const i = world.enemies.indexOf(this);
-    if (i >= 0) world.enemies.splice(i, 1);
-    burst(this.x, this.y, 10, this.color, 160);
-    playSfx("hit");
-  }
-
-  draw(ctx) {
-    ctx.save();
-    ctx.translate(this.x, this.y);
-    ctx.rotate(this.anim);
-    ctx.fillStyle = this.flash > 0 ? "#fff" : this.color;
-    polygon(ctx, 0, 0, this.r, 4, Math.PI / 4, true);
-    ctx.strokeStyle = "#e9feff";
-    ctx.lineWidth = 2;
-    polygon(ctx, 0, 0, this.r + 4, 4, Math.PI / 4, false);
-    ctx.restore();
-  }
+function drawSceneVeil(ctx, boss) {
+  const scene = boss.mode === "storm_cage_scene"
+    || boss.mode === "storm_skyfall_scene"
+    || boss.mode === "storm_tempest_throne"
+    || boss.mode === "phase_transition";
+  if (!scene) return;
+  const alpha = boss.mode === "storm_tempest_throne" ? 0.16 : boss.mode === "phase_transition" ? 0.12 : 0.085;
+  ctx.fillStyle = hex(boss.phaseColor(), alpha);
+  ctx.fillRect(-HALF_WORLD - boss.x, -HALF_WORLD - boss.y, WORLD_SIZE, WORLD_SIZE);
 }
 
-function drawTelegraph(ctx, e) {
-  const chainWindup = e.mode === "chain_dash" && e.chainDashState === "windup";
-  if (e.mode !== "windup" && !chainWindup) return;
-  const attack = chainWindup ? "chain_dash" : e.currentAttack;
-  const alpha = 0.35 + Math.sin(e.anim * 9) * 0.16;
-  const color = e.phaseColor();
+function drawSkillTelegraph(ctx, boss) {
+  if (boss.mode !== "windup" && boss.mode !== "storm_echo_windup") return;
+  const skill = boss.mode === "storm_echo_windup" ? "echo_lance" : boss.currentSkill;
+  const color = boss.phaseColor();
+  const pulseAlpha = 0.42 + Math.sin(boss.anim * 10) * 0.18;
   ctx.save();
   ctx.globalCompositeOperation = "lighter";
-  if (attack === "dash" || attack === "chain_dash") {
-    ctx.rotate(e.lockAngle);
-    ctx.strokeStyle = hex(color, alpha * 0.28);
-    ctx.lineWidth = 22;
-    ctx.lineCap = "round";
-    ctx.beginPath();
-    ctx.moveTo(25, 0);
-    ctx.lineTo(392, 0);
-    ctx.stroke();
-    ctx.strokeStyle = hex(color, alpha);
-    ctx.lineWidth = 5;
-    ctx.beginPath();
-    ctx.moveTo(25, 0);
-    ctx.lineTo(360, 0);
-    ctx.stroke();
-    ctx.strokeStyle = `rgba(255,255,255,${alpha * 0.7})`;
-    ctx.lineWidth = 1.5;
-    for (let i = 0; i < 6; i++) {
-      const x = 72 + i * 48;
-      ctx.beginPath();
-      ctx.moveTo(x, -18);
-      ctx.lineTo(x + 18, 0);
-      ctx.lineTo(x, 18);
-      ctx.stroke();
-    }
-  } else if (attack === "ring" || attack === "tempest_eye") {
-    const r = e.r + 30 + Math.sin(e.anim * 8) * 10;
-    for (let i = 0; i < 3; i++) {
-      ctx.strokeStyle = i === 1 ? `rgba(255,255,255,${alpha * 0.42})` : hex(color, alpha * (0.9 - i * 0.18));
-      ctx.lineWidth = i === 0 ? 5 : 1.6;
-      ctx.beginPath();
-      ctx.arc(0, 0, r + i * 18, e.ringSpin * (i ? -0.7 : 0.9), e.ringSpin * (i ? -0.7 : 0.9) + Math.PI * 1.62);
-      ctx.stroke();
-    }
-  } else if (attack === "thunder_cage") {
-    ctx.strokeStyle = hex(color, alpha);
+  if (skill === "thunder_lance" || skill === "echo_lance") {
+    ctx.rotate(boss.mode === "storm_echo_windup" ? boss.lockAngle + Math.PI : boss.lockAngle);
+    ctx.strokeStyle = hex(color, pulseAlpha);
     ctx.lineWidth = 4;
-    for (const side of [-1, 1]) {
+    ctx.beginPath();
+    ctx.moveTo(34, 0);
+    ctx.lineTo(330, 0);
+    ctx.stroke();
+    ctx.strokeStyle = `rgba(255,255,255,${pulseAlpha * 0.72})`;
+    ctx.lineWidth = 1.4;
+    for (let i = 0; i < 6; i++) {
+      const x = 72 + i * 42;
       ctx.beginPath();
-      ctx.moveTo(side * 96, -112);
-      ctx.lineTo(side * 70, -42);
-      ctx.lineTo(side * 92, 18);
-      ctx.lineTo(side * 64, 108);
+      ctx.moveTo(x, -17);
+      ctx.lineTo(x + 18, 0);
+      ctx.lineTo(x, 17);
       ctx.stroke();
     }
-    ctx.strokeStyle = `rgba(255,255,255,${alpha * 0.54})`;
-    ctx.lineWidth = 1.5;
-    ctx.strokeRect(-58, -86, 116, 172);
-  } else {
-    ctx.rotate(e.lockAngle);
-    ctx.fillStyle = hex(color, alpha * 0.14);
+  } else if (skill === "crown_volley") {
+    ctx.rotate(boss.lockAngle);
+    ctx.fillStyle = hex(color, 0.12 + pulseAlpha * 0.08);
     ctx.beginPath();
-    ctx.moveTo(0, 0);
-    ctx.lineTo(280, -72);
-    ctx.lineTo(280, 72);
+    ctx.moveTo(18, 0);
+    ctx.lineTo(300, -105);
+    ctx.lineTo(300, 105);
     ctx.closePath();
     ctx.fill();
-    ctx.strokeStyle = hex(color, alpha * 0.74);
-    ctx.lineWidth = 2.4;
+    ctx.strokeStyle = hex(color, pulseAlpha);
+    ctx.lineWidth = 2;
     ctx.beginPath();
-    ctx.moveTo(26, -8);
-    ctx.lineTo(288, -74);
-    ctx.moveTo(26, 8);
-    ctx.lineTo(288, 74);
+    ctx.moveTo(34, -12);
+    ctx.lineTo(300, -105);
+    ctx.moveTo(34, 12);
+    ctx.lineTo(300, 105);
     ctx.stroke();
-    ctx.strokeStyle = `rgba(255,255,255,${alpha * 0.46})`;
-    ctx.lineWidth = 1;
-    for (let i = 0; i < 4; i++) {
-      const x = 86 + i * 46;
+  } else {
+    const rings = skill === "tempest_throne" ? 4 : 3;
+    for (let i = 0; i < rings; i++) {
+      ctx.strokeStyle = i === 1 ? `rgba(255,255,255,${pulseAlpha * 0.65})` : hex(color, pulseAlpha * (0.9 - i * 0.15));
+      ctx.lineWidth = i === 0 ? 4 : 1.5;
       ctx.beginPath();
-      ctx.moveTo(x, -28 + i % 2 * 12);
-      ctx.lineTo(x + 28, 0);
-      ctx.lineTo(x, 28 - i % 2 * 12);
+      ctx.arc(0, 0, boss.r + 34 + i * 20, boss.sceneSpin * (i % 2 ? -1 : 1), boss.sceneSpin * (i % 2 ? -1 : 1) + Math.PI * 1.55);
       ctx.stroke();
     }
   }
   ctx.restore();
 }
 
-function drawWings(ctx, e) {
-  const color = e.phase3 ? "rgba(255,209,102,0.5)" : e.phase2 ? "rgba(180,140,255,0.46)" : "rgba(66,232,255,0.42)";
-  const flap = Math.sin(e.anim * 2.4) * 9;
-  ctx.strokeStyle = e.phase3 ? "rgba(255,242,168,0.62)" : e.phase2 ? "rgba(255,255,255,0.5)" : "rgba(217,251,255,0.5)";
-  ctx.lineWidth = 2;
-  ctx.fillStyle = color;
-  for (const side of [-1, 1]) {
+function drawStormTyrant(ctx, boss) {
+  const bob = Math.sin(boss.anim * 1.32) * 4;
+  const color = boss.phaseColor();
+  const core = boss.coreColor();
+  ctx.translate(0, bob);
+  drawShadow(ctx, boss);
+  drawStormVanes(ctx, boss, color);
+  drawRoyalMantle(ctx, boss, color);
+  drawFloatingGreaves(ctx, boss, color);
+  drawTorsoArmor(ctx, boss, color, core);
+  drawArmsAndSpear(ctx, boss, color, core);
+  drawCrownHelm(ctx, boss, color, core);
+  drawPhaseAura(ctx, boss, color);
+}
+
+function drawShadow(ctx, boss) {
+  ctx.fillStyle = "rgba(0,0,0,0.34)";
+  ctx.beginPath();
+  ctx.ellipse(0, boss.r * 0.96, boss.r * 1.08, boss.r * 0.22, 0, 0, TAU);
+  ctx.fill();
+}
+
+function drawStormVanes(ctx, boss, color) {
+  const count = 4;
+  for (let i = 0; i < count; i++) {
+    const angle = boss.crownSpin * (i % 2 ? -0.72 : 0.84) + i * TAU / count;
+    const x = Math.cos(angle) * (82 + boss.phaseLevel * 8);
+    const y = Math.sin(angle) * 32 - 8;
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(angle + Math.PI / 2);
+    ctx.fillStyle = "rgba(4,10,20,0.9)";
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 2;
     ctx.beginPath();
-    ctx.moveTo(side * 28, -26);
-    ctx.bezierCurveTo(side * (70 + flap), -64, side * (125 + flap), -46, side * (142 + flap), -8);
-    ctx.bezierCurveTo(side * (98 + flap), -18, side * (112 + flap), 42, side * 42, 28);
-    ctx.bezierCurveTo(side * 52, 10, side * 42, -8, side * 28, -26);
+    ctx.moveTo(0, -25);
+    ctx.lineTo(13, -6);
+    ctx.lineTo(7, 22);
+    ctx.lineTo(0, 12);
+    ctx.lineTo(-7, 22);
+    ctx.lineTo(-13, -6);
     ctx.closePath();
     ctx.fill();
     ctx.stroke();
-    for (let i = 0; i < 3; i++) {
-      const y = -34 + i * 27;
-      ctx.beginPath();
-      ctx.moveTo(side * 42, y);
-      ctx.quadraticCurveTo(side * (76 + flap), y - 10, side * (118 + flap), y + 2);
-      ctx.stroke();
-    }
-  }
-}
-
-function drawRings(ctx, e) {
-  const ringColor = e.phaseColor();
-  for (let layer = 0; layer < 3; layer++) {
-    ctx.save();
-    ctx.rotate(e.ringSpin * (layer % 2 ? -1 : 1) * (1 + layer * 0.15));
-    ctx.scale(1, 0.78 + layer * 0.07);
-    ctx.strokeStyle = layer === 1 ? "rgba(255,255,255,0.62)" : ringColor;
-    ctx.lineWidth = layer === 0 ? 3 : 1.7;
-    for (let i = 0; i < 9 + layer * 2; i++) {
-      const a = i / (9 + layer * 2) * TAU;
-      const r = 50 + layer * 15;
-      ctx.beginPath();
-      ctx.arc(0, 0, r, a, a + 0.28);
-      ctx.stroke();
-      const x = Math.cos(a) * r;
-      const y = Math.sin(a) * r;
-      if (layer !== 2) polygon(ctx, x, y, layer ? 4 : 5, 3, a, true);
-    }
+    ctx.fillStyle = boss.coreColor();
+    ctx.beginPath();
+    ctx.moveTo(0, -14);
+    ctx.lineTo(4, 4);
+    ctx.lineTo(0, 12);
+    ctx.lineTo(-4, 4);
+    ctx.closePath();
+    ctx.fill();
     ctx.restore();
   }
 }
 
-function drawCore(ctx, e) {
-  const flash = e.flash > 0;
-  const pulseScale = 1 + Math.sin(e.anim * 3) * 0.05 + e.phasePulse * 0.18;
-  ctx.save();
-  ctx.scale(pulseScale, pulseScale);
-  ctx.fillStyle = "rgba(0,0,0,0.32)";
+function drawRoyalMantle(ctx, boss, color) {
+  const sway = Math.sin(boss.anim * 1.8) * 9;
+  ctx.fillStyle = boss.phaseLevel === 3 ? "rgba(58,40,18,0.9)" : "rgba(5,10,25,0.94)";
+  ctx.strokeStyle = hex(color, 0.76);
+  ctx.lineWidth = 2.5;
   ctx.beginPath();
-  ctx.ellipse(0, e.r * 0.74, e.r * 0.92, e.r * 0.18, 0, 0, TAU);
-  ctx.fill();
-  const body = flash ? "#fff" : e.phaseColor();
-  ctx.fillStyle = body;
-  ctx.beginPath();
-  ctx.moveTo(0, -e.r * 0.86);
-  ctx.bezierCurveTo(e.r * 0.62, -e.r * 0.72, e.r * 0.82, -e.r * 0.05, e.r * 0.55, e.r * 0.48);
-  ctx.bezierCurveTo(e.r * 0.26, e.r * 0.86, -e.r * 0.26, e.r * 0.86, -e.r * 0.55, e.r * 0.48);
-  ctx.bezierCurveTo(-e.r * 0.82, -e.r * 0.05, -e.r * 0.62, -e.r * 0.72, 0, -e.r * 0.86);
+  ctx.moveTo(-38, -34);
+  ctx.bezierCurveTo(-78, 4, -72 + sway, 74, -36 + sway * 0.45, 104);
+  ctx.lineTo(-10, 72);
+  ctx.lineTo(0, 103 + Math.sin(boss.anim * 2) * 5);
+  ctx.lineTo(12, 70);
+  ctx.bezierCurveTo(56 + sway * 0.2, 82, 78 + sway, 8, 38, -34);
   ctx.closePath();
   ctx.fill();
-  ctx.fillStyle = "rgba(3,6,12,0.45)";
-  ctx.beginPath();
-  ctx.ellipse(0, 8, e.r * 0.34, e.r * 0.48, 0, 0, TAU);
-  ctx.fill();
-  ctx.fillStyle = flash ? "#fff" : "#d9fbff";
-  polygon(ctx, 0, 6, e.r * 0.28, 4, Math.PI / 4 + e.ringSpin, true);
-  ctx.strokeStyle = "#ffffff";
+  ctx.stroke();
+  ctx.strokeStyle = hex(color, 0.35);
+  ctx.lineWidth = 1.2;
+  for (const side of [-1, 1]) {
+    ctx.beginPath();
+    ctx.moveTo(side * 30, -24);
+    ctx.quadraticCurveTo(side * (48 + sway * 0.25), 34, side * (28 + sway * 0.4), 82);
+    ctx.stroke();
+  }
+}
+
+function drawFloatingGreaves(ctx, boss, color) {
+  for (const side of [-1, 1]) {
+    const lift = Math.sin(boss.anim * 2.4 + side) * 3;
+    ctx.save();
+    ctx.translate(side * 19, 65 + lift);
+    ctx.fillStyle = boss.flash > 0 ? "#ffffff" : "#0b1325";
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(-11, -14);
+    ctx.lineTo(12, -11);
+    ctx.lineTo(9, 19);
+    ctx.lineTo(2, 30);
+    ctx.lineTo(-10, 18);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = boss.coreColor();
+    ctx.fillRect(-3, -7, 6, 24);
+    ctx.restore();
+  }
+}
+
+function drawTorsoArmor(ctx, boss, color, core) {
+  ctx.fillStyle = boss.flash > 0 ? "#ffffff" : "#10182a";
+  ctx.strokeStyle = color;
   ctx.lineWidth = 3;
   ctx.beginPath();
-  ctx.moveTo(0, -e.r * 0.86);
-  ctx.bezierCurveTo(e.r * 0.62, -e.r * 0.72, e.r * 0.82, -e.r * 0.05, e.r * 0.55, e.r * 0.48);
-  ctx.bezierCurveTo(e.r * 0.26, e.r * 0.86, -e.r * 0.26, e.r * 0.86, -e.r * 0.55, e.r * 0.48);
-  ctx.bezierCurveTo(-e.r * 0.82, -e.r * 0.05, -e.r * 0.62, -e.r * 0.72, 0, -e.r * 0.86);
+  ctx.moveTo(-42, -35);
+  ctx.lineTo(-55, -6);
+  ctx.lineTo(-34, 49);
+  ctx.lineTo(0, 63);
+  ctx.lineTo(34, 49);
+  ctx.lineTo(55, -6);
+  ctx.lineTo(42, -35);
+  ctx.lineTo(0, -48);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+
+  ctx.fillStyle = hex(color, boss.phaseLevel === 3 ? 0.74 : 0.52);
+  ctx.beginPath();
+  ctx.moveTo(-34, -27);
+  ctx.lineTo(-48, -5);
+  ctx.lineTo(-24, 8);
+  ctx.lineTo(-6, -18);
+  ctx.closePath();
+  ctx.fill();
+  ctx.beginPath();
+  ctx.moveTo(34, -27);
+  ctx.lineTo(48, -5);
+  ctx.lineTo(24, 8);
+  ctx.lineTo(6, -18);
+  ctx.closePath();
+  ctx.fill();
+
+  ctx.save();
+  ctx.globalCompositeOperation = "lighter";
+  ctx.shadowColor = color;
+  ctx.shadowBlur = boss.phaseLevel === 3 ? 20 : 12;
+  ctx.fillStyle = core;
+  polygon(ctx, 0, 12, 15 + boss.phaseLevel * 2, 6, Math.PI / 6 + boss.sceneSpin * 0.18, true);
+  ctx.fillStyle = "#ffffff";
+  polygon(ctx, 0, 12, 6, 4, Math.PI / 4, true);
+  ctx.restore();
+
+  ctx.strokeStyle = hex(core, 0.72);
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(0, -10);
+  ctx.lineTo(-20, 30);
+  ctx.lineTo(0, 50);
+  ctx.lineTo(20, 30);
+  ctx.closePath();
+  ctx.stroke();
+}
+
+function drawArmsAndSpear(ctx, boss, color, core) {
+  const attacking = boss.mode.includes("dash") || boss.mode === "windup";
+  const cast = boss.mode.includes("scene") || boss.mode === "storm_tempest_throne" || boss.mode === "phase_transition";
+  const spearAngle = cast ? -1.46 : attacking ? 0.02 : boss.weaponAngle;
+  for (const side of [-1, 1]) {
+    const shoulderX = side * 52;
+    const shoulderY = -20;
+    ctx.save();
+    ctx.translate(shoulderX, shoulderY);
+    ctx.fillStyle = boss.flash > 0 ? "#ffffff" : "#131f35";
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 2.5;
+    polygon(ctx, 0, 0, 23, 5, -Math.PI / 2, true);
+    ctx.stroke();
+    const armAngle = side === 1 ? spearAngle : cast ? -1.05 : 0.5;
+    ctx.rotate(armAngle);
+    ctx.fillStyle = "#0b1325";
+    ctx.fillRect(5, -8, 45, 16);
+    ctx.strokeRect(5, -8, 45, 16);
+    ctx.fillStyle = core;
+    ctx.fillRect(18, -3, 19, 6);
+    ctx.restore();
+  }
+
+  ctx.save();
+  ctx.translate(52, -20);
+  ctx.rotate(spearAngle);
+  ctx.strokeStyle = "#07101d";
+  ctx.lineWidth = 9;
+  ctx.beginPath();
+  ctx.moveTo(39, 0);
+  ctx.lineTo(139, 0);
+  ctx.stroke();
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.moveTo(39, 0);
+  ctx.lineTo(146, 0);
+  ctx.stroke();
+  ctx.fillStyle = core;
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(157, 0);
+  ctx.lineTo(126, -17);
+  ctx.lineTo(136, 0);
+  ctx.lineTo(126, 17);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(96, 0);
+  ctx.lineTo(79, -14);
+  ctx.lineTo(87, 0);
+  ctx.lineTo(79, 14);
+  ctx.closePath();
+  ctx.fill();
   ctx.stroke();
   ctx.restore();
 }
 
-function drawCrown(ctx, e) {
-  ctx.fillStyle = e.phase3 ? "#fff2a8" : e.phase2 ? "#efe7ff" : "#d9fbff";
-  ctx.strokeStyle = e.phaseColor();
-  ctx.lineWidth = 2;
+function drawCrownHelm(ctx, boss, color, core) {
+  ctx.fillStyle = boss.flash > 0 ? "#ffffff" : "#09111f";
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.moveTo(-30, -55);
+  ctx.lineTo(-34, -83);
+  ctx.lineTo(-18, -101);
+  ctx.lineTo(0, -107);
+  ctx.lineTo(18, -101);
+  ctx.lineTo(34, -83);
+  ctx.lineTo(30, -55);
+  ctx.lineTo(0, -42);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+
+  ctx.fillStyle = core;
+  const visorHeight = Math.sin(boss.anim * 2.1) > 0.96 ? 2 : 7;
+  ctx.beginPath();
+  ctx.moveTo(-22, -77);
+  ctx.lineTo(-5, -82);
+  ctx.lineTo(0, -75);
+  ctx.lineTo(5, -82);
+  ctx.lineTo(22, -77);
+  ctx.lineTo(13, -77 + visorHeight);
+  ctx.lineTo(0, -71);
+  ctx.lineTo(-13, -77 + visorHeight);
+  ctx.closePath();
+  ctx.fill();
+
   for (let i = -2; i <= 2; i++) {
-    const h = i === 0 ? 34 : i % 2 ? 25 : 18;
+    const height = i === 0 ? 38 : Math.abs(i) === 1 ? 29 : 20;
+    ctx.fillStyle = i === 0 ? core : color;
     ctx.beginPath();
-    ctx.moveTo(i * 14, -e.r - h + Math.sin(e.anim * 2 + i) * 3);
-    ctx.lineTo(i * 14 + 8, -e.r + 4);
-    ctx.lineTo(i * 14 - 8, -e.r + 4);
+    ctx.moveTo(i * 14 - 6, -98);
+    ctx.lineTo(i * 14, -98 - height + Math.sin(boss.anim * 1.8 + i) * 2);
+    ctx.lineTo(i * 14 + 7, -98);
     ctx.closePath();
     ctx.fill();
     ctx.stroke();
   }
 }
 
-function drawStormMantle(ctx, e) {
-  const color = e.phaseColor();
-  const a = 0.12 + Math.sin(e.anim * 1.8) * 0.03;
-  ctx.fillStyle = `rgba(3,6,18,0.42)`;
-  ctx.beginPath();
-  ctx.ellipse(0, 18, e.r * 1.18, e.r * 0.92, 0, 0, TAU);
-  ctx.fill();
-  for (let i = 0; i < 5; i++) {
-    const angle = e.ringSpin * (i % 2 ? -0.8 : 0.9) + i * TAU / 5;
-    const x = Math.cos(angle) * e.r * (0.62 + i * 0.04);
-    const y = Math.sin(angle) * e.r * 0.36;
-    ctx.strokeStyle = hex(color, a + i * 0.015);
-    ctx.lineWidth = 5 - i * 0.45;
+function drawPhaseAura(ctx, boss, color) {
+  ctx.save();
+  ctx.globalCompositeOperation = "lighter";
+  ctx.strokeStyle = hex(color, 0.24 + boss.phasePulse * 0.5);
+  ctx.lineWidth = 2 + boss.phasePulse * 4;
+  const radius = 108 + (1 - boss.phasePulse) * 34 + Math.sin(boss.anim * 1.7) * 5;
+  for (let i = 0; i < boss.phaseLevel; i++) {
     ctx.beginPath();
-    ctx.arc(x * 0.2, y * 0.2, e.r * (0.72 + i * 0.08), angle, angle + Math.PI * 0.9);
+    ctx.arc(0, -10, radius + i * 18, boss.sceneSpin * (i % 2 ? -1 : 1), boss.sceneSpin * (i % 2 ? -1 : 1) + Math.PI * 1.12);
     ctx.stroke();
   }
+  ctx.restore();
 }
 
-function drawFace(ctx, e) {
-  const color = e.phase3 ? "#fff2a8" : e.phase2 ? "#ffd166" : "#ffffff";
-  const blink = Math.sin(e.eyeBlink) > 0.94 ? 0.18 : 1;
-  ctx.fillStyle = color;
-  for (const side of [-1, 1]) {
-    ctx.beginPath();
-    ctx.ellipse(side * 16, -12, 7, 4 * blink, side * 0.16, 0, TAU);
-    ctx.fill();
-  }
-  ctx.strokeStyle = e.phase3 ? "#ff7a1a" : e.phase2 ? "#ffd166" : "#d9fbff";
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  ctx.moveTo(-14, 17);
-  ctx.quadraticCurveTo(0, 25 + Math.sin(e.anim * 3) * 3, 14, 17);
-  ctx.stroke();
+function angleDistance(a, b) {
+  return Math.abs(Math.atan2(Math.sin(a - b), Math.cos(a - b)));
 }
 
 function hex(color, alpha) {
-  const c = color.replace("#", "");
-  const n = Number.parseInt(c, 16);
-  return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${alpha})`;
+  const value = color.replace("#", "");
+  const number = Number.parseInt(value, 16);
+  return `rgba(${(number >> 16) & 255},${(number >> 8) & 255},${number & 255},${alpha})`;
 }
 
-function polygon(ctx, x, y, r, sides, angle, fill) {
+function polygon(ctx, x, y, radius, sides, angle, fill) {
   ctx.beginPath();
   for (let i = 0; i < sides; i++) {
     const a = angle + i / sides * TAU;
-    const px = x + Math.cos(a) * r;
-    const py = y + Math.sin(a) * r;
+    const px = x + Math.cos(a) * radius;
+    const py = y + Math.sin(a) * radius;
     if (i === 0) ctx.moveTo(px, py);
     else ctx.lineTo(px, py);
   }

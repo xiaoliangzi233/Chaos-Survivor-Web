@@ -111,6 +111,7 @@ export function classifyThreat(source, kind) {
   }
   if (kind === "hazard") {
     if (source.kind === "blizzard_core") return "hazard_zone_soft";
+    if (source.kind === "storm_strike") return (source.armTime || 0) > 0 ? "warning_circle" : "hazard_armed";
     if (source.kind === "convict_chain_arc" || source.kind === "convict_chain_line" || source.kind === "convict_chain_path") return (source.armTime || 0) > 0 ? "warning_line" : "hazard_zone_hard";
     if (source.kind === "convict_ball_slam") return (source.armTime || 0) > 0 ? "warning_circle" : "hazard_armed";
     if (source.kind === "scientist_seal_line" || source.kind === "scientist_tendril_path") return (source.armTime || 0) > 0 ? "warning_line" : "hazard_zone_hard";
@@ -447,6 +448,7 @@ function windupScale(threat) {
 function hazardWeight(h) {
   if (h.kind === "toxic_residue" || h.kind === "frost_zone") return 1.35;
   if (h.kind === "storm_laser_net") return 1.8;
+  if (h.kind === "storm_strike") return 1.85;
   if (h.kind === "riftblade_slash" || h.kind === "riftblade_bladefall") return 1.9;
   if (h.kind === "convict_chain_arc" || h.kind === "convict_ball_slam" || h.kind === "convict_chain_line" || h.kind === "convict_chain_path") return 1.95;
   if (h.kind === "scientist_seal_line"
@@ -492,6 +494,8 @@ function addBossSegmentThreats(threats, player, boss, queryRadius) {
 
 function isBossDashLike(source) {
   if (source.mode === "dash") return true;
+  if (source.mode === "windup" && (source.currentSkill === "thunder_lance" || source.currentSkill === "echo_lance")) return true;
+  if (source.mode === "storm_lance_dash" || source.mode === "storm_echo_dash") return true;
   if (source.mode === "riftblade_dash") return true;
   if ((source.mode === "riftblade_mirror_combo" || source.mode === "riftblade_final_combo") && source.comboStep === 1) return true;
   if (source.mode === "portal_dash" && source.portalState === "burst") return true;

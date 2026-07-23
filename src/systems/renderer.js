@@ -2387,7 +2387,7 @@ function drawEnemyProjectiles(ctx) {
       drawVoidFireballProjectile(ctx, b);
       continue;
     }
-    if (b.shape === "stormBlade" || b.shape === "stormOrb") {
+    if (b.shape === "stormBlade" || b.shape === "stormOrb" || b.shape === "stormCrownShard") {
       drawStormProjectile(ctx, b);
       continue;
     }
@@ -2872,7 +2872,7 @@ function drawStormProjectile(ctx, b) {
   const angle = Math.atan2(b.vy, b.vx);
   ctx.save();
   ctx.translate(b.x, b.y);
-  ctx.rotate(b.shape === "stormBlade" ? angle : (b.spin || 0) + state.time * 8);
+  ctx.rotate(b.shape === "stormBlade" || b.shape === "stormCrownShard" ? angle : (b.spin || 0) + state.time * 8);
   ctx.globalCompositeOperation = "source-over";
   if (enemyProjectileHasHalo(b)) glow(ctx, 0, 0, b.r * 2.0, 0.18, b.color);
   if (b.shape === "stormBlade") {
@@ -2896,6 +2896,33 @@ function drawStormProjectile(ctx, b) {
     ctx.beginPath();
     ctx.moveTo(b.r * 2.2, 0);
     ctx.lineTo(-b.r * 0.65, 0);
+    ctx.stroke();
+  } else if (b.shape === "stormCrownShard") {
+    ctx.globalCompositeOperation = "lighter";
+    ctx.fillStyle = hexToRgba(b.color, 0.18);
+    ctx.beginPath();
+    ctx.moveTo(b.r * 3.6, 0);
+    ctx.lineTo(-b.r * 2.4, -b.r * 1.55);
+    ctx.lineTo(-b.r * 1.15, 0);
+    ctx.lineTo(-b.r * 2.4, b.r * 1.55);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = b.color;
+    ctx.strokeStyle = hexToRgba("#ffffff", 0.78);
+    ctx.lineWidth = 1.6;
+    ctx.beginPath();
+    ctx.moveTo(b.r * 2.45, 0);
+    ctx.lineTo(-b.r * 0.65, -b.r * 0.92);
+    ctx.lineTo(-b.r * 1.5, 0);
+    ctx.lineTo(-b.r * 0.65, b.r * 0.92);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    ctx.strokeStyle = hexToRgba("#ffffff", 0.64);
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(b.r * 1.9, 0);
+    ctx.lineTo(-b.r * 0.72, 0);
     ctx.stroke();
   } else {
     ctx.strokeStyle = hexToRgba(b.color, 0.46);
@@ -3081,6 +3108,10 @@ function drawHazards(ctx) {
     }
     if (h.kind === "storm_laser_net") {
       drawStormLaserNetHazard(ctx, h, alpha);
+      continue;
+    }
+    if (h.kind === "storm_strike") {
+      drawStormStrikeHazard(ctx, h, alpha);
       continue;
     }
     if (h.kind === "gravity_well") {
@@ -4488,7 +4519,7 @@ function drawStormPortal(ctx, obj) {
 
 function drawStormLaserNetHazard(ctx, h, alpha) {
   const armed = (h.armTime || 0) <= 0;
-  const warn = Math.max(0, h.armTime || 0) / 0.55;
+  const warn = Math.min(1, Math.max(0, h.armTime || 0) / Math.max(0.01, h.armDuration || 0.55));
   const age = Math.max(0, (h.maxLife || 1) - h.life);
   const activeAge = Math.max(0, age - (h.armDuration || 0.55));
   const surge = armed ? Math.max(0, 1 - Math.abs(activeAge - (h.surgeTime || 0.22)) / 0.18) : 0;
@@ -4519,6 +4550,60 @@ function drawStormLaserNetHazard(ctx, h, alpha) {
   ctx.moveTo(-(h.length || 1200) / 2, 0);
   ctx.lineTo((h.length || 1200) / 2, 0);
   ctx.stroke();
+  ctx.restore();
+}
+
+function drawStormStrikeHazard(ctx, h, alpha) {
+  const armed = (h.armTime || 0) <= 0;
+  const warning = Math.max(0, h.armTime || 0);
+  const progress = armed ? 1 : 1 - warning / Math.max(0.01, h.armDuration || 1);
+  const flicker = 0.72 + Math.sin(state.time * (armed ? 40 : 13) + (h.spin || 0)) * 0.2;
+  ctx.save();
+  ctx.translate(h.x, h.y);
+  ctx.rotate(h.spin || 0);
+  ctx.globalCompositeOperation = "lighter";
+  if (!armed) {
+    ctx.fillStyle = hexToRgba(h.color, 0.06 + progress * 0.09);
+    ctx.beginPath();
+    ctx.arc(0, 0, h.r, 0, TAU);
+    ctx.fill();
+    ctx.strokeStyle = hexToRgba(h.color, 0.35 + progress * 0.48);
+    ctx.lineWidth = 3;
+    ctx.setLineDash([12, 8]);
+    ctx.beginPath();
+    ctx.arc(0, 0, h.r, 0, TAU);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.strokeStyle = hexToRgba("#ffffff", 0.38 + progress * 0.4);
+    ctx.lineWidth = 1.4;
+    for (let i = 0; i < 4; i++) {
+      ctx.rotate(TAU / 4);
+      ctx.beginPath();
+      ctx.moveTo(h.r * 0.28, 0);
+      ctx.lineTo(h.r * (0.62 + progress * 0.28), 0);
+      ctx.stroke();
+    }
+  } else {
+    glow(ctx, 0, 0, h.r * 1.08, alpha * 0.72, h.color);
+    ctx.fillStyle = hexToRgba(h.color, alpha * 0.24);
+    ctx.beginPath();
+    ctx.arc(0, 0, h.r, 0, TAU);
+    ctx.fill();
+    ctx.strokeStyle = hexToRgba("#ffffff", alpha * flicker);
+    ctx.lineWidth = 5;
+    ctx.beginPath();
+    ctx.moveTo(0, -h.r * 1.35);
+    ctx.lineTo(-h.r * 0.18, -h.r * 0.25);
+    ctx.lineTo(h.r * 0.12, h.r * 0.08);
+    ctx.lineTo(-h.r * 0.08, h.r * 0.52);
+    ctx.lineTo(0, h.r);
+    ctx.stroke();
+    ctx.strokeStyle = hexToRgba(h.color, alpha * 0.9);
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(0, 0, h.r, 0, TAU);
+    ctx.stroke();
+  }
   ctx.restore();
 }
 

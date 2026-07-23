@@ -20,7 +20,7 @@ export const EMBER_WAVE_SCENARIOS = [
   { wave: 7, pool: ["zombie", "lancer", ...BASIC_SLIMES], spawnRate: 1.0 },
   { wave: 8, pool: ALL_SLIMES, spawnRate: 1.36 },
   { wave: 9, pool: ["zombie", "lancer", ...BASIC_SLIMES], spawnRate: 1.32, effect: "blind" },
-  { wave: 10, pool: [], spawnRate: 0, boss: "storm_tyrant" },
+  { wave: 10, pool: [], spawnRate: 0, boss: "storm_tyrant", bossProfile: "storm_throne_base" },
   { wave: 11, pool: ["wisp", "zombie", "lancer"], spawnRate: 1.0 },
   { wave: 12, pool: ["wisp"], spawnRate: 0.92, effect: "ice_skate" },
   { wave: 13, pool: ["thief"], spawnRate: 0.7, reward: true },

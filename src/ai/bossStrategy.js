@@ -19,14 +19,19 @@ export function bossContext(state, world) {
   if (!boss || !p) return { active: false };
   const distance = Math.hypot(boss.x - p.x, boss.y - p.y);
   const mode = boss.mode || boss.currentAttack || boss.dashState || "";
-  const riftbladeSkill = boss.currentSkill || "";
-  const riftbladeDash = riftbladeSkill === "flash_draw" || riftbladeSkill === "mirror_combo" || riftbladeSkill === "final_combo";
-  const dashLike = mode.includes("dash") || (mode === "windup" && riftbladeDash) || boss.dashing || boss.eliteDashTime > 0 || boss.portalState === "burst";
+  const currentSkill = boss.currentSkill || "";
+  const riftbladeDash = currentSkill === "flash_draw" || currentSkill === "mirror_combo" || currentSkill === "final_combo";
+  const stormDash = currentSkill === "thunder_lance" || currentSkill === "echo_lance";
+  const dashLike = mode.includes("dash") || (mode === "windup" && (riftbladeDash || stormDash)) || boss.dashing || boss.eliteDashTime > 0 || boss.portalState === "burst";
   const chainPressure = mode.includes("convict_sweep") || mode.includes("convict_garrote") || mode.includes("convict_triple") || mode.includes("convict_bounce") || mode.includes("convict_command") || mode.includes("convict_scene");
   const scientistPressure = mode.includes("scientist_scene")
     || mode === "scientist_cast"
     || ["entropy_bloom", "memory_excision", "void_culture", "gravity_inversion", "event_horizon", "host_displacement", "abyss_mitosis", "living_shadow", "manifestation"].includes(boss.currentSkill);
-  const laserLike = mode.includes("laser") || mode.includes("rail") || mode.includes("sword_array") || mode.includes("judgment") || mode.includes("cross") || chainPressure || scientistPressure || boss.currentAttack === "fan";
+  const stormPressure = mode.includes("storm_cage")
+    || mode.includes("storm_skyfall")
+    || mode.includes("storm_tempest")
+    || ["thunder_cage", "skyfall_decree", "tempest_throne"].includes(boss.currentSkill);
+  const laserLike = mode.includes("laser") || mode.includes("rail") || mode.includes("sword_array") || mode.includes("judgment") || mode.includes("cross") || chainPressure || scientistPressure || stormPressure || boss.currentAttack === "fan";
   const recoveryLike = mode.includes("recover") || mode.includes("summon") || mode === "scientist_abyss_release" || mode === "phase_transition" || mode === "intro";
   return {
     active: true,

@@ -386,6 +386,7 @@ function playMusicNoise(spec, at = null) {
 const SFX = {
   start: { gap: 120, layers: [{ f: 180, to: 260, d: 0.09, type: "square", g: 0.035 }, { f: 360, d: 0.05, delay: 0.06, type: "triangle", g: 0.025 }] },
   select: { gap: 80, layers: [{ f: 420, to: 620, d: 0.08, type: "triangle", g: 0.03 }] },
+  storyType: { gap: 42, layers: [{ f: 760, to: 620, d: 0.022, type: "square", g: 0.009 }, { f: 1180, d: 0.014, delay: 0.006, type: "triangle", g: 0.005 }] },
   level: { gap: 120, layers: [{ f: 520, d: 0.05, type: "sine", g: 0.03 }, { f: 660, d: 0.05, delay: 0.05, type: "sine", g: 0.028 }, { f: 880, d: 0.08, delay: 0.1, type: "triangle", g: 0.026 }] },
   wave: { gap: 260, layers: [{ f: 220, to: 440, d: 0.12, type: "sawtooth", g: 0.024 }, { noise: true, d: 0.08, g: 0.018, filter: 900 }] },
   shoot: { gap: 32, layers: [{ f: 560, to: 300, d: 0.035, type: "square", g: 0.018 }] },

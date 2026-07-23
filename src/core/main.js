@@ -63,7 +63,7 @@ export async function bootGame() {
     },
   });
   setBootProgress(18, "正在同步版本配置");
-  await loadGameConfig();
+  const runtimeGameConfig = await loadGameConfig();
   configurePlayerProgress();
   setBootProgress(42, "本地进度已就绪");
   setBootProgress(54, "正在加载武器与道具");
@@ -120,6 +120,7 @@ export async function bootGame() {
     await playDifficultyStoryIfNeeded({
       difficultyId: difficulty.id,
       playerId: "local-dev",
+      alwaysPlay: Boolean(runtimeGameConfig.storyAlwaysPlay),
     });
 
     if (state.mode !== "story") return false;

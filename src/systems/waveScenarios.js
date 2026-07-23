@@ -30,9 +30,12 @@ export function applyWaveStartScenario() {
   if (!state.waveScenario) return null;
   for (const eventId of eventCodexIdsForScenario(state.waveScenario)) recordCodexEntry("events", eventId);
   spawnScenarioElite(state.waveScenario);
-  spawnScenarioEvent(state.waveScenario);
-  startApocalypseScenarioEvent(state.waveScenario.event);
-  startVoidCrownScenarioEvent(state.waveScenario.event);
+  const events = scenarioEventEntries(state.waveScenario);
+  for (const entry of events) spawnScenarioEvent(entry, state.waveScenario);
+  for (const entry of events) {
+    startApocalypseScenarioEvent(entry.event);
+    startVoidCrownScenarioEvent(entry.event);
+  }
   return state.waveScenario;
 }
 
@@ -42,11 +45,18 @@ export function updateWaveScenario(dt) {
 }
 
 export function activeWaveEffect(effect) {
-  return state.waveScenario?.effect === effect;
+  return state.waveScenario?.effect === effect || (state.waveScenario?.randomEvents || []).some((entry) => entry.effect === effect);
 }
 
 export function activeGearfiendMode() {
-  return state.waveScenario?.gearfiendMode || null;
+  return state.waveScenario?.gearfiendMode || (state.waveScenario?.randomEvents || []).find((entry) => entry.gearfiendMode)?.gearfiendMode || null;
+}
+
+function scenarioEventEntries(scenario) {
+  if (scenario?.randomEvents?.length) return [...scenario.randomEvents];
+  const entries = [];
+  if (scenario?.event || scenario?.reward || scenario?.effect || scenario?.gearfiendMode) entries.push(scenario);
+  return entries;
 }
 
 function spawnScenarioElite(scenario) {
@@ -66,10 +76,10 @@ function spawnScenarioElite(scenario) {
   state.spawnedWaveEvents.add(key);
 }
 
-function spawnScenarioEvent(scenario) {
+function spawnScenarioEvent(scenario, ownerScenario = scenario) {
   const event = scenario.event;
   if (!event) return;
-  const key = `${state.difficultyId}-${scenario.wave}-event-${event.type}`;
+  const key = `${state.difficultyId}-${ownerScenario?.wave || state.wave}-event-${scenario.randomEventId || event.type}`;
   state.spawnedWaveEvents ||= new Set();
   if (state.spawnedWaveEvents.has(key)) return;
   if (event.type === "hazard_ring") spawnHazardRing(event);

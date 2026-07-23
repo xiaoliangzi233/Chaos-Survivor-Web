@@ -2358,7 +2358,7 @@ h2 {
   position: relative;
   z-index: 1;
   display: grid;
-  grid-template-columns: minmax(340px, 0.74fr) minmax(620px, 1.26fr);
+  grid-template-columns: minmax(230px, 0.52fr) minmax(340px, 0.74fr) minmax(620px, 1.26fr);
   gap: 14px;
   min-height: 0;
   padding: 14px 18px 16px;
@@ -2403,6 +2403,11 @@ h2 {
 
 .loadout-difficulty-section::after {
   left: 0;
+}
+
+.loadout-mode-section::after {
+  left: 0;
+  background: linear-gradient(180deg, transparent, rgba(141, 107, 255, 0.82), transparent);
 }
 
 .loadout-weapon-section::after {
@@ -2457,6 +2462,52 @@ h2 {
   min-height: 0;
   overflow: hidden;
   padding: 12px;
+}
+
+.loadout-mode-list,
+.loadout-random-goal-list {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+}
+
+.loadout-random-goal-list {
+  padding-top: 0;
+}
+
+.loadout-mode-card,
+.loadout-random-goal-card {
+  min-height: 66px;
+  padding: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 4px;
+  background: rgba(2, 8, 18, 0.78);
+  color: var(--text);
+  text-align: left;
+  transition: border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease;
+}
+
+.loadout-mode-card strong,
+.loadout-random-goal-card strong {
+  display: block;
+  margin-bottom: 4px;
+}
+
+.loadout-mode-card p,
+.loadout-random-goal-card p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.loadout-mode-card.selected,
+.loadout-random-goal-card.selected {
+  transform: translateY(-1px);
+  border-color: rgba(141, 107, 255, 0.86);
+  box-shadow: 0 0 0 1px rgba(141, 107, 255, 0.32), 0 0 24px rgba(141, 107, 255, 0.2);
 }
 
 .loadout-difficulty-card {
@@ -4518,11 +4569,16 @@ h2 {
 }
 
 .loadout-body {
-  grid-template-columns: minmax(330px, 0.72fr) minmax(0, 2.1fr);
-  grid-template-areas: "difficulty weapon";
+  grid-template-columns: minmax(220px, 0.5fr) minmax(300px, 0.72fr) minmax(0, 2.1fr);
+  grid-template-areas: "mode difficulty weapon";
   align-items: stretch;
   gap: 10px;
   padding: 10px;
+}
+
+.loadout-mode-section {
+  grid-area: mode;
+  align-self: stretch;
 }
 
 .loadout-difficulty-section {
@@ -4783,6 +4839,7 @@ h2 {
   .loadout-body {
     grid-template-columns: 1fr;
     grid-template-areas:
+      "mode"
       "difficulty"
       "weapon";
     overflow: auto;

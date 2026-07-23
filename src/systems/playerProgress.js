@@ -37,6 +37,10 @@ export function getBestSurvivalSeconds() {
   return progress.bestSurvivalSeconds;
 }
 
+export function getBestRandomEndlessWave() {
+  return progress.bestRandomEndlessWave;
+}
+
 export function savePlayerDifficultyProgress(value) {
   progress = mergeProgress(progress, { difficultyProgress: value });
   persistCurrentProgress();
@@ -55,6 +59,14 @@ export function recordBestSurvivalSeconds(seconds) {
   const normalized = boundedInteger(seconds, 0, 86400);
   if (normalized <= progress.bestSurvivalSeconds) return false;
   progress.bestSurvivalSeconds = normalized;
+  persistCurrentProgress();
+  return true;
+}
+
+export function recordBestRandomEndlessWave(wave) {
+  const normalized = boundedInteger(wave, 0, 1_000_000);
+  if (normalized <= progress.bestRandomEndlessWave) return false;
+  progress.bestRandomEndlessWave = normalized;
   persistCurrentProgress();
   return true;
 }
@@ -91,6 +103,7 @@ function normalizeProgress(value) {
   }
   return {
     bestSurvivalSeconds: boundedInteger(value?.bestSurvivalSeconds, 0, 86400),
+    bestRandomEndlessWave: boundedInteger(value?.bestRandomEndlessWave, 0, 1_000_000),
     difficultyProgress: normalizedDifficulty,
     codex: Object.fromEntries(CODEX_TYPES.map((type) => [type, uniqueStrings(value?.codex?.[type])])),
   };
@@ -101,6 +114,7 @@ function mergeProgress(...values) {
   for (const value of values) {
     const source = normalizeProgress(value);
     merged.bestSurvivalSeconds = Math.max(merged.bestSurvivalSeconds, source.bestSurvivalSeconds);
+    merged.bestRandomEndlessWave = Math.max(merged.bestRandomEndlessWave, source.bestRandomEndlessWave);
     for (const id of difficultyIds) {
       const targetRecord = merged.difficultyProgress[id];
       const sourceRecord = source.difficultyProgress[id];

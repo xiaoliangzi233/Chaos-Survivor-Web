@@ -42,10 +42,21 @@ import {
   configurePlayerProgress,
   loadPlayerProgress,
   recordBestSurvivalSeconds,
+  recordBestRandomEndlessWave,
 } from "../systems/playerProgress.js";
 import { closeHelp, initHelpUi, isHelpOpen } from "../ui/helpUi.js";
 import { clearWaveEventNotice, initWaveEventUi, showWaveEventNotice } from "../ui/waveEventUi.js";
 import { initDebugModeUi, updateDebugModeUi } from "../ui/debugModeUi.js";
+import {
+  RANDOM_GOAL_ENDLESS,
+  RANDOM_GOAL_TWENTY_WAVES,
+  RUN_MODE_RANDOM,
+  configureRandomModeRun,
+  isRandomEndlessMode,
+  isRandomMode,
+  randomModeCompletionReached,
+  randomWaveDurationFor,
+} from "../systems/randomMode.js";
 
 const LEVEL_CHOICE_REFRESH_COST = 10;
 
@@ -102,7 +113,7 @@ export async function bootGame() {
     playSfx("select");
   }
 
-  async function startWithLoadout({ difficulty, weapon }) {
+  async function startWithLoadout({ difficulty, weapon, runMode = "standard", randomGoal = RANDOM_GOAL_TWENTY_WAVES }) {
     if (!difficulty?.id || !weapon?.id || state.mode === "story") return false;
     closeCodex();
     closeHelp();
@@ -112,6 +123,12 @@ export async function bootGame() {
     selectDifficulty(difficulty.id);
     resetRun(generateMap());
     selectDifficulty(difficulty.id);
+    configureRandomModeRun({
+      runMode: runMode === RUN_MODE_RANDOM ? RUN_MODE_RANDOM : "standard",
+      randomGoal: randomGoal === RANDOM_GOAL_ENDLESS ? RANDOM_GOAL_ENDLESS : RANDOM_GOAL_TWENTY_WAVES,
+    });
+    state.waveDuration = isRandomMode() ? randomWaveDurationFor(state.wave) : waveDurationFor(state.wave);
+    state.waveTimeLeft = state.waveDuration;
     state.shop = createShopState();
     state.initialWeaponId = weapon.id;
     activateWeapon(weapon.id);
@@ -211,7 +228,7 @@ export async function bootGame() {
     if (isBossWave(state.wave)) state.bossKills++;
     state.waveTimeLeft = 0;
     state.spawnBudget = 0;
-    state.pendingVictory = state.wave >= TOTAL_WAVES;
+    state.pendingVictory = isRandomMode() ? randomModeCompletionReached(state.wave) : state.wave >= TOTAL_WAVES;
     state.pendingNextWave = !state.pendingVictory;
     collectAllExperience();
     clearEnemies();
@@ -230,7 +247,7 @@ export async function bootGame() {
       state.mode = "playing";
       return;
     }
-    openShop({ beforeBossWave: isBossWave(Math.min(TOTAL_WAVES, state.wave + 1)) });
+    openShop({ beforeBossWave: isBossWave(nextWaveNumber()) });
   }
 
   function openDebugShop() {
@@ -239,7 +256,7 @@ export async function bootGame() {
     if (!state.shop) state.shop = createShopState();
     hidePauseMenu();
     openShop({
-      beforeBossWave: isBossWave(Math.min(TOTAL_WAVES, state.wave + 1)),
+      beforeBossWave: isBossWave(nextWaveNumber()),
       manualDebugOpen: true,
     });
     playSfx("select");
@@ -250,8 +267,8 @@ export async function bootGame() {
     if (state.pendingVictory) return endGame(true);
     if (!state.pendingNextWave) return;
     state.pendingNextWave = false;
-    state.wave = Math.min(TOTAL_WAVES, state.wave + 1);
-    state.waveDuration = waveDurationFor(state.wave);
+    state.wave = isRandomEndlessMode() ? state.wave + 1 : Math.min(TOTAL_WAVES, state.wave + 1);
+    state.waveDuration = isRandomMode() ? randomWaveDurationFor(state.wave) : waveDurationFor(state.wave);
     state.waveTimeLeft = state.waveDuration;
     state.spawnBudget = 0;
     consumeNextWaveSpawnBonus();
@@ -267,8 +284,9 @@ export async function bootGame() {
     resetWaveScenarioState();
     state.mode = "ended";
     state.victory = victory;
-    if (victory && !state.debug?.runTainted) recordDifficultyVictory();
+    if (victory && !state.debug?.runTainted && !isRandomMode()) recordDifficultyVictory();
     if (!state.debug?.runTainted) recordBestSurvivalSeconds(Math.floor(state.time));
+    if (isRandomEndlessMode() && !state.debug?.runTainted) recordBestRandomEndlessWave(state.wave);
     hidePauseMenu();
     closeInventory();
     closeShop();
@@ -351,6 +369,10 @@ export async function bootGame() {
 
   function taintRunForDebug() {
     state.debug.runTainted = true;
+  }
+
+  function nextWaveNumber() {
+    return isRandomEndlessMode() ? state.wave + 1 : Math.min(TOTAL_WAVES, state.wave + 1);
   }
 
   function pauseForDebug() {
@@ -445,7 +467,12 @@ export async function bootGame() {
       restart: start,
       continueToNextWave: finishWaveTransition,
       returnToMenu,
-      getLoadoutOptions: () => ({ difficulties: difficultyCards(), weapons: STARTER_WEAPONS }),
+      getLoadoutOptions: () => ({
+        difficulties: difficultyCards(),
+        weapons: STARTER_WEAPONS,
+        runModes: ["standard", "random"],
+        randomGoals: [RANDOM_GOAL_TWENTY_WAVES, RANDOM_GOAL_ENDLESS],
+      }),
     },
   });
   updateBestText();

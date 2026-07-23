@@ -40,12 +40,16 @@ export const ui = {
   startOverlay: document.getElementById("startOverlay"),
   levelOverlay: document.getElementById("levelOverlay"),
   loadoutOverlay: document.getElementById("loadoutOverlay"),
+  loadoutModeList: document.getElementById("loadoutModeList"),
+  loadoutRandomGoalList: document.getElementById("loadoutRandomGoalList"),
   loadoutDifficultyList: document.getElementById("loadoutDifficultyList"),
   loadoutWeaponPreview: document.getElementById("loadoutWeaponPreview"),
   loadoutWeaponList: document.getElementById("loadoutWeaponList"),
   loadoutConfirmButton: document.getElementById("loadoutConfirmButton"),
   loadoutBackButton: document.getElementById("loadoutBackButton"),
+  loadoutRunModeName: document.getElementById("loadoutRunModeName"),
   loadoutDifficultyName: document.getElementById("loadoutDifficultyName"),
+  loadoutRandomGoalName: document.getElementById("loadoutRandomGoalName"),
   loadoutWeaponName: document.getElementById("loadoutWeaponName"),
   loadoutSelectedWeaponName: document.getElementById("loadoutSelectedWeaponName"),
   loadoutWeaponDesc: document.getElementById("loadoutWeaponDesc"),
@@ -131,7 +135,9 @@ export function updateHud(fps) {
   ui.levelText.textContent = `Lv.${p.level}`;
   ui.timerText.textContent = state.bossWaveActive ? (world.boss?.name || "BOSS") : formatTime(state.waveTimeLeft);
   ui.wavePanel?.classList.toggle("boss-active", state.bossWaveActive);
-  ui.waveText.textContent = `第 ${state.wave}/${TOTAL_WAVES} 波`;
+  ui.waveText.textContent = state.runMode === "random" && state.randomGoal === "endless"
+    ? `第 ${state.wave} 波`
+    : `第 ${state.wave}/${TOTAL_WAVES} 波`;
   renderChip(ui.killText, "×", "击败", state.kills);
   renderChip(ui.goldText, "G", "金币", state.gold);
   renderChip(ui.fpsText, "F", "FPS", Math.round(fps));
@@ -235,14 +241,63 @@ export function showRunSetup({ weapons, onConfirm, onBack }) {
   state.ai ||= {};
   ui.quickActions?.classList.add("blocked");
   const difficulties = difficultyCards();
+  const runModes = [
+    { id: "standard", name: "标准模式", desc: "使用当前难度的固定 20 波战役。" },
+    { id: "random", name: "随机模式", desc: "每波从已解锁图鉴中抽取敌人、Boss 与事件。" },
+  ];
+  const randomGoals = [
+    { id: "twenty_waves", name: "20波通关", desc: "第 20 波结束后胜利结算。" },
+    { id: "endless", name: "无限模式", desc: "不会自动通关，死亡时记录最高到达波次。" },
+  ];
   let difficultyIndex = Math.max(0, difficulties.findIndex((item) => item.currentHighest));
   let weaponIndex = 0;
+  let selectedRunMode = runModes[0];
+  let selectedRandomGoal = randomGoals[0];
   let selectedDifficulty = difficulties[difficultyIndex] || null;
   let selectedWeapon = weapons[weaponIndex] || null;
   let confirmed = false;
 
+  if (ui.loadoutModeList) ui.loadoutModeList.innerHTML = "";
+  if (ui.loadoutRandomGoalList) ui.loadoutRandomGoalList.innerHTML = "";
   ui.loadoutDifficultyList.innerHTML = "";
   ui.loadoutWeaponList.innerHTML = "";
+
+  function renderRunModeList() {
+    if (!ui.loadoutModeList) return;
+    ui.loadoutModeList.innerHTML = "";
+    runModes.forEach((item) => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = `loadout-mode-card terminal-card${selectedRunMode.id === item.id ? " selected" : ""}`;
+      button.innerHTML = `<strong>${item.name}</strong><p>${item.desc}</p>`;
+      button.addEventListener("click", () => {
+        selectedRunMode = item;
+        renderRunModeList();
+        renderRandomGoalList();
+        updateSummary();
+      });
+      ui.loadoutModeList.appendChild(button);
+    });
+  }
+
+  function renderRandomGoalList() {
+    if (!ui.loadoutRandomGoalList) return;
+    ui.loadoutRandomGoalList.innerHTML = "";
+    ui.loadoutRandomGoalList.hidden = selectedRunMode.id !== "random";
+    if (selectedRunMode.id !== "random") return;
+    randomGoals.forEach((item) => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = `loadout-random-goal-card terminal-card${selectedRandomGoal.id === item.id ? " selected" : ""}`;
+      button.innerHTML = `<strong>${item.name}</strong><p>${item.desc}</p>`;
+      button.addEventListener("click", () => {
+        selectedRandomGoal = item;
+        renderRandomGoalList();
+        updateSummary();
+      });
+      ui.loadoutRandomGoalList.appendChild(button);
+    });
+  }
 
   function renderDifficultyList() {
     ui.loadoutDifficultyList.innerHTML = "";
@@ -367,7 +422,9 @@ export function showRunSetup({ weapons, onConfirm, onBack }) {
   }
 
   function updateSummary() {
+    if (ui.loadoutRunModeName) ui.loadoutRunModeName.textContent = selectedRunMode?.name || "标准模式";
     ui.loadoutDifficultyName.textContent = selectedDifficulty?.name || "未选择";
+    if (ui.loadoutRandomGoalName) ui.loadoutRandomGoalName.textContent = selectedRunMode?.id === "random" ? selectedRandomGoal.name : "固定战役";
     ui.loadoutSelectedWeaponName.textContent = selectedWeapon?.name || "未选择";
     ui.loadoutConfirmButton.disabled = !selectedDifficulty?.unlocked || !selectedWeapon;
   }
@@ -414,7 +471,7 @@ export function showRunSetup({ weapons, onConfirm, onBack }) {
     if (confirmed || !selectedDifficulty?.unlocked || !selectedWeapon) return;
     confirmed = true;
     ui.loadoutConfirmButton.disabled = true;
-    onConfirm({ difficulty: selectedDifficulty, weapon: selectedWeapon });
+    onConfirm({ difficulty: selectedDifficulty, weapon: selectedWeapon, runMode: selectedRunMode.id, randomGoal: selectedRandomGoal.id });
     return true;
   }
 
@@ -429,6 +486,25 @@ export function showRunSetup({ weapons, onConfirm, onBack }) {
   state.ai.loadoutPanel = {
     difficulties,
     weapons,
+    runModes,
+    randomGoals,
+    selectRunMode: (id) => {
+      const item = runModes.find((entry) => entry.id === id);
+      if (!item) return false;
+      selectedRunMode = item;
+      renderRunModeList();
+      renderRandomGoalList();
+      updateSummary();
+      return true;
+    },
+    selectRandomGoal: (id) => {
+      const item = randomGoals.find((entry) => entry.id === id);
+      if (!item) return false;
+      selectedRandomGoal = item;
+      renderRandomGoalList();
+      updateSummary();
+      return true;
+    },
     selectDifficulty: (id) => {
       const index = difficulties.findIndex((item) => item.id === id && item.unlocked);
       if (index < 0) return false;
@@ -456,12 +532,16 @@ export function showRunSetup({ weapons, onConfirm, onBack }) {
       return {
         difficulty: selectedDifficulty?.id || "",
         weapon: selectedWeapon?.id || "",
+        runMode: selectedRunMode?.id || "standard",
+        randomGoal: selectedRandomGoal?.id || "twenty_waves",
         confirmed,
         canConfirm: Boolean(!confirmed && selectedDifficulty?.unlocked && selectedWeapon),
       };
     },
   };
 
+  renderRunModeList();
+  renderRandomGoalList();
   renderDifficultyList();
   renderWeaponList();
   updateWeaponPreviewInfo();
@@ -592,7 +672,20 @@ export function showEnd(victory) {
   ui.endEyebrow.textContent = victory ? "VICTORY" : "RUN COMPLETE";
   ui.endTitle.textContent = victory ? "20 波已完成" : "生存结束";
   ui.endStats.innerHTML = "";
-  [`难度 ${state.difficulty?.name || "未选择"}`, `时间 ${formatTime(state.time)}`, `等级 ${p.level}`, `击败 ${state.kills}`, `金币 ${state.gold}`].forEach((text) => {
+  const runModeText = state.runMode === "random" ? "随机模式" : "标准模式";
+  const randomGoalText = state.runMode === "random"
+    ? state.randomGoal === "endless" ? "无限模式" : "20波通关"
+    : "固定战役";
+  [
+    `模式 ${runModeText}`,
+    `目标 ${randomGoalText}`,
+    `到达波次 ${state.wave}`,
+    `难度 ${state.difficulty?.name || "未选择"}`,
+    `时间 ${formatTime(state.time)}`,
+    `等级 ${p.level}`,
+    `击败 ${state.kills}`,
+    `金币 ${state.gold}`,
+  ].forEach((text) => {
     const item = document.createElement("span");
     item.textContent = text;
     ui.endStats.appendChild(item);

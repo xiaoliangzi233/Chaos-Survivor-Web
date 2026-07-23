@@ -43,17 +43,24 @@ const EVENT_TYPE_ALIASES = {
 export function eventCodexIdsForScenario(scenario) {
   if (!scenario) return [];
   const ids = [];
-  const event = scenario.event;
-  if (event) {
-    const eventId = event.type === "hazard_field"
-      ? event.kind
-      : Object.prototype.hasOwnProperty.call(EVENT_TYPE_ALIASES, event.type)
-        ? EVENT_TYPE_ALIASES[event.type]
-        : event.type;
-    if (eventId) ids.push(eventId);
+  const collect = (entry) => {
+    const event = entry.event;
+    if (event) {
+      const eventId = event.type === "hazard_field"
+        ? event.kind
+        : Object.prototype.hasOwnProperty.call(EVENT_TYPE_ALIASES, event.type)
+          ? EVENT_TYPE_ALIASES[event.type]
+          : event.type;
+      if (eventId) ids.push(eventId);
+    }
+    if (entry.effect) ids.push(entry.effect);
+    if (entry.reward) ids.push("reward_target");
+    if (entry.gearfiendMode === "fast_only") ids.push("fast_gears");
+    if (entry.randomEventId) ids.push(entry.randomEventId);
+  };
+  collect(scenario);
+  for (const entry of scenario.randomEvents || []) {
+    collect(entry);
   }
-  if (scenario.effect) ids.push(scenario.effect);
-  if (scenario.reward) ids.push("reward_target");
-  if (scenario.gearfiendMode === "fast_only") ids.push("fast_gears");
   return [...new Set(ids)].filter((id) => EVENT_IDS.has(id));
 }

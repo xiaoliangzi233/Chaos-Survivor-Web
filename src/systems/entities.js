@@ -10,6 +10,7 @@ import { applyPlayerDamage, onWeaponHit, rollWeaponDamage, waveSpawnMultiplier }
 import { spawnDamageText } from "../effects.js";
 import { waveScenarioSpawnRate } from "../config/wave-scenario-config.js";
 import { activeWaveEffect } from "./waveScenarios.js";
+import { isRandomMode, randomEnemyLimitForWave } from "./randomMode.js";
 export { applyFrostMark } from "./statusEffects.js";
 import { applyFrostMark } from "./statusEffects.js";
 import { coinAmountForEnemy, dropCoin, dropGem } from "./rewards.js";
@@ -107,7 +108,7 @@ export function updateSpawning(dt) {
     difficultySpawnRate: difficultyMultiplier("spawnRate"),
     itemSpawnMultiplier: waveSpawnMultiplier(),
   });
-  const enemyLimit = currentDifficulty().enemyLimit || ENEMY_LIMIT;
+  const enemyLimit = isRandomMode() ? randomEnemyLimitForWave(state.wave) : (currentDifficulty().enemyLimit || ENEMY_LIMIT);
   while (state.spawnBudget >= 1 && world.enemies.length < enemyLimit) {
     state.spawnBudget--;
     spawnEnemyById(randomEnemyForWave(state.wave));

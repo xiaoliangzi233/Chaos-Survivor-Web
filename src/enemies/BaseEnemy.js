@@ -7,6 +7,7 @@ import { currentDifficulty } from "../difficulty.js";
 import { applyPlayerDamage } from "../systems/items.js";
 import { maybeTriggerBossSignature } from "../systems/easterEggs.js";
 import { dropEnemyRewards } from "../systems/rewards.js";
+import { randomGrowthMultiplierForWave } from "../systems/randomMode.js";
 
 export class BaseEnemy {
   constructor(config, x, y) {
@@ -28,6 +29,11 @@ export class BaseEnemy {
     this.maxHp = this.hp;
     this.speed = config.speed * speedScale * (speedMul || 1);
     this.damage = config.damage * damageScale * (damageMul || 1);
+    const randomGrowth = randomGrowthMultiplierForWave(state.wave, { boss: this.boss });
+    this.hp *= randomGrowth.hp;
+    this.maxHp = this.hp;
+    this.speed *= randomGrowth.speed;
+    this.damage *= randomGrowth.damage;
     this.defense = this.boss ? config.defense || 0 : (config.defense || 0) + defenseScale;
     this.xp = config.xp;
     this.color = config.color;

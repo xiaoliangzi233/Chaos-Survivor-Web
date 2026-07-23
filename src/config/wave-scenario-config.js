@@ -4,8 +4,10 @@ import { overclockSpawnRateForWave, overclockWaveScenario, overclockWaveSpawnPoo
 import { singularitySpawnRateForWave, singularityWaveScenario, singularityWaveSpawnPool } from "./singularity-wave-scenarios.js";
 import { apocalypseSpawnRateForWave, apocalypseWaveScenario, apocalypseWaveSpawnPool } from "./apocalypse-wave-scenarios.js";
 import { voidCrownSpawnRateForWave, voidCrownWaveScenario, voidCrownWaveSpawnPool } from "./void-crown-wave-scenarios.js";
+import { isRandomMode, randomWaveScenarioFor, randomWaveSpawnPool, randomWaveSpawnRate } from "../systems/randomMode.js";
 
 export function waveScenarioFor(difficultyId, wave) {
+  if (isRandomMode()) return randomWaveScenarioFor(wave);
   if (difficultyId === "ember") return emberWaveScenario(wave);
   if (difficultyId === "neon") return neonWaveScenario(wave);
   if (difficultyId === "overclock") return overclockWaveScenario(wave);
@@ -16,6 +18,7 @@ export function waveScenarioFor(difficultyId, wave) {
 }
 
 export function waveScenarioSpawnPool(difficultyId, wave) {
+  if (isRandomMode()) return randomWaveSpawnPool(wave);
   if (difficultyId === "ember") return emberWaveSpawnPool(wave);
   if (difficultyId === "overclock") return overclockWaveSpawnPool(wave);
   if (difficultyId === "singularity") return singularityWaveSpawnPool(wave);
@@ -26,6 +29,7 @@ export function waveScenarioSpawnPool(difficultyId, wave) {
 }
 
 export function waveScenarioSpawnRate(difficultyId, wave) {
+  if (isRandomMode()) return randomWaveSpawnRate(wave);
   if (difficultyId === "ember") return emberSpawnRateForWave(wave);
   if (difficultyId === "overclock") return overclockSpawnRateForWave(wave);
   if (difficultyId === "singularity") return singularitySpawnRateForWave(wave);

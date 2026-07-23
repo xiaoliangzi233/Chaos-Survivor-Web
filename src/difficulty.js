@@ -1,5 +1,6 @@
 import { state } from "./state.js";
 import {
+  getBestRandomEndlessWave,
   getBestSurvivalSeconds,
   getPlayerDifficultyProgress,
   savePlayerDifficultyProgress,
@@ -107,7 +108,9 @@ export function bestSummaryText(formatTime) {
   const best = highestCompletedDifficulty();
   const bestTime = getBestSurvivalSeconds();
   const timeText = formatTime(bestTime);
-  return best ? `最高通关 ${best.name} · 最佳纪录 ${timeText}` : `最高通关 未解锁 · 最佳纪录 ${timeText}`;
+  const endlessWave = getBestRandomEndlessWave();
+  const randomText = endlessWave > 0 ? ` · 随机无限 第${endlessWave}波` : "";
+  return best ? `最高通关 ${best.name} · 最佳纪录 ${timeText}${randomText}` : `最高通关 未解锁 · 最佳纪录 ${timeText}${randomText}`;
 }
 
 export function difficultyCards() {

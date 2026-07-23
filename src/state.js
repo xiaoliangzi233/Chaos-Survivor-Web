@@ -9,6 +9,9 @@ export const state = {
   waveTimeLeft: FIRST_WAVE_SECONDS,
   pendingNextWave: false,
   pendingVictory: false,
+  runMode: "standard",
+  randomGoal: "twenty_waves",
+  randomRun: createRandomRunState(),
   spawnedBossWaves: new Set(),
   thiefSpawnWave: 0,
   thiefSpawnCount: 0,
@@ -193,6 +196,18 @@ export function createDebugState(previous = {}) {
   };
 }
 
+export function createRandomRunState() {
+  return {
+    seed: 0,
+    scenarios: {},
+    eventHistory: [],
+    enemyCaps: {
+      normal: 360,
+      boss: 220,
+    },
+  };
+}
+
 export function resetRun(map) {
   const previousAi = state.ai;
   const previousDebug = state.debug;
@@ -217,6 +232,9 @@ export function resetRun(map) {
   state.waveTimeLeft = state.waveDuration;
   state.pendingNextWave = false;
   state.pendingVictory = false;
+  state.runMode = "standard";
+  state.randomGoal = "twenty_waves";
+  state.randomRun = createRandomRunState();
   state.spawnedBossWaves = new Set();
   state.thiefSpawnWave = 0;
   state.thiefSpawnCount = 0;

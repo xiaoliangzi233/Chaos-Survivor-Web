@@ -306,6 +306,17 @@
             <p>同时选择作战难度与开局武器。确认后立即进入战场。</p>
           </header>
           <div class="loadout-body">
+            <section class="loadout-section loadout-mode-section">
+              <div class="loadout-section-title">
+                <span>00</span>
+                <div>
+                  <h3>选择运行模式</h3>
+                  <p>标准战役使用固定波次；随机模式会从已解锁图鉴中生成每一波。</p>
+                </div>
+              </div>
+              <div id="loadoutModeList" class="loadout-mode-list"></div>
+              <div id="loadoutRandomGoalList" class="loadout-random-goal-list"></div>
+            </section>
             <section class="loadout-section loadout-difficulty-section">
               <div class="loadout-section-title">
                 <span>01</span>
@@ -337,7 +348,9 @@
           </div>
           <footer class="loadout-footer">
             <div class="loadout-summary">
+              <span>模式 <strong id="loadoutRunModeName">标准模式</strong></span>
               <span>难度 <strong id="loadoutDifficultyName">未选择</strong></span>
+              <span>目标 <strong id="loadoutRandomGoalName">20波通关</strong></span>
               <span>武器 <strong id="loadoutSelectedWeaponName">未选择</strong></span>
             </div>
             <div class="loadout-actions">

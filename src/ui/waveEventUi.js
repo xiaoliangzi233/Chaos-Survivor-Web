@@ -79,14 +79,22 @@ export function describeWaveEvent({ scenario = null, boss = false } = {}) {
     if (!entry || entries.some((item) => item.label === entry.label)) return;
     entries.push(entry);
   };
+  const collectScenarioEntry = (entry) => {
+    if (entry?.reward) add({ label: "奖励目标", description: "限定奖励目标出现，优先追击可获得额外金币。", tone: "gold" });
+    if (entry?.elite) add({ label: "精英来袭", description: "强化实验体已被投放，注意其特殊技能。", tone: "danger" });
+    if (entry?.event?.type === "hazard_field") add(HAZARD_INFO[entry.event.kind] || { label: "危险区域", description: "实验场环境已发生异常变化。", tone: "danger" });
+    else add(EVENT_INFO[entry?.event?.type]);
+    add(EFFECT_INFO[entry?.effect]);
+    if (entry?.gearfiendMode === "fast_only") add({ label: "高速齿轮", description: "本波齿轮怪将保持高速形态。", tone: "danger" });
+  };
 
   if (boss || scenario?.boss) add({ label: "首领警报", description: "高威胁生命体正在进入战场。", tone: "danger" });
-  if (scenario?.reward) add({ label: "奖励目标", description: "限定奖励目标出现，优先追击可获得额外金币。", tone: "gold" });
-  if (scenario?.elite) add({ label: "精英来袭", description: "强化实验体已被投放，注意其特殊技能。", tone: "danger" });
-  if (scenario?.event?.type === "hazard_field") add(HAZARD_INFO[scenario.event.kind] || { label: "危险区域", description: "实验场环境已发生异常变化。", tone: "danger" });
-  else add(EVENT_INFO[scenario?.event?.type]);
-  add(EFFECT_INFO[scenario?.effect]);
-  if (scenario?.gearfiendMode === "fast_only") add({ label: "高速齿轮", description: "本波齿轮怪将保持高速形态。", tone: "danger" });
+  if (scenario?.randomEvents?.length) {
+    if (scenario?.elite) collectScenarioEntry({ elite: scenario.elite });
+    for (const entry of scenario.randomEvents) collectScenarioEntry(entry);
+  } else {
+    collectScenarioEntry(scenario);
+  }
 
   if (!entries.length) return null;
   return {

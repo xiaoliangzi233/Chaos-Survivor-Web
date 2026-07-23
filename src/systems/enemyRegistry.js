@@ -5,6 +5,7 @@ import { setSpawnConfigured } from "../enemies/BaseEnemy.js";
 import { currentDifficulty, difficultyOrder } from "../difficulty.js";
 import { recordCodexEntry } from "./codex.js";
 import { waveScenarioFor, waveScenarioSpawnPool } from "../config/wave-scenario-config.js";
+import { isRandomMode, randomBossIdForWave, randomBossWaveFor, randomEnemyLimitForWave, setRandomModeEnemyCatalogProvider } from "./randomMode.js";
 import { voidCrownSpawnPosition } from "./voidCrownScenarioEvents.js";
 import { Zombie } from "../enemies/zombie.js";
 import { Lancer } from "../enemies/lancer.js";
@@ -112,6 +113,7 @@ export let enemyConfig = {};
 
 export function setEnemyConfigForTests(config) {
   enemyConfig = config;
+  setRandomModeEnemyCatalogProvider(() => enemyConfig);
   setSpawnConfigured((id, x, y) => spawnEnemyById(id, x, y));
 }
 
@@ -121,12 +123,14 @@ export async function setupEnemyRegistry() {
     const config = await response.json();
     enemyConfig = Object.fromEntries(Object.entries(config).map(([id, data]) => [id, { id, ...data }]));
   }
+  setRandomModeEnemyCatalogProvider(() => enemyConfig);
   setSpawnConfigured((id, x, y) => spawnEnemyById(id, x, y));
 }
 
 export function spawnEnemyById(id, x = null, y = null) {
   const difficulty = currentDifficulty();
-  if (world.enemies.length >= (difficulty.enemyLimit || ENEMY_LIMIT)) return null;
+  const enemyLimit = isRandomMode() ? randomEnemyLimitForWave(state.wave) : (difficulty.enemyLimit || ENEMY_LIMIT);
+  if (world.enemies.length >= enemyLimit) return null;
   const cfg = enemyConfig[id];
   const Klass = classes[id] || Zombie;
   if (!cfg) return null;
@@ -142,6 +146,15 @@ export function spawnEnemyById(id, x = null, y = null) {
 }
 
 export function spawnWaveBoss() {
+  if (isRandomMode()) {
+    const bossId = randomBossIdForWave(state.wave);
+    state.spawnedBossWaves ||= new Set();
+    if (bossId && !world.boss && !state.spawnedBossWaves.has(state.wave)) {
+      const spawned = spawnEnemyById(bossId);
+      if (spawned) state.spawnedBossWaves.add(state.wave);
+    }
+    return;
+  }
   const boss = Object.values(enemyConfig).find((entry) => entry.boss && isEnemyAvailableFor(entry, state.wave));
   state.spawnedBossWaves ||= new Set();
   if (boss && !world.boss && !state.spawnedBossWaves.has(state.wave)) {
@@ -151,6 +164,7 @@ export function spawnWaveBoss() {
 }
 
 export function isBossWave(wave) {
+  if (isRandomMode()) return randomBossWaveFor(wave);
   return Object.values(enemyConfig).some((entry) => entry.boss && isEnemyAvailableFor(entry, wave));
 }
 
@@ -161,6 +175,7 @@ export function availableEnemyIdsForWave(wave) {
 }
 
 export function randomEnemyForWave(wave) {
+  if (isRandomMode()) return randomScenarioEnemyForWave(wave);
   const difficultyId = state.difficultyId || currentDifficulty()?.id;
   const entries = Object.values(enemyConfig).filter((entry) => !entry.boss && isEnemyAvailableFor(entry, wave, difficultyId) && canSpawnLimitedEnemy(entry.id));
   const weighted = entries
@@ -169,6 +184,24 @@ export function randomEnemyForWave(wave) {
   appendUnlockedLabThief(weighted);
   const totalWeight = weighted.reduce((sum, entry) => sum + entry.weight, 0);
   if (totalWeight <= 0) return null;
+  let roll = Math.random() * totalWeight;
+  for (const entry of weighted) {
+    roll -= entry.weight;
+    if (roll <= 0) return entry.id;
+  }
+  return weighted[weighted.length - 1]?.id || "zombie";
+}
+
+function randomScenarioEnemyForWave(wave) {
+  const pool = waveScenarioSpawnPool(state.difficultyId, wave)
+    .map((id) => enemyConfig[id])
+    .filter((entry) => entry && !entry.boss && canSpawnLimitedEnemy(entry.id));
+  const weighted = pool
+    .map((entry) => ({ id: entry.id, weight: spawnWeightFor(entry, wave, state.difficultyId) }))
+    .filter((entry) => entry.weight > 0);
+  appendUnlockedLabThief(weighted);
+  const totalWeight = weighted.reduce((sum, entry) => sum + entry.weight, 0);
+  if (totalWeight <= 0) return "zombie";
   let roll = Math.random() * totalWeight;
   for (const entry of weighted) {
     roll -= entry.weight;

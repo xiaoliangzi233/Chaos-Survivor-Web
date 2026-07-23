@@ -10,7 +10,10 @@ const FX_TRAIL_ALPHA_SCALE = 0.62;
 let ambientTimer = 0;
 
 export function particle(kind, x, y, options = {}) {
-  if (world.particles.length >= PARTICLE_LIMIT) world.particles.shift();
+  if (world.particles.length >= PARTICLE_LIMIT) {
+    if (kind === "trail" || kind === "dust" || kind === "mote") return;
+    world.particles.splice(0, Math.min(16, world.particles.length));
+  }
   world.particles.push({
     kind,
     x,

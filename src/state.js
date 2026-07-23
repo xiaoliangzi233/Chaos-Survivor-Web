@@ -49,6 +49,7 @@ export const world = {
   particles: [],
   weaponFx: [],
   grid: new Map(),
+  hitTestEnemies: [],
   boss: null,
   blackhole: null,
 };
@@ -203,6 +204,7 @@ export function resetRun(map) {
   world.particles.length = 0;
   world.weaponFx.length = 0;
   world.grid.clear();
+  world.hitTestEnemies.length = 0;
   world.boss = null;
   world.blackhole = null;
 

@@ -341,7 +341,7 @@ export async function bootGame() {
       state.mode = "playing";
       return;
     }
-    openShop();
+    openShop({ beforeBossWave: isBossWave(Math.min(TOTAL_WAVES, state.wave + 1)) });
   }
 
   function finishWaveTransition() {

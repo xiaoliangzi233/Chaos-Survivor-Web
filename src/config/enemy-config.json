@@ -738,7 +738,7 @@
     "radius": 20,
     "color": "#42e8ff",
     "behavior": "pylon",
-    "spawnWeight": 0.18,
+    "spawnWeight": 0.035,
     "excludeDifficulties": [
       "singularity"
     ],
@@ -827,13 +827,14 @@
       18,
       20
     ],
-    "hp": 270,
-    "speed": 62,
-    "damage": 15,
+    "hp": 235,
+    "speed": 56,
+    "damage": 12,
     "xp": 13,
     "radius": 15,
     "color": "#f3f7ff",
     "behavior": "gunner",
+    "spawnWeight": 0.55,
     "difficultyWaves": {
       "overclock": {
         "spawnWaves": [

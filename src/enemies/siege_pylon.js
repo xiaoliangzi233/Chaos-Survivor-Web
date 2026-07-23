@@ -14,8 +14,6 @@ export class SiegePylon extends BaseEnemy {
     this.behavior = "pylon";
     this.cooldown = 1.1 + Math.random() * 0.6;
     this.charge = 0;
-    this.volleyLeft = 0;
-    this.volleyDelay = 0;
     this.angle = 0;
     this.legPhase = Math.random() * TAU;
     this.knockbackResistance = Math.max(this.knockbackResistance, 0.58);
@@ -31,21 +29,13 @@ export class SiegePylon extends BaseEnemy {
     this.flash = Math.max(0, this.flash - dt * 8);
     this.hitTimer = Math.max(0, this.hitTimer - dt);
     this.cooldown -= dt;
-    this.volleyDelay -= dt;
     this.flip = dx < 0 ? -1 : 1;
     this.angle = Math.atan2(dy, dx);
     this.applyDamageField();
 
-    if (this.volleyLeft > 0 && this.volleyDelay <= 0) {
-      this.fireVolley(this.angle);
-      this.volleyLeft--;
-      this.volleyDelay = 0.09;
-    } else if (this.charge > 0) {
+    if (this.charge > 0) {
       this.charge -= dt;
-      if (this.charge <= 0) {
-        this.volleyLeft = this.elite ? 7 : 5;
-        this.volleyDelay = 0.01;
-      }
+      if (this.charge <= 0) this.fireShot(this.angle);
     } else {
       const dir = d < KEEP_RANGE ? -0.52 : d > FIRE_RANGE ? 0.24 : 0.02;
       const strafe = Math.sin(this.anim * 0.7) * 0.08;
@@ -67,23 +57,20 @@ export class SiegePylon extends BaseEnemy {
     this.y = clamp(this.y, -half + this.r, half - this.r);
   }
 
-  fireVolley(angle) {
-    const count = this.elite ? 5 : 4;
-    const spread = this.elite ? 0.34 : 0.26;
-    for (let i = 0; i < count; i++) {
-      const a = angle + (i - (count - 1) / 2) * spread;
-      world.enemyProjectiles.push({
-        x: this.x + Math.cos(a) * (this.r + 8),
-        y: this.y + Math.sin(a) * (this.r + 8),
-        vx: Math.cos(a) * (this.elite ? 330 : 285),
-        vy: Math.sin(a) * (this.elite ? 330 : 285),
-        r: this.elite ? 5.5 : 5,
-        color: this.color,
-        damage: this.damage * 0.52,
-        life: 3.9,
-        shape: "pylonBolt",
-      });
-    }
+  fireShot(angle) {
+    const speed = this.elite ? 690 : 620;
+    world.enemyProjectiles.push({
+      x: this.x + Math.cos(angle) * (this.r + 12),
+      y: this.y + Math.sin(angle) * (this.r + 12),
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed,
+      r: this.elite ? 14 : 12,
+      color: this.color,
+      damage: this.damage * (this.elite ? 1.05 : 0.9),
+      life: 2.7,
+      shape: "pylonBolt",
+      long: true,
+    });
     burst(this.x + Math.cos(angle) * this.r, this.y + Math.sin(angle) * this.r, 5, this.color, 130);
   }
 

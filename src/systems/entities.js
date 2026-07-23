@@ -226,10 +226,12 @@ export function coinPullSpeed(playerSpeed, distance, magnetRadius) {
 
 export function rebuildGrid() {
   world.grid.clear();
+  world.hitTestEnemies.length = 0;
   for (const e of world.enemies) {
     const key = cellKey(e.x, e.y);
     if (!world.grid.has(key)) world.grid.set(key, []);
     world.grid.get(key).push(e);
+    if (e.hitTest) world.hitTestEnemies.push(e);
   }
 }
 
@@ -245,7 +247,7 @@ export function queryEnemies(x, y, radius, out) {
       for (const e of bucket) if (!e.dead && distSq(x, y, e.x, e.y) <= (radius + e.r) ** 2) out.push(e);
     }
   }
-  for (const e of world.enemies) {
+  for (const e of world.hitTestEnemies) {
     if (!e.dead && e.hitTest && !out.includes(e) && e.hitTest(x, y, radius)) out.push(e);
   }
 }
@@ -320,6 +322,7 @@ export function clearEnemies({ dropRewards = true } = {}) {
   world.blackhole = null;
   world.boss = null;
   world.grid.clear();
+  world.hitTestEnemies.length = 0;
 }
 
 function updateEnemyProjectiles(dt) {
@@ -459,7 +462,7 @@ function updateHazards(dt) {
       h.kind === "toxic_residue" ||
       h.kind === "twin_arc_field" ||
       h.kind === "riftblade_echo" ||
-      ((h.kind === "riftblade_slash" || h.kind === "riftblade_bladefall") && (h.armTime || 0) <= 0) ||
+      ((h.kind === "riftblade_slash" || h.kind === "riftblade_bladefall") && (h.armTime || 0) <= 0 && (h.damageDelay || 0) <= 0) ||
       ((h.kind === "convict_chain_arc" || h.kind === "convict_ball_slam" || h.kind === "convict_chain_line" || h.kind === "convict_chain_path") && !h.noDamage && (h.armTime || 0) <= 0) ||
       (isScientistHazard(h) && !h.noDamage) ||
       (h.kind === "storm_laser_net" && (h.armTime || 0) <= 0) ||
@@ -916,8 +919,9 @@ function convictHazardHit(h, player) {
   if ((h.armTime || 0) > 0) return false;
   if (h.kind === "convict_ball_slam") return Math.hypot(player.x - h.x, player.y - h.y) < player.r + h.r;
   if (h.kind === "convict_chain_arc") {
-    return pointSegmentDistance(player.x, player.y, h.centerX, h.centerY, h.ballX, h.ballY) < player.r + (h.width || 18)
-      || Math.hypot(player.x - h.ballX, player.y - h.ballY) < player.r + (h.ballRadius || 28);
+    const ballHit = Math.hypot(player.x - h.ballX, player.y - h.ballY) < player.r + (h.ballRadius || 28);
+    if (h.chainDamage === false) return ballHit;
+    return pointSegmentDistance(player.x, player.y, h.centerX, h.centerY, h.ballX, h.ballY) < player.r + (h.width || 18) || ballHit;
   }
   if (h.kind === "convict_chain_line") {
     const lines = h.lines || [{ x1: h.x1, y1: h.y1, x2: h.x2, y2: h.y2 }];
@@ -1294,16 +1298,22 @@ function updateSpecialEnemyProjectile(b, dt) {
 }
 
 function updateRiftbladeHazard(h, dt) {
-  if ((h.armTime || 0) <= 0) return;
-  h.armTime = Math.max(0, h.armTime - dt);
-  if (h.armTime > 0 || h.riftbladeArmed) return;
-  h.riftbladeArmed = true;
-  if (h.kind === "riftblade_bladefall") {
-    burst(h.x, h.y, 12, h.color, 180);
-    state.shake = Math.max(state.shake, 4);
-  } else {
-    state.shake = Math.max(state.shake, h.sceneBlade ? 6 : 3);
+  let armedThisFrame = false;
+  if ((h.armTime || 0) > 0) {
+    h.armTime = Math.max(0, h.armTime - dt);
+    if (h.armTime > 0) return;
+    if (!h.riftbladeArmed) {
+      h.riftbladeArmed = true;
+      armedThisFrame = true;
+      if (h.kind === "riftblade_bladefall") {
+        burst(h.x, h.y, 12, h.color, 180);
+        state.shake = Math.max(state.shake, 4);
+      } else {
+        state.shake = Math.max(state.shake, h.sceneBlade ? 6 : 3);
+      }
+    }
   }
+  if (!armedThisFrame) h.damageDelay = Math.max(0, (h.damageDelay || 0) - dt);
 }
 
 function snapshotCooldowns(e) {

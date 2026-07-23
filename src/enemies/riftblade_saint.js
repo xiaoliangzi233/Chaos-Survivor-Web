@@ -540,6 +540,7 @@ export class RiftbladeSaint extends BaseEnemy {
       damage,
       armTime,
       armDuration: armTime,
+      damageDelay: 0.05,
       life: armTime + activeTime,
       maxLife: armTime + activeTime,
       activeTime,

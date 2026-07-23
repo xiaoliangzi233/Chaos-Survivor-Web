@@ -1681,6 +1681,11 @@ function fireProjectile(angle, w, opt) {
 function updateProjectiles(dt) {
   const half = WORLD_SIZE / 2 + 280;
   const hits = [];
+  const trailPressureScale = world.projectiles.length > PROJECTILE_LIMIT * 0.72
+    ? 2.4
+    : world.projectiles.length > PROJECTILE_LIMIT * 0.45
+      ? 1.6
+      : 1;
   for (let i = world.projectiles.length - 1; i >= 0; i--) {
     const b = world.projectiles[i];
     if (b.shape === "singularity") {
@@ -1701,7 +1706,7 @@ function updateProjectiles(dt) {
     b.spin += dt * (b.shape === "boomerang" ? 18 : 7);
     b.trailTimer -= dt;
     if (b.trailTimer <= 0) {
-      b.trailTimer = b.shape === "phaseNeedle" ? 0.014 : b.shape === "ice" ? 0.05 : b.shape === "missile" ? 0.026 : 0.035;
+      b.trailTimer = (b.shape === "phaseNeedle" ? 0.014 : b.shape === "ice" ? 0.05 : b.shape === "missile" ? 0.026 : 0.035) * trailPressureScale;
       if (b.shape === "ice") {
         world.weaponFx.push({ kind: "iceShardTrail", x: b.x, y: b.y, px: b.px, py: b.py, angle: b.angle, color: b.color, rank: b.qualityRank || 0, life: 0.2, maxLife: 0.2, seed: b.spin });
       } else {

@@ -13,7 +13,7 @@ import {
 import { startWeaponPreview } from "./weaponPreview.js";
 
 let stopPreview = null;
-const hudLast = { hp: null, xp: null, kills: null, gold: null, level: null };
+const hudLast = { hp: null, xp: null, kills: null, gold: null, level: null, items: "" };
 const FALLBACK_VERSION = "v0.1.0";
 
 export const gameConfig = {
@@ -32,6 +32,7 @@ export const ui = {
   xpBar: document.getElementById("xpBar"),
   xpMeter: document.getElementById("xpMeter"),
   levelText: document.getElementById("levelText"),
+  itemStatusBar: document.getElementById("itemStatusBar"),
   wavePanel: document.getElementById("wavePanel"),
   timerText: document.getElementById("timerText"),
   waveText: document.getElementById("waveText"),
@@ -141,6 +142,7 @@ export function updateHud(fps) {
   setFpsClass(fps);
   ui.hpMeter?.classList.toggle("low", hpRatio < 0.3);
   ui.xpMeter?.classList.toggle("near-level", xpRatio > 0.82);
+  renderItemStatusBar(p);
 
   if (hudLast.hp !== null && hp < hudLast.hp) flashHudValue(ui.hpMeter, "damage");
   if (hudLast.xp !== null && xp > hudLast.xp) flashHudValue(ui.xpMeter, "gain");
@@ -152,6 +154,51 @@ export function updateHud(fps) {
   hudLast.kills = state.kills;
   hudLast.gold = state.gold;
   hudLast.level = p.level;
+}
+
+function renderItemStatusBar(player) {
+  if (!ui.itemStatusBar) return;
+  const entries = (state.inventory?.items || []).map((entry) => {
+    const itemId = entry.itemId || entry.id?.replace(/_(common|uncommon|rare|epic|legendary)$/, "");
+    let status = `×${entry.qty || 1}`;
+    if (itemId === "tardigrade") status = `${player.currentWaveShields || 0}/${player.waveShields || 0}`;
+    else if (itemId === "airburst") status = `${Math.max(0, Math.ceil(player.airburstTimer || 0))}s`;
+    return { ...entry, itemId, status };
+  }).sort((a, b) => itemStatusPriority(a.itemId) - itemStatusPriority(b.itemId));
+  const signature = entries.map((entry) => `${entry.id}:${entry.status}`).join("|");
+  if (signature === hudLast.items) return;
+  hudLast.items = signature;
+  ui.itemStatusBar.replaceChildren();
+  ui.itemStatusBar.classList.toggle("active", entries.length > 0);
+  ui.itemStatusBar.setAttribute("aria-hidden", entries.length ? "false" : "true");
+  const visibleEntries = entries.slice(0, 12);
+  for (const entry of visibleEntries) {
+    const chip = document.createElement("span");
+    chip.className = `item-status-chip${entry.itemId === "tardigrade" && (player.currentWaveShields || 0) <= 0 ? " depleted" : ""}`;
+    chip.title = `${entry.name}：${entry.desc || "已装备道具"}`;
+    chip.setAttribute("aria-label", `${entry.name} ${entry.status}`);
+    const icon = document.createElement("i");
+    icon.textContent = entry.icon || "◇";
+    const name = document.createElement("b");
+    name.textContent = entry.name;
+    const value = document.createElement("strong");
+    value.textContent = entry.status;
+    chip.append(icon, name, value);
+    ui.itemStatusBar.appendChild(chip);
+  }
+  if (entries.length > visibleEntries.length) {
+    const overflow = document.createElement("span");
+    overflow.className = "item-status-chip item-status-overflow";
+    overflow.textContent = `+${entries.length - visibleEntries.length}`;
+    overflow.title = "更多道具请在背包中查看";
+    ui.itemStatusBar.appendChild(overflow);
+  }
+}
+
+function itemStatusPriority(itemId) {
+  if (itemId === "tardigrade") return 0;
+  if (itemId === "airburst") return 1;
+  return 2;
 }
 
 function renderChip(element, icon, label, value) {

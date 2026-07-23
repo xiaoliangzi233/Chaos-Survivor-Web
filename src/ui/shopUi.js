@@ -59,8 +59,8 @@ export function initShopUi({ continueToNextWave }) {
   });
 }
 
-export function openShop() {
-  prepareShopOffers({ preserveLocked: true });
+export function openShop({ beforeBossWave = false } = {}) {
+  prepareShopOffers({ preserveLocked: true, beforeBossWave });
   state.mode = "shop";
   renderShop();
   dom.overlay?.classList.add("active");

@@ -221,6 +221,7 @@ export class ChainbreakConvict extends BaseEnemy {
       width: 22,
       damage: this.damage * 0.68,
       ballDamage: this.damage * 0.78,
+      chainDamage: false,
       style: "sweep",
     });
     this.spawnLinkedBall(hazard, 31);
@@ -241,7 +242,8 @@ export class ChainbreakConvict extends BaseEnemy {
 
   startSentenceThrow() {
     const target = this.predictedPlayer(0.4, 180);
-    const hazard = this.createSlamHazard(target.x, target.y, 112, 0.78, 0.22, this.damage * 0.85, "sentence");
+    const judgmentTime = 1.28;
+    const hazard = this.createSlamHazard(target.x, target.y, 112, judgmentTime, 0.22, this.damage * 0.85, "sentence");
     this.spawnLinkedBall(hazard, 31, { drop: true });
     const escapeAngle = Math.atan2(state.player.y - target.y, state.player.x - target.x);
     this.spawnShrapnelRing(target.x, target.y, {
@@ -250,11 +252,11 @@ export class ChainbreakConvict extends BaseEnemy {
       damage: this.damage * 0.25,
       gapAngle: escapeAngle,
       gapWidth: 0.68,
-      delay: 0.78,
+      delay: judgmentTime,
     });
     this.ballDetached = true;
     this.mode = "convict_throw";
-    this.modeTimer = 1.04;
+    this.modeTimer = 1.54;
     this.skillCooldowns.sentence_throw = 4.8;
     playSfx("wave");
   }
@@ -696,7 +698,7 @@ export class ChainbreakConvict extends BaseEnemy {
     playSfx("wave");
   }
 
-  createArcHazard({ armTime, activeTime, radius, startAngle, sweep, width, damage, ballDamage, style }) {
+  createArcHazard({ armTime, activeTime, radius, startAngle, sweep, width, damage, ballDamage, chainDamage = true, style }) {
     const hazard = {
       kind: "convict_chain_arc",
       x: this.x,
@@ -711,6 +713,7 @@ export class ChainbreakConvict extends BaseEnemy {
       width,
       damage,
       ballDamage,
+      chainDamage,
       armTime,
       armDuration: armTime,
       activeTime: 0,

@@ -20,14 +20,15 @@ export function createShopState() {
     offers: [],
     refreshCount: 0,
     nextOfferUid: 1,
+    beforeBossWave: false,
   };
 }
 
-export function prepareShopOffers({ preserveLocked = true } = {}) {
+export function prepareShopOffers({ preserveLocked = true, beforeBossWave = false } = {}) {
   ensureShop();
-  const kept = preserveLocked ? state.shop.offers.filter((offer) => offer.locked && !isSoldOut(offer)) : [];
-  state.shop.offers = kept;
-  while (state.shop.offers.length < SHOP_SLOTS) state.shop.offers.push(createOffer());
+  state.shop.beforeBossWave = Boolean(beforeBossWave);
+  state.shop.offers = preserveLocked ? eligibleLockedOffers(state.shop.offers) : [];
+  fillShopSlots();
   state.shop.refreshCount = 0;
   return state.shop.offers;
 }
@@ -41,8 +42,8 @@ export function refreshShopOffers() {
   }
   state.gold -= cost;
   state.shop.refreshCount++;
-  state.shop.offers = state.shop.offers.filter((offer) => offer.locked && !isSoldOut(offer));
-  while (state.shop.offers.length < SHOP_SLOTS) state.shop.offers.push(createOffer());
+  state.shop.offers = eligibleLockedOffers(state.shop.offers);
+  fillShopSlots();
   playSfx("select");
   return true;
 }
@@ -168,8 +169,34 @@ export function getOfferByUid(uid) {
   return findOffer(uid);
 }
 
-function createOffer() {
-  return Math.random() < 0.58 ? createWeaponOffer() : createItemOffer();
+function fillShopSlots() {
+  const uniqueItemIds = new Set(state.shop.offers.map(uniqueItemIdForOffer).filter(Boolean));
+  while (state.shop.offers.length < SHOP_SLOTS) {
+    const offer = createOffer(uniqueItemIds);
+    state.shop.offers.push(offer);
+    const uniqueItemId = uniqueItemIdForOffer(offer);
+    if (uniqueItemId) uniqueItemIds.add(uniqueItemId);
+  }
+}
+
+function eligibleLockedOffers(offers) {
+  const uniqueItemIds = new Set();
+  return offers.filter((offer) => {
+    if (!offer.locked || isSoldOut(offer)) return false;
+    if (offer.category !== "道具") return true;
+    const itemId = offer.itemId || offer.id;
+    if ((state.shop.beforeBossWave && itemId === "bait") || !canPurchaseItem(itemId).ok) return false;
+    const uniqueItemId = uniqueItemIdForOffer(offer);
+    if (!uniqueItemId) return true;
+    if (uniqueItemIds.has(uniqueItemId)) return false;
+    uniqueItemIds.add(uniqueItemId);
+    return true;
+  });
+}
+
+function createOffer(excludedUniqueItemIds) {
+  if (Math.random() < 0.58) return createWeaponOffer();
+  return createItemOffer(excludedUniqueItemIds) || createWeaponOffer();
 }
 
 function createWeaponOffer() {
@@ -194,9 +221,14 @@ function createWeaponOffer() {
   };
 }
 
-function createItemOffer() {
-  const candidates = ITEM_DEFS.filter((item) => (!item.unique || !hasPurchasedUniqueItem(item.id)) && canPurchaseItem(item.id).ok);
-  const template = weightedChoice((candidates.length ? candidates : ITEM_DEFS).map((item) => [item, itemWeight(item)]));
+function createItemOffer(excludedUniqueItemIds = new Set()) {
+  const candidates = ITEM_DEFS.filter((item) =>
+    (!state.shop.beforeBossWave || item.id !== "bait")
+    && (!item.unique || (!hasPurchasedUniqueItem(item.id) && !excludedUniqueItemIds.has(item.id)))
+    && canPurchaseItem(item.id).ok
+  );
+  if (!candidates.length) return null;
+  const template = weightedChoice(candidates.map((item) => [item, itemWeight(item)]));
   const rarity = offerQualityForItem(template, weightedQuality(ITEM_RARITY_WEIGHTS));
   const rank = QUALITY_ORDER.indexOf(rarity);
   const quality = QUALITY_INFO[rarity] || QUALITY_INFO.common;
@@ -215,6 +247,12 @@ function createItemOffer() {
     locked: false,
     desc: itemDescription(template, rarity),
   };
+}
+
+function uniqueItemIdForOffer(offer) {
+  if (offer?.category !== "道具") return "";
+  const itemId = offer.itemId || offer.id;
+  return ITEM_DEFS.find((item) => item.id === itemId)?.unique ? itemId : "";
 }
 
 function weightedWeaponId() {

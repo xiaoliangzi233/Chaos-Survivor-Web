@@ -4,8 +4,8 @@ import { burst, pulse } from "../effects.js";
 import { clamp } from "../utils.js";
 import { BaseEnemy } from "./BaseEnemy.js";
 
-const IDEAL_RANGE = 360;
-const FIRE_RANGE = 620;
+const IDEAL_RANGE = 340;
+const FIRE_RANGE = 540;
 
 export class Gunner extends BaseEnemy {
   constructor(config, x, y) {
@@ -46,7 +46,7 @@ export class Gunner extends BaseEnemy {
       this.pattern = ["triangle", "square", "hexagon", "circle"][Math.floor(Math.random() * 4)];
       this.burstLeft = 1;
       this.burstDelay = 0.01;
-      this.cooldown = this.elite ? 1.1 : 1.55;
+      this.cooldown = this.elite ? 1.5 : 2.05;
       pulse(this.x, this.y, 24, this.color, 0.12);
     }
 
@@ -61,7 +61,7 @@ export class Gunner extends BaseEnemy {
     const forwardY = Math.sin(angle);
     const sideX = -forwardY;
     const sideY = forwardX;
-    const speed = this.elite ? 245 : 220;
+    const speed = this.elite ? 225 : 195;
     for (const point of points) {
       world.enemyProjectiles.push({
         x: this.x + forwardX * (this.r + 16) + sideX * point.x + forwardX * point.y,
@@ -70,7 +70,7 @@ export class Gunner extends BaseEnemy {
         vy: forwardY * speed,
         r: this.elite ? 4.5 : 4,
         color: point.accent ? "#42e8ff" : "#f3f7ff",
-        damage: this.damage * 0.46,
+        damage: this.damage * 0.34,
         life: 3.1,
         shape: "gunnerShot",
       });
@@ -168,7 +168,7 @@ function geometryPatternPoints(pattern, elite) {
     for (const x of [-34, 34]) for (const y of [-34, 34]) points.push({ x: x * scale, y: y * scale, accent: x === y });
     return points;
   }
-  const count = pattern === "hexagon" ? 6 : 10;
+  const count = pattern === "hexagon" ? 6 : 8;
   const radius = pattern === "hexagon" ? 44 : 40;
   for (let i = 0; i < count; i++) {
     const a = i * TAU / count;

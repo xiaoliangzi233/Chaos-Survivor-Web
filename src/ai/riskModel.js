@@ -1,5 +1,6 @@
 import { WORLD_SIZE } from "../constants.js";
 import { apocalypseScenarioRiskAtPoint } from "../systems/apocalypseScenarioEvents.js";
+import { voidCrownScenarioRiskAtPoint } from "../systems/voidCrownScenarioEvents.js";
 
 const DEFAULT_LOOK_AHEAD = 0.85;
 const SAMPLE_TIMES = [0, 0.2, 0.45, 0.85];
@@ -161,7 +162,8 @@ export function riskAtPoint(point, threats, options = {}) {
   let risk = boundaryRisk(point, options);
   for (const threat of threats || []) {
     if (threat.kind === "apocalypse_scene") {
-      risk += apocalypseScenarioRiskAtPoint(point, threat.source);
+      risk += apocalypseScenarioRiskAtPoint(point, threat.source)
+        + voidCrownScenarioRiskAtPoint(point, threat.source);
       continue;
     }
     if (threat.kind === "gravity_well") {

@@ -10,14 +10,21 @@ import {
   startApocalypseScenarioEvent,
   updateApocalypseScenarioEvent,
 } from "./apocalypseScenarioEvents.js";
+import {
+  clearVoidCrownScenarioEvent,
+  startVoidCrownScenarioEvent,
+  updateVoidCrownScenarioEvent,
+} from "./voidCrownScenarioEvents.js";
 
 export function resetWaveScenarioState() {
+  clearVoidCrownScenarioEvent();
   clearApocalypseScenarioEvent();
   state.waveScenario = null;
   state.spawnedWaveEvents = new Set();
 }
 
 export function applyWaveStartScenario() {
+  clearVoidCrownScenarioEvent();
   clearApocalypseScenarioEvent();
   state.waveScenario = waveScenarioFor(state.difficultyId, state.wave);
   if (!state.waveScenario) return null;
@@ -25,11 +32,13 @@ export function applyWaveStartScenario() {
   spawnScenarioElite(state.waveScenario);
   spawnScenarioEvent(state.waveScenario);
   startApocalypseScenarioEvent(state.waveScenario.event);
+  startVoidCrownScenarioEvent(state.waveScenario.event);
   return state.waveScenario;
 }
 
 export function updateWaveScenario(dt) {
   updateApocalypseScenarioEvent(dt);
+  updateVoidCrownScenarioEvent(dt);
 }
 
 export function activeWaveEffect(effect) {

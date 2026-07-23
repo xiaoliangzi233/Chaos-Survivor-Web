@@ -5,6 +5,7 @@ import { setSpawnConfigured } from "../enemies/BaseEnemy.js";
 import { currentDifficulty, difficultyOrder } from "../difficulty.js";
 import { recordCodexEntry } from "./codex.js";
 import { waveScenarioFor, waveScenarioSpawnPool } from "../config/wave-scenario-config.js";
+import { voidCrownSpawnPosition } from "./voidCrownScenarioEvents.js";
 import { Zombie } from "../enemies/zombie.js";
 import { Lancer } from "../enemies/lancer.js";
 import { Wisp } from "../enemies/wisp.js";
@@ -191,6 +192,8 @@ export function createDecorativeEnemy(id, x, y) {
 }
 
 function randomSpawnPosition(radius) {
+  const scenarioPosition = voidCrownSpawnPosition(radius);
+  if (scenarioPosition) return scenarioPosition;
   const p = state.player;
   const angle = Math.random() * TAU;
   const dist = 720 + Math.random() * 220;

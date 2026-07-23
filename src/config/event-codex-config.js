@@ -26,6 +26,12 @@ export const EVENT_CODEX_ENTRIES = [
   { id: "ceasefire_credit", icon: "II", name: "停火借秒", category: "时间协议", desc: "敌方弹幕被全场时间层暂时冻结并解除碰撞，借来的安全时间结束后将恢复原有轨迹。", color: "#42e8ff" },
   { id: "sanctuary_quota", icon: "Q", name: "生者配额", category: "末日协议", desc: "赦免区会统计其中的敌人数量；配额超限时安全规则反转，必须果断放弃拥挤避难所。", color: "#ff5a36" },
   { id: "mercy_faultline", icon: "/", name: "恩赦断层", category: "空间协议", desc: "旋转断层会净化穿越它的敌方弹幕，并把积攒的能量转化成伤害敌群的清算爆发。", color: "#72ffb4" },
+  { id: "crown_levy", icon: "¤", name: "王冠征税", category: "虚空王庭", desc: "移动宝库会牵引全场掉落资源。追上宝库可及时截获经验与金币，否则战利品会被带离原本的安全路线。", color: "#ffd166" },
+  { id: "fold_transit", icon: "◇", name: "折叠通路", category: "虚空王庭", desc: "成对王庭门周期性接通远端坐标，玩家与普通敌人都能穿越；可用来跨场撤离，也能把追兵折送到另一侧。", color: "#66f7d0" },
+  { id: "void_relay", icon: "Ⅲ", name: "虚空接力", category: "虚空王庭", desc: "按王冠指定的顺序触碰三座接力印记。超时会受到裁罚，完成整轮则释放清场脉冲。", color: "#d86cff" },
+  { id: "crown_ingress", icon: "▣", name: "王冠门禁", category: "虚空王庭", desc: "四座边界门轮流开放选择。向一座门的方向移动即可将其封印，并迫使下一阶段敌群改从其余边界进入。", color: "#66f7d0" },
+  { id: "sovereign_exchange", icon: "⇄", name: "王权换位", category: "虚空王庭", desc: "王冠会锁定一名远端敌人与玩家交换位置；提前处决目标可取消换位并让虚空反噬周围敌群。", color: "#ff4d7d" },
+  { id: "exile_balance", icon: "±", name: "流放天平", category: "虚空王庭", desc: "战场被分成两座王庭，敌人较多的一侧会超载。玩家必须跨庭重整追兵分布，避开失衡侧的流放裁决。", color: "#d86cff" },
 ];
 
 const EVENT_IDS = new Set(EVENT_CODEX_ENTRIES.map((entry) => entry.id));

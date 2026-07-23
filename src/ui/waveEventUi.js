@@ -24,6 +24,12 @@ const EFFECT_INFO = {
   ceasefire_credit: { label: "停火借秒", description: "敌方弹幕会周期性冻结；停火结束前离开密集弹道。", tone: "cyan" },
   sanctuary_quota: { label: "生者配额", description: "观察避难所内敌人数，超出配额时安全区域会反转。", tone: "danger" },
   mercy_faultline: { label: "恩赦断层", description: "引导敌方弹幕穿过断层，积攒净化能量反击敌群。", tone: "toxic" },
+  crown_levy: { label: "王冠征税", description: "移动宝库正在牵引战利品，追上并截获被征收的经验与金币。", tone: "gold" },
+  fold_transit: { label: "折叠通路", description: "成对王庭门即将接通，穿门可跨越战场，也会折送追入的敌人。", tone: "violet" },
+  void_relay: { label: "虚空接力", description: "按顺序触碰三座接力印记，超时会遭到王冠裁罚。", tone: "violet" },
+  crown_ingress: { label: "王冠门禁", description: "向一座边界门移动将其封印，下一阶段敌群会从其余入口出现。", tone: "cyan" },
+  sovereign_exchange: { label: "王权换位", description: "处决被锁定的远端敌人以取消换位，否则双方坐标将在倒计时结束时交换。", tone: "danger" },
+  exile_balance: { label: "流放天平", description: "敌人更多的一侧会超载，跨过分界线重整追兵并避开流放侧。", tone: "violet" },
 };
 
 const EVENT_INFO = {
@@ -46,6 +52,12 @@ const EVENT_INFO = {
   ceasefire_credit: EFFECT_INFO.ceasefire_credit,
   sanctuary_quota: EFFECT_INFO.sanctuary_quota,
   mercy_faultline: EFFECT_INFO.mercy_faultline,
+  crown_levy: EFFECT_INFO.crown_levy,
+  fold_transit: EFFECT_INFO.fold_transit,
+  void_relay: EFFECT_INFO.void_relay,
+  crown_ingress: EFFECT_INFO.crown_ingress,
+  sovereign_exchange: EFFECT_INFO.sovereign_exchange,
+  exile_balance: EFFECT_INFO.exile_balance,
 };
 
 const HAZARD_INFO = {

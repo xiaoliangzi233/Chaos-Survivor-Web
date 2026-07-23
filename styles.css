@@ -629,6 +629,12 @@ canvas {
   gap: 8px;
 }
 
+@media (min-width: 761px) {
+  body.boss-wave-active .quick-actions {
+    bottom: calc(max(12px, env(safe-area-inset-bottom)) + 42px);
+  }
+}
+
 .is-menu .hud,
 .is-menu .quick-actions,
 .is-menu .touch-stick {

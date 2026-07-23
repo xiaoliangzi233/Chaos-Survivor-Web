@@ -3467,12 +3467,12 @@ function drawVoidFireballProjectile(ctx, b) {
   ctx.restore();
 }
 
-function drawBossHpText(ctx, text, y, size = 12) {
+function drawBossHpText(ctx, text, y, size = 12, color = "#f3f7ff", shadowColor = "rgba(0,0,0,0.7)") {
   if (!text) return;
-  ctx.fillStyle = "#f3f7ff";
+  ctx.fillStyle = color;
   ctx.font = `${size}px ${CANVAS_PIXEL_FONT}`;
   ctx.textAlign = "center";
-  ctx.shadowColor = "rgba(0,0,0,0.7)";
+  ctx.shadowColor = shadowColor;
   ctx.shadowBlur = 4;
   ctx.fillText(text, viewport.width / 2, y);
   ctx.shadowBlur = 0;
@@ -3527,7 +3527,7 @@ function drawTwinBossBar(ctx, b, x, y, w) {
     ctx.strokeStyle = "rgba(255,209,102,0.85)";
     ctx.lineWidth = 2;
     ctx.strokeRect(x + 1, y + 11, w - 2, 26);
-    drawBossHpText(ctx, `${Math.ceil(Math.max(0, solo.hp))} / ${Math.ceil(solo.maxHp)}`, y + 30, 14);
+    drawBossHpText(ctx, `${Math.ceil(Math.max(0, solo.hp))} / ${Math.ceil(solo.maxHp)}`, y + 30, 14, "#05070b", "rgba(255,255,255,0.72)");
     return;
   }
   ctx.fillStyle = "rgba(6,9,18,0.9)";
@@ -3552,9 +3552,10 @@ function drawTwinBossBar(ctx, b, x, y, w) {
   ctx.strokeStyle = b.shared.resonance ? "rgba(255,255,255,0.95)" : "rgba(255,209,102,0.85)";
   ctx.lineWidth = 2;
   ctx.strokeRect(x + 1, y + 1, w - 2, 36);
-  const leftHp = crimson && !crimson.dead ? `${Math.ceil(crimson.hp)}/${Math.ceil(crimson.maxHp)}` : "绯裂已毁";
-  const rightHp = azure && !azure.dead ? `${Math.ceil(azure.hp)}/${Math.ceil(azure.maxHp)}` : "苍雷已毁";
-  drawBossHpText(ctx, `${leftHp}    ${rightHp}`, y + 27, 12);
+  const crimsonHp = crimson && !crimson.dead ? `${Math.ceil(crimson.hp)}/${Math.ceil(crimson.maxHp)}` : "绯裂已毁";
+  const azureHp = azure && !azure.dead ? `${Math.ceil(azure.hp)}/${Math.ceil(azure.maxHp)}` : "苍雷已毁";
+  drawBossHpText(ctx, crimsonHp, y + 15, 10, "#05070b", "rgba(255,255,255,0.72)");
+  drawBossHpText(ctx, azureHp, y + 31, 10, "#05070b", "rgba(255,255,255,0.72)");
 }
 function drawBossTitle(ctx, text, x, y, w) {
   ctx.save();

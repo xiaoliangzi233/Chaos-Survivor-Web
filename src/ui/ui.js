@@ -118,6 +118,7 @@ export function setBootProgress(progress, label, { done = false } = {}) {
 
 export function updateHud(fps) {
   document.body.classList.toggle("is-menu", state.mode === "menu");
+  document.body.classList.toggle("boss-wave-active", Boolean(state.bossWaveActive));
   const p = state.player;
   if (!p) return;
   const hp = Math.max(0, Math.ceil(p.hp));

@@ -4,7 +4,7 @@ export const SINGULARITY_WAVE_SCENARIOS = [
   { wave: 1, pool: ["zombie", "wisp"], spawnRate: 0.74 },
   { wave: 2, pool: ["mech_worm"], spawnRate: 0.24, mechWormMode: "colossus", event: { type: "long_mech_worms", count: 3 } },
   { wave: 3, pool: ["blackhole_mage", ...BASIC_SLIMES], spawnRate: 1.04 },
-  { wave: 4, pool: ["lancer", "zombie", "pentastar"], spawnRate: 1.12, event: { type: "sweeping_laser_maze", count: 1, width: 34, damage: 24, speed: 150, life: 999, fullWave: true }, effect: "laser_disaster" },
+  { wave: 4, pool: ["lancer", "zombie", "pentastar"], spawnRate: 1.12, event: { type: "sweeping_laser_maze", count: 1, width: 34, damage: 24, speed: 105, life: 999, fullWave: true }, effect: "laser_disaster" },
   { wave: 5, pool: ["pyromancer", "gearfiend", "brood_seeder"], spawnRate: 1.02 },
   { wave: 6, pool: ["pyromancer", "gearfiend", "wizard", "magma_beetle"], spawnRate: 1.08 },
   { wave: 7, pool: ["mech_worm", "pyromancer", "zombie", "lancer"], spawnRate: 1.18, elite: { id: "embermine", variant: "embermine_overlord", count: 1 } },

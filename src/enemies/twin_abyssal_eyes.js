@@ -11,6 +11,8 @@ import { maybeTriggerBossSignature } from "../systems/easterEggs.js";
 const TETHER_RANGE = 920;
 const RESONANCE_HP = 0.4;
 const FAR_DASH_DISTANCE = 760;
+const CRIMSON_DASH_OVERSHOOT = 260;
+const AZURE_LASER_AIM_OFFSET = 118;
 
 export class TwinAbyssalEyes extends BaseEnemy {
   constructor(config, x, y, shared = null, role = "crimson") {
@@ -32,6 +34,11 @@ export class TwinAbyssalEyes extends BaseEnemy {
     this.orbit = Math.random() * TAU;
     this.dashVx = 0;
     this.dashVy = 0;
+    this.dashTargetX = x;
+    this.dashTargetY = y;
+    this.dashRemaining = 0;
+    this.laserAimOffsetX = 0;
+    this.laserAimOffsetY = 0;
     this.trailTimer = 0;
     this.enraged = false;
     this.knockbackResistance = 0.93;
@@ -56,7 +63,7 @@ export class TwinAbyssalEyes extends BaseEnemy {
     this.flash = Math.max(0, this.flash - dt * 8);
     this.hitTimer = Math.max(0, this.hitTimer - dt);
     this.flip = dx < 0 ? -1 : 1;
-    this.angle = Math.atan2(dy, dx);
+    if (!["dash_windup", "dash", "laser_aim", "laser_fire"].includes(this.mode)) this.angle = Math.atan2(dy, dx);
     this.updateShared(dt);
 
     if (this.role === "crimson") this.updateCrimson(dt, dx, dy, d);
@@ -107,20 +114,20 @@ export class TwinAbyssalEyes extends BaseEnemy {
       return;
     }
     if (this.mode === "dash") {
-      this.x += this.dashVx * dt;
-      this.y += this.dashVy * dt;
+      const step = Math.min(this.dashRemaining, Math.hypot(this.dashVx, this.dashVy) * dt);
+      this.x += Math.cos(this.angle) * step;
+      this.y += Math.sin(this.angle) * step;
+      this.dashRemaining = Math.max(0, this.dashRemaining - step);
       this.trailTimer -= dt;
       if (this.trailTimer <= 0) {
         this.trailTimer = 0.04;
         trail(this.x, this.y, this.x - this.dashVx * 0.04, this.y - this.dashVy * 0.04, this.color, 14);
         if (this.enraged || this.shared.resonance) this.addEmberWake();
       }
-      if (this.modeTimer <= 0) {
+      if (this.dashRemaining <= 0 || this.modeTimer <= 0) {
         if (this.attackCount < (this.enraged ? 3 : this.shared.resonance ? 2 : 1)) {
           this.attackCount++;
-          this.mode = "dash_windup";
-          this.modeTimer = 0.34;
-          this.angle = Math.atan2(state.player.y - this.y, state.player.x - this.x);
+          this.startDashWindup(0.34);
         } else {
           this.bladeBurst();
           this.recover(0.5);
@@ -144,10 +151,8 @@ export class TwinAbyssalEyes extends BaseEnemy {
 
   chooseCrimsonMode(d) {
     if (d > FAR_DASH_DISTANCE || d < 620 || Math.random() < 0.68) {
-      this.mode = "dash_windup";
-      this.modeTimer = this.enraged ? 0.34 : 0.52;
       this.attackCount = 0;
-      this.angle = Math.atan2(state.player.y - this.y, state.player.x - this.x);
+      this.startDashWindup(this.enraged ? 0.34 : 0.52);
       pulse(this.x, this.y, this.r + 24, this.color, 0.22);
     } else {
       this.mode = "blade_burst";
@@ -159,12 +164,23 @@ export class TwinAbyssalEyes extends BaseEnemy {
 
   startDash() {
     this.mode = "dash";
-    this.modeTimer = this.enraged ? 0.44 : 0.36;
     const speed = this.enraged ? 850 : this.shared.resonance ? 790 : 710;
+    const lockedDistance = Math.hypot(this.dashTargetX - this.x, this.dashTargetY - this.y);
+    this.angle = Math.atan2(this.dashTargetY - this.y, this.dashTargetX - this.x);
+    this.dashRemaining = Math.max(CRIMSON_DASH_OVERSHOOT, lockedDistance + CRIMSON_DASH_OVERSHOOT);
+    this.modeTimer = this.dashRemaining / speed + 0.08;
     this.dashVx = Math.cos(this.angle) * speed;
     this.dashVy = Math.sin(this.angle) * speed;
     burst(this.x, this.y, 12, this.color, 200);
     playSfx("wave");
+  }
+
+  startDashWindup(duration) {
+    this.mode = "dash_windup";
+    this.modeTimer = duration;
+    this.dashTargetX = state.player.x;
+    this.dashTargetY = state.player.y;
+    this.angle = Math.atan2(this.dashTargetY - this.y, this.dashTargetX - this.x);
   }
 
   bladeBurst() {
@@ -187,9 +203,9 @@ export class TwinAbyssalEyes extends BaseEnemy {
     }
     if (this.mode === "laser_aim") {
       this.drift(dx, dy, d, -0.12, 0.16, dt);
-      const lagX = state.player.x - state.player.dirX * 92;
-      const lagY = state.player.y - state.player.dirY * 92;
-      this.angle += angleDiff(Math.atan2(lagY - this.y, lagX - this.x), this.angle) * Math.min(1, dt * 2.1);
+      const offsetX = state.player.x + this.laserAimOffsetX;
+      const offsetY = state.player.y + this.laserAimOffsetY;
+      this.angle += angleDiff(Math.atan2(offsetY - this.y, offsetX - this.x), this.angle) * Math.min(1, dt * 1.25);
       if (this.modeTimer <= 0) {
         this.mode = "laser_fire";
         this.modeTimer = this.enraged ? 0.72 : 0.52;
@@ -198,7 +214,7 @@ export class TwinAbyssalEyes extends BaseEnemy {
       return;
     }
     if (this.mode === "laser_fire") {
-      this.angle = turnTowardLimited(this.angle, Math.atan2(dy, dx), dt * (this.enraged ? 0.38 : 0.26));
+      this.angle = turnTowardLimited(this.angle, Math.atan2(dy, dx), dt * (this.enraged ? 0.2 : 0.14));
       this.damageLaser(dt, this.enraged ? 13 : 10);
       if (this.modeTimer <= 0) this.recover(0.48);
       return;
@@ -237,8 +253,7 @@ export class TwinAbyssalEyes extends BaseEnemy {
       return;
     }
     if (roll < 0.42) {
-      this.mode = "laser_aim";
-      this.modeTimer = this.enraged ? 0.58 : 0.78;
+      this.startLaserAim(this.enraged ? 0.58 : 0.78);
     } else if (roll < 0.72) {
       this.mode = "arc_field";
       this.attackTimer = 0.08;
@@ -246,6 +261,15 @@ export class TwinAbyssalEyes extends BaseEnemy {
       this.mode = "prism_burst";
       this.attackTimer = 0.06;
     }
+  }
+
+  startLaserAim(duration) {
+    const targetAngle = Math.atan2(state.player.y - this.y, state.player.x - this.x);
+    const side = Math.random() < 0.5 ? -1 : 1;
+    this.laserAimOffsetX = Math.cos(targetAngle + Math.PI / 2) * AZURE_LASER_AIM_OFFSET * side;
+    this.laserAimOffsetY = Math.sin(targetAngle + Math.PI / 2) * AZURE_LASER_AIM_OFFSET * side;
+    this.mode = "laser_aim";
+    this.modeTimer = duration;
   }
 
   dropArcMine() {
@@ -263,12 +287,9 @@ export class TwinAbyssalEyes extends BaseEnemy {
     if (!other || other.dead) return;
     const mode = Math.random() < 0.5 ? "cross" : "rail";
     if (mode === "cross") {
-      this.mode = "laser_aim";
-      this.modeTimer = 0.62;
-      other.mode = "dash_windup";
-      other.modeTimer = 0.5;
+      this.startLaserAim(0.62);
       other.attackCount = 0;
-      other.angle = Math.atan2(state.player.y - other.y, state.player.x - other.x) + Math.PI * 0.12;
+      other.startDashWindup(0.5);
     } else {
       this.shared.railTimer = 1.1;
       pulse((this.x + other.x) / 2, (this.y + other.y) / 2, 120, "#ffffff", 0.28);

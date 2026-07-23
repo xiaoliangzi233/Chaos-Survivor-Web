@@ -347,7 +347,7 @@ function updateEnemyProjectiles(dt) {
       playSfx("hurt");
       if (b.landTrapOnHit) placeGearProjectileTrap(b);
       world.enemyProjectiles.splice(i, 1);
-    } else if ((b.bossProjectile && outsideMap) || (!b.bossProjectile && b.life <= 0)) {
+    } else if ((b.bossProjectile && (outsideMap || (b.expireWithLife && b.life <= 0))) || (!b.bossProjectile && b.life <= 0)) {
       if (b.splitOnExpire) splitEnemyProjectile(b);
       if (b.landTrapOnExpire) placeGearProjectileTrap(b);
       world.enemyProjectiles.splice(i, 1);
@@ -432,6 +432,7 @@ function updateHazards(dt) {
     if (h.kind === "magnetic_node") updateMagneticNode(h, dt);
     if (h.kind === "brood_pod") updateBroodPod(h, dt);
     if (h.kind === "storm_laser_net") updateStormLaserNet(h, dt);
+    if (h.kind === "riftblade_slash" || h.kind === "riftblade_bladefall") updateRiftbladeHazard(h, dt);
     if (h.kind === "phase_tear") updatePhaseTear(h, dt);
     if (h.kind === "inferno_beacon") updateInfernoBeacon(h, dt);
     if (h.kind === "artillery_blast") updateArtilleryBlast(h, dt);
@@ -445,11 +446,13 @@ function updateHazards(dt) {
       h.kind === "magma_crack" ||
       h.kind === "toxic_residue" ||
       h.kind === "twin_arc_field" ||
+      h.kind === "riftblade_echo" ||
+      ((h.kind === "riftblade_slash" || h.kind === "riftblade_bladefall") && (h.armTime || 0) <= 0) ||
       (h.kind === "storm_laser_net" && (h.armTime || 0) <= 0) ||
       h.kind === "frost_zone" ||
       h.kind === "blizzard_core" ||
       ((h.kind === "ice_spike" || h.kind === "ice_seal") && h.exploding);
-    const hit = h.kind === "storm_laser_net"
+    const hit = h.kind === "storm_laser_net" || h.kind === "riftblade_slash"
       ? pointLineDistance(p.x, p.y, h.x, h.y, h.angle || 0, h.length || 1200) < p.r + (h.width || 18)
       : distSq(h.x, h.y, p.x, p.y) < (h.r + p.r) ** 2;
     if (hit && p.invuln <= 0 && canDamage) {
@@ -995,7 +998,14 @@ function updateEnemyKnockback(e, dt) {
 }
 
 function updateSpecialEnemyProjectile(b, dt) {
-  if (b.shape === "razorBoomerang") {
+  if (b.shape === "riftbladeCrescent") {
+    const speed = Math.max(1, Math.hypot(b.vx, b.vy));
+    const turn = b.returnAt >= 0 && b.life < b.returnAt ? b.returnCurve || 0 : b.curve || 0;
+    const angle = Math.atan2(b.vy, b.vx) + turn * dt;
+    b.vx = Math.cos(angle) * speed;
+    b.vy = Math.sin(angle) * speed;
+    b.spin = angle;
+  } else if (b.shape === "razorBoomerang") {
     b.spin = (b.spin || 0) + dt * 24;
     if (b.owner && !b.owner.dead && b.life < (b.returnAt || 1.4)) {
       const dx = b.owner.x - b.x;
@@ -1007,6 +1017,19 @@ function updateSpecialEnemyProjectile(b, dt) {
     }
   } else if (b.shape === "fastGear" || b.shape === "starShard" || b.shape === "phaseShard" || b.shape === "arcaneOrb" || b.shape === "slimeOrb") {
     b.spin = (b.spin || 0) + dt * (b.shape === "fastGear" ? 18 : 6);
+  }
+}
+
+function updateRiftbladeHazard(h, dt) {
+  if ((h.armTime || 0) <= 0) return;
+  h.armTime = Math.max(0, h.armTime - dt);
+  if (h.armTime > 0 || h.riftbladeArmed) return;
+  h.riftbladeArmed = true;
+  if (h.kind === "riftblade_bladefall") {
+    burst(h.x, h.y, 12, h.color, 180);
+    state.shake = Math.max(state.shake, 4);
+  } else {
+    state.shake = Math.max(state.shake, h.sceneBlade ? 6 : 3);
   }
 }
 

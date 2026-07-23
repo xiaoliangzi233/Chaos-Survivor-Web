@@ -15,7 +15,8 @@ export function collectThreats(state, world, options = {}) {
   }
   for (const h of world.hazards || []) {
     if ((h.life ?? 1) <= 0) continue;
-    if (distanceSq(p, h) > (queryRadius + (h.r || 0) + 120) ** 2) continue;
+    const lineHazard = h.kind === "storm_laser_net" || h.kind === "riftblade_slash";
+    if (!lineHazard && distanceSq(p, h) > (queryRadius + (h.r || 0) + 120) ** 2) continue;
     threats.push(normalizeThreat("hazard", h, hazardWeight(h)));
   }
   if (world.blackhole && (world.blackhole.life ?? 1) > 0) {
@@ -55,7 +56,7 @@ export function normalizeThreat(kind, source, weight = 1) {
     life: source.life ?? source.modeTimer ?? 1,
     weight,
     armTime: source.armTime || 0,
-    line: source.kind === "storm_laser_net",
+    line: source.kind === "storm_laser_net" || source.kind === "riftblade_slash",
     angle: source.angle || 0,
     length: source.length || 0,
     width: source.width || 0,
@@ -74,7 +75,7 @@ export function classifyThreat(source, kind) {
   }
   if (kind === "hazard") {
     if (source.kind === "blizzard_core") return "hazard_zone_soft";
-    if (source.kind === "storm_laser_net") return (source.armTime || 0) > 0 ? "warning_line" : "hazard_zone_hard";
+    if (source.kind === "storm_laser_net" || source.kind === "riftblade_slash") return (source.armTime || 0) > 0 ? "warning_line" : "hazard_zone_hard";
     if (source.kind === "toxic_residue" || source.kind === "frost_zone") return "hazard_armed";
     if ((source.armTime || 0) > 0.35) {
       if (source.length || source.warningType === "line") return "warning_line";
@@ -294,6 +295,7 @@ function windupScale(threat) {
 function hazardWeight(h) {
   if (h.kind === "toxic_residue" || h.kind === "frost_zone") return 1.35;
   if (h.kind === "storm_laser_net") return 1.8;
+  if (h.kind === "riftblade_slash" || h.kind === "riftblade_bladefall") return 1.9;
   if (h.kind === "blizzard_core") return 0.9;
   return 1.15;
 }
@@ -331,6 +333,8 @@ function addBossSegmentThreats(threats, player, boss, queryRadius) {
 
 function isBossDashLike(source) {
   if (source.mode === "dash") return true;
+  if (source.mode === "riftblade_dash") return true;
+  if ((source.mode === "riftblade_mirror_combo" || source.mode === "riftblade_final_combo") && source.comboStep === 1) return true;
   if (source.mode === "portal_dash" && source.portalState === "burst") return true;
   return source.dashState === "high_speed" || source.dashState === "burst_dash" || source.dashState === "coast";
 }

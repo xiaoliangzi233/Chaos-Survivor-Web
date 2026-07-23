@@ -2,12 +2,14 @@ import { emberSpawnRateForWave, emberWaveScenario, emberWaveSpawnPool } from "./
 import { neonWaveScenario } from "./neon-wave-scenarios.js";
 import { overclockSpawnRateForWave, overclockWaveScenario, overclockWaveSpawnPool } from "./overclock-wave-scenarios.js";
 import { singularitySpawnRateForWave, singularityWaveScenario, singularityWaveSpawnPool } from "./singularity-wave-scenarios.js";
+import { apocalypseWaveScenario } from "./apocalypse-wave-scenarios.js";
 
 export function waveScenarioFor(difficultyId, wave) {
   if (difficultyId === "ember") return emberWaveScenario(wave);
   if (difficultyId === "neon") return neonWaveScenario(wave);
   if (difficultyId === "overclock") return overclockWaveScenario(wave);
   if (difficultyId === "singularity") return singularityWaveScenario(wave);
+  if (difficultyId === "apocalypse") return apocalypseWaveScenario(wave);
   return null;
 }
 

@@ -2388,6 +2388,10 @@ function drawEnemyProjectiles(ctx) {
       drawStormProjectile(ctx, b);
       continue;
     }
+    if (b.shape === "riftbladeCrescent") {
+      drawRiftbladeCrescentProjectile(ctx, b);
+      continue;
+    }
     if (b.shape === "slimeOrb") {
       drawSlimeOrbProjectile(ctx, b);
       continue;
@@ -2403,6 +2407,42 @@ function drawEnemyProjectiles(ctx) {
     ctx.fillStyle = b.color; ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, TAU); ctx.fill();
     ctx.fillStyle = "#fff"; ctx.fillRect(b.x - 1, b.y - 1, 2, 2);
   }
+}
+
+function drawRiftbladeCrescentProjectile(ctx, b) {
+  const angle = Math.atan2(b.vy, b.vx);
+  const pulseK = 1 + Math.sin(state.time * 14 + (b.spin || 0)) * 0.08;
+  ctx.save();
+  ctx.translate(b.x, b.y);
+  ctx.rotate(angle);
+  ctx.scale(pulseK, 1 / pulseK);
+  ctx.globalCompositeOperation = "lighter";
+  glow(ctx, 0, 0, b.r * 2.6, 0.18, b.color);
+  ctx.strokeStyle = hexToRgba(b.color, 0.28);
+  ctx.lineWidth = b.r * 1.25;
+  ctx.lineCap = "round";
+  ctx.beginPath();
+  ctx.arc(0, 0, b.r * 1.42, -1.04, 1.04);
+  ctx.stroke();
+  ctx.strokeStyle = b.color;
+  ctx.lineWidth = 5;
+  ctx.beginPath();
+  ctx.moveTo(-b.r * 0.2, -b.r * 1.36);
+  ctx.quadraticCurveTo(b.r * 1.9, 0, -b.r * 0.2, b.r * 1.36);
+  ctx.stroke();
+  ctx.strokeStyle = "rgba(255,255,255,0.92)";
+  ctx.lineWidth = 1.6;
+  ctx.beginPath();
+  ctx.moveTo(0, -b.r * 1.16);
+  ctx.quadraticCurveTo(b.r * 1.42, 0, 0, b.r * 1.16);
+  ctx.stroke();
+  ctx.fillStyle = hexToRgba(b.color, 0.72);
+  for (let i = 0; i < 3; i++) {
+    const x = -b.r * (0.9 + i * 0.46);
+    const y = Math.sin(state.time * 18 + i * 2.1) * b.r * 0.38;
+    ctx.fillRect(x, y - 1.5, b.r * (0.36 - i * 0.06), 3);
+  }
+  ctx.restore();
 }
 
 function drawItemObjects(ctx) {
@@ -2774,6 +2814,18 @@ function drawHazards(ctx) {
       drawTwinArcFieldHazard(ctx, h, alpha);
       continue;
     }
+    if (h.kind === "riftblade_slash") {
+      drawRiftbladeSlashHazard(ctx, h, alpha);
+      continue;
+    }
+    if (h.kind === "riftblade_bladefall") {
+      drawRiftbladeBladefallHazard(ctx, h, alpha);
+      continue;
+    }
+    if (h.kind === "riftblade_echo") {
+      drawRiftbladeEchoHazard(ctx, h, alpha);
+      continue;
+    }
     if (h.kind === "ice_spike" || h.kind === "ice_seal") {
       drawIceHazard(ctx, h, alpha);
       continue;
@@ -2818,6 +2870,148 @@ function drawHazards(ctx) {
     ctx.beginPath(); ctx.arc(0, 0, h.r, 0, TAU); ctx.fill();
     ctx.restore();
   }
+}
+
+function drawRiftbladeSlashHazard(ctx, h, alpha) {
+  const armed = (h.armTime || 0) <= 0;
+  const progress = armed ? 1 : 1 - (h.armTime || 0) / Math.max(0.01, h.armDuration || 1);
+  const half = (h.length || 1200) / 2;
+  const flicker = 0.72 + Math.sin(state.time * 24 + h.angle * 3) * 0.2;
+  ctx.save();
+  ctx.translate(h.x, h.y);
+  ctx.rotate(h.angle || 0);
+  ctx.globalCompositeOperation = "lighter";
+
+  if (!armed) {
+    ctx.strokeStyle = hexToRgba(h.color, (0.22 + progress * 0.42) * flicker);
+    ctx.lineWidth = 2 + progress * 2;
+    ctx.setLineDash(h.sceneBlade ? [28, 15] : [16, 10]);
+    ctx.beginPath();
+    ctx.moveTo(-half, 0);
+    ctx.lineTo(half, 0);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = hexToRgba(h.color, 0.08 + progress * 0.12);
+    ctx.fillRect(-half, -(h.width || 18), h.length || 1200, (h.width || 18) * 2);
+    ctx.strokeStyle = hexToRgba("#ffffff", 0.38 + progress * 0.34);
+    ctx.lineWidth = 1;
+    for (let x = -half + 44; x < half; x += h.sceneBlade ? 92 : 70) {
+      ctx.beginPath();
+      ctx.moveTo(x - 10, -8);
+      ctx.lineTo(x, 0);
+      ctx.lineTo(x - 10, 8);
+      ctx.stroke();
+    }
+  } else {
+    ctx.shadowColor = h.color;
+    ctx.shadowBlur = h.style?.includes("judgment") ? 30 : 20;
+    ctx.strokeStyle = hexToRgba(h.color, 0.3 * alpha);
+    ctx.lineWidth = (h.width || 20) * 2.2;
+    ctx.beginPath();
+    ctx.moveTo(-half, 0);
+    ctx.lineTo(half, 0);
+    ctx.stroke();
+    ctx.strokeStyle = h.color;
+    ctx.lineWidth = Math.max(8, (h.width || 20) * 0.72);
+    ctx.beginPath();
+    ctx.moveTo(-half, 0);
+    ctx.lineTo(half, 0);
+    ctx.stroke();
+    ctx.strokeStyle = "rgba(255,255,255,0.96)";
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    ctx.moveTo(-half, 0);
+    ctx.lineTo(half, 0);
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = hexToRgba(h.color, 0.75 * alpha);
+    const seed = Math.floor((h.angle || 0) * 1000);
+    for (let i = 0; i < 18; i++) {
+      const x = -half + ((i * 197 + seed) % Math.max(1, h.length || 1200));
+      const y = (i % 2 ? -1 : 1) * (10 + i % 4 * 7);
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.rotate((i % 5 - 2) * 0.18);
+      ctx.fillRect(-7, -2, 14, 4);
+      ctx.restore();
+    }
+  }
+
+  if (h.sceneBlade) {
+    for (const side of [-1, 1]) {
+      ctx.save();
+      ctx.translate(side * Math.min(half - 38, WORLD_SIZE * 0.48), 0);
+      ctx.rotate(side < 0 ? Math.PI / 2 : -Math.PI / 2);
+      ctx.fillStyle = hexToRgba(h.color, armed ? 0.9 : 0.45 + progress * 0.35);
+      ctx.beginPath();
+      ctx.moveTo(0, -44);
+      ctx.lineTo(8, 4);
+      ctx.lineTo(0, 24);
+      ctx.lineTo(-8, 4);
+      ctx.closePath();
+      ctx.fill();
+      ctx.fillStyle = "rgba(255,255,255,0.75)";
+      ctx.fillRect(-1, -36, 2, 42);
+      ctx.fillStyle = "#15182a";
+      ctx.fillRect(-13, 18, 26, 6);
+      ctx.restore();
+    }
+  }
+  ctx.restore();
+}
+
+function drawRiftbladeBladefallHazard(ctx, h, alpha) {
+  const armed = (h.armTime || 0) <= 0;
+  const progress = armed ? 1 : 1 - (h.armTime || 0) / Math.max(0.01, h.armDuration || 1);
+  const spin = state.time * 1.8 + h.x * 0.001;
+  ctx.save();
+  ctx.translate(h.x, h.y);
+  ctx.globalCompositeOperation = "lighter";
+  glow(ctx, 0, 0, h.r * 0.9, (armed ? 0.28 : 0.1) * alpha, h.color);
+  ctx.strokeStyle = hexToRgba(h.color, armed ? 0.92 : 0.32 + progress * 0.42);
+  ctx.lineWidth = armed ? 4 : 2;
+  ctx.setLineDash(armed ? [] : [8, 6]);
+  ctx.beginPath();
+  ctx.arc(0, 0, h.r * (0.72 + progress * 0.28), spin, spin + Math.PI * 1.7);
+  ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.rotate(-0.72);
+  const dropY = armed ? 0 : -115 * (1 - progress);
+  ctx.translate(0, dropY);
+  ctx.shadowColor = h.color;
+  ctx.shadowBlur = armed ? 20 : 9;
+  ctx.fillStyle = hexToRgba(h.color, armed ? 0.96 : 0.42 + progress * 0.35);
+  ctx.beginPath();
+  ctx.moveTo(-6, -58);
+  ctx.lineTo(0, -76);
+  ctx.lineTo(7, -58);
+  ctx.lineTo(5, 17);
+  ctx.lineTo(-5, 17);
+  ctx.closePath();
+  ctx.fill();
+  ctx.fillStyle = "rgba(255,255,255,0.88)";
+  ctx.fillRect(-1, -60, 2, 70);
+  ctx.fillStyle = "#171a2b";
+  ctx.fillRect(-15, 14, 30, 6);
+  ctx.restore();
+}
+
+function drawRiftbladeEchoHazard(ctx, h, alpha) {
+  ctx.save();
+  ctx.translate(h.x, h.y);
+  ctx.rotate(state.time * 7 + h.x * 0.002);
+  ctx.globalCompositeOperation = "lighter";
+  glow(ctx, 0, 0, h.r, alpha * 0.2, h.color);
+  ctx.strokeStyle = hexToRgba(h.color, alpha * 0.7);
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(0, -h.r);
+  ctx.lineTo(h.r * 0.55, 0);
+  ctx.lineTo(0, h.r);
+  ctx.lineTo(-h.r * 0.55, 0);
+  ctx.closePath();
+  ctx.stroke();
+  ctx.restore();
 }
 
 function drawGearTrapHazard(ctx, h, alpha) {

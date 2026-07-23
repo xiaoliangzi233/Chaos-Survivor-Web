@@ -19,9 +19,11 @@ export function bossContext(state, world) {
   if (!boss || !p) return { active: false };
   const distance = Math.hypot(boss.x - p.x, boss.y - p.y);
   const mode = boss.mode || boss.currentAttack || boss.dashState || "";
-  const dashLike = mode.includes("dash") || boss.dashing || boss.eliteDashTime > 0 || boss.portalState === "burst";
-  const laserLike = mode.includes("laser") || mode.includes("rail") || boss.currentAttack === "fan";
-  const recoveryLike = mode.includes("recover") || mode.includes("summon") || mode === "intro";
+  const riftbladeSkill = boss.currentSkill || "";
+  const riftbladeDash = riftbladeSkill === "flash_draw" || riftbladeSkill === "mirror_combo" || riftbladeSkill === "final_combo";
+  const dashLike = mode.includes("dash") || (mode === "windup" && riftbladeDash) || boss.dashing || boss.eliteDashTime > 0 || boss.portalState === "burst";
+  const laserLike = mode.includes("laser") || mode.includes("rail") || mode.includes("sword_array") || mode.includes("judgment") || mode.includes("cross") || boss.currentAttack === "fan";
+  const recoveryLike = mode.includes("recover") || mode.includes("summon") || mode === "phase_transition" || mode === "intro";
   return {
     active: true,
     boss,

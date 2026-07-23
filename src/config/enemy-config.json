@@ -940,6 +940,30 @@
     "desc": "原“超级高铁”项目试验蛇，在废弃隧道里靠吞食废弃电缆进化成雷轨巨蛇。它现在到处画轨道线，然后呼啸而过，嘴里还念叨着“准点率100%”。",
     "tip": "雷轨预警出现时立刻离开线路，二阶段连续冲锋和电网封锁会更频繁。"
   },
+  "riftblade_saint": {
+    "name": "霓渊剑圣·断界",
+    "category": "Boss",
+    "trait": "三相剑域",
+    "hp": 60000,
+    "speed": 68,
+    "damage": 34,
+    "defense": 6,
+    "xp": 380,
+    "radius": 54,
+    "color": "#52f7ff",
+    "behavior": "boss_riftblade",
+    "boss": true,
+    "difficulties": [
+      "apocalypse"
+    ],
+    "difficultyWaves": {
+      "apocalypse": {
+        "bossWave": 10
+      }
+    },
+    "desc": "末日实验区最后一位仍保持自我意识的剑术执行官。断界把自动防卫系统重写成八柄灵剑，以青蓝试锋、紫白断界、赤金终式丈量每一个闯入者的生路。",
+    "tip": "剑痕出现后方向便会锁定。持续变向穿过安全通道，并在它收剑或单膝蓄势时让自动火力全力输出。"
+  },
   "twin_abyssal_eyes": {
     "name": "裂渊双瞳",
     "category": "Boss",

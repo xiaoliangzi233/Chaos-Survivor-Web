@@ -446,9 +446,11 @@ function updateHazards(dt) {
     if (h.kind === "brood_pod") updateBroodPod(h, dt);
     if (h.kind === "storm_laser_net") updateStormLaserNet(h, dt);
     if (h.kind === "storm_strike") updateStormStrike(h, dt);
+    if (h.kind === "polar_ice_lane") updatePolarIceLane(h, dt);
     if (h.kind === "riftblade_slash" || h.kind === "riftblade_bladefall") updateRiftbladeHazard(h, dt);
     if (h.kind === "convict_chain_arc" || h.kind === "convict_ball_slam" || h.kind === "convict_chain_line" || h.kind === "convict_chain_path") updateConvictHazard(h, dt);
     if (isScientistHazard(h)) updateScientistHazard(h, dt);
+    if (isDarkEntityHazard(h)) updateDarkEntityHazard(h, dt);
     if (h.kind === "phase_tear") updatePhaseTear(h, dt);
     if (h.kind === "inferno_beacon") updateInfernoBeacon(h, dt);
     if (h.kind === "artillery_blast") updateArtilleryBlast(h, dt);
@@ -466,28 +468,35 @@ function updateHazards(dt) {
       ((h.kind === "riftblade_slash" || h.kind === "riftblade_bladefall") && (h.armTime || 0) <= 0 && (h.damageDelay || 0) <= 0) ||
       ((h.kind === "convict_chain_arc" || h.kind === "convict_ball_slam" || h.kind === "convict_chain_line" || h.kind === "convict_chain_path") && !h.noDamage && (h.armTime || 0) <= 0) ||
       (isScientistHazard(h) && !h.noDamage) ||
+      (isDarkEntityHazard(h) && !h.noDamage && (h.armTime || 0) <= 0) ||
       (h.kind === "storm_laser_net" && (h.armTime || 0) <= 0) ||
       (h.kind === "storm_strike" && (h.armTime || 0) <= 0) ||
+      (h.kind === "polar_ice_lane" && (h.armTime || 0) <= 0) ||
       h.kind === "frost_zone" ||
       h.kind === "blizzard_core" ||
       ((h.kind === "ice_spike" || h.kind === "ice_seal") && h.exploding);
     const convictHazard = h.kind === "convict_chain_arc" || h.kind === "convict_ball_slam" || h.kind === "convict_chain_line" || h.kind === "convict_chain_path";
     const scientistHazard = isScientistHazard(h);
+    const darkEntityHazard = isDarkEntityHazard(h);
     const stormStrike = h.kind === "storm_strike";
     const stormTyrantHazard = Boolean(h.stormTyrantOwner);
+    const polarHazard = Boolean(h.polarOwner);
     const riftbladeBladeCorridor = h.kind === "riftblade_bladefall" && Array.isArray(h.lines);
-    const hit = riftbladeBladeCorridor
+    const hit = darkEntityHazard
+      ? darkEntityHazardHit(h, p)
+      : riftbladeBladeCorridor
       ? h.lines.some((line) => pointSegmentDistance(p.x, p.y, line.x1, line.y1, line.x2, line.y2) < p.r + (h.width || 31))
       : scientistHazard
       ? scientistHazardHit(h, p)
       : convictHazard
       ? convictHazardHit(h, p)
-      : h.kind === "storm_laser_net" || h.kind === "riftblade_slash"
+      : h.kind === "storm_laser_net" || h.kind === "polar_ice_lane" || h.kind === "riftblade_slash"
         ? pointLineDistance(p.x, p.y, h.x, h.y, h.angle || 0, h.length || 1200) < p.r + (h.width || 18)
         : distSq(h.x, h.y, p.x, p.y) < (h.r + p.r) ** 2;
     if (hit && p.invuln <= 0 && canDamage && !h.playerHit) {
-      const result = applyPlayerDamage(convictHazard ? convictHazardDamage(h, p) : h.damage, h);
-      if (convictHazard || scientistHazard || riftbladeBladeCorridor || stormStrike || stormTyrantHazard) h.playerHit = true;
+      const damage = darkEntityHazard ? darkEntityHazardDamage(h) : convictHazard ? convictHazardDamage(h, p) : h.damage;
+      const result = applyPlayerDamage(damage, h);
+      if (darkEntityHazard || convictHazard || scientistHazard || riftbladeBladeCorridor || stormStrike || stormTyrantHazard || polarHazard) h.playerHit = true;
       p.invuln = 0.35;
       if (result.damaged && h.frostDuration > 0) {
         if (h.frostMarks) applyFrostMark(p, { duration: h.frostDuration, slow: h.frostSlow || 0.18, freezeDuration: h.freezeDuration || 5 });
@@ -1053,6 +1062,222 @@ function isScientistHazard(h) {
     || h.kind === "scientist_void_node";
 }
 
+function isDarkEntityHazard(h) {
+  return h.kind === "dark_entity_field";
+}
+
+function updateDarkEntityHazard(h, dt) {
+  const wasArmed = (h.armTime || 0) <= 0;
+  if ((h.armTime || 0) > 0) h.armTime = Math.max(0, h.armTime - dt);
+  const armed = (h.armTime || 0) <= 0;
+  if (!wasArmed && armed) {
+    h.darkEntityArmed = true;
+    burst(h.x, h.y, h.variant === "negative_star" ? 16 : 9, h.color, h.variant === "negative_star" ? 210 : 130);
+    state.shake = Math.max(state.shake, h.scene ? 7 : 3);
+  }
+  if (armed) h.activeElapsed = Math.min(h.activeDuration || 0, (h.activeElapsed || 0) + dt);
+  const elapsed = h.activeElapsed || 0;
+
+  if (h.variant === "fold") {
+    const progress = clamp(elapsed / Math.max(0.01, h.activeDuration || 1), 0, 1);
+    const sideX = -Math.sin(h.angle || 0);
+    const sideY = Math.cos(h.angle || 0);
+    const forwardX = Math.cos(h.angle || 0);
+    const forwardY = Math.sin(h.angle || 0);
+    const outer = 1080 - Math.sin(progress * Math.PI) * 430;
+    const inner = (h.corridor || 180) / 2 + (h.width || 34);
+    const offsets = [-outer, -inner, inner, outer];
+    h.lines ||= [];
+    for (let index = 0; index < offsets.length; index++) {
+      const offset = offsets[index];
+      const cx = h.x + sideX * offset;
+      const cy = h.y + sideY * offset;
+      const half = (h.length || WORLD_SIZE) / 2;
+      h.lines[index] = writeDarkLine(
+        h.lines[index],
+        cx - forwardX * half,
+        cy - forwardY * half,
+        cx + forwardX * half,
+        cy + forwardY * half,
+        h.width,
+      );
+    }
+    h.lines.length = offsets.length;
+    setDarkEntityDamageEpoch(h, Math.floor(elapsed / 0.58));
+  } else if (h.variant === "entropy_mirror") {
+    const group = elapsed < 1.08 ? 0 : elapsed < 1.3 ? -1 : elapsed < 2.38 ? 1 : -1;
+    h.activeGroup = group;
+    h.lines = group >= 0 ? h.lineSets?.[group] || [] : [];
+    if (group >= 0) setDarkEntityDamageEpoch(h, group);
+  } else if (h.variant === "night_crown") {
+    const beat = Math.min(4, Math.floor(elapsed / 0.85));
+    if (beat !== h.beat) {
+      h.beat = beat;
+      h.gateIndex = ((h.gateIndex || 0) + (h.beatStarted ? 1 : 0)) % (h.sides || 6);
+      h.beatStarted = true;
+      setDarkEntityDamageEpoch(h, beat);
+      if (armed) h.bossOwner?.releaseNightCrownNeedles?.(h);
+    }
+    if (armed && !h.firstArmedBeatReleased) {
+      h.firstArmedBeatReleased = true;
+      h.bossOwner?.releaseNightCrownNeedles?.(h);
+    }
+    if (!h.vertices || h.geometryGateIndex !== h.gateIndex) rebuildNightCrownGeometry(h);
+  } else if (h.variant === "unmaking") {
+    h.lines ||= [];
+    h.linePool ||= [];
+    h.lines.length = 0;
+    let activeShell = -1;
+    for (let index = 0; index < (h.shells || []).length; index++) {
+      const shell = h.shells[index];
+      if (elapsed < shell.start || elapsed > shell.start + shell.duration) continue;
+      activeShell = index;
+      const progress = clamp((elapsed - shell.start) / shell.duration, 0, 1);
+      const radius = shell.fromRadius + (shell.toRadius - shell.fromRadius) * progress;
+      const vertices = writeDarkPolygonVertices(h.activeVertices, h.x, h.y, radius, 8, -Math.PI / 2);
+      h.activeVertices = vertices;
+      h.activeGateIndex = shell.gateIndex;
+      for (let side = 0; side < vertices.length; side++) {
+        if (side === shell.gateIndex) continue;
+        const start = vertices[side];
+        const end = vertices[(side + 1) % vertices.length];
+        const lineIndex = h.lines.length;
+        const line = writeDarkLine(h.linePool[lineIndex], start.x, start.y, end.x, end.y, h.width, h.damage);
+        h.linePool[lineIndex] = line;
+        h.lines.push(line);
+      }
+      const gateAngle = -Math.PI / 2 + (shell.gateIndex + 0.5) * TAU / 8;
+      const rayAngle = gateAngle + Math.PI;
+      const rayIndex = h.lines.length;
+      const ray = writeDarkLine(
+        h.linePool[rayIndex],
+        h.x + Math.cos(rayAngle) * 80,
+        h.y + Math.sin(rayAngle) * 80,
+        h.x + Math.cos(rayAngle) * radius * 0.92,
+        h.y + Math.sin(rayAngle) * radius * 0.92,
+        Math.max(18, (h.width || 30) * 0.72),
+        h.rayDamage,
+      );
+      ray.ray = true;
+      h.linePool[rayIndex] = ray;
+      h.lines.push(ray);
+      break;
+    }
+    h.activeShell = activeShell;
+    if (activeShell >= 0) setDarkEntityDamageEpoch(h, activeShell);
+  } else if (h.variant === "negative_star" && armed && !h.starReleased) {
+    h.starReleased = true;
+    setDarkEntityDamageEpoch(h, 0);
+    h.bossOwner?.releaseNegativeStarShards?.(h);
+    pulse(h.x, h.y, h.r * 1.35, h.coreColor || h.color, 0.25);
+  } else if (h.variant === "beam") {
+    setDarkEntityDamageEpoch(h, 0);
+  }
+}
+
+function darkEntityHazardHit(h, player) {
+  h.currentHitDamage = h.damage;
+  if ((h.armTime || 0) > 0 || h.noDamage) return false;
+  if (h.variant === "negative_star") {
+    return Math.hypot(player.x - h.x, player.y - h.y) < player.r + (h.r || 72);
+  }
+  for (const line of h.lines || []) {
+    const width = line.width ?? h.width ?? 24;
+    const padding = player.r + width;
+    if (line.minX != null && (
+      player.x < line.minX - padding
+      || player.x > line.maxX + padding
+      || player.y < line.minY - padding
+      || player.y > line.maxY + padding
+    )) continue;
+    if (pointSegmentDistance(player.x, player.y, line.x1, line.y1, line.x2, line.y2) < player.r + width) {
+      h.currentHitDamage = line.damage ?? h.damage;
+      return true;
+    }
+  }
+  return false;
+}
+
+function darkEntityHazardDamage(h) {
+  return h.currentHitDamage ?? h.damage;
+}
+
+function setDarkEntityDamageEpoch(h, epoch) {
+  if (h.damageEpoch === epoch) return;
+  h.damageEpoch = epoch;
+  h.playerHit = false;
+}
+
+function writeDarkPolygonVertices(target, x, y, radius, sides, rotation) {
+  const vertices = target || [];
+  for (let index = 0; index < sides; index++) {
+    const angle = rotation + index * TAU / sides;
+    const vertex = vertices[index] || {};
+    vertex.x = x + Math.cos(angle) * radius;
+    vertex.y = y + Math.sin(angle) * radius;
+    vertices[index] = vertex;
+  }
+  vertices.length = sides;
+  return vertices;
+}
+
+function rebuildNightCrownGeometry(h) {
+  h.vertices = writeDarkPolygonVertices(h.vertices, h.x, h.y, h.radius || 520, h.sides || 6, -Math.PI / 2);
+  const lines = [];
+  for (let index = 0; index < h.vertices.length; index++) {
+    const start = h.vertices[index];
+    const end = h.vertices[(index + 1) % h.vertices.length];
+    if (index === h.gateIndex) {
+      for (const line of splitDarkLineForGate(start, end, h.gateWidth || 190, h.width || 34)) {
+        lines.push(writeDarkLine(null, line.x1, line.y1, line.x2, line.y2, line.width));
+      }
+    } else {
+      lines.push(writeDarkLine(null, start.x, start.y, end.x, end.y, h.width));
+    }
+  }
+  h.lines = lines;
+  h.geometryGateIndex = h.gateIndex;
+}
+
+function writeDarkLine(line, x1, y1, x2, y2, width, damage = line?.damage) {
+  const target = line || {};
+  target.x1 = x1;
+  target.y1 = y1;
+  target.x2 = x2;
+  target.y2 = y2;
+  target.width = width;
+  target.damage = damage;
+  target.minX = Math.min(x1, x2);
+  target.maxX = Math.max(x1, x2);
+  target.minY = Math.min(y1, y2);
+  target.maxY = Math.max(y1, y2);
+  target.ray = false;
+  return target;
+}
+
+function splitDarkLineForGate(start, end, gap, width) {
+  const dx = end.x - start.x;
+  const dy = end.y - start.y;
+  const length = Math.max(1, Math.hypot(dx, dy));
+  const halfGapT = Math.min(0.45, gap / length / 2);
+  return [
+    {
+      x1: start.x,
+      y1: start.y,
+      x2: start.x + dx * (0.5 - halfGapT),
+      y2: start.y + dy * (0.5 - halfGapT),
+      width,
+    },
+    {
+      x1: start.x + dx * (0.5 + halfGapT),
+      y1: start.y + dy * (0.5 + halfGapT),
+      x2: end.x,
+      y2: end.y,
+      width,
+    },
+  ];
+}
+
 function applyScientistPull(h, dt) {
   if (!(h.pullStrength > 0) || !(h.pullRadius > 0)) return;
   const p = state.player;
@@ -1096,6 +1321,17 @@ function updateStormStrike(h, dt) {
     burst(h.x, h.y, 16, h.color, 210);
     pulse(h.x, h.y, h.r * 1.16, h.color, 0.2);
     state.shake = Math.max(state.shake, 6);
+  }
+}
+
+function updatePolarIceLane(h, dt) {
+  if (h.armTime > 0) h.armTime = Math.max(0, h.armTime - dt);
+  h.pulse = (h.pulse || 0) + dt;
+  if ((h.armTime || 0) <= 0 && !h.impactFx) {
+    h.impactFx = true;
+    burst(h.x, h.y, 14, h.color, 190);
+    pulse(h.x, h.y, Math.max(52, (h.width || 24) * 2.2), h.color, 0.16);
+    state.shake = Math.max(state.shake, h.style === "absolute_zero" ? 7 : 5);
   }
 }
 
@@ -1238,7 +1474,23 @@ function updateEnemyKnockback(e, dt) {
 }
 
 function updateSpecialEnemyProjectile(b, dt) {
-  if (b.shape === "scientistAbyssCore") {
+  if (b.shape === "darkEntityHunter") {
+    const nextT = Math.min(1, (b.pathT || 0) + dt / Math.max(0.01, b.pathDuration || 2));
+    const point = quadraticPoint(b.pathStart, b.pathControl, b.pathEnd, nextT);
+    b.vx = (point.x - b.x) / Math.max(0.001, dt);
+    b.vy = (point.y - b.y) / Math.max(0.001, dt);
+    b.spin = Math.atan2(b.vy, b.vx);
+    b.pathT = nextT;
+    if (nextT >= 1) b.life = Math.min(b.life, 0.04);
+  } else if (b.shape === "darkEntityScythe") {
+    const speed = Math.max(1, Math.hypot(b.vx, b.vy));
+    b.heading = (b.heading ?? Math.atan2(b.vy, b.vx)) + (b.curve || 0) * dt;
+    b.vx = Math.cos(b.heading) * speed;
+    b.vy = Math.sin(b.heading) * speed;
+    b.spin = b.heading;
+  } else if (b.shape === "darkEntityLance") {
+    b.spin = Math.atan2(b.vy, b.vx);
+  } else if (b.shape === "scientistAbyssCore") {
     b.spin = (b.spin || 0) + dt * (b.splitSide || 1) * 3.8;
     b.splitTimer = Math.max(0, (b.splitTimer || 0) - dt);
     if (b.splitTimer <= 0 && !b.splitDone) {
@@ -1310,6 +1562,14 @@ function updateSpecialEnemyProjectile(b, dt) {
   } else if (b.shape === "fastGear" || b.shape === "starShard" || b.shape === "phaseShard" || b.shape === "arcaneOrb" || b.shape === "slimeOrb") {
     b.spin = (b.spin || 0) + dt * (b.shape === "fastGear" ? 18 : 6);
   }
+}
+
+function quadraticPoint(start, control, end, t) {
+  const inverse = 1 - t;
+  return {
+    x: inverse * inverse * start.x + 2 * inverse * t * control.x + t * t * end.x,
+    y: inverse * inverse * start.y + 2 * inverse * t * control.y + t * t * end.y,
+  };
 }
 
 function updateRiftbladeHazard(h, dt) {

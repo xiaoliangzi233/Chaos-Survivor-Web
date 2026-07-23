@@ -3,6 +3,8 @@ import { apocalypseScenarioRiskAtPoint } from "../systems/apocalypseScenarioEven
 
 const DEFAULT_LOOK_AHEAD = 0.85;
 const SAMPLE_TIMES = [0, 0.2, 0.45, 0.85];
+const FAST_SAMPLE_TIMES = [0, 0.1, 0.2, 0.34, 0.52];
+const FIELD_SAMPLE_TIMES = [0, 0.25, 0.55, 0.85];
 
 export function collectThreats(state, world, options = {}) {
   const p = state.player;
@@ -19,6 +21,8 @@ export function collectThreats(state, world, options = {}) {
     if ((h.life ?? 1) <= 0) continue;
     if (h.delayedWarning && (h.armTime || 0) > (h.armDuration || 0)) continue;
     const lineHazard = h.kind === "storm_laser_net"
+      || h.kind === "polar_ice_lane"
+      || h.kind === "dark_entity_field"
       || h.kind === "riftblade_slash"
       || (h.kind === "riftblade_bladefall" && Array.isArray(h.lines))
       || h.kind === "convict_chain_arc"
@@ -81,6 +85,7 @@ export function normalizeThreat(kind, source, weight = 1) {
     weight,
     armTime: source.armTime || 0,
     line: source.kind === "storm_laser_net"
+      || source.kind === "polar_ice_lane"
       || source.kind === "riftblade_slash"
       || (source.kind === "riftblade_bladefall" && !source.lines)
       || ((source.kind === "convict_chain_line" || source.kind === "scientist_seal_line") && !source.lines),
@@ -111,7 +116,9 @@ export function classifyThreat(source, kind) {
   }
   if (kind === "hazard") {
     if (source.kind === "blizzard_core") return "hazard_zone_soft";
+    if (source.kind === "dark_entity_field") return (source.armTime || 0) > 0 ? "warning_line" : "hazard_zone_hard";
     if (source.kind === "storm_strike") return (source.armTime || 0) > 0 ? "warning_circle" : "hazard_armed";
+    if (source.kind === "polar_ice_lane") return (source.armTime || 0) > 0 ? "warning_line" : "hazard_zone_hard";
     if (source.kind === "convict_chain_arc" || source.kind === "convict_chain_line" || source.kind === "convict_chain_path") return (source.armTime || 0) > 0 ? "warning_line" : "hazard_zone_hard";
     if (source.kind === "convict_ball_slam") return (source.armTime || 0) > 0 ? "warning_circle" : "hazard_armed";
     if (source.kind === "scientist_seal_line" || source.kind === "scientist_tendril_path") return (source.armTime || 0) > 0 ? "warning_line" : "hazard_zone_hard";
@@ -139,9 +146,7 @@ export function classifyThreat(source, kind) {
 }
 
 export function riskSamplesForThreat(threat, lookAhead = DEFAULT_LOOK_AHEAD) {
-  if (threat.kind === "projectile_fast" || threat.kind === "enemy_dash" || threat.kind === "boss_dash" || threat.kind === "boss_segment_dash") return [0, 0.1, 0.2, 0.34, 0.52].filter((t) => t <= lookAhead);
-  if (threat.kind === "projectile_slow_field" || threat.kind === "projectile_orbit" || threat.kind === "projectile_boomerang" || threat.kind === "hazard_zone_hard" || threat.kind === "hazard_zone_soft" || threat.kind === "gravity_well") return [0, 0.25, 0.55, 0.85].filter((t) => t <= lookAhead);
-  return SAMPLE_TIMES.filter((t) => t <= lookAhead);
+  return riskSampleTemplate(threat).filter((t) => t <= lookAhead);
 }
 
 export function predictThreatPosition(threat, t) {
@@ -167,8 +172,12 @@ export function riskAtPoint(point, threats, options = {}) {
       risk += hazardRisk(point, threat);
       continue;
     }
-    const samples = riskSamplesForThreat(threat, lookAhead).filter((t) => t <= (threat.life ?? lookAhead));
-    for (const t of samples.length ? samples : [0]) {
+    const sampleTimes = riskSampleTemplate(threat);
+    const life = threat.life ?? lookAhead;
+    let sampled = false;
+    for (const t of sampleTimes) {
+      if (t > lookAhead || t > life) continue;
+      sampled = true;
       const pos = predictThreatPosition(threat, t);
       const dx = point.x - pos.x;
       const dy = point.y - pos.y;
@@ -178,8 +187,23 @@ export function riskAtPoint(point, threats, options = {}) {
       if (d < safeRadius) risk += severity * (1 + (safeRadius - d) / safeRadius) * 8;
       else risk += severity * Math.max(0, 1 - (d - safeRadius) / 180) * 0.7;
     }
+    if (!sampled) {
+      const dx = point.x - threat.x;
+      const dy = point.y - threat.y;
+      const safeRadius = (point.r || 14) + (threat.r || 0) + threatPadding(threat);
+      const d = Math.max(1, Math.hypot(dx, dy));
+      const severity = (threat.damage || 1) * (threat.weight || 1);
+      if (d < safeRadius) risk += severity * (1 + (safeRadius - d) / safeRadius) * 8;
+      else risk += severity * Math.max(0, 1 - (d - safeRadius) / 180) * 0.7;
+    }
   }
   return risk;
+}
+
+function riskSampleTemplate(threat) {
+  if (threat.kind === "projectile_fast" || threat.kind === "enemy_dash" || threat.kind === "boss_dash" || threat.kind === "boss_segment_dash") return FAST_SAMPLE_TIMES;
+  if (threat.kind === "projectile_slow_field" || threat.kind === "projectile_orbit" || threat.kind === "projectile_boomerang" || threat.kind === "hazard_zone_hard" || threat.kind === "hazard_zone_soft" || threat.kind === "gravity_well") return FIELD_SAMPLE_TIMES;
+  return SAMPLE_TIMES;
 }
 
 export function riskBreakdownAtPoint(point, threats, options = {}) {
@@ -276,6 +300,7 @@ export function surroundScore(player, enemies, options = {}) {
 
 function hazardRisk(point, threat) {
   if (threat.armTime > 0.45 && threat.kind !== "warning_line" && threat.kind !== "warning_circle") return 0;
+  if (threat.sourceKind === "dark_entity_field") return darkEntityFieldRisk(point, threat);
   if (threat.sourceKind === "scientist_entropy_field") return scientistEntropyRisk(point, threat);
   if (threat.sourceKind === "scientist_memory_path") return scientistMemoryRisk(point, threat);
   if (threat.sourceKind === "convict_chain_arc") return convictArcRisk(point, threat) * (threat.armTime > 0 ? windupScale(threat) : 1);
@@ -300,6 +325,56 @@ function hazardRisk(point, threat) {
   const severity = (threat.damage || 1) * (threat.weight || 1);
   if (d < safeRadius) return severity * (1 + (safeRadius - d) / safeRadius) * 9;
   return severity * Math.max(0, 1 - (d - safeRadius) / 150);
+}
+
+function darkEntityFieldRisk(point, threat) {
+  const source = threat.source || {};
+  const warningScale = threat.armTime > 0 ? windupScale(threat) : 1;
+  if (source.variant === "lane_guide") {
+    const angle = source.angle || 0;
+    const sideX = -Math.sin(angle);
+    const sideY = Math.cos(angle);
+    const side = Math.abs((point.x - source.x) * sideX + (point.y - source.y) * sideY);
+    const safeHalf = Math.max(70, (source.width || 170) / 2 - (point.r || 14));
+    return side <= safeHalf ? 0 : (threat.weight || 1) * warningScale * Math.min(18, 5 + (side - safeHalf) / 80);
+  }
+  if (source.variant === "wing_guide") {
+    let risk = 0;
+    for (const angle of source.angles || []) {
+      const length = source.length || 1200;
+      risk = Math.max(risk, segmentRisk(
+        point,
+        source.x,
+        source.y,
+        source.x + Math.cos(angle) * length,
+        source.y + Math.sin(angle) * length,
+        (point.r || 14) + 34,
+        threat,
+      ));
+    }
+    return risk * warningScale;
+  }
+  if (source.variant === "hunter_guide") {
+    const angle = source.angle || 0;
+    const dx = point.x - source.x;
+    const dy = point.y - source.y;
+    const forward = dx * Math.cos(angle) + dy * Math.sin(angle);
+    const side = Math.abs(dx * -Math.sin(angle) + dy * Math.cos(angle));
+    const halfLength = (source.length || 760) / 2;
+    const width = (source.width || 120) * Math.max(0.25, 1 - Math.abs(forward) / Math.max(1, halfLength));
+    return Math.abs(forward) <= halfLength && side < width + (point.r || 14)
+      ? (threat.weight || 1) * warningScale * 10
+      : 0;
+  }
+  if (Array.isArray(source.lines) && source.lines.length) {
+    return convictMultiLineRisk(point, threat, source.lines) * warningScale;
+  }
+  const dx = point.x - source.x;
+  const dy = point.y - source.y;
+  const distance = Math.hypot(dx, dy);
+  const safe = (point.r || 14) + (source.r || 32) + 18;
+  if (distance > safe + 150) return 0;
+  return (threat.damage || 1) * (threat.weight || 1) * warningScale * (distance < safe ? 10 : Math.max(0, 1 - (distance - safe) / 150) * 4);
 }
 
 function gravityRisk(point, threat) {
@@ -398,10 +473,18 @@ function scientistEntropyRisk(point, threat) {
   return severity * Math.max(0, 1 - ringDistance / 260) * 1.5;
 }
 
-function convictMultiLineRisk(point, threat) {
-  const safe = (point.r || 14) + (threat.width || 18) + 16;
+function convictMultiLineRisk(point, threat, lines = threat.lines || []) {
   let risk = 0;
-  for (const line of threat.lines || []) risk = Math.max(risk, segmentRisk(point, line.x1, line.y1, line.x2, line.y2, safe, threat));
+  for (const line of lines) {
+    const safe = (point.r || 14) + (line.width ?? threat.width ?? 18) + 16;
+    if (line.minX != null && (
+      point.x < line.minX - safe
+      || point.x > line.maxX + safe
+      || point.y < line.minY - safe
+      || point.y > line.maxY + safe
+    )) continue;
+    risk = Math.max(risk, segmentRisk(point, line.x1, line.y1, line.x2, line.y2, safe, threat));
+  }
   return risk;
 }
 
@@ -449,6 +532,8 @@ function hazardWeight(h) {
   if (h.kind === "toxic_residue" || h.kind === "frost_zone") return 1.35;
   if (h.kind === "storm_laser_net") return 1.8;
   if (h.kind === "storm_strike") return 1.85;
+  if (h.kind === "polar_ice_lane") return 1.92;
+  if (h.kind === "dark_entity_field") return 2.15;
   if (h.kind === "riftblade_slash" || h.kind === "riftblade_bladefall") return 1.9;
   if (h.kind === "convict_chain_arc" || h.kind === "convict_ball_slam" || h.kind === "convict_chain_line" || h.kind === "convict_chain_path") return 1.95;
   if (h.kind === "scientist_seal_line"
@@ -494,6 +579,8 @@ function addBossSegmentThreats(threats, player, boss, queryRadius) {
 
 function isBossDashLike(source) {
   if (source.mode === "dash") return true;
+  if ((source.mode === "windup" || source.mode === "crystal_dash") && source.currentSkill === "glacial_lance") return true;
+  if (source.mode === "polar_glacial_dash") return true;
   if (source.mode === "windup" && (source.currentSkill === "thunder_lance" || source.currentSkill === "echo_lance")) return true;
   if (source.mode === "storm_lance_dash" || source.mode === "storm_echo_dash") return true;
   if (source.mode === "riftblade_dash") return true;

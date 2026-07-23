@@ -241,8 +241,9 @@ export function updateEffects(dt) {
   const viewH = (window.innerHeight || 720) / CAMERA_ZOOM;
   const maxDx = viewW * 0.75 + 520;
   const maxDy = viewH * 0.75 + 520;
-  for (let i = world.particles.length - 1; i >= 0; i--) {
-    const p = world.particles[i];
+  let writeIndex = 0;
+  for (let index = 0; index < world.particles.length; index++) {
+    const p = world.particles[index];
     if (p.drift) {
       p.vx += Math.sin(p.t * 1.7 + p.x * 0.015) * p.drift * dt;
       p.vy += Math.cos(p.t * 1.3 + p.y * 0.014) * p.drift * 0.45 * dt;
@@ -251,8 +252,10 @@ export function updateEffects(dt) {
     p.y += p.vy * dt;
     p.life -= dt;
     p.t += dt;
-    if (p.life <= 0 || (p.ambient && (Math.abs(p.x - state.cameraX) > maxDx || Math.abs(p.y - state.cameraY) > maxDy))) world.particles.splice(i, 1);
+    if (p.life <= 0 || (p.ambient && (Math.abs(p.x - state.cameraX) > maxDx || Math.abs(p.y - state.cameraY) > maxDy))) continue;
+    world.particles[writeIndex++] = p;
   }
+  world.particles.length = writeIndex;
 }
 
 export function drawEffects(ctx) {

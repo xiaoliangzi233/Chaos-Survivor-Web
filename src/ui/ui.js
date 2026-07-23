@@ -18,9 +18,6 @@ const FALLBACK_VERSION = "v0.1.0";
 
 export const gameConfig = {
   version: FALLBACK_VERSION,
-  leaderboardApiBaseUrl: "api",
-  userInfoUrl: "api/v1/survivor/session",
-  skipTokenValidationOnLocalhost: false,
 };
 
 export const ui = {

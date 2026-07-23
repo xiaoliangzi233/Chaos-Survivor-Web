@@ -22,7 +22,8 @@ export function bossContext(state, world) {
   const currentSkill = boss.currentSkill || "";
   const riftbladeDash = currentSkill === "flash_draw" || currentSkill === "mirror_combo" || currentSkill === "final_combo";
   const stormDash = currentSkill === "thunder_lance" || currentSkill === "echo_lance";
-  const dashLike = mode.includes("dash") || (mode === "windup" && (riftbladeDash || stormDash)) || boss.dashing || boss.eliteDashTime > 0 || boss.portalState === "burst";
+  const polarDash = currentSkill === "glacial_lance";
+  const dashLike = mode.includes("dash") || (mode === "windup" && (riftbladeDash || stormDash || polarDash)) || boss.dashing || boss.eliteDashTime > 0 || boss.portalState === "burst";
   const chainPressure = mode.includes("convict_sweep") || mode.includes("convict_garrote") || mode.includes("convict_triple") || mode.includes("convict_bounce") || mode.includes("convict_command") || mode.includes("convict_scene");
   const scientistPressure = mode.includes("scientist_scene")
     || mode === "scientist_cast"
@@ -31,8 +32,17 @@ export function bossContext(state, world) {
     || mode.includes("storm_skyfall")
     || mode.includes("storm_tempest")
     || ["thunder_cage", "skyfall_decree", "tempest_throne"].includes(boss.currentSkill);
-  const laserLike = mode.includes("laser") || mode.includes("rail") || mode.includes("sword_array") || mode.includes("judgment") || mode.includes("cross") || chainPressure || scientistPressure || stormPressure || boss.currentAttack === "fan";
-  const recoveryLike = mode.includes("recover") || mode.includes("summon") || mode === "scientist_abyss_release" || mode === "phase_transition" || mode === "intro";
+  const polarPressure = mode.includes("polar_cross")
+    || mode.includes("polar_gallery")
+    || mode.includes("polar_whiteout")
+    || mode.includes("polar_absolute")
+    || ["ice_cross", "frozen_gallery", "whiteout_hunt", "absolute_zero"].includes(boss.currentSkill);
+  const darkEntityPressure = mode.includes("dark_entity_scene")
+    || mode === "dark_entity_cast"
+    || mode === "dark_entity_windup"
+    || ["null_lance_matrix", "umbra_wing_shear", "dark_fold_corridor", "negative_starfall", "eclipse_exchange", "entropy_prism", "night_crown_matrix", "void_hunter_swarm", "unmaking_rite"].includes(boss.currentSkill);
+  const laserLike = mode.includes("laser") || mode.includes("rail") || mode.includes("sword_array") || mode.includes("judgment") || mode.includes("cross") || chainPressure || scientistPressure || stormPressure || polarPressure || darkEntityPressure || boss.currentAttack === "fan";
+  const recoveryLike = mode.includes("recover") || mode.includes("summon") || mode.includes("transition") || mode.includes("intro") || mode === "scientist_abyss_release";
   return {
     active: true,
     boss,

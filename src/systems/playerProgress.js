@@ -1,4 +1,4 @@
-const STORAGE_PREFIX = "pixel-survivor-player-progress-v1:";
+const STORAGE_KEY = "pixel-survivor-player-progress-v1:local-dev";
 const LEGACY_STORAGE_KEYS = [
   "pixel-survivor-best",
   "pixel-survivor-difficulty-progress",
@@ -6,57 +6,18 @@ const LEGACY_STORAGE_KEYS = [
 ];
 const CODEX_TYPES = ["enemies", "weapons", "items", "events"];
 
-let apiBaseUrl = "api";
-let identity = createIdentity();
 let difficultyIds = [];
 let progress = emptyProgress();
-let identityVersion = 0;
-let syncPromise = null;
-let syncRequested = false;
 
-globalThis.addEventListener?.("online", () => {
-  if (canSyncRemotely()) void flushPlayerProgress();
-});
-
-export function configurePlayerProgress({ baseUrl, token, user, localMode = false } = {}) {
-  const nextIdentity = createIdentity({ token, user, localMode });
-  const identityChanged = nextIdentity.storageId !== identity.storageId
-    || nextIdentity.token !== identity.token
-    || nextIdentity.localMode !== identity.localMode;
-  apiBaseUrl = normalizeBaseUrl(baseUrl);
-  identity = nextIdentity;
-  if (identityChanged) {
-    identityVersion++;
-    progress = emptyProgress();
-    syncRequested = false;
-  }
+export function configurePlayerProgress() {
+  // Progress is intentionally browser-local; no identity or backend is required.
 }
 
 export async function loadPlayerProgress({ difficultyIds: nextDifficultyIds = [] } = {}) {
   difficultyIds = uniqueStrings(nextDifficultyIds);
-  const version = identityVersion;
   progress = normalizeProgress(readCachedProgress());
   discardLegacyProgress();
-
-  if (identity.localMode) {
-    persistCurrentProgress();
-    return getPlayerProgressSnapshot();
-  }
-  if (!identity.userId || !identity.token) {
-    return getPlayerProgressSnapshot();
-  }
-
-  try {
-    const remote = normalizeProgress(await requestJson(`${apiBaseUrl}/v1/survivor/progress`, { method: "GET" }));
-    if (version !== identityVersion) return getPlayerProgressSnapshot();
-    const merged = mergeProgress(remote, progress);
-    const hasUnsyncedCache = JSON.stringify(merged) !== JSON.stringify(remote);
-    progress = merged;
-    persistCurrentProgress();
-    if (hasUnsyncedCache) requestProgressSync();
-  } catch {
-    // The account-scoped cache is safe to use offline and will be merged on the next successful request.
-  }
+  persistCurrentProgress();
   return getPlayerProgressSnapshot();
 }
 
@@ -78,7 +39,7 @@ export function getBestSurvivalSeconds() {
 
 export function savePlayerDifficultyProgress(value) {
   progress = mergeProgress(progress, { difficultyProgress: value });
-  persistAndSync();
+  persistCurrentProgress();
   return getPlayerDifficultyProgress();
 }
 
@@ -86,7 +47,7 @@ export function recordPlayerCodexEntry(type, id) {
   const normalizedId = String(id || "").trim();
   if (!CODEX_TYPES.includes(type) || !normalizedId || progress.codex[type].includes(normalizedId)) return false;
   progress.codex[type].push(normalizedId);
-  persistAndSync();
+  persistCurrentProgress();
   return true;
 }
 
@@ -94,82 +55,12 @@ export function recordBestSurvivalSeconds(seconds) {
   const normalized = boundedInteger(seconds, 0, 86400);
   if (normalized <= progress.bestSurvivalSeconds) return false;
   progress.bestSurvivalSeconds = normalized;
-  persistAndSync();
+  persistCurrentProgress();
   return true;
 }
 
 export function flushPlayerProgress() {
-  if (!canSyncRemotely()) return Promise.resolve(getPlayerProgressSnapshot());
-  syncRequested = true;
-  if (!syncPromise) {
-    syncPromise = (async () => {
-      do {
-        syncRequested = false;
-        const version = identityVersion;
-        const payload = getPlayerProgressSnapshot();
-        try {
-          const remote = await requestJson(`${apiBaseUrl}/v1/survivor/progress`, {
-            method: "PUT",
-            body: JSON.stringify(payload),
-          });
-          if (version !== identityVersion) return;
-          progress = mergeProgress(progress, remote);
-          persistCurrentProgress();
-        } catch {
-          if (version === identityVersion) syncRequested = false;
-          return;
-        }
-      } while (syncRequested);
-    })().finally(() => {
-      syncPromise = null;
-      if (syncRequested && canSyncRemotely()) queueMicrotask(() => void flushPlayerProgress());
-    });
-  }
-  return syncPromise;
-}
-
-function persistAndSync() {
-  persistCurrentProgress();
-  requestProgressSync();
-}
-
-function requestProgressSync() {
-  if (!canSyncRemotely()) return;
-  syncRequested = true;
-  queueMicrotask(() => void flushPlayerProgress());
-}
-
-function canSyncRemotely() {
-  return !identity.localMode && Boolean(identity.userId && identity.token);
-}
-
-async function requestJson(url, options) {
-  const response = await fetch(url, {
-    ...options,
-    headers: {
-      Authorization: identity.token,
-      ...(options.body ? { "Content-Type": "application/json" } : {}),
-    },
-    cache: "no-store",
-  });
-  let body = null;
-  try {
-    body = await response.json();
-  } catch {
-    body = null;
-  }
-  if (!response.ok) throw new Error(body?.message || `玩家进度请求失败（${response.status}）`);
-  return body;
-}
-
-function createIdentity({ token = "", user = null, localMode = false } = {}) {
-  const userId = String(user?.id || "").trim();
-  return {
-    token: String(token || "").trim(),
-    userId,
-    localMode: Boolean(localMode),
-    storageId: localMode ? "local-dev" : userId,
-  };
+  return Promise.resolve(getPlayerProgressSnapshot());
 }
 
 function emptyProgress() {
@@ -222,20 +113,20 @@ function mergeProgress(...values) {
         targetRecord.completedAt = sourceRecord.completedAt;
       }
     }
-    for (const type of CODEX_TYPES) merged.codex[type] = uniqueStrings([...merged.codex[type], ...source.codex[type]]);
+    for (const type of CODEX_TYPES) {
+      merged.codex[type] = uniqueStrings([...merged.codex[type], ...source.codex[type]]);
+    }
   }
   return normalizeProgress(merged);
 }
 
 function readCachedProgress() {
-  const key = currentStorageKey();
-  if (!key) return {};
   try {
-    const parsed = JSON.parse(localStorage.getItem(key) || "{}");
+    const parsed = JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}");
     return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : {};
   } catch {
     try {
-      localStorage.removeItem(key);
+      localStorage.removeItem(STORAGE_KEY);
     } catch {
       // Storage can be disabled without blocking game startup.
     }
@@ -244,17 +135,11 @@ function readCachedProgress() {
 }
 
 function persistCurrentProgress() {
-  const key = currentStorageKey();
-  if (!key) return;
   try {
-    localStorage.setItem(key, JSON.stringify(progress));
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(progress));
   } catch {
     // In-memory progress still works when storage is unavailable.
   }
-}
-
-function currentStorageKey() {
-  return identity.storageId ? `${STORAGE_PREFIX}${encodeURIComponent(identity.storageId)}` : "";
 }
 
 function discardLegacyProgress() {
@@ -291,9 +176,4 @@ function minimumPositive(first, second) {
 
 function validCompletedAt(value) {
   return typeof value === "string" && value.length > 0 && value.length <= 64;
-}
-
-function normalizeBaseUrl(value) {
-  const base = String(value || "api").trim() || "api";
-  return base.endsWith("/") ? base.slice(0, -1) : base;
 }

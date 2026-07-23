@@ -1,6 +1,3 @@
 {
-  "version": "beta 0.14",
-  "leaderboardApiBaseUrl": "api",
-  "userInfoUrl": "api/v1/survivor/session",
-  "skipTokenValidationOnLocalhost": true
+  "version": "beta 0.14"
 }

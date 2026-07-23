@@ -2,7 +2,6 @@
 .edge-ai-test
 .agents/
 .VSCodeCounter/
-backend
 scripts
 tests
 **/__pycache__

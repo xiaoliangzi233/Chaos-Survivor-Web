@@ -1,27 +1,10 @@
 services:
-  leaderboard:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
-    image: survivor-leaderboard:latest
-    container_name: survivor-leaderboard
-    environment:
-      SURVIVOR_DB_PATH: /data/leaderboard.db
-    volumes:
-      - leaderboard-data:/data
-    restart: unless-stopped
-
   survivor:
     build:
       context: .
       dockerfile: Dockerfile
     image: survivor:latest
     container_name: survivor
-    depends_on:
-      - leaderboard
     ports:
       - "127.0.0.1:5000:80"
     restart: unless-stopped
-
-volumes:
-  leaderboard-data:

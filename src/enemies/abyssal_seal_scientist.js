@@ -4,7 +4,7 @@ import { burst, pulse, trail } from "../effects.js";
 import { clamp } from "../utils.js";
 import { playSfx } from "../audio.js";
 import { applyPlayerDamage } from "../systems/items.js";
-import { BaseEnemy } from "./BaseEnemy.js";
+import { BaseEnemy, spawnConfigured } from "./BaseEnemy.js";
 
 export const ABYSSAL_SCIENTIST_PHASE_THRESHOLD = 0.52;
 export const ABYSSAL_SCIENTIST_SAFE_CORRIDORS = Object.freeze({ entropyGap: 0.72, memoryPath: 140, manifestation: 160 });
@@ -1289,6 +1289,8 @@ export class AbyssalSealScientist extends BaseEnemy {
       playSfx(nextStage === 3 ? "wave" : "level");
     }
     if (this.modeTimer <= 0 && !this.releaseFinalized) {
+      const entity = spawnConfigured("dark_energy_entity", this.x, this.y);
+      if (!entity) return;
       this.releaseFinalized = true;
       this.clearOwnedEffects();
       super.kill();

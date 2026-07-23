@@ -37,38 +37,15 @@ import { loadEditableGameData } from "../config/editableGameData.js";
 import { initAi, updateAi } from "../ai/aiController.js";
 import { loadAiRunConfig, loadAiTrainingModeConfig } from "../ai/aiConfigLoader.js";
 import { difficultyCards } from "../difficulty.js";
-import { initializeUserProfile } from "../services/userProfile.js";
-import {
-  beginLeaderboardRun,
-  checkpointLeaderboardRun,
-  configureLeaderboard,
-  finishLeaderboardRun,
-  hasActiveLeaderboardRun,
-  updateLeaderboardRun,
-} from "../systems/leaderboard.js";
-import {
-  closeLeaderboard,
-  initLeaderboardUi,
-  isLeaderboardOpen,
-  setLeaderboardUserSession,
-} from "../ui/leaderboardUi.js";
 import { cancelStoryPlayback, initStoryUi, playDifficultyStoryIfNeeded } from "../ui/storyUi.js";
-import { configureFeedback } from "../systems/feedback.js";
 import {
   configurePlayerProgress,
   loadPlayerProgress,
   recordBestSurvivalSeconds,
 } from "../systems/playerProgress.js";
-import {
-  closeFeedback,
-  initFeedbackUi,
-  isFeedbackOpen,
-  setFeedbackUserSession,
-} from "../ui/feedbackUi.js";
 import { closeHelp, initHelpUi, isHelpOpen } from "../ui/helpUi.js";
 import { clearWaveEventNotice, initWaveEventUi, showWaveEventNotice } from "../ui/waveEventUi.js";
 import { initDebugModeUi, updateDebugModeUi } from "../ui/debugModeUi.js";
-import { loadAccessConfig } from "../config/accessConfig.js";
 
 const LEVEL_CHOICE_REFRESH_COST = 10;
 
@@ -83,67 +60,12 @@ export async function bootGame() {
   initHelpUi({
     onBeforeOpen: () => {
       closeCodex();
-      closeLeaderboard();
-      closeFeedback();
     },
   });
   setBootProgress(18, "正在同步版本配置");
-  const config = await loadGameConfig();
-  const accessConfig = await loadAccessConfig();
-  const anonymousLocalPlay = accessConfig.anonymousLocalPlay.enabled;
-  const skipLocalTokenValidation = Boolean(config.skipTokenValidationOnLocalhost) && isLocalDevelopmentHost();
-  const skipTokenValidation = anonymousLocalPlay || skipLocalTokenValidation;
-  setBootProgress(30, "正在识别玩家身份");
-  let userSession = await initializeUserProfile({
-    url: config.userInfoUrl,
-    skipTokenValidation,
-  });
-  setBootProgress(
-    userSession.status === "ready" || userSession.status === "local" ? 42 : 38,
-    userSession.status === "ready"
-      ? "玩家档案已就绪"
-      : userSession.status === "local"
-        ? anonymousLocalPlay
-          ? "匿名本地模式：进度仅保存到当前浏览器"
-          : "本地调试模式：已跳过身份校验"
-        : "访客模式：排行榜暂不可同步",
-  );
-  configureLeaderboard({
-    baseUrl: config.leaderboardApiBaseUrl,
-    token: userSession.token,
-    user: userSession.user,
-    enabled: !anonymousLocalPlay,
-  });
-  configureFeedback({
-    baseUrl: config.leaderboardApiBaseUrl,
-    token: userSession.token,
-    user: userSession.user,
-  });
-  configurePlayerProgress({
-    baseUrl: config.leaderboardApiBaseUrl,
-    token: userSession.token,
-    user: userSession.user,
-    localMode: userSession.status === "local",
-  });
-  initLeaderboardUi({
-    session: userSession,
-    enabled: !anonymousLocalPlay,
-    onBeforeOpen: () => {
-      closeCodex();
-      closeFeedback();
-      closeHelp();
-    },
-    onRefreshIdentity: refreshLeaderboardIdentity,
-  });
-  initFeedbackUi({
-    session: userSession,
-    onBeforeOpen: () => {
-      closeCodex();
-      closeLeaderboard();
-      closeHelp();
-    },
-    onRefreshIdentity: refreshLeaderboardIdentity,
-  });
+  await loadGameConfig();
+  configurePlayerProgress();
+  setBootProgress(42, "本地进度已就绪");
   setBootProgress(54, "正在加载武器与道具");
   await loadEditableGameData();
   refreshStarterWeapons();
@@ -165,43 +87,9 @@ export async function bootGame() {
   let fpsAcc = 0;
   let fpsFrames = 0;
 
-  async function refreshLeaderboardIdentity() {
-    userSession = await initializeUserProfile({
-      force: true,
-      url: config.userInfoUrl,
-      skipTokenValidation,
-    });
-    configureLeaderboard({
-      baseUrl: config.leaderboardApiBaseUrl,
-      token: userSession.token,
-      user: userSession.user,
-      enabled: !anonymousLocalPlay,
-    });
-    configureFeedback({
-      baseUrl: config.leaderboardApiBaseUrl,
-      token: userSession.token,
-      user: userSession.user,
-    });
-    configurePlayerProgress({
-      baseUrl: config.leaderboardApiBaseUrl,
-      token: userSession.token,
-      user: userSession.user,
-      localMode: userSession.status === "local",
-    });
-    await loadPlayerProgress({ difficultyIds: difficultyOrder });
-    loadDifficultyProgress();
-    updateBestText();
-    setLeaderboardUserSession(userSession);
-    setFeedbackUserSession(userSession);
-    return userSession;
-  }
-
   function start() {
-    if (isLeaderboardOpen() || isFeedbackOpen() || isHelpOpen()) return;
-    if (hasActiveLeaderboardRun()) finishLeaderboardRun(leaderboardSnapshot(), "ABANDONED");
+    if (isHelpOpen()) return;
     closeCodex();
-    closeLeaderboard();
-    closeFeedback();
     closeHelp();
     clearWaveEventNotice();
     hideAllOverlays();
@@ -231,12 +119,11 @@ export async function bootGame() {
 
     await playDifficultyStoryIfNeeded({
       difficultyId: difficulty.id,
-      playerId: userSession.status === "ready" ? userSession.user?.id : "local-dev",
+      playerId: "local-dev",
     });
 
     if (state.mode !== "story") return false;
     state.mode = "playing";
-    if (!state.debug?.runTainted) beginLeaderboardRun(difficulty.id);
     resetWaveScenarioState();
     const scenario = applyWaveStartScenario();
     showWaveEventNotice({ wave: state.wave, scenario, boss: isBossWave(state.wave) });
@@ -364,11 +251,6 @@ export async function bootGame() {
   function endGame(victory) {
     clearWaveEventNotice();
     resetWaveScenarioState();
-    if (state.debug?.runTainted) {
-      if (hasActiveLeaderboardRun()) finishLeaderboardRun(leaderboardSnapshot(), "ABANDONED");
-    } else {
-      finishLeaderboardRun(leaderboardSnapshot(), victory ? "VICTORY" : "DEFEAT");
-    }
     state.mode = "ended";
     state.victory = victory;
     if (victory && !state.debug?.runTainted) recordDifficultyVictory();
@@ -409,10 +291,7 @@ export async function bootGame() {
 
   function returnToMenu() {
     cancelStoryPlayback();
-    if (hasActiveLeaderboardRun()) finishLeaderboardRun(leaderboardSnapshot(), "ABANDONED");
     closeCodex();
-    closeLeaderboard();
-    closeFeedback();
     closeHelp();
     clearWaveEventNotice();
     stopMusic();
@@ -429,10 +308,7 @@ export async function bootGame() {
     if (!difficultyCards().some((entry) => entry.id === difficultyId)) return false;
     if (!STARTER_WEAPONS.some((entry) => entry.id === weaponId)) return false;
     cancelStoryPlayback();
-    if (hasActiveLeaderboardRun()) finishLeaderboardRun(leaderboardSnapshot(), "ABANDONED");
     closeCodex();
-    closeLeaderboard();
-    closeFeedback();
     closeHelp();
     clearWaveEventNotice();
     hideAllOverlays();
@@ -456,7 +332,6 @@ export async function bootGame() {
 
   function taintRunForDebug() {
     state.debug.runTainted = true;
-    if (hasActiveLeaderboardRun()) finishLeaderboardRun(leaderboardSnapshot(), "ABANDONED");
   }
 
   function pauseForDebug() {
@@ -477,7 +352,6 @@ export async function bootGame() {
     const debugFreeze = Boolean(state.debug?.enabled && state.debug.freezeWave);
     state.bossWaveActive = bossWave || Boolean(world.boss);
     state.time += dt;
-    if (!state.debug?.runTainted) updateLeaderboardRun(dt, leaderboardSnapshot());
     if (!bossWave && !debugFreeze) state.waveTimeLeft = Math.max(0, state.waveTimeLeft - dt);
     state.shake = Math.max(0, state.shake - dt * 20);
     state.flash = Math.max(0, state.flash - dt * 3);
@@ -525,12 +399,6 @@ export async function bootGame() {
 
   resizeCanvas(ui.canvas, ctx);
   window.addEventListener("resize", () => resizeCanvas(ui.canvas, ctx));
-  document.addEventListener("visibilitychange", () => {
-    if (document.visibilityState === "hidden") checkpointLeaderboardRun(leaderboardSnapshot());
-  });
-  window.addEventListener("pagehide", (event) => {
-    if (!event.persisted && hasActiveLeaderboardRun()) finishLeaderboardRun(leaderboardSnapshot(), "ABANDONED");
-  });
   bindInput({ start, restart: start, togglePause, resume: resumeGame, returnToMenu });
   resetRun(generateMap());
   state.shop = createShopState();
@@ -559,17 +427,4 @@ export async function bootGame() {
   });
   updateBestText();
   requestAnimationFrame(loop);
-
-  function leaderboardSnapshot() {
-    return {
-      time: state.time,
-      kills: state.kills,
-      bossKills: state.bossKills,
-    };
-  }
-}
-
-function isLocalDevelopmentHost() {
-  const host = window.location.hostname.trim().toLowerCase();
-  return host === "localhost" || host === "127.0.0.1" || host === "[::1]" || host === "::1";
 }

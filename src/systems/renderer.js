@@ -12,6 +12,7 @@ import { drawAiDebug, drawAiHud } from "../ai/aiDebugDraw.js";
 import { drawApocalypseScenarioEvent } from "./apocalypseScenarioEvents.js";
 
 export const viewport = { width: 1, height: 1, dpr: 1 };
+const darkEntityProjectileSprites = new Map();
 
 export function bossHudLayout(view, boss) {
   const twin = Boolean(boss?.shared?.members);
@@ -2375,6 +2376,11 @@ function drawCoins(ctx) {
 
 function drawEnemyProjectiles(ctx) {
   for (const b of world.enemyProjectiles) {
+    if (!inView(b.x, b.y, Math.max(72, (b.r || 8) * 5))) continue;
+    if (b.shape === "darkEntityLance" || b.shape === "darkEntityScythe" || b.shape === "darkEntityHunter") {
+      drawDarkEntityProjectile(ctx, b);
+      continue;
+    }
     if (b.shape === "snowflake" || b.shape === "frostComet") {
       drawSnowflakeProjectile(ctx, b);
       continue;
@@ -2425,6 +2431,97 @@ function drawEnemyProjectiles(ctx) {
     }
     ctx.fillStyle = b.color; ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, TAU); ctx.fill();
     ctx.fillStyle = "#fff"; ctx.fillRect(b.x - 1, b.y - 1, 2, 2);
+  }
+}
+
+function drawDarkEntityProjectile(ctx, b) {
+  const angle = Math.atan2(b.vy, b.vx);
+  const sprite = darkEntityProjectileSprite(b);
+  const wobble = b.shape === "darkEntityScythe" ? Math.sin(state.time * 7 + (b.spin || 0)) * 0.12 : 0;
+  ctx.save();
+  ctx.translate(b.x, b.y);
+  ctx.rotate(angle + wobble);
+  ctx.globalCompositeOperation = "lighter";
+  ctx.drawImage(sprite.canvas, -sprite.width / 2, -sprite.height / 2, sprite.width, sprite.height);
+  ctx.restore();
+}
+
+function darkEntityProjectileSprite(b) {
+  const r = Math.max(2, Math.round((b.r || 8) * 2) / 2);
+  const color = b.color || "#8b5cf6";
+  const key = `${b.shape}:${r}:${color}`;
+  const cached = darkEntityProjectileSprites.get(key);
+  if (cached) return cached;
+  const width = Math.ceil(r * (b.shape === "darkEntityHunter" ? 7 : 10) + 18);
+  const height = Math.ceil(r * (b.shape === "darkEntityScythe" ? 7 : 5) + 18);
+  const scale = 2;
+  const canvas = document.createElement("canvas");
+  canvas.width = width * scale;
+  canvas.height = height * scale;
+  const spriteCtx = canvas.getContext("2d", { alpha: true });
+  spriteCtx.scale(scale, scale);
+  spriteCtx.translate(width / 2, height / 2);
+  paintDarkEntityProjectileSprite(spriteCtx, { ...b, r, color });
+  const sprite = { canvas, width, height };
+  darkEntityProjectileSprites.set(key, sprite);
+  return sprite;
+}
+
+function paintDarkEntityProjectileSprite(ctx, b) {
+  glow(ctx, 0, 0, b.r * (b.shape === "darkEntityHunter" ? 2.8 : 2.2), 0.32, b.color || "#8b5cf6");
+  if (b.shape === "darkEntityLance") {
+    const gradient = ctx.createLinearGradient(-b.r * 4.2, 0, b.r * 2.4, 0);
+    gradient.addColorStop(0, hexToRgba(b.color || "#8b5cf6", 0));
+    gradient.addColorStop(0.56, hexToRgba(b.color || "#8b5cf6", 0.55));
+    gradient.addColorStop(1, "#ffffff");
+    ctx.fillStyle = gradient;
+    ctx.beginPath();
+    ctx.moveTo(b.r * 2.5, 0);
+    ctx.lineTo(-b.r * 1.4, -b.r * 0.82);
+    ctx.lineTo(-b.r * 4.1, 0);
+    ctx.lineTo(-b.r * 1.4, b.r * 0.82);
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = "#fff3b0";
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(b.r * 2.1, 0);
+    ctx.lineTo(-b.r * 2.2, 0);
+    ctx.stroke();
+  } else if (b.shape === "darkEntityScythe") {
+    ctx.strokeStyle = "#ffffff";
+    ctx.lineWidth = 3;
+    ctx.fillStyle = hexToRgba(b.color || "#ff4dd8", 0.62);
+    ctx.beginPath();
+    ctx.moveTo(b.r * 2.9, -b.r * 0.25);
+    ctx.quadraticCurveTo(-b.r * 0.2, -b.r * 2.6, -b.r * 2.5, b.r * 0.9);
+    ctx.quadraticCurveTo(-b.r * 0.1, -b.r * 0.55, b.r * 2.9, -b.r * 0.25);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    ctx.strokeStyle = "#fff3b0";
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(b.r * 1.8, -b.r * 0.35);
+    ctx.quadraticCurveTo(-b.r * 0.2, -b.r * 1.55, -b.r * 1.65, b.r * 0.45);
+    ctx.stroke();
+  } else {
+    ctx.fillStyle = "#05020b";
+    ctx.strokeStyle = "#ffffff";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(b.r * 2.6, 0);
+    ctx.lineTo(-b.r * 0.8, -b.r * 1.4);
+    ctx.lineTo(-b.r * 0.2, 0);
+    ctx.lineTo(-b.r * 0.8, b.r * 1.4);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    ctx.strokeStyle = b.color || "#8b5cf6";
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.arc(0, 0, b.r * 1.1, -1.2, 1.2);
+    ctx.stroke();
   }
 }
 
@@ -3022,6 +3119,11 @@ function drawSnowflakeProjectile(ctx, b) {
 function drawHazards(ctx) {
   for (const h of world.hazards) {
     const alpha = Math.max(0, h.life / h.maxLife);
+    if (h.kind === "dark_entity_field") {
+      if (h.variant === "negative_star" && !inView(h.x, h.y, (h.r || 72) + 80)) continue;
+      drawDarkEntityFieldHazard(ctx, h, alpha);
+      continue;
+    }
     if (h.kind === "ember_mine") {
       drawEmberMineHazard(ctx, h, alpha);
       continue;
@@ -3102,6 +3204,10 @@ function drawHazards(ctx) {
       drawIceHazard(ctx, h, alpha);
       continue;
     }
+    if (h.kind === "polar_ice_lane") {
+      drawPolarIceLaneHazard(ctx, h, alpha);
+      continue;
+    }
     if (h.kind === "frost_zone" || h.kind === "blizzard_core") {
       drawFrostZoneHazard(ctx, h, alpha);
       continue;
@@ -3146,6 +3252,166 @@ function drawHazards(ctx) {
     ctx.beginPath(); ctx.arc(0, 0, h.r, 0, TAU); ctx.fill();
     ctx.restore();
   }
+}
+
+function drawDarkEntityFieldHazard(ctx, h, alpha) {
+  const armed = (h.armTime || 0) <= 0;
+  const warningProgress = armed ? 1 : 1 - (h.armTime || 0) / Math.max(0.01, h.armDuration || 1);
+  const color = h.color || "#8b5cf6";
+  const warning = h.warningColor || "#ffe48a";
+  ctx.save();
+  ctx.globalCompositeOperation = "lighter";
+
+  if (h.variant === "lane_guide") {
+    const sideX = -Math.sin(h.angle || 0);
+    const sideY = Math.cos(h.angle || 0);
+    const forwardX = Math.cos(h.angle || 0);
+    const forwardY = Math.sin(h.angle || 0);
+    const half = (h.length || WORLD_SIZE) / 2;
+    ctx.strokeStyle = hexToRgba(warning, 0.35 + warningProgress * 0.5);
+    ctx.lineWidth = 3;
+    ctx.setLineDash([18, 10]);
+    for (const side of [-1, 1]) {
+      const offset = side * (h.width || 170) / 2;
+      ctx.beginPath();
+      ctx.moveTo(h.x + sideX * offset - forwardX * half, h.y + sideY * offset - forwardY * half);
+      ctx.lineTo(h.x + sideX * offset + forwardX * half, h.y + sideY * offset + forwardY * half);
+      ctx.stroke();
+    }
+    ctx.setLineDash([]);
+    ctx.restore();
+    return;
+  }
+
+  if (h.variant === "wing_guide") {
+    ctx.strokeStyle = hexToRgba(warning, 0.28 + warningProgress * 0.55);
+    ctx.lineWidth = 3;
+    ctx.setLineDash([14, 9]);
+    for (const angle of h.angles || []) {
+      ctx.beginPath();
+      ctx.moveTo(h.x, h.y);
+      ctx.lineTo(h.x + Math.cos(angle) * (h.length || 1200), h.y + Math.sin(angle) * (h.length || 1200));
+      ctx.stroke();
+    }
+    ctx.setLineDash([]);
+    ctx.restore();
+    return;
+  }
+
+  if (h.variant === "hunter_guide") {
+    ctx.translate(h.x, h.y);
+    ctx.rotate(h.angle || 0);
+    ctx.strokeStyle = hexToRgba(warning, 0.36 + warningProgress * 0.5);
+    ctx.fillStyle = hexToRgba(color, 0.04 + warningProgress * 0.08);
+    ctx.lineWidth = 3;
+    ctx.setLineDash([16, 8]);
+    ctx.beginPath();
+    ctx.moveTo(-(h.length || 760) / 2, -(h.width || 120));
+    ctx.lineTo((h.length || 760) / 2, 0);
+    ctx.lineTo(-(h.length || 760) / 2, (h.width || 120));
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.restore();
+    return;
+  }
+
+  if (h.variant === "negative_star") {
+    ctx.translate(h.x, h.y);
+    ctx.rotate(state.time * (armed ? 2.8 : 0.7));
+    glow(ctx, 0, 0, h.r * 1.25, armed ? alpha * 0.58 : 0.16 + warningProgress * 0.18, armed ? color : warning);
+    ctx.fillStyle = hexToRgba(color, armed ? alpha * 0.2 : 0.05 + warningProgress * 0.06);
+    ctx.strokeStyle = armed ? "#ffffff" : hexToRgba(warning, 0.42 + warningProgress * 0.48);
+    ctx.lineWidth = armed ? 5 : 3;
+    if (!armed) ctx.setLineDash([10, 7]);
+    ctx.beginPath();
+    ctx.moveTo(0, -h.r);
+    ctx.lineTo(h.r * 0.62, 0);
+    ctx.lineTo(0, h.r);
+    ctx.lineTo(-h.r * 0.62, 0);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.strokeStyle = hexToRgba(warning, 0.9);
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(Math.cos(h.safeEscapeAngle || 0) * h.r * 0.72, Math.sin(h.safeEscapeAngle || 0) * h.r * 0.72);
+    ctx.lineTo(Math.cos(h.safeEscapeAngle || 0) * h.r * 1.38, Math.sin(h.safeEscapeAngle || 0) * h.r * 1.38);
+    ctx.stroke();
+    ctx.restore();
+    return;
+  }
+
+  if (Array.isArray(h.anchors)) drawDarkEntityNodes(ctx, h.anchors, color, warning, h.safeAnchor);
+  if (Array.isArray(h.mirrors)) drawDarkEntityNodes(ctx, h.mirrors, color, warning, -1);
+  if (Array.isArray(h.vertices) && h.variant === "night_crown") drawDarkEntityNodes(ctx, h.vertices, color, warning, h.gateIndex);
+
+  for (const line of h.lines || []) {
+    const width = line.width ?? h.width ?? 24;
+    ctx.strokeStyle = armed ? hexToRgba(color, Math.min(1, 0.68 + alpha * 0.28)) : hexToRgba(warning, 0.28 + warningProgress * 0.52);
+    ctx.lineWidth = armed ? width * 2 : 3;
+    ctx.lineCap = "round";
+    if (!armed) ctx.setLineDash([16, 10]);
+    ctx.shadowColor = armed ? color : warning;
+    ctx.shadowBlur = armed ? 0 : 4;
+    ctx.beginPath();
+    ctx.moveTo(line.x1, line.y1);
+    ctx.lineTo(line.x2, line.y2);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    if (armed) {
+      ctx.strokeStyle = line.ray ? "#fff3b0" : "#ffffff";
+      ctx.lineWidth = Math.max(2, width * 0.22);
+      ctx.shadowBlur = 0;
+      ctx.beginPath();
+      ctx.moveTo(line.x1, line.y1);
+      ctx.lineTo(line.x2, line.y2);
+      ctx.stroke();
+    }
+  }
+
+  if (h.variant === "night_crown" && Array.isArray(h.vertices)) {
+    const start = h.vertices[h.gateIndex || 0];
+    const end = h.vertices[((h.gateIndex || 0) + 1) % h.vertices.length];
+    const midX = (start.x + end.x) / 2;
+    const midY = (start.y + end.y) / 2;
+    glow(ctx, midX, midY, 48, 0.45, warning);
+    ctx.fillStyle = warning;
+    ctx.fillRect(midX - 5, midY - 5, 10, 10);
+  }
+  if (h.variant === "unmaking") {
+    glow(ctx, h.x, h.y, 64 + Math.sin(state.time * 9) * 10, 0.28, color);
+    ctx.fillStyle = "#ffffff";
+    ctx.beginPath();
+    ctx.arc(h.x, h.y, 5, 0, TAU);
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
+function drawDarkEntityNodes(ctx, nodes, color, warning, safeIndex) {
+  nodes.forEach((node, index) => {
+    ctx.save();
+    ctx.translate(node.x, node.y);
+    ctx.rotate(state.time * (index % 2 ? -1.8 : 1.8));
+    ctx.strokeStyle = index === safeIndex ? warning : color;
+    ctx.fillStyle = "rgba(4,2,10,0.82)";
+    ctx.lineWidth = index === safeIndex ? 4 : 2.5;
+    ctx.shadowColor = index === safeIndex ? warning : color;
+    ctx.shadowBlur = 6;
+    ctx.beginPath();
+    ctx.moveTo(0, -13);
+    ctx.lineTo(10, -3);
+    ctx.lineTo(7, 11);
+    ctx.lineTo(-7, 11);
+    ctx.lineTo(-10, -3);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    ctx.restore();
+  });
 }
 
 function drawRiftbladeSlashHazard(ctx, h, alpha) {
@@ -4255,9 +4521,67 @@ function drawMiniGear(ctx, x, y, r, teeth, color, spin = state.time * 10) {
   ctx.restore();
 }
 
+function drawPolarIceLaneHazard(ctx, h, alpha) {
+  const armed = (h.armTime || 0) <= 0;
+  const progress = armed ? 1 : 1 - Math.min(1, (h.armTime || 0) / Math.max(0.01, h.armDuration || 0.72));
+  const length = h.length || 1200;
+  const width = h.width || 28;
+  const half = length * 0.5;
+  const flicker = 0.78 + Math.sin(state.time * 34 + (h.waveIndex || 0)) * 0.18;
+  ctx.save();
+  ctx.translate(h.x, h.y);
+  ctx.rotate(h.angle || 0);
+  ctx.globalCompositeOperation = "lighter";
+  if (!armed) {
+    ctx.fillStyle = hexToRgba(h.color, 0.04 + progress * 0.1);
+    ctx.fillRect(-half, -width, length, width * 2);
+    ctx.strokeStyle = hexToRgba(h.color, 0.34 + progress * 0.5);
+    ctx.lineWidth = 2.4;
+    ctx.setLineDash([18, 12]);
+    ctx.strokeRect(-half, -width, length, width * 2);
+    ctx.setLineDash([]);
+    ctx.strokeStyle = hexToRgba("#ffffff", 0.3 + progress * 0.42);
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.moveTo(-half, 0);
+    ctx.lineTo(half, 0);
+    ctx.stroke();
+  } else {
+    ctx.strokeStyle = hexToRgba(h.color, alpha * 0.38);
+    ctx.lineWidth = width * 2.25;
+    ctx.beginPath();
+    ctx.moveTo(-half, 0);
+    ctx.lineTo(half, 0);
+    ctx.stroke();
+    ctx.strokeStyle = hexToRgba("#ffffff", alpha * flicker);
+    ctx.lineWidth = Math.max(4, width * 0.28);
+    ctx.beginPath();
+    ctx.moveTo(-half, 0);
+    ctx.lineTo(half, 0);
+    ctx.stroke();
+    const shards = Math.min(14, Math.max(5, Math.floor(length / 240)));
+    ctx.fillStyle = hexToRgba(h.color, alpha * 0.78);
+    ctx.strokeStyle = hexToRgba(h.accent || "#ffffff", alpha * 0.7);
+    ctx.lineWidth = 1.2;
+    for (let i = 0; i < shards; i++) {
+      const x = -half + (i + 0.5) / shards * length;
+      const height = width * (1.25 + (i % 3) * 0.28);
+      const side = i % 2 ? -1 : 1;
+      ctx.beginPath();
+      ctx.moveTo(x - width * 0.46, side * width * 0.72);
+      ctx.lineTo(x, side * height);
+      ctx.lineTo(x + width * 0.46, side * width * 0.72);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+    }
+  }
+  ctx.restore();
+}
+
 function drawIceHazard(ctx, h, alpha) {
   const armed = (h.armTime || 0) <= 0;
-  const warn = Math.max(0, h.armTime || 0) / (h.kind === "ice_seal" ? 0.95 : 0.72);
+  const warn = Math.min(1, Math.max(0, h.armTime || 0) / Math.max(0.01, h.armDuration || (h.kind === "ice_seal" ? 0.95 : 0.72)));
   ctx.save();
   ctx.translate(h.x, h.y);
   ctx.rotate(h.angle || h.spikeAngle || 0);
@@ -4471,6 +4795,10 @@ function drawBossBar(ctx) {
     drawTwinBossBar(ctx, b, x, y, w);
     return;
   }
+  if (b.type === "dark_energy_entity") {
+    drawDarkEntityBossBar(ctx, b, x, y, w, layout);
+    return;
+  }
   const hpRatio = Math.max(0, b.hp / b.maxHp);
   ctx.fillStyle = "rgba(6,9,18,0.9)";
   ctx.fillRect(x, y, w, 28);
@@ -4488,6 +4816,61 @@ function drawBossBar(ctx) {
   ctx.lineWidth = 2;
   ctx.strokeRect(x + 1, y + 1, w - 2, 26);
   drawBossHpText(ctx, layout.bar.text, y + 20, 14);
+}
+
+function drawDarkEntityBossBar(ctx, boss, x, y, w, layout) {
+  const hpRatio = Math.max(0, boss.hp / boss.maxHp);
+  const palettes = [
+    ["#2a1650", "#54efff", "#f5ffff"],
+    ["#33081f", "#ff4dd8", "#fff0fb"],
+    ["#08040f", "#ff3dbb", "#fff3b0"],
+  ];
+  const palette = palettes[Math.max(0, Math.min(2, (boss.subStage || 1) - 1))];
+  ctx.fillStyle = "rgba(3,1,9,0.94)";
+  ctx.fillRect(x, y, w, 28);
+  ctx.fillStyle = "rgba(255,255,255,0.07)";
+  ctx.fillRect(x + 6, y + 5, w - 12, 18);
+  const fill = ctx.createLinearGradient(x, y, x + w, y);
+  fill.addColorStop(0, palette[0]);
+  fill.addColorStop(0.56, palette[1]);
+  fill.addColorStop(1, palette[2]);
+  ctx.fillStyle = fill;
+  ctx.fillRect(x + 6, y + 5, (w - 12) * hpRatio, 18);
+  ctx.fillStyle = "rgba(255,255,255,0.32)";
+  ctx.fillRect(x + 6, y + 5, (w - 12) * hpRatio, 3);
+  ctx.strokeStyle = palette[2];
+  ctx.lineWidth = 2;
+  ctx.strokeRect(x + 1, y + 1, w - 2, 26);
+  for (const threshold of [1 / 3, 2 / 3]) {
+    const markerX = x + 6 + (w - 12) * threshold;
+    ctx.fillStyle = "#fff3b0";
+    ctx.fillRect(markerX - 2, y + 3, 4, 22);
+  }
+  const pipSize = 9;
+  const pipGap = 8;
+  const totalWidth = 4 * pipSize + 3 * pipGap;
+  let pipX = x + w / 2 - totalWidth / 2;
+  for (let index = 0; index < 4; index++) {
+    ctx.save();
+    ctx.translate(pipX + pipSize / 2, y - 24);
+    ctx.rotate(Math.PI / 4);
+    ctx.fillStyle = index < (boss.encounterStage || 1) ? palette[1] : "rgba(255,255,255,0.12)";
+    ctx.strokeStyle = index === (boss.encounterStage || 1) - 1 ? "#fff3b0" : "rgba(255,255,255,0.36)";
+    ctx.lineWidth = 1.5;
+    ctx.fillRect(-pipSize / 2, -pipSize / 2, pipSize, pipSize);
+    ctx.strokeRect(-pipSize / 2, -pipSize / 2, pipSize, pipSize);
+    ctx.restore();
+    pipX += pipSize + pipGap;
+  }
+  drawBossHpText(
+    ctx,
+    `${boss.name} · 本体阶段 ${boss.encounterStage}/${boss.encounterStageCount} · 子阶段 ${boss.subStage}/${boss.subStageCount}`,
+    y - 7,
+    12,
+    palette[2],
+    "rgba(0,0,0,0.88)",
+  );
+  drawBossHpText(ctx, layout.bar.text, y + 20, 14, "#ffffff");
 }
 
 function drawStormPortal(ctx, obj) {

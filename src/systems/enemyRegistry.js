@@ -51,6 +51,7 @@ import { MagrailBroodMatriarch } from "../enemies/magrail_brood_matriarch.js";
 import { RiftbladeSaint } from "../enemies/riftblade_saint.js";
 import { ChainbreakConvict } from "../enemies/chainbreak_convict.js";
 import { AbyssalSealScientist } from "../enemies/abyssal_seal_scientist.js";
+import { DarkEnergyEntity } from "../enemies/dark_energy_entity.js";
 
 const classes = {
   zombie: Zombie,
@@ -99,6 +100,7 @@ const classes = {
   riftblade_saint: RiftbladeSaint,
   chainbreak_convict: ChainbreakConvict,
   abyssal_seal_scientist: AbyssalSealScientist,
+  dark_energy_entity: DarkEnergyEntity,
 };
 const WAVE_SPAWN_LIMITS = {
   thief: 3,
@@ -108,6 +110,7 @@ export let enemyConfig = {};
 
 export function setEnemyConfigForTests(config) {
   enemyConfig = config;
+  setSpawnConfigured((id, x, y) => spawnEnemyById(id, x, y));
 }
 
 export async function setupEnemyRegistry() {

@@ -30,7 +30,7 @@ export const EMBER_WAVE_SCENARIOS = [
   { wave: 17, pool: ["gearfiend", "zombie", "lancer", ...BASIC_SLIMES], spawnRate: 1.08, gearfiendMode: "fast_only" },
   { wave: 18, pool: LATE_MIX, spawnRate: 1.5 },
   { wave: 19, pool: LATE_MIX, spawnRate: 1.58, elite: { id: "gearfiend", variant: "giant", count: 1 } },
-  { wave: 20, pool: [], spawnRate: 0, boss: "polar_crystal_wraith" },
+  { wave: 20, pool: [], spawnRate: 0, boss: "polar_crystal_wraith", bossProfile: "polar_hunt_finale" },
 ];
 
 export function emberWaveScenario(wave) {

@@ -1,4 +1,4 @@
-﻿<!doctype html>
+<!doctype html>
 <html lang="zh-CN">
   <head>
     <meta charset="UTF-8" />
@@ -87,12 +87,6 @@
       <nav class="menu-actions" aria-label="主菜单功能">
         <button id="codexButton" type="button" class="menu-codex-button" aria-label="打开图鉴" aria-controls="codexOverlay" aria-expanded="false">
           <span>图鉴</span>
-        </button>
-        <button id="leaderboardButton" type="button" class="menu-leaderboard-button" aria-label="打开排行榜" aria-controls="leaderboardOverlay" aria-expanded="false">
-          <span>排行榜</span>
-        </button>
-        <button id="feedbackButton" type="button" class="menu-feedback-button" aria-label="打开用户反馈" aria-controls="feedbackOverlay" aria-expanded="false">
-          <span>反馈</span>
         </button>
         <button id="helpButton" type="button" class="menu-help-button" aria-label="打开游戏帮助" aria-controls="helpOverlay" aria-expanded="false">
           <span>帮助</span>
@@ -207,105 +201,6 @@
             <p id="debugPanelMessage" aria-live="polite">选择测试配置后即可直接生成目标。</p>
             <button id="debugLockButton" type="button" class="danger">退出并锁定调试模式</button>
           </footer>
-        </div>
-      </section>
-
-      <section id="leaderboardOverlay" class="overlay leaderboard-overlay" aria-hidden="true">
-        <div class="leaderboard-panel" role="dialog" aria-modal="true" aria-labelledby="leaderboardTitle">
-          <header class="leaderboard-head">
-            <div>
-              <h2 id="leaderboardTitle">幸存者排行榜</h2>
-            </div>
-            <button id="leaderboardCloseButton" type="button" class="leaderboard-close" aria-label="关闭排行榜">×</button>
-          </header>
-
-          <section id="leaderboardProfile" class="leaderboard-profile" aria-live="polite"></section>
-
-          <nav id="leaderboardTabs" class="leaderboard-tabs" role="tablist" aria-label="排行榜分类">
-            <button type="button" role="tab" data-metric="TOTAL_PLAY_SECONDS" aria-selected="true">总时长</button>
-            <button type="button" role="tab" data-metric="TOTAL_KILLS" aria-selected="false">总击杀</button>
-            <button type="button" role="tab" data-metric="TOTAL_BOSS_KILLS" aria-selected="false">Boss击杀</button>
-            <button type="button" role="tab" data-metric="HIGHEST_DIFFICULTY" aria-selected="false">最高难度</button>
-          </nav>
-
-          <div class="leaderboard-table-wrap">
-            <div class="leaderboard-table-head" aria-hidden="true">
-              <span>排名</span><span>玩家名称</span><span>工号</span><span id="leaderboardMetricLabel">总时长</span><span>最高难度</span><span>战局</span><span>胜局 / 胜率</span><span>最后游玩</span>
-            </div>
-            <div id="leaderboardRows" class="leaderboard-rows" role="tabpanel" aria-live="polite"></div>
-          </div>
-
-          <footer class="leaderboard-footer">
-            <p id="leaderboardStatus">仅统计已通过用户接口识别并完成同步的战局</p>
-            <button id="leaderboardRefreshButton" type="button">刷新排行榜</button>
-          </footer>
-        </div>
-      </section>
-
-      <section id="feedbackOverlay" class="overlay feedback-overlay" aria-hidden="true">
-        <div class="feedback-panel" role="dialog" aria-modal="true" aria-labelledby="feedbackTitle">
-          <header class="feedback-head">
-            <div>
-              <h2 id="feedbackTitle">幸存者反馈站</h2>
-            </div>
-            <button id="feedbackCloseButton" type="button" class="feedback-close" aria-label="关闭用户反馈">×</button>
-          </header>
-
-          <div class="feedback-layout">
-            <section class="feedback-list-panel" aria-labelledby="feedbackListTitle">
-              <header class="feedback-section-head">
-                <h3 id="feedbackListTitle">反馈列表</h3>
-                <nav id="feedbackFilters" class="feedback-filters" aria-label="反馈筛选">
-                  <button type="button" data-scope="ALL" class="active" aria-pressed="true">全部反馈</button>
-                  <button type="button" data-scope="MINE" aria-pressed="false">我的反馈</button>
-                </nav>
-              </header>
-              <div id="feedbackRows" class="feedback-rows" aria-live="polite"></div>
-              <footer class="feedback-list-footer">
-                <nav class="feedback-pagination" aria-label="反馈分页">
-                  <button id="feedbackPrevButton" type="button" aria-label="上一页">
-                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7" /></svg>
-                  </button>
-                  <div id="feedbackPageNumbers" class="feedback-page-numbers"></div>
-                  <button id="feedbackNextButton" type="button" aria-label="下一页">
-                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7" /></svg>
-                  </button>
-                </nav>
-                <p id="feedbackListStatus">正在连接反馈服务…</p>
-              </footer>
-            </section>
-
-            <aside class="feedback-composer" aria-labelledby="feedbackComposerTitle">
-              <header class="feedback-composer-head">
-                <h3 id="feedbackComposerTitle">提交反馈</h3>
-                <span id="feedbackEditingStatus" hidden>编辑中</span>
-              </header>
-              <form id="feedbackForm" novalidate>
-                <label for="feedbackContent">请描述你的建议（最多100字）</label>
-                <textarea id="feedbackContent" rows="7" placeholder="输入你的反馈建议…" aria-describedby="feedbackCounter feedbackFormMessage"></textarea>
-                <div class="feedback-compose-meta">
-                  <p id="feedbackFormMessage" aria-live="polite"></p>
-                  <span id="feedbackCounter">0 / 100</span>
-                </div>
-                <div class="feedback-form-actions">
-                  <button id="feedbackCancelEditButton" type="button" class="secondary" hidden>取消编辑</button>
-                  <button id="feedbackSubmitButton" type="submit" class="primary" disabled>提交反馈</button>
-                </div>
-              </form>
-            </aside>
-          </div>
-
-          <div id="feedbackDeleteDialog" class="feedback-delete-dialog" role="alertdialog" aria-modal="true" aria-labelledby="feedbackDeleteTitle" aria-describedby="feedbackDeleteText" hidden>
-            <div>
-              <span class="feedback-delete-mark" aria-hidden="true"><i>!</i></span>
-              <h3 id="feedbackDeleteTitle">确认删除反馈？</h3>
-              <p id="feedbackDeleteText">删除后无法恢复，请确认是否继续。</p>
-              <div>
-                <button id="feedbackDeleteCancelButton" type="button">取消</button>
-                <button id="feedbackDeleteConfirmButton" type="button" class="danger">确认删除</button>
-              </div>
-            </div>
-          </div>
         </div>
       </section>
 

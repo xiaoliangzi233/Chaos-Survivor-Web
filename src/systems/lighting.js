@@ -5,6 +5,7 @@ import { activeWaveEffect } from "./waveScenarios.js";
 
 const LIGHT_SCALE = 0.45;
 const MAX_PROJECTILE_LIGHTS = 56;
+const MAX_DARK_ENTITY_PROJECTILE_LIGHTS = 18;
 const MAX_GEM_LIGHTS = 24;
 const MAX_MAP_LIGHTS = 48;
 const MAX_ENEMY_LIGHTS = 18;
@@ -205,6 +206,7 @@ function addEntityLights(lights, camera, viewport) {
 
 function addProjectileLights(lights, camera, viewport) {
   let count = 0;
+  let darkEntityCount = 0;
   for (const b of world.projectiles) {
     if (count >= MAX_PROJECTILE_LIGHTS) break;
     if (!worldVisible(b.x, b.y, 80, camera)) continue;
@@ -222,6 +224,8 @@ function addProjectileLights(lights, camera, viewport) {
   for (const b of world.enemyProjectiles) {
     if (count >= MAX_PROJECTILE_LIGHTS) break;
     if (!worldVisible(b.x, b.y, 80, camera)) continue;
+    const darkEntityProjectile = b.shape === "darkEntityLance" || b.shape === "darkEntityScythe" || b.shape === "darkEntityHunter";
+    if (darkEntityProjectile && darkEntityCount >= MAX_DARK_ENTITY_PROJECTILE_LIGHTS) continue;
     addWorldLight(lights, camera, viewport, {
       x: b.x,
       y: b.y,
@@ -231,6 +235,7 @@ function addProjectileLights(lights, camera, viewport) {
       core: 0.18,
     });
     count++;
+    if (darkEntityProjectile) darkEntityCount++;
   }
 }
 

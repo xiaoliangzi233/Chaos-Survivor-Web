@@ -3,16 +3,24 @@ import { isMuted, playSfx } from "../audio.js";
 
 const STORY_PROGRESS_PREFIX = "pixel-survivor-story-progress-v1";
 const STORY_VOICE_STORAGE_KEY = "pixel-survivor-story-voice-v1";
+const STORY_VOICE_TONE_STORAGE_KEY = "pixel-survivor-story-voice-tone-v1";
 const TYPEWRITER_INTERVAL_MS = 28;
 const SCENE_DURATION_MS = 6000;
+const SPEECH_END_HOLD_MS = 520;
 const CLOSE_TRANSITION_MS = 180;
 const SILENT_TYPE_CHARACTERS = /[\s，。！？、：；…,.!?—“”‘’]/;
+const STORY_VOICE_TONES = Object.freeze([
+  { id: "machine", label: "机械低频", rate: 0.9, pitch: 0.58, voiceOffset: 1 },
+  { id: "broadcast", label: "合成广播", rate: 1, pitch: 0.76, voiceOffset: 0 },
+  { id: "sentinel", label: "警戒单元", rate: 1.08, pitch: 0.92, voiceOffset: 2 },
+]);
 
 let initialized = false;
 let activePlayback = null;
 let animationFrame = 0;
 let elements = null;
 let storyVoiceEnabled = true;
+let storyVoiceTone = STORY_VOICE_TONES[0].id;
 let storySpeechSupported = false;
 let speechSerial = 0;
 let currentUtterance = null;
@@ -25,6 +33,7 @@ export function initStoryUi() {
 
   storySpeechSupported = supportsStorySpeech();
   storyVoiceEnabled = readStoryVoicePreference();
+  storyVoiceTone = readStoryVoiceTonePreference();
   updateStoryVoiceControl();
   elements.voiceButton.addEventListener("pointerdown", (event) => event.stopPropagation());
   elements.voiceButton.addEventListener("click", (event) => {
@@ -33,8 +42,21 @@ export function initStoryUi() {
     storyVoiceEnabled = !storyVoiceEnabled;
     writeStoryVoicePreference(storyVoiceEnabled);
     updateStoryVoiceControl();
-    if (!storyVoiceEnabled) stopStorySpeech();
+    if (!storyVoiceEnabled) {
+      stopStorySpeech();
+      releaseStorySpeechWait();
+    }
     else if (activePlayback && !activePlayback.closing) speakCurrentScene();
+  });
+  elements.toneButton.addEventListener("pointerdown", (event) => event.stopPropagation());
+  elements.toneButton.addEventListener("click", (event) => {
+    event.stopPropagation();
+    if (!storySpeechSupported) return;
+    storyVoiceTone = nextStoryVoiceTone(storyVoiceTone);
+    writeStoryVoiceTonePreference(storyVoiceTone);
+    updateStoryVoiceControl();
+    playSfx("select");
+    if (activePlayback && !activePlayback.closing && storyVoiceEnabled) speakCurrentScene();
   });
   elements.skipButton.addEventListener("pointerdown", (event) => event.stopPropagation());
   elements.skipButton.addEventListener("click", (event) => {
@@ -75,6 +97,10 @@ export function playDifficultyStoryIfNeeded({ difficultyId, playerId = "local-de
     sceneStartedAt: 0,
     typingStartedAt: 0,
     sceneDurationMs: SCENE_DURATION_MS,
+    speechStarted: false,
+    speechComplete: true,
+    speechEndedAt: 0,
+    speechTimeoutMs: SCENE_DURATION_MS,
     pausedAt: 0,
     closing: false,
     resolve: resolvePlayback,
@@ -129,15 +155,59 @@ export function writeStoryVoicePreference(enabled, storage = globalThis.localSto
   }
 }
 
+export function readStoryVoiceTonePreference(storage = globalThis.localStorage) {
+  if (!storage) return STORY_VOICE_TONES[0].id;
+  try {
+    return normalizeStoryVoiceTone(storage.getItem(STORY_VOICE_TONE_STORAGE_KEY));
+  } catch {
+    return STORY_VOICE_TONES[0].id;
+  }
+}
+
+export function writeStoryVoiceTonePreference(toneId, storage = globalThis.localStorage) {
+  if (!storage) return false;
+  try {
+    storage.setItem(STORY_VOICE_TONE_STORAGE_KEY, normalizeStoryVoiceTone(toneId));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export function nextStoryVoiceTone(toneId) {
+  const currentIndex = STORY_VOICE_TONES.findIndex((tone) => tone.id === toneId);
+  return STORY_VOICE_TONES[(currentIndex + 1) % STORY_VOICE_TONES.length].id;
+}
+
 export function storySceneDurationMs(text) {
   return Math.min(10000, Math.max(SCENE_DURATION_MS, 1600 + String(text || "").length * 155));
 }
 
-export function selectChineseStoryVoice(voices = []) {
+export function storySpeechTimeoutMs(text) {
+  return Math.min(45000, Math.max(14000, 4000 + String(text || "").length * 500));
+}
+
+export function shouldAdvanceStoryScene({
+  elapsedMs,
+  sceneDurationMs,
+  speechStarted,
+  speechComplete,
+  speechEndedAgoMs = 0,
+  speechTimeoutMs,
+} = {}) {
+  if (elapsedMs < sceneDurationMs) return false;
+  if (!speechStarted) return true;
+  if (speechComplete) return speechEndedAgoMs >= SPEECH_END_HOLD_MS;
+  return elapsedMs >= speechTimeoutMs;
+}
+
+export function selectChineseStoryVoice(voices = [], offset = 0) {
   const ranked = [...voices]
     .map((voice, index) => ({ voice, index, score: storyVoiceScore(voice) }))
+    .filter((entry) => entry.score >= 60)
     .sort((a, b) => b.score - a.score || a.index - b.index);
-  return ranked[0]?.score >= 60 ? ranked[0].voice : null;
+  if (!ranked.length) return null;
+  return ranked[Math.abs(Number(offset) || 0) % ranked.length].voice;
 }
 
 export function hasSeenDifficultyStory({ difficultyId, playerId, storage = globalThis.localStorage } = {}) {
@@ -180,6 +250,8 @@ function collectElements() {
   const overlay = document.getElementById("storyOverlay");
   const voiceButton = document.getElementById("storyVoiceButton");
   const voiceStatus = document.getElementById("storyVoiceStatus");
+  const toneButton = document.getElementById("storyToneButton");
+  const toneStatus = document.getElementById("storyToneStatus");
   const skipButton = document.getElementById("storySkipButton");
   const archive = document.getElementById("storyArchive");
   const title = document.getElementById("storyTitle");
@@ -188,10 +260,10 @@ function collectElements() {
   const announcement = document.getElementById("storyAnnouncement");
   const progress = document.getElementById("storyProgress");
   const progressTrack = document.getElementById("storyProgressTrack");
-  if (!overlay || !voiceButton || !voiceStatus || !skipButton || !archive || !title || !speaker || !text || !announcement || !progress || !progressTrack) {
+  if (!overlay || !voiceButton || !voiceStatus || !toneButton || !toneStatus || !skipButton || !archive || !title || !speaker || !text || !announcement || !progress || !progressTrack) {
     return null;
   }
-  return { overlay, voiceButton, voiceStatus, skipButton, archive, title, speaker, text, announcement, progress, progressTrack };
+  return { overlay, voiceButton, voiceStatus, toneButton, toneStatus, skipButton, archive, title, speaker, text, announcement, progress, progressTrack };
 }
 
 function renderScene(sceneIndex) {
@@ -208,6 +280,10 @@ function renderScene(sceneIndex) {
   activePlayback.sceneStartedAt = performance.now();
   activePlayback.typingStartedAt = activePlayback.sceneStartedAt;
   activePlayback.sceneDurationMs = storySceneDurationMs(scene.text);
+  activePlayback.speechStarted = false;
+  activePlayback.speechComplete = true;
+  activePlayback.speechEndedAt = 0;
+  activePlayback.speechTimeoutMs = storySpeechTimeoutMs(scene.text);
   activePlayback.pausedAt = 0;
 
   elements.speaker.textContent = scene.speaker;
@@ -256,7 +332,16 @@ function updatePlaybackFrame(now) {
       activePlayback.renderedCharacters = activePlayback.fullText.length;
     }
   }
-  if (now - activePlayback.sceneStartedAt >= activePlayback.sceneDurationMs) {
+  const elapsedMs = now - activePlayback.sceneStartedAt;
+  const speechEndedAgoMs = activePlayback.speechEndedAt ? now - activePlayback.speechEndedAt : 0;
+  if (shouldAdvanceStoryScene({
+    elapsedMs,
+    sceneDurationMs: activePlayback.sceneDurationMs,
+    speechStarted: activePlayback.speechStarted,
+    speechComplete: activePlayback.speechComplete,
+    speechEndedAgoMs,
+    speechTimeoutMs: activePlayback.speechTimeoutMs,
+  })) {
     advanceScene();
     return;
   }
@@ -269,7 +354,7 @@ function accelerateStory() {
     activePlayback.textComplete = true;
     elements.text.textContent = activePlayback.fullText;
     activePlayback.renderedCharacters = activePlayback.fullText.length;
-    activePlayback.sceneStartedAt = performance.now();
+    if (!activePlayback.speechStarted) activePlayback.sceneStartedAt = performance.now();
     return;
   }
   advanceScene();
@@ -311,7 +396,7 @@ function finishPlayback(outcome) {
 function handleStoryKeydown(event) {
   if (!activePlayback || activePlayback.closing) return;
   if (event.code !== "Space" && event.code !== "Enter" && event.code !== "NumpadEnter") return;
-  if (event.target === elements.skipButton) return;
+  if (event.target?.closest?.("button")) return;
   event.__survivorHandled = true;
   event.preventDefault();
   event.stopPropagation();
@@ -345,10 +430,16 @@ function supportsStorySpeech() {
 function updateStoryVoiceControl() {
   if (!elements) return;
   elements.voiceButton.disabled = !storySpeechSupported;
+  elements.toneButton.disabled = !storySpeechSupported;
   elements.voiceButton.setAttribute("aria-pressed", String(storySpeechSupported && storyVoiceEnabled));
+  const tone = getStoryVoiceTone(storyVoiceTone);
+  elements.toneButton.setAttribute("aria-label", `切换剧情音色，当前${tone.label}`);
+  elements.toneStatus.textContent = tone.label;
   if (!storySpeechSupported) {
     elements.voiceButton.setAttribute("aria-label", "当前浏览器不支持剧情语音");
     elements.voiceStatus.textContent = "语音不可用";
+    elements.toneButton.setAttribute("aria-label", "当前浏览器不支持音色切换");
+    elements.toneStatus.textContent = "音色不可用";
     return;
   }
   elements.voiceButton.setAttribute("aria-label", storyVoiceEnabled ? "关闭剧情语音" : "开启剧情语音");
@@ -357,32 +448,57 @@ function updateStoryVoiceControl() {
 
 function speakCurrentScene() {
   stopStorySpeech();
-  if (!activePlayback || !storyVoiceEnabled || !storySpeechSupported || isMuted()) return false;
+  if (!activePlayback) return false;
+  activePlayback.speechStarted = false;
+  activePlayback.speechComplete = true;
+  activePlayback.speechEndedAt = 0;
+  if (!storyVoiceEnabled || !storySpeechSupported || isMuted()) return false;
   const scene = activePlayback.chapter.scenes[activePlayback.sceneIndex];
   if (!scene?.text) return false;
   try {
     const synth = window.speechSynthesis;
     const utterance = new window.SpeechSynthesisUtterance(scene.text);
-    const voice = selectChineseStoryVoice(synth.getVoices());
+    const tone = getStoryVoiceTone(storyVoiceTone);
+    const voice = selectChineseStoryVoice(synth.getVoices(), tone.voiceOffset);
     if (voice) utterance.voice = voice;
     utterance.lang = voice?.lang || "zh-CN";
-    utterance.rate = 1.04;
-    utterance.pitch = storyVoicePitch(scene.speaker);
+    utterance.rate = tone.rate;
+    utterance.pitch = clampVoicePitch(tone.pitch + storySpeakerPitchOffset(scene.speaker));
     utterance.volume = 0.88;
     const serial = speechSerial;
+    const sceneIndex = activePlayback.sceneIndex;
     utterance.onend = () => {
-      if (serial === speechSerial) currentUtterance = null;
+      markStorySpeechComplete(serial, sceneIndex);
     };
     utterance.onerror = () => {
-      if (serial === speechSerial) currentUtterance = null;
+      markStorySpeechComplete(serial, sceneIndex);
     };
+    activePlayback.speechStarted = true;
+    activePlayback.speechComplete = false;
     currentUtterance = utterance;
     synth.speak(utterance);
     return true;
   } catch {
     currentUtterance = null;
+    activePlayback.speechStarted = false;
+    activePlayback.speechComplete = true;
     return false;
   }
+}
+
+function markStorySpeechComplete(serial, sceneIndex) {
+  if (serial !== speechSerial) return;
+  currentUtterance = null;
+  if (!activePlayback || activePlayback.sceneIndex !== sceneIndex) return;
+  activePlayback.speechComplete = true;
+  activePlayback.speechEndedAt = performance.now();
+}
+
+function releaseStorySpeechWait() {
+  if (!activePlayback) return;
+  activePlayback.speechStarted = false;
+  activePlayback.speechComplete = true;
+  activePlayback.speechEndedAt = 0;
 }
 
 function stopStorySpeech() {
@@ -430,12 +546,24 @@ function storyVoiceScore(voice) {
   return score;
 }
 
-function storyVoicePitch(speaker) {
+function storySpeakerPitchOffset(speaker) {
   const name = String(speaker || "");
-  if (/中央 AI|中央系统/.test(name)) return 0.78;
-  if (/广播|警告|网络/.test(name)) return 0.88;
-  if (/录音|日志/.test(name)) return 0.94;
-  return 1;
+  if (/中央 AI|中央系统/.test(name)) return -0.1;
+  if (/广播|警告|网络/.test(name)) return -0.04;
+  if (/录音|日志/.test(name)) return 0.04;
+  return 0;
+}
+
+function normalizeStoryVoiceTone(toneId) {
+  return STORY_VOICE_TONES.some((tone) => tone.id === toneId) ? toneId : STORY_VOICE_TONES[0].id;
+}
+
+function getStoryVoiceTone(toneId) {
+  return STORY_VOICE_TONES.find((tone) => tone.id === toneId) || STORY_VOICE_TONES[0];
+}
+
+function clampVoicePitch(value) {
+  return Math.max(0.2, Math.min(2, value));
 }
 
 function readProgress(playerId, storage) {

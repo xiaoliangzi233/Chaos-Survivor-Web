@@ -5016,7 +5016,8 @@ body.story-open .menu-actions {
   transition: border-color 160ms ease, color 160ms ease, background 160ms ease, box-shadow 160ms ease, transform 120ms ease;
 }
 
-.story-voice-button {
+.story-voice-button,
+.story-tone-button {
   position: absolute;
   z-index: 9;
   top: clamp(24px, 3.4vw, 52px);
@@ -5041,7 +5042,13 @@ body.story-open .menu-actions {
   transition: border-color 160ms ease, color 160ms ease, background 160ms ease, box-shadow 160ms ease, transform 120ms ease;
 }
 
-.story-voice-button svg {
+.story-tone-button {
+  right: clamp(402px, calc(4vw + 374px), 470px);
+  min-width: 160px;
+}
+
+.story-voice-button svg,
+.story-tone-button svg {
   width: 25px;
   height: 25px;
   overflow: visible;
@@ -5054,7 +5061,9 @@ body.story-open .menu-actions {
 }
 
 .story-voice-button:hover,
-.story-voice-button:focus-visible {
+.story-voice-button:focus-visible,
+.story-tone-button:hover,
+.story-tone-button:focus-visible {
   color: #ffffff;
   border-color: var(--story-accent, #7ddff2);
   outline: none;
@@ -5078,7 +5087,13 @@ body.story-open .menu-actions {
   cursor: not-allowed;
 }
 
-.story-voice-button:active {
+.story-tone-button:disabled {
+  opacity: 0.48;
+  cursor: not-allowed;
+}
+
+.story-voice-button:active,
+.story-tone-button:active {
   transform: translateY(2px);
 }
 
@@ -5376,6 +5391,7 @@ body.story-open .menu-actions {
 
 @media (max-height: 800px) {
   .story-voice-button,
+  .story-tone-button,
   .story-skip-button {
     top: 24px;
     height: 56px;
@@ -6370,6 +6386,16 @@ body.debug-panel-open .menu-actions {
     height: 1px;
     overflow: hidden;
     clip-path: inset(50%);
+  }
+
+  .story-tone-button {
+    top: 80px;
+    right: auto;
+    left: 20px;
+    min-width: 138px;
+    height: 48px;
+    padding: 0 12px;
+    font-size: 12px;
   }
 
   .story-skip-button {

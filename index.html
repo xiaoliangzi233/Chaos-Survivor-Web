@@ -96,7 +96,118 @@
         <button id="helpButton" type="button" class="menu-help-button" aria-label="打开游戏帮助" aria-controls="helpOverlay" aria-expanded="false">
           <span>帮助</span>
         </button>
+        <button id="debugMenuButton" type="button" class="menu-debug-button" aria-label="进入密码保护的调试模式" aria-controls="debugAuthOverlay" aria-expanded="false">
+          <span>调试</span>
+        </button>
       </nav>
+
+      <button id="debugQuickButton" type="button" class="debug-quick-button" aria-label="打开调试面板，快捷键 F8" hidden>
+        <span>DBG</span><kbd>F8</kbd>
+      </button>
+
+      <section id="debugAuthOverlay" class="overlay debug-auth-overlay" aria-hidden="true">
+        <form id="debugAuthForm" class="debug-auth-panel" role="dialog" aria-modal="true" aria-labelledby="debugAuthTitle">
+          <header class="debug-panel-head">
+            <div>
+              <p id="debugAuthEyebrow" class="eyebrow">RESTRICTED ACCESS</p>
+              <h2 id="debugAuthTitle">调试终端认证</h2>
+            </div>
+            <button id="debugAuthCloseButton" type="button" class="debug-icon-button" aria-label="关闭">×</button>
+          </header>
+          <p id="debugAuthDescription" class="debug-auth-description">请输入调试密码。密码只保存在当前浏览器中，不会发送到服务器。</p>
+          <label class="debug-field">
+            <span>调试密码</span>
+            <input id="debugPasswordInput" type="password" minlength="6" autocomplete="current-password" required>
+          </label>
+          <label id="debugPasswordConfirmField" class="debug-field" hidden>
+            <span>确认密码</span>
+            <input id="debugPasswordConfirmInput" type="password" minlength="6" autocomplete="new-password">
+          </label>
+          <p id="debugAuthError" class="debug-auth-error" role="alert"></p>
+          <div class="debug-auth-actions">
+            <button id="debugAuthCancelButton" type="button">取消</button>
+            <button id="debugAuthSubmitButton" type="submit" class="primary">验证并进入</button>
+          </div>
+          <small>纯前端门禁用于防止误入；清除站点数据可以重设密码。</small>
+        </form>
+      </section>
+
+      <section id="debugPanelOverlay" class="overlay debug-panel-overlay" aria-hidden="true">
+        <div class="debug-control-panel" role="dialog" aria-modal="true" aria-labelledby="debugPanelTitle">
+          <header class="debug-panel-head">
+            <div>
+              <p class="eyebrow">AUTHORIZED // LOCAL ONLY</p>
+              <h2 id="debugPanelTitle">战斗调试终端</h2>
+            </div>
+            <div class="debug-panel-head-actions">
+              <span id="debugRunStatus" class="debug-run-status">等待战斗</span>
+              <button id="debugPanelCloseButton" type="button" class="debug-icon-button" aria-label="关闭">×</button>
+            </div>
+          </header>
+
+          <div class="debug-control-layout">
+            <section class="debug-section">
+              <h3>测试场配置</h3>
+              <div class="debug-form-grid">
+                <label class="debug-field">
+                  <span>难度</span>
+                  <select id="debugDifficultySelect"></select>
+                </label>
+                <label class="debug-field">
+                  <span>波次</span>
+                  <input id="debugWaveInput" type="number" min="1" max="20" value="1">
+                </label>
+                <label class="debug-field debug-field-wide">
+                  <span>开局武器</span>
+                  <select id="debugWeaponSelect"></select>
+                </label>
+              </div>
+              <div class="debug-button-row">
+                <button id="debugQuickStartButton" type="button" class="primary">快速进入测试场</button>
+                <button id="debugApplySetupButton" type="button">应用难度 / 波次</button>
+              </div>
+            </section>
+
+            <section class="debug-section">
+              <h3>指定敌人生成</h3>
+              <div class="debug-form-grid">
+                <label class="debug-field debug-field-wide">
+                  <span>Boss / 怪物</span>
+                  <select id="debugEnemySelect"></select>
+                </label>
+                <label class="debug-field">
+                  <span>数量</span>
+                  <input id="debugEnemyCountInput" type="number" min="1" max="20" value="1">
+                </label>
+              </div>
+              <div class="debug-button-row">
+                <button id="debugSpawnButton" type="button" class="primary">生成选中目标</button>
+                <button id="debugDamageBossButton" type="button">Boss 扣除 25% 生命</button>
+              </div>
+            </section>
+
+            <section class="debug-section debug-cheat-section">
+              <h3>作弊选项</h3>
+              <div class="debug-toggle-grid">
+                <label><input id="debugInvincibleToggle" type="checkbox"><span>玩家无敌</span></label>
+                <label><input id="debugSpeedToggle" type="checkbox"><span>双倍移速</span></label>
+                <label><input id="debugFreezeWaveToggle" type="checkbox" checked><span>锁定波次 / 停止自然刷怪</span></label>
+              </div>
+              <div class="debug-button-grid">
+                <button id="debugHealButton" type="button">恢复满血</button>
+                <button id="debugGoldButton" type="button">+1000 金币</button>
+                <button id="debugClearProjectilesButton" type="button">清除敌方弹幕</button>
+                <button id="debugClearBattlefieldButton" type="button">清空战场</button>
+              </div>
+            </section>
+          </div>
+
+          <footer class="debug-panel-footer">
+            <p id="debugPanelMessage" aria-live="polite">选择测试配置后即可直接生成目标。</p>
+            <button id="debugLockButton" type="button" class="danger">退出并锁定调试模式</button>
+          </footer>
+        </div>
+      </section>
 
       <section id="leaderboardOverlay" class="overlay leaderboard-overlay" aria-hidden="true">
         <div class="leaderboard-panel" role="dialog" aria-modal="true" aria-labelledby="leaderboardTitle">

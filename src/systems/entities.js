@@ -37,7 +37,8 @@ export function updatePlayer(dt) {
     vy = 0;
   }
   const frostScale = 1 - Math.min(0.42, p.frostSlow || 0);
-  const moveSpeed = p.speed * frostScale;
+  const debugSpeedScale = state.debug?.enabled && state.debug.doubleSpeed ? 2 : 1;
+  const moveSpeed = p.speed * frostScale * debugSpeedScale;
   const skating = activeWaveEffect("ice_skate");
   if (skating) {
     const accel = 850;
@@ -72,10 +73,15 @@ export function updatePlayer(dt) {
     }
   }
   if (p.burnTimer > 0) {
-    p.burnTimer = Math.max(0, p.burnTimer - dt);
-    p.hp -= (p.burnDps || 0) * dt;
-    state.flash = Math.max(state.flash, 0.05);
-    if (p.burnTimer <= 0) p.burnDps = 0;
+    if (state.debug?.enabled && state.debug.invincible) {
+      p.burnTimer = 0;
+      p.burnDps = 0;
+    } else {
+      p.burnTimer = Math.max(0, p.burnTimer - dt);
+      p.hp -= (p.burnDps || 0) * dt;
+      state.flash = Math.max(state.flash, 0.05);
+      if (p.burnTimer <= 0) p.burnDps = 0;
+    }
   }
   if (p.frostTimer > 0) {
     p.frostTimer = Math.max(0, p.frostTimer - dt);
@@ -92,6 +98,7 @@ export function updatePlayer(dt) {
 }
 
 export function updateSpawning(dt) {
+  if (state.debug?.enabled && state.debug.freezeWave) return;
   spawnWaveBoss();
   if (isBossWave(state.wave)) return;
   state.spawnBudget += dt * spawnBudgetGainPerSecond({
@@ -294,11 +301,13 @@ export function collectAllCoins() {
   world.coins.length = 0;
 }
 
-export function clearEnemies() {
-  for (const e of world.enemies) {
-    const amount = coinAmountForEnemy(e);
-    if (amount > 0) dropCoin(e.x, e.y, amount);
-    burst(e.x, e.y, e.type === "tank" ? 14 : 7, e.color, 120);
+export function clearEnemies({ dropRewards = true } = {}) {
+  if (dropRewards) {
+    for (const e of world.enemies) {
+      const amount = coinAmountForEnemy(e);
+      if (amount > 0) dropCoin(e.x, e.y, amount);
+      burst(e.x, e.y, e.type === "tank" ? 14 : 7, e.color, 120);
+    }
   }
   world.enemies.length = 0;
   world.projectiles.length = 0;
@@ -325,7 +334,8 @@ function updateEnemyProjectiles(dt) {
     b.life -= dt;
     const outsideMap = isEnemyProjectileOutsideMap(b);
     if (b.landTrapAtY != null && b.y >= b.landTrapAtY) b.life = 0;
-    if (circleHit(b.x, b.y, b.r, p.x, p.y, p.r) && p.invuln <= 0) {
+    const projectileActive = !b.nonColliding && (!b.activeWhenArmed || (b.linkedHazard?.armTime || 0) <= 0);
+    if (projectileActive && circleHit(b.x, b.y, b.r, p.x, p.y, p.r) && p.invuln <= 0) {
       const result = applyPlayerDamage(b.damage, b);
       p.invuln = 0.5;
       if (result.damaged && b.burnDuration > 0) {
@@ -433,6 +443,8 @@ function updateHazards(dt) {
     if (h.kind === "brood_pod") updateBroodPod(h, dt);
     if (h.kind === "storm_laser_net") updateStormLaserNet(h, dt);
     if (h.kind === "riftblade_slash" || h.kind === "riftblade_bladefall") updateRiftbladeHazard(h, dt);
+    if (h.kind === "convict_chain_arc" || h.kind === "convict_ball_slam" || h.kind === "convict_chain_line" || h.kind === "convict_chain_path") updateConvictHazard(h, dt);
+    if (isScientistHazard(h)) updateScientistHazard(h, dt);
     if (h.kind === "phase_tear") updatePhaseTear(h, dt);
     if (h.kind === "inferno_beacon") updateInfernoBeacon(h, dt);
     if (h.kind === "artillery_blast") updateArtilleryBlast(h, dt);
@@ -448,15 +460,27 @@ function updateHazards(dt) {
       h.kind === "twin_arc_field" ||
       h.kind === "riftblade_echo" ||
       ((h.kind === "riftblade_slash" || h.kind === "riftblade_bladefall") && (h.armTime || 0) <= 0) ||
+      ((h.kind === "convict_chain_arc" || h.kind === "convict_ball_slam" || h.kind === "convict_chain_line" || h.kind === "convict_chain_path") && !h.noDamage && (h.armTime || 0) <= 0) ||
+      (isScientistHazard(h) && !h.noDamage) ||
       (h.kind === "storm_laser_net" && (h.armTime || 0) <= 0) ||
       h.kind === "frost_zone" ||
       h.kind === "blizzard_core" ||
       ((h.kind === "ice_spike" || h.kind === "ice_seal") && h.exploding);
-    const hit = h.kind === "storm_laser_net" || h.kind === "riftblade_slash"
-      ? pointLineDistance(p.x, p.y, h.x, h.y, h.angle || 0, h.length || 1200) < p.r + (h.width || 18)
-      : distSq(h.x, h.y, p.x, p.y) < (h.r + p.r) ** 2;
-    if (hit && p.invuln <= 0 && canDamage) {
-      const result = applyPlayerDamage(h.damage, h);
+    const convictHazard = h.kind === "convict_chain_arc" || h.kind === "convict_ball_slam" || h.kind === "convict_chain_line" || h.kind === "convict_chain_path";
+    const scientistHazard = isScientistHazard(h);
+    const riftbladeBladeCorridor = h.kind === "riftblade_bladefall" && Array.isArray(h.lines);
+    const hit = riftbladeBladeCorridor
+      ? h.lines.some((line) => pointSegmentDistance(p.x, p.y, line.x1, line.y1, line.x2, line.y2) < p.r + (h.width || 31))
+      : scientistHazard
+      ? scientistHazardHit(h, p)
+      : convictHazard
+      ? convictHazardHit(h, p)
+      : h.kind === "storm_laser_net" || h.kind === "riftblade_slash"
+        ? pointLineDistance(p.x, p.y, h.x, h.y, h.angle || 0, h.length || 1200) < p.r + (h.width || 18)
+        : distSq(h.x, h.y, p.x, p.y) < (h.r + p.r) ** 2;
+    if (hit && p.invuln <= 0 && canDamage && !h.playerHit) {
+      const result = applyPlayerDamage(convictHazard ? convictHazardDamage(h, p) : h.damage, h);
+      if (convictHazard || scientistHazard || riftbladeBladeCorridor) h.playerHit = true;
       p.invuln = 0.35;
       if (result.damaged && h.frostDuration > 0) {
         if (h.frostMarks) applyFrostMark(p, { duration: h.frostDuration, slow: h.frostSlow || 0.18, freezeDuration: h.freezeDuration || 5 });
@@ -848,6 +872,203 @@ function updateBroodPod(h, dt) {
   burst(h.x, h.y, 10, h.color, 120);
 }
 
+function pointSegmentDistance(px, py, x1, y1, x2, y2) {
+  const dx = x2 - x1;
+  const dy = y2 - y1;
+  const lengthSq = dx * dx + dy * dy;
+  if (lengthSq <= 0.0001) return Math.hypot(px - x1, py - y1);
+  const t = clamp(((px - x1) * dx + (py - y1) * dy) / lengthSq, 0, 1);
+  return Math.hypot(px - (x1 + dx * t), py - (y1 + dy * t));
+}
+
+function updateConvictHazard(h, dt) {
+  if ((h.armTime || 0) > 0) {
+    h.armTime = Math.max(0, h.armTime - dt);
+    if (h.armTime > 0) return;
+    if (!h.convictArmed) {
+      h.convictArmed = true;
+      if (h.kind === "convict_ball_slam") {
+        burst(h.x, h.y, 18, h.color, 230);
+        pulse(h.x, h.y, h.r * 1.35, h.coreColor || h.color, 0.18);
+        state.shake = Math.max(state.shake, 6);
+      } else {
+        state.shake = Math.max(state.shake, h.sceneChain ? 6 : 3);
+      }
+    }
+  }
+  h.activeTime = Math.min(h.activeDuration || 0, (h.activeTime || 0) + dt);
+  const progress = clamp((h.activeTime || 0) / Math.max(0.001, h.activeDuration || 1), 0, 1);
+  if (h.kind === "convict_chain_arc") {
+    h.currentAngle = h.startAngle + h.sweep * progress;
+    h.ballX = h.centerX + Math.cos(h.currentAngle) * h.radius;
+    h.ballY = h.centerY + Math.sin(h.currentAngle) * h.radius;
+  } else if (h.kind === "convict_chain_line" && h.movingBall) {
+    h.ballX = h.x1 + (h.x2 - h.x1) * progress;
+    h.ballY = h.y1 + (h.y2 - h.y1) * progress;
+  } else if (h.kind === "convict_chain_path" && Array.isArray(h.points)) {
+    const position = pointAlongPath(h.points, progress);
+    h.ballX = position.x;
+    h.ballY = position.y;
+  }
+}
+
+function convictHazardHit(h, player) {
+  if ((h.armTime || 0) > 0) return false;
+  if (h.kind === "convict_ball_slam") return Math.hypot(player.x - h.x, player.y - h.y) < player.r + h.r;
+  if (h.kind === "convict_chain_arc") {
+    return pointSegmentDistance(player.x, player.y, h.centerX, h.centerY, h.ballX, h.ballY) < player.r + (h.width || 18)
+      || Math.hypot(player.x - h.ballX, player.y - h.ballY) < player.r + (h.ballRadius || 28);
+  }
+  if (h.kind === "convict_chain_line") {
+    const lines = h.lines || [{ x1: h.x1, y1: h.y1, x2: h.x2, y2: h.y2 }];
+    return lines.some((line) => pointSegmentDistance(player.x, player.y, line.x1, line.y1, line.x2, line.y2) < player.r + (h.width || 18));
+  }
+  if (h.kind === "convict_chain_path") {
+    for (let i = 1; i < (h.points || []).length; i++) {
+      const a = h.points[i - 1];
+      const b = h.points[i];
+      if (pointSegmentDistance(player.x, player.y, a.x, a.y, b.x, b.y) < player.r + (h.width || 18)) return true;
+    }
+  }
+  return false;
+}
+
+function convictHazardDamage(h, player) {
+  if (h.ballDamage && Number.isFinite(h.ballX) && Math.hypot(player.x - h.ballX, player.y - h.ballY) < player.r + (h.ballRadius || 28)) {
+    return h.ballDamage;
+  }
+  return h.damage;
+}
+
+function updateScientistHazard(h, dt) {
+  if (h.kind === "scientist_entropy_field") {
+    h.previousElapsed = h.elapsed || 0;
+    h.elapsed = (h.elapsed || 0) + dt;
+    const activeIndex = (h.waves || []).findIndex((wave) => h.elapsed >= wave.delay && h.elapsed < wave.delay + wave.duration);
+    if (activeIndex !== h.activeWaveIndex) {
+      h.activeWaveIndex = activeIndex;
+      h.playerHit = false;
+      if (activeIndex >= 0) {
+        const wave = h.waves[activeIndex];
+        pulse(h.x, h.y, Math.max(96, wave.startRadius), h.coreColor || h.color, 0.16);
+        state.shake = Math.max(state.shake, h.style === "event_horizon" || h.style === "manifestation_core" ? 5 : 3);
+      }
+    }
+    applyScientistPull(h, dt);
+    return;
+  }
+
+  applyScientistPull(h, dt);
+  if ((h.armTime || 0) > 0) {
+    h.armTime = Math.max(0, h.armTime - dt);
+    if (h.armTime > 0) return;
+    if (!h.scientistArmed) {
+      h.scientistArmed = true;
+      if (h.kind === "scientist_vial_blast" || h.kind === "scientist_void_node") {
+        burst(h.x, h.y, h.style === "corruption" ? 20 : 16, h.color, 220);
+        pulse(h.x, h.y, h.r * 1.3, h.coreColor || h.color, 0.2);
+        h.abyssScientistOwner?.releaseVialShards?.(h);
+      } else if (h.kind === "scientist_memory_path") {
+        const head = pointAlongPath(h.points, 0);
+        burst(head.x, head.y, 9, h.color, 120);
+      }
+      state.shake = Math.max(state.shake, h.sceneSeal ? 6 : h.kind === "scientist_tendril_path" ? 4 : 3);
+    }
+  }
+  h.activeTime = Math.min(h.activeDuration || 0, (h.activeTime || 0) + dt);
+  if (h.kind === "scientist_memory_path") {
+    h.pathHead = clamp(h.activeTime / Math.max(0.01, h.activeDuration || 1), 0, 1);
+  } else if (h.kind === "scientist_void_node" && h.activeDuration > 0) {
+    const progress = clamp(h.activeTime / h.activeDuration, 0, 1);
+    h.x = h.fromX + (h.toX - h.fromX) * progress;
+    h.y = h.fromY + (h.toY - h.fromY) * progress;
+  }
+}
+
+function scientistHazardHit(h, player) {
+  if (h.kind === "scientist_entropy_field") {
+    const wave = h.waves?.[h.activeWaveIndex];
+    if (!wave) return false;
+    const progress = clamp((h.elapsed - wave.delay) / Math.max(0.01, wave.duration), 0, 1);
+    const previousProgress = clamp(((h.previousElapsed ?? h.elapsed) - wave.delay) / Math.max(0.01, wave.duration), 0, 1);
+    const radius = wave.startRadius + (wave.endRadius - wave.startRadius) * progress;
+    const previousRadius = wave.startRadius + (wave.endRadius - wave.startRadius) * previousProgress;
+    const dx = player.x - h.x;
+    const dy = player.y - h.y;
+    const angle = Math.atan2(dy, dx);
+    const gapDistance = Math.abs(Math.atan2(Math.sin(angle - wave.gapAngle), Math.cos(angle - wave.gapAngle)));
+    if (gapDistance <= wave.gapWidth * 0.5) return false;
+    const distance = Math.hypot(dx, dy);
+    const padding = player.r + (wave.width || 32);
+    return distance + padding >= Math.min(previousRadius, radius) && distance - padding <= Math.max(previousRadius, radius);
+  }
+  if ((h.armTime || 0) > 0) return false;
+  if (h.kind === "scientist_vial_blast") {
+    return Math.hypot(player.x - h.x, player.y - h.y) < player.r + h.r;
+  }
+  if (h.kind === "scientist_void_node") {
+    return Math.hypot(player.x - h.x, player.y - h.y) < player.r + h.r;
+  }
+  if (h.kind === "scientist_seal_line") {
+    if (Array.isArray(h.lines)) {
+      return h.lines.some((line) => pointSegmentDistance(player.x, player.y, line.x1, line.y1, line.x2, line.y2) < player.r + (h.width || 24));
+    }
+    return pointLineDistance(player.x, player.y, h.x, h.y, h.angle || 0, h.length || WORLD_SIZE * 1.5) < player.r + (h.width || 24);
+  }
+  if (h.kind === "scientist_tendril_path") {
+    for (let i = 1; i < (h.points || []).length; i++) {
+      const a = h.points[i - 1];
+      const b = h.points[i];
+      if (pointSegmentDistance(player.x, player.y, a.x, a.y, b.x, b.y) < player.r + (h.width || 30)) return true;
+    }
+  }
+  if (h.kind === "scientist_memory_path") {
+    const points = h.points || [];
+    const head = h.pathHead || 0;
+    for (let i = 1; i < points.length; i++) {
+      const segmentProgress = (i - 0.5) / Math.max(1, points.length - 1);
+      if (Math.abs(segmentProgress - head) > 0.18) continue;
+      const a = points[i - 1];
+      const b = points[i];
+      if (pointSegmentDistance(player.x, player.y, a.x, a.y, b.x, b.y) < player.r + (h.width || 28)) return true;
+    }
+  }
+  return false;
+}
+
+function isScientistHazard(h) {
+  return h.kind === "scientist_seal_line"
+    || h.kind === "scientist_vial_blast"
+    || h.kind === "scientist_tendril_path"
+    || h.kind === "scientist_entropy_field"
+    || h.kind === "scientist_memory_path"
+    || h.kind === "scientist_void_node";
+}
+
+function applyScientistPull(h, dt) {
+  if (!(h.pullStrength > 0) || !(h.pullRadius > 0)) return;
+  const p = state.player;
+  const dx = h.x - p.x;
+  const dy = h.y - p.y;
+  const distance = Math.max(1, Math.hypot(dx, dy));
+  if (distance >= h.pullRadius) return;
+  const force = h.pullStrength * (1 - distance / h.pullRadius);
+  p.x = clamp(p.x + dx / distance * force * dt, -WORLD_SIZE / 2 + p.r, WORLD_SIZE / 2 - p.r);
+  p.y = clamp(p.y + dy / distance * force * dt, -WORLD_SIZE / 2 + p.r, WORLD_SIZE / 2 - p.r);
+}
+
+function pointAlongPath(points, progress) {
+  if (!points?.length) return { x: 0, y: 0 };
+  if (points.length === 1) return points[0];
+  const scaled = clamp(progress, 0, 1) * (points.length - 1);
+  const index = Math.min(points.length - 2, Math.floor(scaled));
+  const t = scaled - index;
+  return {
+    x: points[index].x + (points[index + 1].x - points[index].x) * t,
+    y: points[index].y + (points[index + 1].y - points[index].y) * t,
+  };
+}
+
 function updateStormLaserNet(h, dt) {
   if (h.armTime > 0) h.armTime = Math.max(0, h.armTime - dt);
   h.x += (h.vx || 0) * dt;
@@ -998,7 +1219,59 @@ function updateEnemyKnockback(e, dt) {
 }
 
 function updateSpecialEnemyProjectile(b, dt) {
-  if (b.shape === "riftbladeCrescent") {
+  if (b.shape === "scientistAbyssCore") {
+    b.spin = (b.spin || 0) + dt * (b.splitSide || 1) * 3.8;
+    b.splitTimer = Math.max(0, (b.splitTimer || 0) - dt);
+    if (b.splitTimer <= 0 && !b.splitDone) {
+      b.splitDone = true;
+      b.abyssScientistOwner?.splitAbyssCore?.(b);
+      b.life = 0;
+    }
+  } else if (b.shape === "scientistAbyssShard") {
+    if ((b.activationDelay || 0) > 0) {
+      b.activationDelay = Math.max(0, b.activationDelay - dt);
+      if (b.activationDelay <= 0) {
+        b.vx = b.launchVx || 0;
+        b.vy = b.launchVy || 0;
+        b.hidden = false;
+        b.nonColliding = false;
+        burst(b.x, b.y, 4, b.color, 80);
+      }
+    } else {
+      const speed = Math.max(1, Math.hypot(b.vx, b.vy));
+      const angle = Math.atan2(b.vy, b.vx) + (b.curve || 0) * dt;
+      b.vx = Math.cos(angle) * speed;
+      b.vy = Math.sin(angle) * speed;
+      b.spin = angle;
+    }
+  } else if (b.shape === "convictShrapnel") {
+    b.spin = (b.spin || 0) + dt * 15;
+    if ((b.activationDelay || 0) > 0) {
+      b.activationDelay = Math.max(0, b.activationDelay - dt);
+      if (b.activationDelay <= 0) {
+        b.vx = b.launchVx || 0;
+        b.vy = b.launchVy || 0;
+        b.hidden = false;
+        b.nonColliding = false;
+        burst(b.x, b.y, 4, b.color, 90);
+      }
+    }
+  } else if (b.shape === "convictBall") {
+    b.spin = (b.spin || 0) + dt * 8;
+    let linked = b.linkedHazard;
+    if (Array.isArray(b.bounceHazards)) {
+      linked = b.bounceHazards.find((hazard) => (hazard.armTime || 0) <= 0 && hazard.life > 0)
+        || b.bounceHazards.find((hazard) => hazard.life > 0);
+    }
+    if (!linked || linked.life <= 0) {
+      b.life = 0;
+      return;
+    }
+    b.x = linked.ballX ?? linked.x ?? b.x;
+    b.y = linked.ballY ?? linked.y ?? b.y;
+    b.hidden = Boolean(b.armedOnly && (linked.armTime || 0) > 0);
+    b.visualHeight = b.drop ? Math.max(0, (linked.armTime || 0) / Math.max(0.01, linked.armDuration || 1)) * 130 : 0;
+  } else if (b.shape === "riftbladeCrescent") {
     const speed = Math.max(1, Math.hypot(b.vx, b.vy));
     const turn = b.returnAt >= 0 && b.life < b.returnAt ? b.returnCurve || 0 : b.curve || 0;
     const angle = Math.atan2(b.vy, b.vx) + turn * dt;

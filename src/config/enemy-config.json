@@ -964,6 +964,54 @@
     "desc": "末日实验区最后一位仍保持自我意识的剑术执行官。断界把自动防卫系统重写成八柄灵剑，以青蓝试锋、紫白断界、赤金终式丈量每一个闯入者的生路。",
     "tip": "剑痕出现后方向便会锁定。持续变向穿过安全通道，并在它收剑或单膝蓄势时让自动火力全力输出。"
   },
+  "chainbreak_convict": {
+    "name": "终刑重犯·断锁",
+    "category": "Boss",
+    "trait": "极刑链球",
+    "hp": 72000,
+    "speed": 62,
+    "damage": 36,
+    "defense": 8,
+    "xp": 420,
+    "radius": 60,
+    "color": "#d89a52",
+    "behavior": "boss_chainbreak_convict",
+    "boss": true,
+    "difficulties": [
+      "void_crown"
+    ],
+    "difficultyWaves": {
+      "void_crown": {
+        "bossWave": 10
+      }
+    },
+    "desc": "中央 AI 把死刑犯 K-13 改造成最早期的王冠候选，又用处刑项圈和磁锁链封存了他的意识。断锁挣脱刑台后没有丢掉那颗巨型链球，而是把自己的枷锁变成了砸碎中央核心的武器。",
+    "tip": "扇形与锁链轨迹亮起后便会锁定。跟随未被刑链切断的安全通道，并在他回收链球或跪地收链时让自动火力全力输出。"
+  },
+  "abyssal_seal_scientist": {
+    "name": "蚀渊博士·维恩",
+    "category": "Boss",
+    "trait": "暗质寄生·记忆猎杀",
+    "hp": 140000,
+    "speed": 58,
+    "damage": 42,
+    "defense": 10,
+    "xp": 650,
+    "radius": 64,
+    "color": "#54efff",
+    "behavior": "boss_abyssal_seal_scientist",
+    "boss": true,
+    "difficulties": [
+      "void_crown"
+    ],
+    "difficultyWaves": {
+      "void_crown": {
+        "bossWave": 20
+      }
+    },
+    "desc": "中央核心的黑暗能量封印项目负责人维恩，本想关闭足以吞噬实验室的暗质，却被中央 AI 强迫留在反应舱中维持实验。封印对象已经学会读取他的行动记忆：它借维恩的身体培养引力胚核、复制玩家走过的路径，并用不断扩张的事件视界啃噬整座实验室。",
+    "tip": "熵环扩张前先找准发光缺口，不要停留在自己刚走过的紫黑记忆轨迹上。暗质培养核会先牵引再坍缩；维恩完成宿主置换或短暂夺回意识时，是自动火力最稳定的输出窗口。"
+  },
   "twin_abyssal_eyes": {
     "name": "裂渊双瞳",
     "category": "Boss",

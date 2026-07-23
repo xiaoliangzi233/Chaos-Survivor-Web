@@ -7,6 +7,7 @@ let currentSession = { status: "idle", user: null, error: "" };
 let onBeforeOpen = null;
 let onRefreshIdentity = null;
 let requestSerial = 0;
+let leaderboardEnabled = true;
 
 export function initLeaderboardUi(options = {}) {
   dom.overlay = document.getElementById("leaderboardOverlay");
@@ -21,9 +22,21 @@ export function initLeaderboardUi(options = {}) {
   dom.refreshButton = document.getElementById("leaderboardRefreshButton");
   if (!dom.overlay || !dom.openButton || !dom.closeButton || !dom.profile || !dom.tabs || !dom.rows) return;
 
+  leaderboardEnabled = options.enabled !== false;
   onBeforeOpen = options.onBeforeOpen || null;
   onRefreshIdentity = options.onRefreshIdentity || null;
   currentSession = options.session || currentSession;
+  if (!leaderboardEnabled) {
+    dom.openButton.hidden = true;
+    dom.openButton.disabled = true;
+    dom.openButton.style.display = "none";
+    dom.overlay.hidden = true;
+    dom.overlay.style.display = "none";
+    dom.overlay.classList.remove("active");
+    dom.overlay.setAttribute("aria-hidden", "true");
+    document.body.classList.remove("leaderboard-open");
+    return;
+  }
   dom.openButton.addEventListener("click", toggleLeaderboard);
   dom.closeButton.addEventListener("click", closeLeaderboard);
   dom.overlay.addEventListener("click", (event) => {
@@ -46,6 +59,7 @@ export function initLeaderboardUi(options = {}) {
 
 export function setLeaderboardUserSession(session) {
   currentSession = session || currentSession;
+  if (!leaderboardEnabled) return;
   if (isLeaderboardOpen()) {
     renderProfile(null);
     void loadLeaderboard();
@@ -53,7 +67,7 @@ export function setLeaderboardUserSession(session) {
 }
 
 export function isLeaderboardOpen() {
-  return Boolean(dom.overlay?.classList.contains("active"));
+  return leaderboardEnabled && Boolean(dom.overlay?.classList.contains("active"));
 }
 
 export function toggleLeaderboard() {
@@ -62,7 +76,7 @@ export function toggleLeaderboard() {
 }
 
 export function openLeaderboard() {
-  if (!dom.overlay || window.matchMedia("(max-width: 899px)").matches) return;
+  if (!leaderboardEnabled || !dom.overlay || window.matchMedia("(max-width: 899px)").matches) return;
   onBeforeOpen?.();
   dom.overlay.classList.add("active");
   document.body.classList.add("leaderboard-open");

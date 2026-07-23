@@ -10,12 +10,23 @@ export function collectThreats(state, world, options = {}) {
   const threats = [];
   for (const b of world.enemyProjectiles || []) {
     if ((b.life ?? 1) <= 0) continue;
+    if (b.nonColliding) continue;
     if (distanceSq(p, b) > (queryRadius + (b.r || 0)) ** 2) continue;
     threats.push(normalizeThreat("projectile", b, 1.15));
   }
   for (const h of world.hazards || []) {
     if ((h.life ?? 1) <= 0) continue;
-    const lineHazard = h.kind === "storm_laser_net" || h.kind === "riftblade_slash";
+    if (h.delayedWarning && (h.armTime || 0) > (h.armDuration || 0)) continue;
+    const lineHazard = h.kind === "storm_laser_net"
+      || h.kind === "riftblade_slash"
+      || (h.kind === "riftblade_bladefall" && Array.isArray(h.lines))
+      || h.kind === "convict_chain_arc"
+      || h.kind === "convict_chain_line"
+      || h.kind === "convict_chain_path"
+      || h.kind === "scientist_seal_line"
+      || h.kind === "scientist_tendril_path"
+      || h.kind === "scientist_memory_path"
+      || h.kind === "scientist_entropy_field";
     if (!lineHazard && distanceSq(p, h) > (queryRadius + (h.r || 0) + 120) ** 2) continue;
     threats.push(normalizeThreat("hazard", h, hazardWeight(h)));
   }
@@ -56,10 +67,22 @@ export function normalizeThreat(kind, source, weight = 1) {
     life: source.life ?? source.modeTimer ?? 1,
     weight,
     armTime: source.armTime || 0,
-    line: source.kind === "storm_laser_net" || source.kind === "riftblade_slash",
+    line: source.kind === "storm_laser_net"
+      || source.kind === "riftblade_slash"
+      || (source.kind === "riftblade_bladefall" && !source.lines)
+      || ((source.kind === "convict_chain_line" || source.kind === "scientist_seal_line") && !source.lines),
     angle: source.angle || 0,
     length: source.length || 0,
     width: source.width || 0,
+    sourceKind: source.kind || "",
+    lines: source.lines || null,
+    points: source.points || null,
+    centerX: source.centerX,
+    centerY: source.centerY,
+    radius: source.radius,
+    startAngle: source.startAngle,
+    sweep: source.sweep,
+    currentAngle: source.currentAngle,
   };
 }
 
@@ -75,7 +98,14 @@ export function classifyThreat(source, kind) {
   }
   if (kind === "hazard") {
     if (source.kind === "blizzard_core") return "hazard_zone_soft";
-    if (source.kind === "storm_laser_net" || source.kind === "riftblade_slash") return (source.armTime || 0) > 0 ? "warning_line" : "hazard_zone_hard";
+    if (source.kind === "convict_chain_arc" || source.kind === "convict_chain_line" || source.kind === "convict_chain_path") return (source.armTime || 0) > 0 ? "warning_line" : "hazard_zone_hard";
+    if (source.kind === "convict_ball_slam") return (source.armTime || 0) > 0 ? "warning_circle" : "hazard_armed";
+    if (source.kind === "scientist_seal_line" || source.kind === "scientist_tendril_path") return (source.armTime || 0) > 0 ? "warning_line" : "hazard_zone_hard";
+    if (source.kind === "scientist_vial_blast") return (source.armTime || 0) > 0 ? "warning_circle" : "hazard_armed";
+    if (source.kind === "scientist_memory_path") return (source.armTime || 0) > 0 ? "warning_line" : "hazard_zone_hard";
+    if (source.kind === "scientist_void_node") return (source.armTime || 0) > 0 ? "warning_circle" : "hazard_armed";
+    if (source.kind === "scientist_entropy_field") return "hazard_zone_hard";
+    if (source.kind === "storm_laser_net" || source.kind === "riftblade_slash" || source.kind === "riftblade_bladefall") return (source.armTime || 0) > 0 ? "warning_line" : "hazard_zone_hard";
     if (source.kind === "toxic_residue" || source.kind === "frost_zone") return "hazard_armed";
     if ((source.armTime || 0) > 0.35) {
       if (source.length || source.warningType === "line") return "warning_line";
@@ -227,6 +257,11 @@ export function surroundScore(player, enemies, options = {}) {
 
 function hazardRisk(point, threat) {
   if (threat.armTime > 0.45 && threat.kind !== "warning_line" && threat.kind !== "warning_circle") return 0;
+  if (threat.sourceKind === "scientist_entropy_field") return scientistEntropyRisk(point, threat);
+  if (threat.sourceKind === "scientist_memory_path") return scientistMemoryRisk(point, threat);
+  if (threat.sourceKind === "convict_chain_arc") return convictArcRisk(point, threat) * (threat.armTime > 0 ? windupScale(threat) : 1);
+  if (threat.sourceKind === "convict_chain_path" || threat.sourceKind === "scientist_tendril_path") return convictPathRisk(point, threat) * (threat.armTime > 0 ? windupScale(threat) : 1);
+  if ((threat.sourceKind === "convict_chain_line" || threat.sourceKind === "scientist_seal_line" || threat.sourceKind === "riftblade_bladefall") && threat.lines) return convictMultiLineRisk(point, threat) * (threat.armTime > 0 ? windupScale(threat) : 1);
   if (threat.line) return lineRisk(point, threat);
   const dx = point.x - threat.x;
   const dy = point.y - threat.y;
@@ -273,6 +308,105 @@ function lineRisk(point, threat) {
   return side < safe ? (threat.damage || 1) * 12 : 0;
 }
 
+function convictArcRisk(point, threat) {
+  const cx = threat.centerX ?? threat.x;
+  const cy = threat.centerY ?? threat.y;
+  const radius = threat.radius || threat.r || 300;
+  const safe = (point.r || 14) + (threat.width || 18) + 18;
+  if (threat.armTime <= 0) {
+    const angle = threat.currentAngle ?? threat.startAngle ?? 0;
+    return segmentRisk(point, cx, cy, cx + Math.cos(angle) * radius, cy + Math.sin(angle) * radius, safe, threat);
+  }
+  const dx = point.x - cx;
+  const dy = point.y - cy;
+  const distance = Math.hypot(dx, dy);
+  if (distance > radius + safe) return 0;
+  const angle = Math.atan2(dy, dx);
+  if (!angleWithinSweep(angle, threat.startAngle || 0, threat.sweep || 0, safe / Math.max(80, distance))) return 0;
+  return Math.max(1, threat.damage || 1) * (threat.weight || 1) * 8;
+}
+
+function convictPathRisk(point, threat) {
+  const points = threat.points || [];
+  const safe = (point.r || 14) + (threat.width || 18) + 16;
+  let risk = 0;
+  for (let i = 1; i < points.length; i++) risk = Math.max(risk, segmentRisk(point, points[i - 1].x, points[i - 1].y, points[i].x, points[i].y, safe, threat));
+  return risk;
+}
+
+function scientistMemoryRisk(point, threat) {
+  const points = threat.points || [];
+  if (threat.armTime > 0) return convictPathRisk(point, threat) * windupScale(threat);
+  const head = threat.source?.pathHead || 0;
+  const safe = (point.r || 14) + (threat.width || 28) + 18;
+  let risk = 0;
+  for (let i = 1; i < points.length; i++) {
+    const segmentProgress = (i - 0.5) / Math.max(1, points.length - 1);
+    if (Math.abs(segmentProgress - head) > 0.2) continue;
+    risk = Math.max(risk, segmentRisk(point, points[i - 1].x, points[i - 1].y, points[i].x, points[i].y, safe, threat));
+  }
+  return risk;
+}
+
+function scientistEntropyRisk(point, threat) {
+  const source = threat.source || {};
+  const elapsed = source.elapsed || 0;
+  const waves = source.waves || [];
+  let wave = waves[source.activeWaveIndex];
+  let warning = false;
+  if (!wave) {
+    wave = waves.find((candidate) => candidate.delay >= elapsed && candidate.delay - elapsed <= 1);
+    warning = Boolean(wave);
+  }
+  if (!wave) return 0;
+  const dx = point.x - threat.x;
+  const dy = point.y - threat.y;
+  const angle = Math.atan2(dy, dx);
+  const gapDistance = Math.abs(Math.atan2(Math.sin(angle - wave.gapAngle), Math.cos(angle - wave.gapAngle)));
+  const safeGap = Math.max(0.08, wave.gapWidth * 0.5 - 0.08);
+  if (gapDistance <= safeGap) return 0;
+  const severity = Math.max(1, wave.damage || threat.damage || 1) * (threat.weight || 1);
+  if (warning) {
+    const urgency = Math.max(0.18, 1 - (wave.delay - elapsed) / 1);
+    return severity * urgency * (gapDistance < wave.gapWidth * 0.7 ? 3.5 : 8);
+  }
+  const progress = Math.max(0, Math.min(1, (elapsed - wave.delay) / Math.max(0.01, wave.duration)));
+  const radius = wave.startRadius + (wave.endRadius - wave.startRadius) * progress;
+  const distance = Math.hypot(dx, dy);
+  const safe = (point.r || 14) + (wave.width || 32) + 28;
+  const ringDistance = Math.abs(distance - radius);
+  if (ringDistance < safe) return severity * (1 + (safe - ringDistance) / safe) * 12;
+  return severity * Math.max(0, 1 - ringDistance / 260) * 1.5;
+}
+
+function convictMultiLineRisk(point, threat) {
+  const safe = (point.r || 14) + (threat.width || 18) + 16;
+  let risk = 0;
+  for (const line of threat.lines || []) risk = Math.max(risk, segmentRisk(point, line.x1, line.y1, line.x2, line.y2, safe, threat));
+  return risk;
+}
+
+function segmentRisk(point, x1, y1, x2, y2, safe, threat) {
+  const dx = x2 - x1;
+  const dy = y2 - y1;
+  const lengthSq = dx * dx + dy * dy;
+  if (lengthSq <= 0.001) return 0;
+  const t = Math.max(0, Math.min(1, ((point.x - x1) * dx + (point.y - y1) * dy) / lengthSq));
+  const distance = Math.hypot(point.x - (x1 + dx * t), point.y - (y1 + dy * t));
+  return distance < safe ? Math.max(1, threat.damage || 1) * (threat.weight || 1) * 12 : 0;
+}
+
+function angleWithinSweep(angle, start, sweep, padding = 0) {
+  const delta = sweep >= 0 ? normalizeAngle(angle - start) : normalizeAngle(start - angle);
+  const size = Math.abs(sweep);
+  return delta <= size + padding || delta >= Math.PI * 2 - padding;
+}
+
+function normalizeAngle(angle) {
+  const full = Math.PI * 2;
+  return (angle % full + full) % full;
+}
+
 function threatPadding(threat) {
   if (threat.kind === "projectile_fast") return 34;
   if (threat.kind === "projectile_slow_field") return 42;
@@ -296,6 +430,13 @@ function hazardWeight(h) {
   if (h.kind === "toxic_residue" || h.kind === "frost_zone") return 1.35;
   if (h.kind === "storm_laser_net") return 1.8;
   if (h.kind === "riftblade_slash" || h.kind === "riftblade_bladefall") return 1.9;
+  if (h.kind === "convict_chain_arc" || h.kind === "convict_ball_slam" || h.kind === "convict_chain_line" || h.kind === "convict_chain_path") return 1.95;
+  if (h.kind === "scientist_seal_line"
+    || h.kind === "scientist_vial_blast"
+    || h.kind === "scientist_tendril_path"
+    || h.kind === "scientist_entropy_field"
+    || h.kind === "scientist_memory_path"
+    || h.kind === "scientist_void_node") return 2.05;
   if (h.kind === "blizzard_core") return 0.9;
   return 1.15;
 }

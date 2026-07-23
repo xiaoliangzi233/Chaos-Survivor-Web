@@ -67,6 +67,8 @@ import {
 } from "../ui/feedbackUi.js";
 import { closeHelp, initHelpUi, isHelpOpen } from "../ui/helpUi.js";
 import { clearWaveEventNotice, initWaveEventUi, showWaveEventNotice } from "../ui/waveEventUi.js";
+import { initDebugModeUi, updateDebugModeUi } from "../ui/debugModeUi.js";
+import { loadAccessConfig } from "../config/accessConfig.js";
 
 const LEVEL_CHOICE_REFRESH_COST = 10;
 
@@ -87,24 +89,30 @@ export async function bootGame() {
   });
   setBootProgress(18, "正在同步版本配置");
   const config = await loadGameConfig();
+  const accessConfig = await loadAccessConfig();
+  const anonymousLocalPlay = accessConfig.anonymousLocalPlay.enabled;
   const skipLocalTokenValidation = Boolean(config.skipTokenValidationOnLocalhost) && isLocalDevelopmentHost();
+  const skipTokenValidation = anonymousLocalPlay || skipLocalTokenValidation;
   setBootProgress(30, "正在识别玩家身份");
   let userSession = await initializeUserProfile({
     url: config.userInfoUrl,
-    skipTokenValidation: skipLocalTokenValidation,
+    skipTokenValidation,
   });
   setBootProgress(
     userSession.status === "ready" || userSession.status === "local" ? 42 : 38,
     userSession.status === "ready"
       ? "玩家档案已就绪"
       : userSession.status === "local"
-        ? "本地调试模式：已跳过身份校验"
+        ? anonymousLocalPlay
+          ? "匿名本地模式：进度仅保存到当前浏览器"
+          : "本地调试模式：已跳过身份校验"
         : "访客模式：排行榜暂不可同步",
   );
   configureLeaderboard({
     baseUrl: config.leaderboardApiBaseUrl,
     token: userSession.token,
     user: userSession.user,
+    enabled: !anonymousLocalPlay,
   });
   configureFeedback({
     baseUrl: config.leaderboardApiBaseUrl,
@@ -119,6 +127,7 @@ export async function bootGame() {
   });
   initLeaderboardUi({
     session: userSession,
+    enabled: !anonymousLocalPlay,
     onBeforeOpen: () => {
       closeCodex();
       closeFeedback();
@@ -160,12 +169,13 @@ export async function bootGame() {
     userSession = await initializeUserProfile({
       force: true,
       url: config.userInfoUrl,
-      skipTokenValidation: skipLocalTokenValidation,
+      skipTokenValidation,
     });
     configureLeaderboard({
       baseUrl: config.leaderboardApiBaseUrl,
       token: userSession.token,
       user: userSession.user,
+      enabled: !anonymousLocalPlay,
     });
     configureFeedback({
       baseUrl: config.leaderboardApiBaseUrl,
@@ -226,7 +236,7 @@ export async function bootGame() {
 
     if (state.mode !== "story") return false;
     state.mode = "playing";
-    beginLeaderboardRun(difficulty.id);
+    if (!state.debug?.runTainted) beginLeaderboardRun(difficulty.id);
     resetWaveScenarioState();
     const scenario = applyWaveStartScenario();
     showWaveEventNotice({ wave: state.wave, scenario, boss: isBossWave(state.wave) });
@@ -352,11 +362,15 @@ export async function bootGame() {
 
   function endGame(victory) {
     clearWaveEventNotice();
-    finishLeaderboardRun(leaderboardSnapshot(), victory ? "VICTORY" : "DEFEAT");
+    if (state.debug?.runTainted) {
+      if (hasActiveLeaderboardRun()) finishLeaderboardRun(leaderboardSnapshot(), "ABANDONED");
+    } else {
+      finishLeaderboardRun(leaderboardSnapshot(), victory ? "VICTORY" : "DEFEAT");
+    }
     state.mode = "ended";
     state.victory = victory;
-    if (victory) recordDifficultyVictory();
-    recordBestSurvivalSeconds(Math.floor(state.time));
+    if (victory && !state.debug?.runTainted) recordDifficultyVictory();
+    if (!state.debug?.runTainted) recordBestSurvivalSeconds(Math.floor(state.time));
     hidePauseMenu();
     closeInventory();
     closeShop();
@@ -409,20 +423,66 @@ export async function bootGame() {
     updateBestText();
   }
 
+  function startDebugRun({ difficultyId, weaponId }) {
+    if (!difficultyCards().some((entry) => entry.id === difficultyId)) return false;
+    if (!STARTER_WEAPONS.some((entry) => entry.id === weaponId)) return false;
+    cancelStoryPlayback();
+    if (hasActiveLeaderboardRun()) finishLeaderboardRun(leaderboardSnapshot(), "ABANDONED");
+    closeCodex();
+    closeLeaderboard();
+    closeFeedback();
+    closeHelp();
+    clearWaveEventNotice();
+    hideAllOverlays();
+    hideRunSetup();
+    selectDifficulty(difficultyId);
+    resetRun(generateMap());
+    selectDifficulty(difficultyId);
+    state.shop = createShopState();
+    state.initialWeaponId = weaponId;
+    activateWeapon(weaponId);
+    state.debug.enabled = true;
+    state.debug.unlocked = true;
+    state.debug.runTainted = true;
+    state.mode = "playing";
+    resetWaveScenarioState();
+    startWaveItems();
+    playSfx("start");
+    startMusic();
+    return true;
+  }
+
+  function taintRunForDebug() {
+    state.debug.runTainted = true;
+    if (hasActiveLeaderboardRun()) finishLeaderboardRun(leaderboardSnapshot(), "ABANDONED");
+  }
+
+  function pauseForDebug() {
+    if (state.mode !== "playing") return false;
+    pauseGame();
+    hidePauseMenu();
+    return true;
+  }
+
+  function resumeFromDebug() {
+    if (state.mode === "paused") resumeGame();
+  }
+
   function update(dt) {
     updateAi(dt);
     if (state.mode !== "playing") return;
     const bossWave = isBossWave(state.wave);
-    state.bossWaveActive = bossWave;
+    const debugFreeze = Boolean(state.debug?.enabled && state.debug.freezeWave);
+    state.bossWaveActive = bossWave || Boolean(world.boss);
     state.time += dt;
-    updateLeaderboardRun(dt, leaderboardSnapshot());
-    if (!bossWave) state.waveTimeLeft = Math.max(0, state.waveTimeLeft - dt);
+    if (!state.debug?.runTainted) updateLeaderboardRun(dt, leaderboardSnapshot());
+    if (!bossWave && !debugFreeze) state.waveTimeLeft = Math.max(0, state.waveTimeLeft - dt);
     state.shake = Math.max(0, state.shake - dt * 20);
     state.flash = Math.max(0, state.flash - dt * 3);
     updateItems(dt);
     updatePlayer(dt);
     updateEasterEggs(dt);
-    if (bossWave || state.waveTimeLeft > 0) updateSpawning(dt);
+    if (!debugFreeze && (bossWave || state.waveTimeLeft > 0)) updateSpawning(dt);
     updateEnemies(dt);
     rebuildGrid();
     updateWeapons(dt);
@@ -433,8 +493,8 @@ export async function bootGame() {
     updateCamera(dt);
     checkLevelUps();
     if (state.player.hp <= 0) endGame(false);
-    if (state.mode === "playing" && bossWave && !world.boss && state.spawnedBossWaves?.has(state.wave)) completeWave();
-    if (state.mode === "playing" && !bossWave && state.waveTimeLeft <= 0) completeWave();
+    if (!debugFreeze && state.mode === "playing" && bossWave && !world.boss && state.spawnedBossWaves?.has(state.wave)) completeWave();
+    if (!debugFreeze && state.mode === "playing" && !bossWave && state.waveTimeLeft <= 0) completeWave();
   }
 
   function loop(now) {
@@ -456,6 +516,7 @@ export async function bootGame() {
     update(dt);
     render(ctx);
     updateHud(fps);
+    updateDebugModeUi();
     requestAnimationFrame(loop);
   }
 
@@ -471,6 +532,12 @@ export async function bootGame() {
   resetRun(generateMap());
   state.shop = createShopState();
   state.mode = "menu";
+  initDebugModeUi({
+    onQuickStart: startDebugRun,
+    onTaintRun: taintRunForDebug,
+    onPauseForDebug: pauseForDebug,
+    onResumeFromDebug: resumeFromDebug,
+  });
   initAi({
     clearTrainingOnStartup: aiTrainingMode.clearTrainingOnStartup,
     ignoreStoredEnabled: aiTrainingMode.enabled,

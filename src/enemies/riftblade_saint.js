@@ -7,9 +7,19 @@ import { applyPlayerDamage } from "../systems/items.js";
 import { BaseEnemy } from "./BaseEnemy.js";
 
 export const RIFTBLADE_PHASE_THRESHOLDS = [0.68, 0.34];
+export const RIFTBLADE_SCREEN_PRESSURE = Object.freeze({
+  dashWarningLength: 1560,
+  moonProjectiles: [8, 10, 12],
+  bladeRainWaves: 3,
+  bladeRainLines: 6,
+  bladeRainCorridor: 190,
+  judgmentLines: 9,
+  peakProjectiles: 96,
+});
 
 const PHASE_COLORS = ["#52f7ff", "#c49aff", "#ffcf66"];
 const HALF_WORLD = WORLD_SIZE / 2;
+const SCREEN_SLASH_LENGTH = RIFTBLADE_SCREEN_PRESSURE.dashWarningLength;
 
 export class RiftbladeSaint extends BaseEnemy {
   constructor(config, x, y) {
@@ -197,32 +207,21 @@ export class RiftbladeSaint extends BaseEnemy {
 
   launchMoonReturn() {
     const base = this.angleToPredictedPlayer(0.22);
-    for (const side of [-1, 1]) {
-      const angle = base + side * 0.24;
-      world.enemyProjectiles.push({
-        x: this.x + Math.cos(angle) * 54,
-        y: this.y + Math.sin(angle) * 54,
-        vx: Math.cos(angle) * 290,
-        vy: Math.sin(angle) * 290,
-        r: 15,
-        color: this.phaseColor(),
-        damage: this.damage * 0.52,
-        life: 3.8,
-        returnAt: 2.9,
-        curve: side * 0.42,
-        returnCurve: side * 2.7,
-        returning: true,
-        shape: "riftbladeCrescent",
-        spin: angle,
-        bossProjectile: true,
-        expireWithLife: true,
-        riftbladeOwner: this,
+    const count = RIFTBLADE_SCREEN_PRESSURE.moonProjectiles[this.phaseLevel - 1];
+    const offsets = spreadWithCenterGap(count, 1.08, 0.18);
+    offsets.forEach((offset, index) => {
+      const side = offset < 0 ? -1 : 1;
+      this.shootCrescent(base + offset, side, 310 + (index % 3) * 18, this.damage * 0.36, true, {
+        radius: 14,
+        curveScale: 1.18,
+        life: 4.25,
+        returnAt: 3.12,
       });
-    }
+    });
     this.swordAngle = 0.62;
-    pulse(this.x, this.y, 88, this.phaseColor(), 0.28);
+    pulse(this.x, this.y, 128, this.phaseColor(), 0.32);
     playSfx("shoot");
-    this.finishAttack();
+    this.finishAttack(0.72);
   }
 
   launchShadowStep() {
@@ -287,7 +286,18 @@ export class RiftbladeSaint extends BaseEnemy {
     this.y += this.dashVy * dt;
     this.leaveDashTrail(dt, 10);
     if (this.modeTimer > 0) return;
-    this.addSlashLine(this.x - Math.cos(this.lockAngle) * this.dashDistance * 0.5, this.y - Math.sin(this.lockAngle) * this.dashDistance * 0.5, this.lockAngle, this.dashDistance + 120, 24, 0.55, 0.2, this.damage * 0.42, "afterimage");
+    this.addSlashLine(
+      this.x - Math.cos(this.lockAngle) * this.dashDistance * 0.5,
+      this.y - Math.sin(this.lockAngle) * this.dashDistance * 0.5,
+      this.lockAngle,
+      Math.max(SCREEN_SLASH_LENGTH, this.dashDistance + 360),
+      30,
+      0.55,
+      0.2,
+      this.damage * 0.42,
+      "afterimage",
+    );
+    this.spawnCrescentFan(this.lockAngle + Math.PI, 6, 0.95, 350, this.damage * 0.22, 0.16);
     this.comboRemaining--;
     if (this.comboRemaining <= 0) {
       this.skillCooldowns.mirror_combo = 5.2;
@@ -300,22 +310,51 @@ export class RiftbladeSaint extends BaseEnemy {
   launchCrossRift() {
     const center = this.predictedPlayer(0.25);
     const angle = Math.hypot(this.motion.vx, this.motion.vy) > 25 ? Math.atan2(this.motion.vy, this.motion.vx) : this.angleToPredictedPlayer(0);
-    this.addSlashLine(center.x, center.y, angle, 1700, 28, 0.85, 0.22, this.damage * 0.58, "cross");
-    this.addSlashLine(center.x, center.y, angle + Math.PI / 2, 1700, 28, 1.3, 0.22, this.damage * 0.58, "cross");
+    [0, Math.PI / 2, Math.PI / 4, -Math.PI / 4].forEach((offset, index) => {
+      this.addSlashLine(
+        center.x,
+        center.y,
+        angle + offset,
+        WORLD_SIZE * 1.28,
+        index < 2 ? 31 : 27,
+        0.9 + index * 0.43,
+        0.2,
+        this.damage * (index < 2 ? 0.54 : 0.46),
+        "cross",
+        true,
+      );
+    });
     this.mode = "riftblade_cross";
-    this.modeTimer = 1.58;
-    this.skillCooldowns.cross_rift = 4.4;
+    this.modeTimer = 2.42;
+    this.skillCooldowns.cross_rift = 5.2;
     playSfx("wave");
   }
 
   launchEightGate() {
+    const center = this.predictedPlayer(0.18);
     const base = Math.hypot(this.motion.vx, this.motion.vy) > 25 ? Math.atan2(this.motion.vy, this.motion.vx) : this.sceneSpin;
-    for (let i = 0; i < 8; i++) {
-      const angle = base + i * Math.PI / 4;
-      this.addSlashLine(0, 0, angle, WORLD_SIZE * 1.28, 27, 0.9 + i * 0.32, 0.2, this.damage * 0.54, "gate", true);
+    const halfGap = 116;
+    for (let i = 0; i < 6; i++) {
+      const angle = base + i * Math.PI / 3;
+      const nx = -Math.sin(angle);
+      const ny = Math.cos(angle);
+      for (const side of [-1, 1]) {
+        this.addSlashLine(
+          center.x + nx * halfGap * side,
+          center.y + ny * halfGap * side,
+          angle,
+          WORLD_SIZE * 1.3,
+          28,
+          0.95 + i * 0.44,
+          0.2,
+          this.damage * 0.5,
+          "gate",
+          true,
+        );
+      }
     }
     this.mode = "riftblade_sword_array";
-    this.modeTimer = 3.42;
+    this.modeTimer = 3.55;
     this.skillCooldowns.eight_gate = 13;
     this.attacksSinceLongRecover = 0;
     playSfx("level");
@@ -346,35 +385,62 @@ export class RiftbladeSaint extends BaseEnemy {
       if (this.modeTimer > 0) return;
       const center = this.predictedPlayer(0.18);
       const angle = Math.atan2(center.y - this.y, center.x - this.x);
-      this.addSlashLine(center.x, center.y, angle + 0.72, 1250, 26, 0.45, 0.2, this.damage * 0.5, "final_cross");
-      this.addSlashLine(center.x, center.y, angle - 0.72, 1250, 26, 0.8, 0.2, this.damage * 0.5, "final_cross");
+      [-0.72, 0.72, -Math.PI / 2, Math.PI / 2].forEach((offset, index) => {
+        this.addSlashLine(
+          center.x,
+          center.y,
+          angle + offset,
+          WORLD_SIZE * 1.26,
+          29,
+          0.52 + index * 0.34,
+          0.2,
+          this.damage * 0.48,
+          "final_cross",
+          true,
+        );
+      });
       this.comboStep = 2;
-      this.modeTimer = 1.08;
+      this.modeTimer = 1.72;
       return;
     }
     if (this.comboStep === 2 && this.modeTimer <= 0) {
       const base = this.angleToPredictedPlayer(0.16);
-      for (const offset of [-0.52, -0.34, -0.17, 0.17, 0.34, 0.52]) this.shootCrescent(base + offset, Math.sign(offset) || 1, 330, this.damage * 0.38, false);
-      this.skillCooldowns.final_combo = 6.2;
-      this.finishAttack(1.05, true);
+      this.spawnCrescentFan(base, 18, 2.45, 365, this.damage * 0.25, 0.2);
+      this.skillCooldowns.final_combo = 7;
+      this.finishAttack(1.15, true);
     }
   }
 
   launchBladeRain() {
-    const p = this.predictedPlayer(0.42);
-    const speed = Math.max(1, Math.hypot(this.motion.vx, this.motion.vy));
-    const nx = speed > 15 ? this.motion.vx / speed : 1;
-    const ny = speed > 15 ? this.motion.vy / speed : 0;
-    for (let i = 0; i < 6; i++) {
-      const side = i % 2 === 0 ? -1 : 1;
-      const lane = 65 + Math.floor(i / 2) * 42;
-      const x = clamp(p.x + nx * i * 34 - ny * side * lane, -HALF_WORLD + 70, HALF_WORLD - 70);
-      const y = clamp(p.y + ny * i * 34 + nx * side * lane, -HALF_WORLD + 70, HALF_WORLD - 70);
-      this.addBladeFall(x, y, 0.75 + i * 0.27);
+    const center = this.predictedPlayer(0.38);
+    const playerRadius = state.player.r || 14;
+    const width = 31;
+    const halfGap = (RIFTBLADE_SCREEN_PRESSURE.bladeRainCorridor + (width + playerRadius) * 2) * 0.5;
+    const speed = Math.hypot(this.motion.vx, this.motion.vy);
+    const baseAngle = speed > 18
+      ? Math.atan2(this.motion.vy, this.motion.vx)
+      : Math.atan2(state.player.y - this.y, state.player.x - this.x);
+    const rotations = [0, Math.PI / 3, -Math.PI / 3];
+    for (let wave = 0; wave < RIFTBLADE_SCREEN_PRESSURE.bladeRainWaves; wave++) {
+      const angle = baseAngle + rotations[wave];
+      const nx = -Math.sin(angle);
+      const ny = Math.cos(angle);
+      const halfLength = WORLD_SIZE * 0.66;
+      const lines = [-halfGap, halfGap].map((offset) => {
+        const cx = center.x + nx * offset;
+        const cy = center.y + ny * offset;
+        return {
+          x1: cx - Math.cos(angle) * halfLength,
+          y1: cy - Math.sin(angle) * halfLength,
+          x2: cx + Math.cos(angle) * halfLength,
+          y2: cy + Math.sin(angle) * halfLength,
+        };
+      });
+      this.addBladeFallWave(center.x, center.y, lines, 0.82 + wave * 0.5, width);
     }
     this.mode = "riftblade_blade_rain";
-    this.modeTimer = 2.38;
-    this.skillCooldowns.blade_rain = 5.6;
+    this.modeTimer = 2.28;
+    this.skillCooldowns.blade_rain = 6.2;
     playSfx("level");
   }
 
@@ -383,15 +449,28 @@ export class RiftbladeSaint extends BaseEnemy {
     const angle = Math.hypot(this.motion.vx, this.motion.vy) > 20 ? Math.atan2(this.motion.vy, this.motion.vx) : this.sceneSpin;
     const normalX = -Math.sin(angle);
     const normalY = Math.cos(angle);
-    for (let i = 0; i < 3; i++) {
-      const offset = (i - 1) * 240;
-      this.addSlashLine(center.x + normalX * offset, center.y + normalY * offset, angle, WORLD_SIZE * 1.28, 30, 0.95 + i * 0.45, 0.22, this.damage * 0.64, "judgment", true);
+    for (let i = 0; i < 5; i++) {
+      const offset = (i - 2) * 238;
+      this.addSlashLine(center.x + normalX * offset, center.y + normalY * offset, angle, WORLD_SIZE * 1.3, 31, 1 + i * 0.42, 0.2, this.damage * 0.58, "judgment", true);
     }
-    this.addSlashLine(center.x, center.y, angle + Math.PI / 4, WORLD_SIZE * 1.22, 31, 2.45, 0.22, this.damage * 0.68, "judgment_cross", true);
-    this.addSlashLine(center.x, center.y, angle - Math.PI / 4, WORLD_SIZE * 1.22, 31, 2.8, 0.22, this.damage * 0.68, "judgment_cross", true);
+    [Math.PI / 4, -Math.PI / 4, Math.PI * 0.75, -Math.PI * 0.75].forEach((offset, index) => {
+      this.addSlashLine(
+        center.x,
+        center.y,
+        angle + offset,
+        WORLD_SIZE * 1.26,
+        32,
+        3.15 + index * 0.4,
+        0.2,
+        this.damage * 0.62,
+        "judgment_cross",
+        true,
+      );
+    });
+    this.spawnCrescentRingWithGap(center.x, center.y, angle + Math.PI, 24, 0.42, 235, this.damage * 0.2);
     this.mode = "riftblade_judgment";
-    this.modeTimer = 3.08;
-    this.skillCooldowns.judgment = 16;
+    this.modeTimer = 4.68;
+    this.skillCooldowns.judgment = 17;
     this.attacksSinceLongRecover = 0;
     state.shake = Math.max(state.shake, 7);
     playSfx("level");
@@ -401,7 +480,10 @@ export class RiftbladeSaint extends BaseEnemy {
     this.x += this.dashVx * dt;
     this.y += this.dashVy * dt;
     this.leaveDashTrail(dt, 13, damageScale);
-    if (this.modeTimer <= 0) this.finishAttack();
+    if (this.modeTimer <= 0) {
+      this.spawnCrescentFan(this.lockAngle + Math.PI, 8, 1.3, 350, this.damage * 0.22, 0.18);
+      this.finishAttack(0.68);
+    }
   }
 
   prepareDashLine(armTime, prediction, overshoot, style) {
@@ -409,10 +491,20 @@ export class RiftbladeSaint extends BaseEnemy {
     const dx = target.x - this.x;
     const dy = target.y - this.y;
     this.lockAngle = Math.atan2(dy, dx);
-    this.dashDistance = clamp(Math.hypot(dx, dy) + overshoot, 300, 650);
+    this.dashDistance = clamp(Math.hypot(dx, dy) + overshoot, 620, 980);
     const cx = this.x + Math.cos(this.lockAngle) * this.dashDistance * 0.5;
     const cy = this.y + Math.sin(this.lockAngle) * this.dashDistance * 0.5;
-    this.addSlashLine(cx, cy, this.lockAngle, this.dashDistance + 120, style === "final" ? 30 : 26, armTime, 0.22, this.damage * (style === "final" ? 0.68 : 0.58), style);
+    this.addSlashLine(
+      cx,
+      cy,
+      this.lockAngle,
+      Math.max(SCREEN_SLASH_LENGTH, this.dashDistance + 360),
+      style === "final" ? 34 : 30,
+      armTime,
+      0.22,
+      this.damage * (style === "final" ? 0.68 : 0.58),
+      style,
+    );
   }
 
   leaveDashTrail(dt, width = 12, damageScale = 0) {
@@ -457,36 +549,41 @@ export class RiftbladeSaint extends BaseEnemy {
     });
   }
 
-  addBladeFall(x, y, armTime) {
+  addBladeFallWave(x, y, lines, armTime, width) {
     world.hazards.push({
       kind: "riftblade_bladefall",
-      warningType: "circle",
+      warningType: "line",
       x,
       y,
-      r: 44,
+      lines,
+      width,
+      r: width,
       color: this.phaseColor(),
       damage: this.damage * 0.46,
       armTime,
       armDuration: armTime,
       life: armTime + 0.24,
       maxLife: armTime + 0.24,
+      activeTime: 0.24,
+      style: "blade_corridor",
       riftbladeOwner: this,
     });
   }
 
-  shootCrescent(angle, side, speed, damage, returning = true) {
+  shootCrescent(angle, side, speed, damage, returning = true, options = {}) {
+    if (this.ownedProjectileCount() >= RIFTBLADE_SCREEN_PRESSURE.peakProjectiles) return;
     world.enemyProjectiles.push({
       x: this.x + Math.cos(angle) * 54,
       y: this.y + Math.sin(angle) * 54,
       vx: Math.cos(angle) * speed,
       vy: Math.sin(angle) * speed,
-      r: 13,
+      r: options.radius || 13,
       color: this.phaseColor(),
       damage,
-      life: returning ? 3.7 : 2.8,
-      returnAt: returning ? 2.8 : -1,
-      curve: side * 0.28,
-      returnCurve: side * 2.4,
+      life: options.life || (returning ? 3.7 : 3.15),
+      returnAt: options.returnAt ?? (returning ? 2.8 : -1),
+      curve: side * 0.28 * (options.curveScale ?? 1),
+      returnCurve: side * 2.4 * (options.curveScale ?? 1),
       returning,
       shape: "riftbladeCrescent",
       spin: angle,
@@ -494,6 +591,54 @@ export class RiftbladeSaint extends BaseEnemy {
       expireWithLife: true,
       riftbladeOwner: this,
     });
+  }
+
+  spawnCrescentFan(baseAngle, count, spread, speed, damage, centerGap = 0) {
+    const offsets = spreadWithCenterGap(count, spread, centerGap);
+    offsets.forEach((offset, index) => {
+      this.shootCrescent(
+        baseAngle + offset,
+        offset < 0 ? -1 : 1,
+        speed + (index % 3 - 1) * 16,
+        damage,
+        false,
+        { curveScale: 0.35, life: 3.35 },
+      );
+    });
+  }
+
+  spawnCrescentRingWithGap(x, y, gapAngle, count, gapWidth, speed, damage) {
+    for (let i = 0; i < count; i++) {
+      if (this.ownedProjectileCount() >= RIFTBLADE_SCREEN_PRESSURE.peakProjectiles) break;
+      const angle = i / count * TAU + this.sceneSpin * 0.16;
+      if (Math.abs(wrapAngle(angle - gapAngle)) < gapWidth * 0.5) continue;
+      world.enemyProjectiles.push({
+        x: x + Math.cos(angle) * 38,
+        y: y + Math.sin(angle) * 38,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed,
+        r: 11,
+        color: this.phaseColor(),
+        damage,
+        life: 4.2,
+        returnAt: -1,
+        curve: (i % 2 ? 1 : -1) * 0.055,
+        returnCurve: 0,
+        returning: false,
+        shape: "riftbladeCrescent",
+        spin: angle,
+        bossProjectile: true,
+        expireWithLife: true,
+        riftbladeOwner: this,
+      });
+    }
+  }
+
+  ownedProjectileCount() {
+    return world.enemyProjectiles.reduce(
+      (count, projectile) => count + (projectile.riftbladeOwner === this ? 1 : 0),
+      0,
+    );
   }
 
   finishAttack(recovery = null, forceLong = false, countAttack = true) {
@@ -793,6 +938,23 @@ function polygon(ctx, points) {
   ctx.beginPath();
   points.forEach(([x, y], index) => index ? ctx.lineTo(x, y) : ctx.moveTo(x, y));
   ctx.closePath();
+}
+
+function spreadWithCenterGap(count, spread, centerGap = 0) {
+  if (count <= 1) return [0];
+  const half = spread * 0.5;
+  const values = [];
+  for (let i = 0; i < count; i++) {
+    const offset = -half + i / (count - 1) * spread;
+    values.push(Math.abs(offset) < centerGap ? (offset < 0 ? -centerGap : centerGap) : offset);
+  }
+  return values;
+}
+
+function wrapAngle(angle) {
+  while (angle > Math.PI) angle -= TAU;
+  while (angle < -Math.PI) angle += TAU;
+  return angle;
 }
 
 function rgba(hex, alpha) {

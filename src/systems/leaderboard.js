@@ -14,15 +14,25 @@ let activeRun = null;
 let checkpointAccumulator = 0;
 let flushPromise = null;
 let flushRequested = false;
+let leaderboardEnabled = true;
 
-export function configureLeaderboard({ baseUrl, token, user }) {
+export function configureLeaderboard({ baseUrl, token, user, enabled = true }) {
   apiBaseUrl = normalizeBaseUrl(baseUrl);
-  identity = { token: String(token || ""), user: user || null };
+  leaderboardEnabled = enabled !== false;
+  identity = leaderboardEnabled
+    ? { token: String(token || ""), user: user || null }
+    : { token: "", user: null };
+  if (!leaderboardEnabled) {
+    activeRun = null;
+    checkpointAccumulator = 0;
+    flushRequested = false;
+    return;
+  }
   if (identity.user && identity.token) void flushPendingRuns();
 }
 
 export function beginLeaderboardRun(difficultyId) {
-  if (!identity.user || !identity.token) return null;
+  if (!leaderboardEnabled || !identity.user || !identity.token) return null;
   activeRun = {
     runId: createRunId(),
     ownerUserId: identity.user.id,
@@ -72,6 +82,7 @@ export async function fetchLeaderboard(metric, { page = 1, pageSize = 100 } = {}
 }
 
 export function flushPendingRuns() {
+  if (!leaderboardEnabled) return Promise.resolve();
   flushRequested = true;
   if (!flushPromise) {
     flushPromise = (async () => {
@@ -106,7 +117,7 @@ function queueSnapshot(snapshot, status) {
 }
 
 async function doFlushPendingRuns() {
-  if (!identity.user || !identity.token) return;
+  if (!leaderboardEnabled || !identity.user || !identity.token) return;
   const outbox = readOutbox();
   for (const payload of Object.values(outbox)) {
     if (payload.ownerUserId !== identity.user.id) continue;
@@ -148,6 +159,7 @@ async function requestJson(url, options) {
 }
 
 function requireIdentity() {
+  if (!leaderboardEnabled) throw new Error("本地游玩模式下排行榜已关闭");
   if (!identity.user || !identity.token) throw new Error("未识别登录用户，无法访问排行榜");
 }
 

@@ -49,6 +49,8 @@ import { GearKing } from "../enemies/gear_king.js";
 import { VoidFoldArchon } from "../enemies/void_fold_archon.js";
 import { MagrailBroodMatriarch } from "../enemies/magrail_brood_matriarch.js";
 import { RiftbladeSaint } from "../enemies/riftblade_saint.js";
+import { ChainbreakConvict } from "../enemies/chainbreak_convict.js";
+import { AbyssalSealScientist } from "../enemies/abyssal_seal_scientist.js";
 
 const classes = {
   zombie: Zombie,
@@ -95,6 +97,8 @@ const classes = {
   void_fold_archon: VoidFoldArchon,
   magrail_brood_matriarch: MagrailBroodMatriarch,
   riftblade_saint: RiftbladeSaint,
+  chainbreak_convict: ChainbreakConvict,
+  abyssal_seal_scientist: AbyssalSealScientist,
 };
 const WAVE_SPAWN_LIMITS = {
   thief: 3,

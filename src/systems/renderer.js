@@ -2392,6 +2392,22 @@ function drawEnemyProjectiles(ctx) {
       drawRiftbladeCrescentProjectile(ctx, b);
       continue;
     }
+    if (b.shape === "convictBall") {
+      drawConvictBallProjectile(ctx, b);
+      continue;
+    }
+    if (b.shape === "convictShrapnel") {
+      drawConvictShrapnelProjectile(ctx, b);
+      continue;
+    }
+    if (b.shape === "scientistAbyssShard") {
+      drawScientistAbyssShardProjectile(ctx, b);
+      continue;
+    }
+    if (b.shape === "scientistAbyssCore") {
+      drawScientistAbyssCoreProjectile(ctx, b);
+      continue;
+    }
     if (b.shape === "slimeOrb") {
       drawSlimeOrbProjectile(ctx, b);
       continue;
@@ -2443,6 +2459,62 @@ function drawRiftbladeCrescentProjectile(ctx, b) {
     ctx.fillRect(x, y - 1.5, b.r * (0.36 - i * 0.06), 3);
   }
   ctx.restore();
+}
+
+function drawConvictBallProjectile(ctx, b) {
+  if (b.hidden) return;
+  const y = b.y - (b.visualHeight || 0);
+  const radius = b.r || 28;
+  ctx.save();
+  ctx.translate(b.x, y);
+  ctx.rotate(b.spin || 0);
+  ctx.globalCompositeOperation = "lighter";
+  glow(ctx, 0, 0, radius * 1.65, 0.2, b.color);
+  ctx.globalCompositeOperation = "source-over";
+  ctx.shadowColor = b.color;
+  ctx.shadowBlur = 15;
+  ctx.fillStyle = "#080b11";
+  ctx.strokeStyle = b.color;
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  for (let i = 0; i < 16; i++) {
+    const angle = i / 16 * TAU;
+    const r = i % 2 ? radius * 0.82 : radius;
+    const x = Math.cos(angle) * r;
+    const py = Math.sin(angle) * r;
+    if (i === 0) ctx.moveTo(x, py); else ctx.lineTo(x, py);
+  }
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+  ctx.shadowBlur = 0;
+  ctx.fillStyle = b.coreColor || "#ffffff";
+  ctx.fillRect(-6, -6, 12, 12);
+  ctx.fillStyle = "rgba(255,255,255,0.85)";
+  ctx.fillRect(-2, -5, 4, 3);
+  for (let i = 0; i < 8; i++) {
+    ctx.rotate(TAU / 8);
+    ctx.fillStyle = i % 2 ? b.color : "#8b949f";
+    ctx.beginPath();
+    ctx.moveTo(radius * 0.78, -4);
+    ctx.lineTo(radius * 1.28, 0);
+    ctx.lineTo(radius * 0.78, 4);
+    ctx.closePath();
+    ctx.fill();
+  }
+  ctx.restore();
+
+  if ((b.visualHeight || 0) > 0) {
+    const scale = clamp(1 - (b.visualHeight || 0) / 200, 0.35, 1);
+    ctx.save();
+    ctx.translate(b.x, b.y);
+    ctx.scale(1, 0.38);
+    ctx.fillStyle = hexToRgba(b.color, 0.16 * scale);
+    ctx.beginPath();
+    ctx.arc(0, 0, radius * (1.5 - scale * 0.35), 0, TAU);
+    ctx.fill();
+    ctx.restore();
+  }
 }
 
 function drawItemObjects(ctx) {
@@ -2512,6 +2584,136 @@ function drawSpecialEnemyProjectile(ctx, b) {
   } else if (b.shape === "fastGear") {
     drawMiniGear(ctx, 0, 0, b.r * 1.8, 10, b.color);
   }
+  ctx.restore();
+}
+
+function drawConvictShrapnelProjectile(ctx, b) {
+  if (b.hidden) return;
+  const angle = Math.atan2(b.vy, b.vx);
+  const radius = b.r || 8;
+  ctx.save();
+  ctx.translate(b.x, b.y);
+  ctx.rotate(angle);
+  ctx.globalCompositeOperation = "lighter";
+  glow(ctx, 0, 0, radius * 2.5, 0.2, b.color);
+  ctx.strokeStyle = hexToRgba(b.color, 0.28);
+  ctx.lineWidth = radius * 1.35;
+  ctx.lineCap = "round";
+  ctx.beginPath();
+  ctx.moveTo(-radius * 3.6, 0);
+  ctx.lineTo(-radius * 0.4, 0);
+  ctx.stroke();
+  ctx.globalCompositeOperation = "source-over";
+  ctx.rotate((b.spin || 0) * 0.35);
+  ctx.shadowColor = b.color;
+  ctx.shadowBlur = 12;
+  ctx.fillStyle = "#090b10";
+  ctx.strokeStyle = b.color;
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(radius * 1.45, 0);
+  ctx.lineTo(radius * 0.25, -radius * 0.72);
+  ctx.lineTo(-radius * 1.25, -radius * 0.45);
+  ctx.lineTo(-radius * 0.72, 0);
+  ctx.lineTo(-radius * 1.25, radius * 0.45);
+  ctx.lineTo(radius * 0.25, radius * 0.72);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+  ctx.strokeStyle = b.coreColor || "#ffffff";
+  ctx.lineWidth = 1.4;
+  ctx.beginPath();
+  ctx.moveTo(-radius * 0.65, 0);
+  ctx.lineTo(radius * 1.05, 0);
+  ctx.stroke();
+  ctx.restore();
+}
+
+function drawScientistAbyssShardProjectile(ctx, b) {
+  if (b.hidden) return;
+  const angle = Math.atan2(b.vy, b.vx);
+  const radius = b.r || 8;
+  ctx.save();
+  ctx.translate(b.x, b.y);
+  ctx.rotate(angle);
+  ctx.globalCompositeOperation = "lighter";
+  glow(ctx, -radius * 0.8, 0, radius * 3.4, 0.28, b.color);
+  ctx.strokeStyle = hexToRgba(b.color, 0.24);
+  ctx.lineWidth = radius * 1.5;
+  ctx.lineCap = "round";
+  ctx.beginPath();
+  ctx.moveTo(-radius * 4.5, 0);
+  ctx.lineTo(-radius * 0.6, 0);
+  ctx.stroke();
+  ctx.strokeStyle = hexToRgba(b.coreColor || "#ffffff", 0.65);
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(-radius * 3.1, 0);
+  ctx.lineTo(radius * 0.6, 0);
+  ctx.stroke();
+  ctx.globalCompositeOperation = "source-over";
+  ctx.shadowColor = b.color;
+  ctx.shadowBlur = 11;
+  ctx.fillStyle = "#08040f";
+  ctx.strokeStyle = b.color;
+  ctx.lineWidth = 1.8;
+  ctx.beginPath();
+  ctx.moveTo(radius * 1.7, 0);
+  ctx.lineTo(radius * 0.1, -radius * 0.82);
+  ctx.lineTo(-radius * 1.2, -radius * 0.35);
+  ctx.lineTo(-radius * 0.58, 0);
+  ctx.lineTo(-radius * 1.2, radius * 0.35);
+  ctx.lineTo(radius * 0.1, radius * 0.82);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = b.coreColor || "#e8ffff";
+  ctx.fillRect(-radius * 0.2, -1.3, radius * 1.15, 2.6);
+  ctx.restore();
+}
+
+function drawScientistAbyssCoreProjectile(ctx, b) {
+  const angle = Math.atan2(b.vy, b.vx);
+  const radius = b.r || 22;
+  const pulseK = 1 + Math.sin(state.time * 11 + (b.spin || 0)) * 0.08;
+  ctx.save();
+  ctx.translate(b.x, b.y);
+  ctx.rotate(angle);
+  ctx.strokeStyle = hexToRgba(b.color, 0.22);
+  ctx.lineWidth = radius * 1.35;
+  ctx.lineCap = "round";
+  ctx.beginPath();
+  ctx.moveTo(-radius * 4.8, 0);
+  ctx.lineTo(-radius * 0.75, 0);
+  ctx.stroke();
+  ctx.rotate((b.spin || 0) * 0.45);
+  ctx.scale(pulseK, 2 - pulseK);
+  ctx.fillStyle = "#07030d";
+  ctx.strokeStyle = b.color;
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  for (let i = 0; i < 12; i++) {
+    const a = i / 12 * TAU;
+    const r = radius * (i % 2 ? 0.72 : 1.18);
+    const x = Math.cos(a) * r;
+    const y = Math.sin(a) * r;
+    if (i) ctx.lineTo(x, y);
+    else ctx.moveTo(x, y);
+  }
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+  ctx.strokeStyle = hexToRgba("#a52aff", 0.82);
+  ctx.lineWidth = 4;
+  ctx.beginPath();
+  ctx.arc(0, 0, radius * 0.55, -0.7, Math.PI + 0.7);
+  ctx.stroke();
+  ctx.fillStyle = b.coreColor || "#efffff";
+  ctx.beginPath();
+  ctx.ellipse(radius * 0.08, 0, radius * 0.38, radius * 0.12, 0, 0, TAU);
+  ctx.fill();
+  ctx.fillStyle = "#240038";
+  ctx.fillRect(-2, -radius * 0.18, 4, radius * 0.36);
   ctx.restore();
 }
 
@@ -2826,6 +3028,46 @@ function drawHazards(ctx) {
       drawRiftbladeEchoHazard(ctx, h, alpha);
       continue;
     }
+    if (h.kind === "convict_chain_arc") {
+      drawConvictChainArcHazard(ctx, h, alpha);
+      continue;
+    }
+    if (h.kind === "convict_ball_slam") {
+      drawConvictBallSlamHazard(ctx, h, alpha);
+      continue;
+    }
+    if (h.kind === "convict_chain_line") {
+      drawConvictChainLineHazard(ctx, h, alpha);
+      continue;
+    }
+    if (h.kind === "convict_chain_path") {
+      drawConvictChainPathHazard(ctx, h, alpha);
+      continue;
+    }
+    if (h.kind === "scientist_seal_line") {
+      drawScientistSealLineHazard(ctx, h, alpha);
+      continue;
+    }
+    if (h.kind === "scientist_vial_blast") {
+      drawScientistVialBlastHazard(ctx, h, alpha);
+      continue;
+    }
+    if (h.kind === "scientist_tendril_path") {
+      drawScientistTendrilPathHazard(ctx, h, alpha);
+      continue;
+    }
+    if (h.kind === "scientist_entropy_field") {
+      drawScientistEntropyFieldHazard(ctx, h, alpha);
+      continue;
+    }
+    if (h.kind === "scientist_memory_path") {
+      drawScientistMemoryPathHazard(ctx, h, alpha);
+      continue;
+    }
+    if (h.kind === "scientist_void_node") {
+      drawScientistVoidNodeHazard(ctx, h, alpha);
+      continue;
+    }
     if (h.kind === "ice_spike" || h.kind === "ice_seal") {
       drawIceHazard(ctx, h, alpha);
       continue;
@@ -2962,7 +3204,72 @@ function drawRiftbladeSlashHazard(ctx, h, alpha) {
 
 function drawRiftbladeBladefallHazard(ctx, h, alpha) {
   const armed = (h.armTime || 0) <= 0;
-  const progress = armed ? 1 : 1 - (h.armTime || 0) / Math.max(0.01, h.armDuration || 1);
+  const progress = armed ? 1 : clamp(1 - (h.armTime || 0) / Math.max(0.01, h.armDuration || 1), 0, 1);
+  if (Array.isArray(h.lines)) {
+    ctx.save();
+    ctx.globalCompositeOperation = "lighter";
+    for (const [lineIndex, line] of h.lines.entries()) {
+      const dx = line.x2 - line.x1;
+      const dy = line.y2 - line.y1;
+      const length = Math.max(1, Math.hypot(dx, dy));
+      const angle = Math.atan2(dy, dx);
+      ctx.save();
+      ctx.translate(line.x1, line.y1);
+      ctx.rotate(angle);
+      if (!armed) {
+        ctx.strokeStyle = hexToRgba(h.color, 0.25 + progress * 0.58);
+        ctx.lineWidth = 2.5;
+        ctx.setLineDash([22, 13]);
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.lineTo(length, 0);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.fillStyle = hexToRgba(h.color, 0.045 + progress * 0.075);
+        ctx.fillRect(0, -(h.width || 31), length, (h.width || 31) * 2);
+      } else {
+        ctx.strokeStyle = hexToRgba(h.color, 0.24 * alpha);
+        ctx.lineWidth = (h.width || 31) * 2;
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.lineTo(length, 0);
+        ctx.stroke();
+        ctx.strokeStyle = hexToRgba(h.color, 0.9 * alpha);
+        ctx.lineWidth = Math.max(7, (h.width || 31) * 0.54);
+        ctx.stroke();
+        ctx.strokeStyle = hexToRgba("#ffffff", 0.92 * alpha);
+        ctx.lineWidth = 2;
+        ctx.stroke();
+      }
+
+      const swordCount = 7;
+      for (let i = 0; i < swordCount; i++) {
+        const x = length * (i + 0.5) / swordCount;
+        const fall = armed ? 0 : -(52 + (i % 3) * 18) * (1 - progress);
+        ctx.save();
+        ctx.translate(x, fall);
+        ctx.rotate(Math.PI / 2 + (lineIndex ? -0.1 : 0.1));
+        ctx.fillStyle = hexToRgba(h.color, armed ? 0.88 * alpha : 0.34 + progress * 0.38);
+        ctx.beginPath();
+        ctx.moveTo(17, 0);
+        ctx.lineTo(4, -4);
+        ctx.lineTo(-15, -3);
+        ctx.lineTo(-15, 3);
+        ctx.lineTo(4, 4);
+        ctx.closePath();
+        ctx.fill();
+        ctx.fillStyle = hexToRgba("#ffffff", armed ? 0.82 * alpha : 0.38 + progress * 0.3);
+        ctx.fillRect(-12, -1, 25, 2);
+        ctx.fillStyle = "#171a2b";
+        ctx.fillRect(-19, -6, 5, 12);
+        ctx.restore();
+      }
+      ctx.restore();
+    }
+    ctx.restore();
+    return;
+  }
+
   const spin = state.time * 1.8 + h.x * 0.001;
   ctx.save();
   ctx.translate(h.x, h.y);
@@ -3011,6 +3318,586 @@ function drawRiftbladeEchoHazard(ctx, h, alpha) {
   ctx.lineTo(-h.r * 0.55, 0);
   ctx.closePath();
   ctx.stroke();
+  ctx.restore();
+}
+
+function drawConvictChainArcHazard(ctx, h, alpha) {
+  const armed = (h.armTime || 0) <= 0;
+  const progress = armed ? 1 : clamp(1 - (h.armTime || 0) / Math.max(0.01, h.armDuration || 1), 0, 1);
+  const endAngle = h.startAngle + h.sweep;
+  const minAngle = h.sweep >= 0 ? h.startAngle : endAngle;
+  const maxAngle = h.sweep >= 0 ? endAngle : h.startAngle;
+  ctx.save();
+  ctx.translate(h.centerX, h.centerY);
+  ctx.globalCompositeOperation = "lighter";
+  if (!armed) {
+    ctx.fillStyle = hexToRgba(h.color, 0.035 + progress * 0.08);
+    ctx.strokeStyle = hexToRgba(h.color, 0.28 + progress * 0.5);
+    ctx.lineWidth = 2.5;
+    ctx.setLineDash([12, 9]);
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.arc(0, 0, h.radius, minAngle, maxAngle);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    ctx.setLineDash([]);
+    for (const angle of [h.startAngle, endAngle]) {
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.lineTo(Math.cos(angle) * h.radius, Math.sin(angle) * h.radius);
+      ctx.stroke();
+    }
+  } else {
+    const angle = h.currentAngle || h.startAngle;
+    const x = Math.cos(angle) * h.radius;
+    const y = Math.sin(angle) * h.radius;
+    ctx.strokeStyle = hexToRgba(h.color, 0.3 * alpha);
+    ctx.lineWidth = (h.width || 18) * 2.2;
+    ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(x, y); ctx.stroke();
+    drawConvictChainLinks(ctx, 0, 0, x, y, h.color, alpha);
+    ctx.strokeStyle = hexToRgba(h.coreColor || "#ffffff", 0.85 * alpha);
+    ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(x, y); ctx.stroke();
+  }
+  ctx.restore();
+}
+
+function drawConvictBallSlamHazard(ctx, h, alpha) {
+  const armed = (h.armTime || 0) <= 0;
+  const progress = armed ? 1 : clamp(1 - (h.armTime || 0) / Math.max(0.01, h.armDuration || 1), 0, 1);
+  ctx.save();
+  ctx.translate(h.x, h.y);
+  ctx.globalCompositeOperation = "lighter";
+  glow(ctx, 0, 0, h.r * 0.92, (armed ? 0.26 : 0.08 + progress * 0.08) * alpha, h.color);
+  ctx.strokeStyle = hexToRgba(h.color, armed ? 0.92 : 0.28 + progress * 0.55);
+  ctx.lineWidth = armed ? 5 : 2.5;
+  ctx.setLineDash(armed ? [] : [9, 7]);
+  ctx.beginPath();
+  ctx.arc(0, 0, h.r * (0.72 + progress * 0.28), 0, TAU);
+  ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.strokeStyle = hexToRgba(h.coreColor || "#ffffff", armed ? 0.9 : 0.35);
+  ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.moveTo(-h.r, 0); ctx.lineTo(h.r, 0); ctx.moveTo(0, -h.r); ctx.lineTo(0, h.r); ctx.stroke();
+  if (armed) {
+    ctx.fillStyle = hexToRgba(h.color, 0.23 * alpha);
+    for (let i = 0; i < 12; i++) {
+      const angle = i / 12 * TAU;
+      ctx.save();
+      ctx.rotate(angle);
+      ctx.fillRect(h.r * 0.35, -2, h.r * (0.4 + i % 3 * 0.08), 4);
+      ctx.restore();
+    }
+  }
+  if (h.bouncePoints && !armed) {
+    ctx.strokeStyle = hexToRgba(h.color, 0.2);
+    ctx.setLineDash([8, 10]);
+    ctx.beginPath();
+    h.bouncePoints.forEach((point, index) => index ? ctx.lineTo(point.x - h.x, point.y - h.y) : ctx.moveTo(point.x - h.x, point.y - h.y));
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
+  ctx.restore();
+}
+
+function drawConvictChainLineHazard(ctx, h, alpha) {
+  if (h.delayedWarning && (h.armTime || 0) > (h.armDuration || 0)) return;
+  const armed = (h.armTime || 0) <= 0;
+  const progress = armed ? 1 : clamp(1 - (h.armTime || 0) / Math.max(0.01, h.armDuration || 1), 0, 1);
+  const lines = h.lines || [{ x1: h.x1, y1: h.y1, x2: h.x2, y2: h.y2 }];
+  ctx.save();
+  ctx.globalCompositeOperation = "lighter";
+  for (const line of lines) {
+    if (!armed) {
+      ctx.strokeStyle = hexToRgba(h.color, 0.2 + progress * 0.55);
+      ctx.lineWidth = 2 + progress * 2;
+      ctx.setLineDash(h.sceneChain ? [24, 14] : [13, 9]);
+      ctx.beginPath(); ctx.moveTo(line.x1, line.y1); ctx.lineTo(line.x2, line.y2); ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.strokeStyle = hexToRgba(h.color, 0.05 + progress * 0.08);
+      ctx.lineWidth = (h.width || 20) * 2;
+      ctx.beginPath(); ctx.moveTo(line.x1, line.y1); ctx.lineTo(line.x2, line.y2); ctx.stroke();
+    } else {
+      ctx.strokeStyle = hexToRgba(h.color, 0.28 * alpha);
+      ctx.lineWidth = (h.width || 20) * 2.2;
+      ctx.beginPath(); ctx.moveTo(line.x1, line.y1); ctx.lineTo(line.x2, line.y2); ctx.stroke();
+      drawConvictChainLinks(ctx, line.x1, line.y1, line.x2, line.y2, h.color, alpha, h.sceneChain ? 34 : 12);
+      ctx.strokeStyle = hexToRgba(h.coreColor || "#ffffff", 0.8 * alpha);
+      ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(line.x1, line.y1); ctx.lineTo(line.x2, line.y2); ctx.stroke();
+    }
+    if (h.sceneChain) {
+      drawConvictPillar(ctx, line.x1, line.y1, h.color, armed ? 1 : 0.45 + progress * 0.4);
+      drawConvictPillar(ctx, line.x2, line.y2, h.color, armed ? 1 : 0.45 + progress * 0.4);
+    }
+  }
+  ctx.restore();
+}
+
+function drawConvictChainPathHazard(ctx, h, alpha) {
+  if (!h.points?.length) return;
+  if (h.delayedWarning && (h.armTime || 0) > (h.armDuration || 0)) return;
+  const armed = (h.armTime || 0) <= 0;
+  const progress = armed ? 1 : clamp(1 - (h.armTime || 0) / Math.max(0.01, h.armDuration || 1), 0, 1);
+  ctx.save();
+  ctx.globalCompositeOperation = "lighter";
+  ctx.beginPath();
+  h.points.forEach((point, index) => index ? ctx.lineTo(point.x, point.y) : ctx.moveTo(point.x, point.y));
+  if (!armed) {
+    ctx.strokeStyle = hexToRgba(h.color, 0.25 + progress * 0.55);
+    ctx.lineWidth = 3;
+    ctx.setLineDash([20, 13]);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.strokeStyle = hexToRgba(h.color, 0.05 + progress * 0.09);
+    ctx.lineWidth = (h.width || 22) * 2;
+    ctx.stroke();
+  } else {
+    ctx.strokeStyle = hexToRgba(h.color, 0.28 * alpha);
+    ctx.lineWidth = (h.width || 22) * 2.25;
+    ctx.stroke();
+    ctx.strokeStyle = h.color;
+    ctx.lineWidth = Math.max(7, (h.width || 22) * 0.72);
+    ctx.stroke();
+    ctx.strokeStyle = hexToRgba(h.coreColor || "#ffffff", 0.9 * alpha);
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    for (let i = 0; i < h.points.length; i += 2) {
+      const point = h.points[i];
+      ctx.fillStyle = i % 4 ? h.color : h.coreColor;
+      ctx.fillRect(point.x - 3, point.y - 3, 6, 6);
+    }
+  }
+  ctx.restore();
+}
+
+function drawScientistEntropyFieldHazard(ctx, h, alpha) {
+  const elapsed = h.elapsed || 0;
+  const waves = h.waves || [];
+  const activeIndex = h.activeWaveIndex ?? -1;
+  let warningIndex = -1;
+  for (let i = 0; i < waves.length; i++) {
+    const lead = waves[i].delay - elapsed;
+    if (lead >= 0 && lead <= 0.95) {
+      warningIndex = i;
+      break;
+    }
+  }
+
+  ctx.save();
+  ctx.translate(h.x, h.y);
+  ctx.lineCap = "round";
+  if (warningIndex >= 0) {
+    const wave = waves[warningIndex];
+    const lead = wave.delay - elapsed;
+    const warningProgress = clamp(1 - lead / 0.95, 0, 1);
+    const previewRadius = wave.startRadius + warningProgress * 120;
+    const gapHalf = wave.gapWidth * 0.5;
+    ctx.strokeStyle = hexToRgba(h.color, 0.28 + warningProgress * 0.58);
+    ctx.lineWidth = 3;
+    ctx.setLineDash([18, 12]);
+    ctx.beginPath();
+    ctx.arc(0, 0, previewRadius, wave.gapAngle + gapHalf, wave.gapAngle + TAU - gapHalf);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.strokeStyle = hexToRgba(h.coreColor || "#ffffff", 0.24 + warningProgress * 0.34);
+    ctx.lineWidth = 2;
+    for (const side of [-1, 1]) {
+      const angle = wave.gapAngle + side * gapHalf;
+      ctx.beginPath();
+      ctx.moveTo(Math.cos(angle) * previewRadius, Math.sin(angle) * previewRadius);
+      ctx.lineTo(Math.cos(angle) * wave.endRadius, Math.sin(angle) * wave.endRadius);
+      ctx.stroke();
+    }
+    ctx.fillStyle = hexToRgba(h.coreColor || "#ffffff", 0.76);
+    const markerX = Math.cos(wave.gapAngle) * (previewRadius + 20);
+    const markerY = Math.sin(wave.gapAngle) * (previewRadius + 20);
+    ctx.save();
+    ctx.translate(markerX, markerY);
+    ctx.rotate(wave.gapAngle);
+    ctx.beginPath();
+    ctx.moveTo(18, 0);
+    ctx.lineTo(-8, -8);
+    ctx.lineTo(-8, 8);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+  }
+
+  if (activeIndex >= 0) {
+    const wave = waves[activeIndex];
+    const progress = clamp((elapsed - wave.delay) / Math.max(0.01, wave.duration), 0, 1);
+    const radius = wave.startRadius + (wave.endRadius - wave.startRadius) * progress;
+    const gapHalf = wave.gapWidth * 0.5;
+    const start = wave.gapAngle + gapHalf;
+    const end = wave.gapAngle + TAU - gapHalf;
+    ctx.strokeStyle = hexToRgba("#16021f", 0.8 * alpha);
+    ctx.lineWidth = (wave.width || 32) * 2.1;
+    ctx.beginPath();
+    ctx.arc(0, 0, radius, start, end);
+    ctx.stroke();
+    ctx.strokeStyle = hexToRgba(h.color, 0.92 * alpha);
+    ctx.lineWidth = wave.width || 32;
+    ctx.stroke();
+    ctx.strokeStyle = hexToRgba(h.coreColor || "#ffffff", 0.9 * alpha);
+    ctx.lineWidth = 3;
+    ctx.stroke();
+    for (const side of [-1, 1]) {
+      const angle = wave.gapAngle + side * gapHalf;
+      ctx.fillStyle = h.coreColor || "#ffffff";
+      ctx.beginPath();
+      ctx.arc(Math.cos(angle) * radius, Math.sin(angle) * radius, 7, 0, TAU);
+      ctx.fill();
+    }
+  }
+
+  const corePulse = 26 + Math.sin(state.time * 9) * 4;
+  ctx.rotate(state.time * (h.style === "manifestation_core" ? -0.75 : 0.5));
+  ctx.fillStyle = "#09020f";
+  ctx.strokeStyle = hexToRgba(h.color, 0.82);
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  for (let i = 0; i < 10; i++) {
+    const a = i / 10 * TAU;
+    const r = corePulse * (i % 2 ? 0.72 : 1.18);
+    if (i) ctx.lineTo(Math.cos(a) * r, Math.sin(a) * r);
+    else ctx.moveTo(Math.cos(a) * r, Math.sin(a) * r);
+  }
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+  ctx.restore();
+}
+
+function drawScientistMemoryPathHazard(ctx, h, alpha) {
+  if (!h.points?.length || (h.delayedWarning && (h.armTime || 0) > (h.armDuration || 0))) return;
+  const armed = (h.armTime || 0) <= 0;
+  const progress = armed ? 1 : clamp(1 - (h.armTime || 0) / Math.max(0.01, h.armDuration || 1), 0, 1);
+  const traceRange = (from, to) => {
+    const lastIndex = h.points.length - 1;
+    const startIndex = Math.max(0, Math.floor(from * lastIndex));
+    const endIndex = Math.min(lastIndex, Math.ceil(to * lastIndex));
+    ctx.beginPath();
+    for (let i = startIndex; i <= endIndex; i++) {
+      const point = h.points[i];
+      if (i === startIndex) ctx.moveTo(point.x, point.y);
+      else ctx.lineTo(point.x, point.y);
+    }
+  };
+  ctx.save();
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+  if (!armed) {
+    traceRange(0, 1);
+    ctx.strokeStyle = hexToRgba("#250431", 0.22 + progress * 0.18);
+    ctx.lineWidth = (h.width || 28) * 1.85;
+    ctx.stroke();
+    traceRange(0, 1);
+    ctx.strokeStyle = hexToRgba(h.color, 0.3 + progress * 0.62);
+    ctx.lineWidth = 3;
+    ctx.setLineDash([18, 12]);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    for (let i = 0; i < h.points.length; i += 3) {
+      const point = h.points[i];
+      ctx.fillStyle = hexToRgba(h.coreColor || "#ffffff", 0.2 + progress * 0.55);
+      ctx.fillRect(point.x - 3, point.y - 3, 6, 6);
+    }
+  } else {
+    const head = h.pathHead || 0;
+    const from = Math.max(0, head - 0.18);
+    const to = Math.min(1, head + 0.18);
+    traceRange(from, to);
+    ctx.strokeStyle = hexToRgba("#100016", 0.88 * alpha);
+    ctx.lineWidth = (h.width || 28) * 2.15;
+    ctx.stroke();
+    traceRange(from, to);
+    ctx.strokeStyle = hexToRgba("#8423d1", 0.92 * alpha);
+    ctx.lineWidth = h.width || 28;
+    ctx.stroke();
+    traceRange(from, to);
+    ctx.strokeStyle = hexToRgba(h.coreColor || "#ffffff", 0.9 * alpha);
+    ctx.lineWidth = 3;
+    ctx.stroke();
+    const lastIndex = h.points.length - 1;
+    const headPoint = h.points[Math.min(lastIndex, Math.max(0, Math.round(head * lastIndex)))];
+    ctx.fillStyle = "#08010d";
+    ctx.strokeStyle = h.color;
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.arc(headPoint.x, headPoint.y, 16, 0, TAU);
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = h.coreColor || "#ffffff";
+    ctx.beginPath();
+    ctx.ellipse(headPoint.x, headPoint.y, 9, 3, 0, 0, TAU);
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
+function drawScientistVoidNodeHazard(ctx, h, alpha) {
+  const armed = (h.armTime || 0) <= 0;
+  const progress = armed ? 1 : clamp(1 - (h.armTime || 0) / Math.max(0.01, h.armDuration || 1), 0, 1);
+  ctx.save();
+  if (!armed && (h.fromX !== h.toX || h.fromY !== h.toY)) {
+    ctx.strokeStyle = hexToRgba(h.color, 0.5);
+    ctx.lineWidth = 3;
+    ctx.setLineDash([20, 13]);
+    ctx.beginPath();
+    ctx.moveTo(h.fromX, h.fromY);
+    ctx.lineTo(h.toX, h.toY);
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
+  ctx.translate(h.x, h.y);
+  ctx.strokeStyle = hexToRgba(h.color, armed ? 0.96 * alpha : 0.32 + progress * 0.58);
+  ctx.lineWidth = armed ? 6 : 3;
+  ctx.setLineDash(armed ? [] : [11, 8]);
+  ctx.beginPath();
+  ctx.arc(0, 0, h.r, 0, TAU);
+  ctx.stroke();
+  ctx.setLineDash([]);
+  if (!armed) {
+    ctx.strokeStyle = hexToRgba(h.coreColor || "#ffffff", 0.2 + progress * 0.48);
+    ctx.lineWidth = 2;
+    for (let i = 0; i < 8; i++) {
+      const angle = i / 8 * TAU + state.time * 0.25;
+      ctx.beginPath();
+      ctx.moveTo(Math.cos(angle) * h.r * 1.65, Math.sin(angle) * h.r * 1.65);
+      ctx.lineTo(Math.cos(angle) * h.r * 1.05, Math.sin(angle) * h.r * 1.05);
+      ctx.stroke();
+    }
+  } else {
+    ctx.rotate(state.time * 2.2);
+    ctx.fillStyle = "#07020c";
+    ctx.strokeStyle = h.color;
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    for (let i = 0; i < 12; i++) {
+      const angle = i / 12 * TAU;
+      const radius = h.r * (i % 2 ? 0.62 : 0.94);
+      if (i) ctx.lineTo(Math.cos(angle) * radius, Math.sin(angle) * radius);
+      else ctx.moveTo(Math.cos(angle) * radius, Math.sin(angle) * radius);
+    }
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = h.coreColor || "#ffffff";
+    ctx.beginPath();
+    ctx.ellipse(0, 0, h.r * 0.38, h.r * 0.09, 0, 0, TAU);
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
+function drawScientistSealLineHazard(ctx, h, alpha) {
+  if (h.delayedWarning && (h.armTime || 0) > (h.armDuration || 0)) return;
+  const armed = (h.armTime || 0) <= 0;
+  const progress = armed ? 1 : clamp(1 - (h.armTime || 0) / Math.max(0.01, h.armDuration || 1), 0, 1);
+  const halfLength = (h.length || WORLD_SIZE * 1.5) * 0.5;
+  const dx = Math.cos(h.angle || 0) * halfLength;
+  const dy = Math.sin(h.angle || 0) * halfLength;
+  const lines = h.lines || [{ x1: h.x - dx, y1: h.y - dy, x2: h.x + dx, y2: h.y + dy }];
+  ctx.save();
+  ctx.globalCompositeOperation = "lighter";
+  for (const line of lines) {
+    ctx.beginPath();
+    ctx.moveTo(line.x1, line.y1);
+    ctx.lineTo(line.x2, line.y2);
+    if (!armed) {
+      ctx.strokeStyle = hexToRgba(h.color, 0.22 + progress * 0.58);
+      ctx.lineWidth = 2 + progress * 2;
+      ctx.setLineDash(h.sceneSeal ? [28, 13] : [16, 9]);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.strokeStyle = hexToRgba(h.coreColor || "#ffffff", 0.05 + progress * 0.08);
+      ctx.lineWidth = (h.width || 24) * 2;
+      ctx.stroke();
+    } else {
+      ctx.strokeStyle = hexToRgba("#2a073d", 0.52 * alpha);
+      ctx.lineWidth = (h.width || 24) * 2.15;
+      ctx.stroke();
+      ctx.strokeStyle = hexToRgba(h.color, 0.88 * alpha);
+      ctx.lineWidth = Math.max(6, (h.width || 24) * 0.62);
+      ctx.stroke();
+      ctx.strokeStyle = hexToRgba(h.coreColor || "#ffffff", 0.96 * alpha);
+      ctx.lineWidth = 2.2;
+      ctx.stroke();
+      const lineDx = line.x2 - line.x1;
+      const lineDy = line.y2 - line.y1;
+      for (let i = 1; i < 9; i++) {
+        const t = i / 9;
+        const x = line.x1 + lineDx * t;
+        const y = line.y1 + lineDy * t;
+        ctx.fillStyle = i % 2 ? h.color : h.coreColor;
+        ctx.fillRect(x - 3, y - 3, 6, 6);
+      }
+    }
+    if (h.sceneSeal) {
+      drawScientistSealPylon(ctx, line.x1, line.y1, h.color, armed ? alpha : 0.42 + progress * 0.48);
+      drawScientistSealPylon(ctx, line.x2, line.y2, h.color, armed ? alpha : 0.42 + progress * 0.48);
+    }
+  }
+  ctx.restore();
+}
+
+function drawScientistVialBlastHazard(ctx, h, alpha) {
+  const armed = (h.armTime || 0) <= 0;
+  const progress = armed ? 1 : clamp(1 - (h.armTime || 0) / Math.max(0.01, h.armDuration || 1), 0, 1);
+  const pulseScale = 0.94 + Math.sin(state.time * 10 + h.x * 0.01) * 0.04;
+  ctx.save();
+  ctx.translate(h.x, h.y);
+  ctx.globalCompositeOperation = "lighter";
+  ctx.strokeStyle = hexToRgba(h.color, armed ? 0.88 * alpha : 0.3 + progress * 0.55);
+  ctx.lineWidth = armed ? 6 : 2.5;
+  ctx.setLineDash(armed ? [] : [12, 8]);
+  ctx.beginPath();
+  ctx.arc(0, 0, h.r * pulseScale, 0, TAU);
+  ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.strokeStyle = hexToRgba(h.coreColor || "#ffffff", armed ? 0.85 * alpha : 0.16 + progress * 0.28);
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.arc(0, 0, h.r * (0.45 + progress * 0.47), 0, TAU);
+  ctx.stroke();
+  if (!armed) {
+    const dropHeight = (1 - progress) * 135;
+    ctx.translate(0, -dropHeight);
+    ctx.rotate(state.time * 2.8 + h.x * 0.001);
+    ctx.fillStyle = "#07131a";
+    ctx.strokeStyle = h.color;
+    ctx.lineWidth = 2;
+    ctx.fillRect(-8, -16, 16, 27);
+    ctx.strokeRect(-8, -16, 16, 27);
+    ctx.fillStyle = h.style === "corruption" ? "#9d31ff" : "#39ecff";
+    ctx.fillRect(-5, -3, 10, 11);
+    ctx.fillStyle = "#eaffff";
+    ctx.fillRect(-3, -21, 6, 7);
+  } else {
+    glow(ctx, 0, 0, h.r * 1.25, 0.32 * alpha, h.color);
+    ctx.strokeStyle = hexToRgba(h.coreColor || "#ffffff", 0.9 * alpha);
+    ctx.lineWidth = 3;
+    for (let i = 0; i < 8; i++) {
+      const angle = i / 8 * TAU + state.time * 0.6;
+      ctx.beginPath();
+      ctx.moveTo(Math.cos(angle) * h.r * 0.18, Math.sin(angle) * h.r * 0.18);
+      ctx.lineTo(Math.cos(angle) * h.r * 0.82, Math.sin(angle) * h.r * 0.82);
+      ctx.stroke();
+    }
+  }
+  ctx.restore();
+}
+
+function drawScientistTendrilPathHazard(ctx, h, alpha) {
+  if (!h.points?.length) return;
+  const armed = (h.armTime || 0) <= 0;
+  const progress = armed ? 1 : clamp(1 - (h.armTime || 0) / Math.max(0.01, h.armDuration || 1), 0, 1);
+  const tracePath = () => {
+    ctx.beginPath();
+    h.points.forEach((point, index) => index ? ctx.lineTo(point.x, point.y) : ctx.moveTo(point.x, point.y));
+  };
+  ctx.save();
+  ctx.globalCompositeOperation = "lighter";
+  tracePath();
+  if (!armed) {
+    ctx.strokeStyle = hexToRgba(h.color, 0.25 + progress * 0.55);
+    ctx.lineWidth = 3;
+    ctx.setLineDash([22, 12]);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    tracePath();
+    ctx.strokeStyle = hexToRgba("#7114b7", 0.07 + progress * 0.1);
+    ctx.lineWidth = (h.width || 30) * 2;
+    ctx.stroke();
+  } else {
+    ctx.strokeStyle = hexToRgba("#14031f", 0.7 * alpha);
+    ctx.lineWidth = (h.width || 30) * 2.15;
+    ctx.stroke();
+    tracePath();
+    ctx.strokeStyle = hexToRgba("#7b20cc", 0.88 * alpha);
+    ctx.lineWidth = (h.width || 30) * 1.25;
+    ctx.stroke();
+    tracePath();
+    ctx.strokeStyle = hexToRgba(h.color, 0.82 * alpha);
+    ctx.lineWidth = Math.max(6, (h.width || 30) * 0.42);
+    ctx.stroke();
+    tracePath();
+    ctx.strokeStyle = hexToRgba(h.coreColor || "#ffffff", 0.9 * alpha);
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    for (let i = 1; i < h.points.length; i += 2) {
+      const point = h.points[i];
+      const size = 5 + Math.sin(state.time * 8 + i) * 1.5;
+      ctx.fillStyle = i % 4 === 1 ? h.color : "#bc55ff";
+      ctx.beginPath();
+      ctx.arc(point.x, point.y, size, 0, TAU);
+      ctx.fill();
+    }
+  }
+  ctx.restore();
+}
+
+function drawScientistSealPylon(ctx, x, y, color, alpha) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.fillStyle = hexToRgba("#06131a", alpha);
+  ctx.strokeStyle = hexToRgba(color, alpha);
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.moveTo(-16, 28);
+  ctx.lineTo(-12, -25);
+  ctx.lineTo(0, -43);
+  ctx.lineTo(12, -25);
+  ctx.lineTo(16, 28);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = hexToRgba("#9425da", 0.62 * alpha);
+  ctx.fillRect(-7, -20, 14, 28);
+  ctx.strokeStyle = hexToRgba("#e8ffff", 0.85 * alpha);
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(-5, -8);
+  ctx.lineTo(5, -8);
+  ctx.moveTo(0, -18);
+  ctx.lineTo(0, 4);
+  ctx.stroke();
+  ctx.restore();
+}
+
+function drawConvictChainLinks(ctx, x1, y1, x2, y2, color, alpha, spacing = 12) {
+  const dx = x2 - x1;
+  const dy = y2 - y1;
+  const distance = Math.max(1, Math.hypot(dx, dy));
+  const count = Math.max(2, Math.floor(distance / spacing));
+  const angle = Math.atan2(dy, dx);
+  for (let i = 0; i <= count; i++) {
+    const t = i / count;
+    ctx.save();
+    ctx.translate(x1 + dx * t, y1 + dy * t);
+    ctx.rotate(angle + (i % 2 ? Math.PI / 2 : 0));
+    ctx.strokeStyle = hexToRgba(i % 3 ? "#89919d" : color, 0.88 * alpha);
+    ctx.lineWidth = 2.4;
+    ctx.beginPath(); ctx.ellipse(0, 0, 7, 4, 0, 0, TAU); ctx.stroke();
+    ctx.restore();
+  }
+}
+
+function drawConvictPillar(ctx, x, y, color, alpha) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.fillStyle = hexToRgba("#090c12", alpha);
+  ctx.strokeStyle = hexToRgba(color, alpha);
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.moveTo(-18, 32); ctx.lineTo(-12, -32); ctx.lineTo(0, -48); ctx.lineTo(12, -32); ctx.lineTo(18, 32); ctx.closePath();
+  ctx.fill(); ctx.stroke();
+  ctx.fillStyle = hexToRgba(color, 0.8 * alpha);
+  ctx.fillRect(-7, -28, 14, 26);
+  ctx.fillStyle = hexToRgba("#ffffff", 0.7 * alpha);
+  ctx.fillRect(-2, -25, 4, 19);
   ctx.restore();
 }
 

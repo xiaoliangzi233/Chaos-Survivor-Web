@@ -91,6 +91,7 @@ export function startWaveItems() {
 export function applyPlayerDamage(amount, source = {}) {
   const p = state.player;
   if (!p || amount <= 0) return { damaged: false, amount: 0 };
+  if (state.debug?.enabled && state.debug.invincible) return { damaged: false, debugInvincible: true, amount: 0 };
   if (amount < 1) {
     const reducedTick = Math.max(0.05, amount - (p.defense || 0) * 0.016);
     p.hp -= reducedTick;

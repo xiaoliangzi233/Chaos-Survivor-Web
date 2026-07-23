@@ -35,6 +35,7 @@ export const state = {
   difficulty: null,
   difficultyProgress: null,
   ai: null,
+  debug: createDebugState(),
 };
 
 export const world = {
@@ -178,8 +179,20 @@ export function createAiState(previous = {}) {
   };
 }
 
+export function createDebugState(previous = {}) {
+  return {
+    unlocked: Boolean(previous.unlocked),
+    enabled: Boolean(previous.enabled),
+    invincible: Boolean(previous.invincible),
+    doubleSpeed: Boolean(previous.doubleSpeed),
+    freezeWave: previous.freezeWave !== false,
+    runTainted: Boolean(previous.enabled),
+  };
+}
+
 export function resetRun(map) {
   const previousAi = state.ai;
+  const previousDebug = state.debug;
   world.enemies.length = 0;
   world.projectiles.length = 0;
   world.enemyProjectiles.length = 0;
@@ -224,4 +237,5 @@ export function resetRun(map) {
   state.spawnedWaveEvents = new Set();
   state.difficultyId = state.difficultyId || "ember";
   state.ai = createAiState(previousAi || {});
+  state.debug = createDebugState(previousDebug || {});
 }

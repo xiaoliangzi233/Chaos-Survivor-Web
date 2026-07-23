@@ -6954,6 +6954,362 @@ body.codex-open .menu-actions {
 /* Main-menu help */
 body.help-open .menu-actions { display: none; }
 
+/* Password-gated local battle debugger */
+.menu-debug-button {
+  position: relative;
+  display: grid;
+  grid-template-columns: 42px auto;
+  align-items: center;
+  min-width: 148px;
+  min-height: 52px;
+  border: 1px solid rgba(255, 209, 102, 0.5);
+  border-radius: 8px;
+  padding: 10px 14px;
+  background:
+    radial-gradient(circle at 22px 50%, rgba(255, 209, 102, 0.2), transparent 36px),
+    linear-gradient(135deg, rgba(255, 209, 102, 0.14), rgba(255, 77, 109, 0.08)),
+    rgba(3, 8, 16, 0.82);
+  color: #fff8df;
+  box-shadow: 0 0 24px rgba(255, 209, 102, 0.14), inset 0 0 0 1px rgba(255, 255, 255, 0.05);
+}
+
+.menu-debug-button::before {
+  content: "⌘";
+  display: grid;
+  width: 30px;
+  height: 30px;
+  place-items: center;
+  border: 1px solid rgba(255, 209, 102, 0.55);
+  color: var(--gold);
+  font-size: 18px;
+  text-shadow: 0 0 12px rgba(255, 209, 102, 0.75);
+}
+
+.menu-debug-button:hover {
+  border-color: rgba(255, 209, 102, 0.9);
+  box-shadow: 0 0 30px rgba(255, 209, 102, 0.24), inset 0 0 18px rgba(255, 209, 102, 0.08);
+  transform: translateY(-2px);
+}
+
+.debug-quick-button {
+  position: absolute;
+  top: 82px;
+  right: 14px;
+  z-index: 9;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid rgba(255, 209, 102, 0.66);
+  border-radius: 4px;
+  padding: 7px 10px;
+  background: rgba(5, 9, 18, 0.9);
+  color: var(--gold);
+  box-shadow: 0 0 16px rgba(255, 209, 102, 0.2), inset 0 0 10px rgba(255, 209, 102, 0.06);
+  font: 900 11px/1 var(--font-pixel);
+  letter-spacing: 1.5px;
+}
+
+.debug-quick-button[hidden],
+.is-menu .debug-quick-button {
+  display: none;
+}
+
+.debug-quick-button kbd {
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 2px;
+  padding: 2px 4px;
+  color: rgba(255, 255, 255, 0.64);
+  font-size: 9px;
+}
+
+.debug-auth-overlay,
+.debug-panel-overlay {
+  z-index: 90;
+  background:
+    repeating-linear-gradient(0deg, transparent 0 3px, rgba(255, 255, 255, 0.012) 3px 4px),
+    rgba(2, 5, 12, 0.82);
+  backdrop-filter: blur(7px);
+}
+
+.debug-auth-panel,
+.debug-control-panel {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid rgba(255, 209, 102, 0.58);
+  border-radius: 6px;
+  background:
+    linear-gradient(135deg, rgba(255, 209, 102, 0.06), transparent 35%),
+    rgba(4, 9, 18, 0.97);
+  color: #eef7ff;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.04), 0 28px 90px rgba(0, 0, 0, 0.72), 0 0 50px rgba(255, 209, 102, 0.12);
+}
+
+.debug-auth-panel::before,
+.debug-control-panel::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--gold), var(--cyan), transparent);
+  box-shadow: 0 0 18px rgba(255, 209, 102, 0.7);
+}
+
+.debug-auth-panel {
+  width: min(470px, 100%);
+  padding: 26px;
+}
+
+.debug-control-panel {
+  width: min(920px, 100%);
+  max-height: calc(100vh - 36px);
+  padding: 24px;
+  overflow-y: auto;
+}
+
+.debug-panel-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+  margin-bottom: 18px;
+}
+
+.debug-panel-head .eyebrow {
+  margin: 0 0 5px;
+  color: var(--gold);
+  font-size: 9px;
+  letter-spacing: 2.4px;
+}
+
+.debug-panel-head h2 {
+  margin: 0;
+  color: #f9fcff;
+  font-size: 25px;
+  letter-spacing: 2px;
+  text-shadow: 0 0 18px rgba(66, 232, 255, 0.32);
+}
+
+.debug-panel-head-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.debug-icon-button {
+  width: 36px;
+  height: 36px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 3px;
+  padding: 0;
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(255, 255, 255, 0.78);
+  font-size: 24px;
+}
+
+.debug-run-status {
+  border: 1px solid rgba(66, 232, 255, 0.34);
+  border-radius: 2px;
+  padding: 5px 8px;
+  color: var(--cyan);
+  background: rgba(66, 232, 255, 0.06);
+  font-size: 9px;
+  letter-spacing: 1px;
+}
+
+.debug-auth-description {
+  margin: 0 0 18px;
+  color: rgba(223, 236, 248, 0.72);
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+.debug-field {
+  display: grid;
+  gap: 7px;
+  min-width: 0;
+  color: rgba(223, 236, 248, 0.72);
+  font-size: 10px;
+  letter-spacing: 1px;
+}
+
+.debug-field input,
+.debug-field select {
+  width: 100%;
+  min-height: 40px;
+  border: 1px solid rgba(66, 232, 255, 0.28);
+  border-radius: 3px;
+  padding: 8px 10px;
+  outline: none;
+  background: rgba(2, 7, 15, 0.92);
+  color: #f4f9ff;
+  font: 700 12px/1.3 var(--font-pixel);
+  box-shadow: inset 0 0 14px rgba(66, 232, 255, 0.04);
+}
+
+.debug-field input:focus,
+.debug-field select:focus {
+  border-color: var(--cyan);
+  box-shadow: 0 0 0 2px rgba(66, 232, 255, 0.11), inset 0 0 18px rgba(66, 232, 255, 0.06);
+}
+
+.debug-auth-panel .debug-field + .debug-field {
+  margin-top: 13px;
+}
+
+.debug-auth-error {
+  min-height: 18px;
+  margin: 10px 0 4px;
+  color: #ff8096;
+  font-size: 10px;
+}
+
+.debug-auth-actions,
+.debug-button-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.debug-auth-actions {
+  justify-content: flex-end;
+}
+
+.debug-auth-actions button,
+.debug-button-row button,
+.debug-button-grid button,
+.debug-panel-footer button {
+  min-height: 38px;
+  border: 1px solid rgba(66, 232, 255, 0.3);
+  border-radius: 3px;
+  padding: 8px 13px;
+  background: rgba(66, 232, 255, 0.06);
+  color: #eaf8ff;
+  font: 800 10px/1.25 var(--font-pixel);
+}
+
+.debug-auth-actions .primary,
+.debug-button-row .primary {
+  border-color: rgba(255, 209, 102, 0.72);
+  background: linear-gradient(135deg, rgba(255, 209, 102, 0.2), rgba(255, 77, 109, 0.08));
+  color: #fff5cf;
+}
+
+.debug-auth-panel > small {
+  display: block;
+  margin-top: 15px;
+  color: rgba(223, 236, 248, 0.42);
+  font-size: 9px;
+  line-height: 1.6;
+}
+
+.debug-control-layout {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.debug-section {
+  border: 1px solid rgba(66, 232, 255, 0.15);
+  border-radius: 4px;
+  padding: 16px;
+  background: rgba(5, 12, 23, 0.62);
+  box-shadow: inset 0 0 24px rgba(66, 232, 255, 0.025);
+}
+
+.debug-section h3 {
+  margin: 0 0 14px;
+  color: var(--cyan);
+  font-size: 12px;
+  letter-spacing: 1.5px;
+}
+
+.debug-cheat-section {
+  grid-column: 1 / -1;
+}
+
+.debug-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.debug-field-wide {
+  grid-column: 1 / -1;
+}
+
+.debug-toggle-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 13px;
+}
+
+.debug-toggle-grid label {
+  position: relative;
+  display: flex;
+  min-height: 42px;
+  align-items: center;
+  gap: 9px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 3px;
+  padding: 9px 11px;
+  background: rgba(255, 255, 255, 0.025);
+  color: rgba(238, 247, 255, 0.72);
+  font-size: 10px;
+}
+
+.debug-toggle-grid input {
+  width: 15px;
+  height: 15px;
+  accent-color: var(--gold);
+}
+
+.debug-toggle-grid label:has(input:checked) {
+  border-color: rgba(255, 209, 102, 0.5);
+  color: #fff5cf;
+  box-shadow: inset 0 0 18px rgba(255, 209, 102, 0.07);
+}
+
+.debug-button-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.debug-panel-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  margin-top: 16px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  padding-top: 14px;
+}
+
+.debug-panel-footer p {
+  margin: 0;
+  color: rgba(223, 236, 248, 0.62);
+  font-size: 10px;
+  line-height: 1.5;
+}
+
+.debug-panel-footer p.error {
+  color: #ff8299;
+}
+
+.debug-panel-footer .danger {
+  flex: 0 0 auto;
+  border-color: rgba(255, 77, 109, 0.52);
+  background: rgba(255, 77, 109, 0.08);
+  color: #ff9aac;
+}
+
+body.debug-auth-open .menu-actions,
+body.debug-panel-open .menu-actions {
+  display: none;
+}
+
 .menu-actions .menu-help-button {
   position: relative;
   display: grid;

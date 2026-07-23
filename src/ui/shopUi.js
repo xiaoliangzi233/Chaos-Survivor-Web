@@ -54,13 +54,20 @@ export function initShopUi({ continueToNextWave }) {
     else renderShop(text.noGoldRefresh);
   });
   dom.continue?.addEventListener("click", () => {
+    if (state.shop?.manualDebugOpen) {
+      state.shop.manualDebugOpen = false;
+      closeShop();
+      state.mode = "playing";
+      return;
+    }
     closeShop();
     continueHandler?.();
   });
 }
 
-export function openShop({ beforeBossWave = false } = {}) {
+export function openShop({ beforeBossWave = false, manualDebugOpen = false } = {}) {
   prepareShopOffers({ preserveLocked: true, beforeBossWave });
+  if (state.shop) state.shop.manualDebugOpen = Boolean(manualDebugOpen);
   state.mode = "shop";
   renderShop();
   dom.overlay?.classList.add("active");

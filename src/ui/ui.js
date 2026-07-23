@@ -13,7 +13,7 @@ import {
 import { startWeaponPreview } from "./weaponPreview.js";
 
 let stopPreview = null;
-const hudLast = { hp: null, xp: null, kills: null, gold: null, level: null, items: "" };
+const hudLast = { hp: null, xp: null, kills: null, gold: null, level: null };
 const FALLBACK_VERSION = "v0.1.0";
 
 export const gameConfig = {
@@ -30,7 +30,6 @@ export const ui = {
   xpBar: document.getElementById("xpBar"),
   xpMeter: document.getElementById("xpMeter"),
   levelText: document.getElementById("levelText"),
-  itemStatusBar: document.getElementById("itemStatusBar"),
   wavePanel: document.getElementById("wavePanel"),
   timerText: document.getElementById("timerText"),
   waveText: document.getElementById("waveText"),
@@ -140,8 +139,6 @@ export function updateHud(fps) {
   setFpsClass(fps);
   ui.hpMeter?.classList.toggle("low", hpRatio < 0.3);
   ui.xpMeter?.classList.toggle("near-level", xpRatio > 0.82);
-  renderItemStatusBar(p);
-
   if (hudLast.hp !== null && hp < hudLast.hp) flashHudValue(ui.hpMeter, "damage");
   if (hudLast.xp !== null && xp > hudLast.xp) flashHudValue(ui.xpMeter, "gain");
   if (hudLast.level !== null && p.level > hudLast.level) flashHudValue(ui.xpMeter, "pulse");

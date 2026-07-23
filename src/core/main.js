@@ -233,6 +233,19 @@ export async function bootGame() {
     openShop({ beforeBossWave: isBossWave(Math.min(TOTAL_WAVES, state.wave + 1)) });
   }
 
+  function openDebugShop() {
+    if (!state.debug?.enabled || !state.debug?.unlocked || !state.player) return false;
+    if (state.mode !== "playing") return false;
+    if (!state.shop) state.shop = createShopState();
+    hidePauseMenu();
+    openShop({
+      beforeBossWave: isBossWave(Math.min(TOTAL_WAVES, state.wave + 1)),
+      manualDebugOpen: true,
+    });
+    playSfx("select");
+    return true;
+  }
+
   function finishWaveTransition() {
     if (state.pendingVictory) return endGame(true);
     if (!state.pendingNextWave) return;
@@ -305,7 +318,7 @@ export async function bootGame() {
     updateBestText();
   }
 
-  function startDebugRun({ difficultyId, weaponId }) {
+  function startDebugRun({ difficultyId, weaponId, wave = 1 }) {
     if (!difficultyCards().some((entry) => entry.id === difficultyId)) return false;
     if (!STARTER_WEAPONS.some((entry) => entry.id === weaponId)) return false;
     cancelStoryPlayback();
@@ -323,9 +336,14 @@ export async function bootGame() {
     state.debug.enabled = true;
     state.debug.unlocked = true;
     state.debug.runTainted = true;
+    state.wave = Math.max(1, Math.min(TOTAL_WAVES, Math.floor(Number(wave) || 1)));
+    state.waveDuration = waveDurationFor(state.wave);
+    state.waveTimeLeft = state.waveDuration;
     state.mode = "playing";
     resetWaveScenarioState();
     startWaveItems();
+    const scenario = applyWaveStartScenario();
+    showWaveEventNotice({ wave: state.wave, scenario, boss: isBossWave(state.wave) });
     playSfx("start");
     startMusic();
     return true;
@@ -348,9 +366,13 @@ export async function bootGame() {
 
   function update(dt) {
     updateAi(dt);
+    if (state.mode === "shop") {
+      state.time += dt;
+      return;
+    }
     if (state.mode !== "playing") return;
     const bossWave = isBossWave(state.wave);
-    const debugFreeze = Boolean(state.debug?.enabled && state.debug.freezeWave);
+    const debugFreeze = Boolean(state.debug?.enabled);
     state.bossWaveActive = bossWave || Boolean(world.boss);
     state.time += dt;
     if (!bossWave && !debugFreeze) state.waveTimeLeft = Math.max(0, state.waveTimeLeft - dt);
@@ -360,7 +382,7 @@ export async function bootGame() {
     updatePlayer(dt);
     updateWaveScenario(dt);
     updateEasterEggs(dt);
-    if (!debugFreeze && (bossWave || state.waveTimeLeft > 0)) updateSpawning(dt);
+    if (bossWave || state.waveTimeLeft > 0 || debugFreeze) updateSpawning(dt);
     updateEnemies(dt);
     rebuildGrid();
     updateWeapons(dt);
@@ -400,7 +422,7 @@ export async function bootGame() {
 
   resizeCanvas(ui.canvas, ctx);
   window.addEventListener("resize", () => resizeCanvas(ui.canvas, ctx));
-  bindInput({ start, restart: start, togglePause, resume: resumeGame, returnToMenu });
+  bindInput({ start, restart: start, togglePause, resume: resumeGame, returnToMenu, openDebugShop });
   resetRun(generateMap());
   state.shop = createShopState();
   state.mode = "menu";

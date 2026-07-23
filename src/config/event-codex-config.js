@@ -5,7 +5,7 @@ export const EVENT_CODEX_ENTRIES = [
   { id: "fast_gears", icon: ">", name: "高速齿轮", category: "敌群异变", desc: "本波齿轮怪锁定高速形态，不再进入常规减速阶段。", color: "#ffb347" },
   { id: "scrap_wind", icon: "//", name: "废料风暴", category: "环境异常", desc: "高速废料掠过实验场，持续移动才能避开不断变化的危险区。", color: "#42e8ff" },
   { id: "toxic_residue", icon: "T", name: "剧毒残留", category: "污染区域", desc: "培养液残留覆盖实验场，进入污染区后会持续受到毒性伤害。", color: "#72ffb4" },
-  { id: "invisible_brain_eaters", icon: "?", name: "隐匿侵袭", category: "敌群异变", desc: "部分敌人进入低可见状态，只会在接近时显露轮廓。", color: "#b48cff" },
+  { id: "invisible_brain_eaters", icon: "?", name: "隐匿侵袭", category: "敌群异变", desc: "全部敌人进入低可见状态，只会在接近时显露轮廓。", color: "#b48cff" },
   { id: "gear_trap", icon: "#", name: "齿轮陷阱", category: "机关封锁", desc: "大量机械陷阱被投放到战场，接触运转中的齿轮会受到伤害。", color: "#f59e0b" },
   { id: "mini_overdrive", icon: "+", name: "微型过载", category: "敌群异变", desc: "过载脉冲提升普通敌人的移动与攻击节奏，直到本波结束。", color: "#ff4d6d" },
   { id: "gravity_well_grid", icon: "O", name: "重力井", category: "空间异常", desc: "实验场生成多个引力节点，靠近核心的单位会被持续牵引。", color: "#8d6bff" },

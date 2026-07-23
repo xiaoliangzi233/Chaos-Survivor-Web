@@ -3,7 +3,7 @@ import { ui } from "../ui/ui.js";
 import { setMuted, isMuted, nextMusicTrack } from "../audio.js";
 import { handleEasterEggKey } from "./easterEggs.js";
 
-export function bindInput({ start, restart, togglePause, resume, returnToMenu }) {
+export function bindInput({ start, restart, togglePause, resume, returnToMenu, openDebugShop }) {
   const keys = new Map([
     ["KeyW", "up"], ["ArrowUp", "up"],
     ["KeyS", "down"], ["ArrowDown", "down"],
@@ -29,6 +29,11 @@ export function bindInput({ start, restart, togglePause, resume, returnToMenu })
     if ((event.code === "KeyM" || key === "m") && !event.repeat) {
       event.__survivorHandled = true;
       nextMusicTrack();
+      return;
+    }
+    if ((event.code === "KeyO" || key === "o") && !event.repeat && openDebugShop?.()) {
+      event.__survivorHandled = true;
+      event.preventDefault();
       return;
     }
     if (event.code === "Space" && state.mode === "menu") {

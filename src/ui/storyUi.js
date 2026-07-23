@@ -10,9 +10,9 @@ const SPEECH_END_HOLD_MS = 520;
 const CLOSE_TRANSITION_MS = 180;
 const SILENT_TYPE_CHARACTERS = /[\s，。！？、：；…,.!?—“”‘’]/;
 const STORY_VOICE_TONES = Object.freeze([
-  { id: "machine", label: "机械低频", rate: 0.9, pitch: 0.58, voiceOffset: 1 },
-  { id: "broadcast", label: "合成广播", rate: 1, pitch: 0.76, voiceOffset: 0 },
-  { id: "sentinel", label: "警戒单元", rate: 1.08, pitch: 0.92, voiceOffset: 2 },
+  { id: "machine", label: "机械低频", rate: 0.86, pitch: 0.42, voiceOffset: 0 },
+  { id: "broadcast", label: "合成广播", rate: 0.96, pitch: 0.58, voiceOffset: 0 },
+  { id: "sentinel", label: "警戒单元", rate: 1.04, pitch: 0.68, voiceOffset: 1 },
 ]);
 
 let initialized = false;
@@ -541,7 +541,9 @@ function storyVoiceScore(voice) {
   if (lang === "zh-cn" || lang === "zh-hans-cn") score += 100;
   else if (lang.startsWith("zh-hans")) score += 80;
   else if (lang.startsWith("zh")) score += 60;
-  if (/xiaoxiao|xiaoyi|yunxi|huihui|mandarin|chinese|普通话|中文/.test(name)) score += 16;
+  if (/yunxi|yunyang|kangkang|male|man|男|机器|robot|synthetic|neural/.test(name)) score += 28;
+  if (/mandarin|chinese|普通话|中文/.test(name)) score += 16;
+  if (/xiaoxiao|xiaoyi|huihui|female|woman|女/.test(name)) score -= 32;
   if (voice?.default) score += 4;
   return score;
 }

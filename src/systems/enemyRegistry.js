@@ -106,6 +106,7 @@ const classes = {
 const WAVE_SPAWN_LIMITS = {
   thief: 3,
 };
+const LAB_THIEF_UNLOCK_KEY = "pixel-survivor-lab-thief-unlocked-v1";
 
 export let enemyConfig = {};
 
@@ -134,6 +135,7 @@ export function spawnEnemyById(id, x = null, y = null) {
   const e = new Klass(cfg, pos.x, pos.y);
   world.enemies.push(e);
   recordLimitedEnemySpawn(id);
+  if (id === "thief" && state.difficultyId === "ember" && state.wave === 13) recordLabThiefUnlocked();
   if (e.boss) world.boss = e;
   recordCodexEntry("enemies", id);
   return e;
@@ -164,6 +166,7 @@ export function randomEnemyForWave(wave) {
   const weighted = entries
     .map((entry) => ({ id: entry.id, weight: spawnWeightFor(entry, wave, difficultyId) }))
     .filter((entry) => entry.weight > 0);
+  appendUnlockedLabThief(weighted);
   const totalWeight = weighted.reduce((sum, entry) => sum + entry.weight, 0);
   if (totalWeight <= 0) return null;
   let roll = Math.random() * totalWeight;
@@ -172,6 +175,30 @@ export function randomEnemyForWave(wave) {
     if (roll <= 0) return entry.id;
   }
   return weighted[weighted.length - 1]?.id || "zombie";
+}
+
+function appendUnlockedLabThief(weighted) {
+  if (!isLabThiefUnlocked()) return;
+  if (weighted.some((entry) => entry.id === "thief")) return;
+  if (!enemyConfig.thief || !canSpawnLimitedEnemy("thief")) return;
+  weighted.push({ id: "thief", weight: 0.16 });
+}
+
+function recordLabThiefUnlocked() {
+  state.labThiefUnlocked = true;
+  try {
+    globalThis.localStorage?.setItem(LAB_THIEF_UNLOCK_KEY, "1");
+  } catch {}
+}
+
+function isLabThiefUnlocked() {
+  if (state.labThiefUnlocked) return true;
+  try {
+    state.labThiefUnlocked = globalThis.localStorage?.getItem(LAB_THIEF_UNLOCK_KEY) === "1";
+  } catch {
+    state.labThiefUnlocked = false;
+  }
+  return Boolean(state.labThiefUnlocked);
 }
 
 export function decorativeEnemyIds() {

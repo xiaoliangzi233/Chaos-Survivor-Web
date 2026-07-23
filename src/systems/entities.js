@@ -583,6 +583,13 @@ function releaseElitePulse(e) {
 }
 
 export function eliteProjectileVisualFor(enemy) {
+  if (enemy?.type === "zombie") {
+    return {
+      shape: "zombieClot",
+      color: enemy?.eliteVariant === "giant" ? "#b7f56a" : "#7ccf68",
+      slimePalette: null,
+    };
+  }
   if (!enemy?.type?.startsWith("slime_")) {
     return {
       shape: "starShard",
@@ -607,6 +614,8 @@ export function eliteProjectileVisualFor(enemy) {
 function releaseEliteFireballs(e) {
   const count = e.eliteVariant === "giant" ? 5 : 3;
   const base = Math.atan2(state.player.y - e.y, state.player.x - e.x);
+  const color = e.type === "mech_worm" ? "#b48cff" : "#ff7a1a";
+  const coreColor = e.type === "mech_worm" ? "#f3e8ff" : "#ffad66";
   for (let i = 0; i < count; i++) {
     const spread = (i - (count - 1) / 2) * 0.18;
     const a = base + spread;
@@ -616,7 +625,7 @@ function releaseEliteFireballs(e) {
       vx: Math.cos(a) * 250,
       vy: Math.sin(a) * 250,
       r: 9,
-      color: "#ff7a1a",
+      color,
       damage: Math.max(1, e.damage * 0.42),
       life: 4,
       shape: "fireball",
@@ -625,8 +634,8 @@ function releaseEliteFireballs(e) {
       burnDps: e.damage * 0.22,
     });
   }
-  burst(e.x, e.y, 18, "#ff7a1a", 180);
-  pulse(e.x, e.y, e.r * 2.6, "#ffad66", 0.28);
+  burst(e.x, e.y, 18, color, 180);
+  pulse(e.x, e.y, e.r * 2.6, coreColor, 0.28);
   e.eliteSkillCooldown = e.eliteSkillInterval;
 }
 
@@ -1559,7 +1568,7 @@ function updateSpecialEnemyProjectile(b, dt) {
       b.vx += (dx / d * speed - b.vx) * Math.min(1, dt * 6.5);
       b.vy += (dy / d * speed - b.vy) * Math.min(1, dt * 6.5);
     }
-  } else if (b.shape === "fastGear" || b.shape === "starShard" || b.shape === "phaseShard" || b.shape === "arcaneOrb" || b.shape === "slimeOrb") {
+  } else if (b.shape === "fastGear" || b.shape === "starShard" || b.shape === "phaseShard" || b.shape === "arcaneOrb" || b.shape === "slimeOrb" || b.shape === "zombieClot") {
     b.spin = (b.spin || 0) + dt * (b.shape === "fastGear" ? 18 : 6);
   }
 }

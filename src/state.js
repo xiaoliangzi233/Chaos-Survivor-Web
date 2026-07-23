@@ -12,6 +12,7 @@ export const state = {
   spawnedBossWaves: new Set(),
   thiefSpawnWave: 0,
   thiefSpawnCount: 0,
+  labThiefUnlocked: false,
   bossWaveActive: false,
   kills: 0,
   bossKills: 0,

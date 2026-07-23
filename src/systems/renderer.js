@@ -2428,7 +2428,7 @@ function drawEnemyProjectiles(ctx) {
       drawEnemyBolt(ctx, b);
       continue;
     }
-    if (b.shape === "arcaneOrb" || b.shape === "starShard" || b.shape === "phaseShard" || b.shape === "razorBoomerang" || b.shape === "fastGear") {
+    if (b.shape === "arcaneOrb" || b.shape === "starShard" || b.shape === "phaseShard" || b.shape === "razorBoomerang" || b.shape === "fastGear" || b.shape === "zombieClot") {
       drawSpecialEnemyProjectile(ctx, b);
       continue;
     }
@@ -2672,6 +2672,27 @@ function drawSpecialEnemyProjectile(ctx, b) {
     ctx.lineTo(-b.r * 0.9, b.r * 0.9);
     ctx.closePath();
     ctx.fill();
+  } else if (b.shape === "zombieClot") {
+    glow(ctx, 0, 0, b.r * 2.1, 0.12, b.color);
+    ctx.fillStyle = "#2d4f2e";
+    ctx.strokeStyle = b.color;
+    ctx.lineWidth = 1.4;
+    ctx.beginPath();
+    for (let i = 0; i < 9; i++) {
+      const a = i * TAU / 9;
+      const r = b.r * (i % 3 === 0 ? 1.55 : i % 2 ? 0.82 : 1.18);
+      const x = Math.cos(a) * r;
+      const y = Math.sin(a) * r;
+      if (i === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    }
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = "#d7ff8f";
+    ctx.fillRect(-b.r * 0.35, -b.r * 0.18, b.r * 0.7, b.r * 0.36);
+    ctx.fillStyle = "rgba(255,255,255,0.72)";
+    ctx.fillRect(b.r * 0.25, -b.r * 0.58, b.r * 0.32, b.r * 0.24);
   } else if (b.shape === "razorBoomerang") {
     ctx.strokeStyle = "#ffffff";
     ctx.lineWidth = 1.2;

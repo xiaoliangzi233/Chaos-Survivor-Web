@@ -3,7 +3,8 @@ import { state, world } from "../state.js";
 import { difficultyCards, selectDifficulty } from "../difficulty.js";
 import { enemyConfig, spawnEnemyById } from "../systems/enemyRegistry.js";
 import { clearEnemies } from "../systems/entities.js";
-import { resetWaveScenarioState } from "../systems/waveScenarios.js";
+import { applyWaveStartScenario, resetWaveScenarioState } from "../systems/waveScenarios.js";
+import { startWaveItems } from "../systems/items.js";
 import { STARTER_WEAPONS } from "../systems/weapons.js";
 
 const DEBUG_CREDENTIAL_KEY = "survivor.debug.credentials.v1";
@@ -407,6 +408,8 @@ function applySetup(elements, { clearBattlefield = false } = {}) {
   state.spawnedBossWaves?.delete(wave);
   state.bossWaveActive = false;
   resetWaveScenarioState();
+  startWaveItems();
+  applyWaveStartScenario();
 }
 
 function spawnAroundPlayer(id, count, radius) {

@@ -13,10 +13,13 @@ export class Thief extends BaseEnemy {
     this.maxHp = 999999;
     this.speed = config.speed || 560;
     this.wanderAngle = Math.random() * TAU;
-    this.moveState = "run";
-    this.moveTimer = 0.62 + Math.random() * 0.55;
+    this.moveState = "taunt";
+    this.moveTimer = 1.1 + Math.random() * 0.6;
     this.turnTimer = 0.08;
     this.afterimageTimer = 0;
+    this.tauntPhase = Math.random() * TAU;
+    this.tauntSide = Math.random() < 0.5 ? -1 : 1;
+    this.fleeDistance = 430;
     this.coinDrop = config.coinDrop || 24;
     this.hitCoinDrop = config.hitCoinDrop || 2;
     this.damage = 0;
@@ -26,8 +29,9 @@ export class Thief extends BaseEnemy {
   }
 
   update(dt) {
-    this.anim += dt * (this.moveState === "run" ? 15 : 4);
-    this.bagSwing += dt * (this.moveState === "run" ? 10 : 2.4);
+    const running = this.moveState === "flee";
+    this.anim += dt * (running ? 15 : 8.5);
+    this.bagSwing += dt * (running ? 10 : 4.5);
     this.flash = Math.max(0, this.flash - dt * 8);
     this.hitTimer = Math.max(0, this.hitTimer - dt);
     this.freezeTimer = 0;
@@ -36,38 +40,74 @@ export class Thief extends BaseEnemy {
     this.moveTimer -= dt;
     this.turnTimer -= dt;
 
-    if (this.moveTimer <= 0) {
-      if (this.moveState === "run") {
-        this.moveState = "rest";
-        this.moveTimer = 0.32 + Math.random() * 0.42;
-        pulse(this.x, this.y, 24, "#ffd166", 0.18);
-      } else {
-        this.moveState = "run";
+    const p = state.player || { x: 0, y: 0, dirX: 1, dirY: 0 };
+    const distanceFromPlayer = Math.hypot(this.x - p.x, this.y - p.y);
+    if (this.moveState === "flee") {
+      if (this.turnTimer <= 0) {
         this.pickEscapeAngle();
-        this.moveTimer = 0.7 + Math.random() * 0.6;
+        this.turnTimer = 0.16 + Math.random() * 0.14;
       }
-    }
-    if (this.moveState === "run" && this.turnTimer <= 0) {
-      this.pickEscapeAngle();
-      this.turnTimer = 0.18 + Math.random() * 0.18;
+      if (this.moveTimer <= 0 || distanceFromPlayer > this.fleeDistance) this.startTaunt();
+    } else if (this.moveTimer <= 0) {
+      this.tauntSide *= -1;
+      this.moveTimer = 0.7 + Math.random() * 0.5;
+      pulse(this.x, this.y, 22, "#ffd166", 0.14);
     }
 
     const px = this.x;
     const py = this.y;
-    if (this.moveState === "run") {
+    if (this.moveState === "flee") {
       const weave = Math.sin(this.anim * 0.9) * 0.2;
       this.x += Math.cos(this.wanderAngle + weave) * this.speed * dt;
       this.y += Math.sin(this.wanderAngle + weave) * this.speed * dt;
+    } else {
+      this.moveTowardTauntPoint(dt);
     }
     const half = WORLD_SIZE / 2;
     this.x = clamp(this.x, -half + this.r, half - this.r);
     this.y = clamp(this.y, -half + this.r, half - this.r);
     this.flip = Math.cos(this.wanderAngle) < 0 ? -1 : 1;
     this.afterimageTimer -= dt;
-    if (this.moveState === "run" && this.afterimageTimer <= 0 && Math.hypot(this.x - px, this.y - py) > 2) {
-      this.afterimageTimer = 0.035;
+    if (this.afterimageTimer <= 0 && Math.hypot(this.x - px, this.y - py) > 2) {
+      this.afterimageTimer = this.moveState === "flee" ? 0.035 : 0.07;
       trail(this.x, this.y, px, py, "#ffd166", 8);
     }
+  }
+
+  startTaunt() {
+    this.moveState = "taunt";
+    this.moveTimer = 0.75 + Math.random() * 0.5;
+    this.turnTimer = 0.08;
+    this.tauntSide = Math.random() < 0.5 ? -1 : 1;
+    pulse(this.x, this.y, 24, "#42e8ff", 0.16);
+  }
+
+  startFlee() {
+    this.moveState = "flee";
+    this.moveTimer = 0.85 + Math.random() * 0.35;
+    this.turnTimer = 0;
+    this.pickEscapeAngle();
+    burst(this.x, this.y, 7, "#ffd166", 110);
+  }
+
+  moveTowardTauntPoint(dt) {
+    const p = state.player || { x: 0, y: 0, dirX: 1, dirY: 0 };
+    const forwardLen = Math.hypot(p.dirX || 0, p.dirY || 0) || 1;
+    const fx = (p.dirX || 1) / forwardLen;
+    const fy = (p.dirY || 0) / forwardLen;
+    const sideX = -fy;
+    const sideY = fx;
+    this.tauntPhase += dt * 5.6;
+    const bob = Math.sin(this.tauntPhase) * 54 * this.tauntSide;
+    const targetX = p.x + fx * 118 + sideX * bob;
+    const targetY = p.y + fy * 118 + sideY * bob;
+    const dx = targetX - this.x;
+    const dy = targetY - this.y;
+    const d = Math.max(1, Math.hypot(dx, dy));
+    const speed = this.speed * (d > 280 ? 0.82 : 0.46);
+    this.wanderAngle = Math.atan2(dy, dx);
+    this.x += dx / d * Math.min(d, speed * dt);
+    this.y += dy / d * Math.min(d, speed * dt);
   }
 
   pickEscapeAngle() {
@@ -87,6 +127,7 @@ export class Thief extends BaseEnemy {
     this.knockbackY = 0;
     if (!options.statusEffect) {
       dropCoin(x ?? this.x, y ?? this.y, this.hitCoinDrop);
+      this.startFlee();
     }
     super.takeDamage(amount, x, y, options);
   }
@@ -102,7 +143,7 @@ export class Thief extends BaseEnemy {
   draw(ctx) {
     const z = this.r / 13;
     const flash = this.flash > 0;
-    const run = this.moveState === "run";
+    const run = this.moveState === "flee";
     const stride = Math.sin(this.anim) * (run ? 1 : 0.25);
     const bob = Math.abs(Math.cos(this.anim)) * (run ? -3 : -0.6) * z;
     const bag = Math.sin(this.bagSwing) * (run ? 5 : 1.4) * z;

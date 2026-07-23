@@ -6,7 +6,7 @@ const EFFECT_INFO = {
   scrap_wind: { label: "废料风暴", description: "高速废料掠过实验场，注意持续移动。", tone: "cyan" },
   blind: { label: "视野干扰", description: "照明系统失效，敌群将从暗区逼近。", tone: "violet" },
   ice_skate: { label: "冰面滑行", description: "地面摩擦力下降，移动会产生额外惯性。", tone: "cyan" },
-  invisible_brain_eaters: { label: "隐匿侵袭", description: "部分敌人进入低可见状态，留意近身轮廓。", tone: "violet" },
+  invisible_brain_eaters: { label: "隐匿侵袭", description: "全部敌人进入低可见状态，留意近身轮廓。", tone: "violet" },
   mini_overdrive: { label: "微型过载", description: "普通敌人的移动与弹幕节奏暂时加快。", tone: "danger" },
   gravity_well_grid: { label: "重力井", description: "实验场出现牵引节点，远离重力核心。", tone: "violet" },
   prism_refraction: { label: "棱镜折射", description: "棱镜节点会折射敌方弹幕，注意改变后的轨迹。", tone: "cyan" },

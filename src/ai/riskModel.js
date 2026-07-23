@@ -1,4 +1,5 @@
 import { WORLD_SIZE } from "../constants.js";
+import { apocalypseScenarioRiskAtPoint } from "../systems/apocalypseScenarioEvents.js";
 
 const DEFAULT_LOOK_AHEAD = 0.85;
 const SAMPLE_TIMES = [0, 0.2, 0.45, 0.85];
@@ -45,6 +46,18 @@ export function collectThreats(state, world, options = {}) {
     threats.push(normalizeThreat("boss", world.boss, 1.3));
   }
   if (world.boss && !world.boss.dead) addBossSegmentThreats(threats, p, world.boss, queryRadius);
+  if (state.waveScenarioRuntime) {
+    threats.push({
+      kind: "apocalypse_scene",
+      baseKind: "scene",
+      source: state.waveScenarioRuntime,
+      x: 0,
+      y: 0,
+      damage: 1,
+      weight: 1,
+      life: 1,
+    });
+  }
   return threats;
 }
 
@@ -141,6 +154,10 @@ export function riskAtPoint(point, threats, options = {}) {
   const lookAhead = options.lookAhead || DEFAULT_LOOK_AHEAD;
   let risk = boundaryRisk(point, options);
   for (const threat of threats || []) {
+    if (threat.kind === "apocalypse_scene") {
+      risk += apocalypseScenarioRiskAtPoint(point, threat.source);
+      continue;
+    }
     if (threat.kind === "gravity_well") {
       risk += gravityRisk(point, threat);
       continue;
@@ -174,7 +191,8 @@ export function riskBreakdownAtPoint(point, threats, options = {}) {
   };
   for (const threat of threats || []) {
     const single = riskAtPoint(point, [threat], options);
-    if (threat.kind === "gravity_well" || threat.kind === "hazard_zone_soft" || threat.kind === "hazard_disruption") breakdown.controlRisk += single;
+    if (threat.kind === "apocalypse_scene") breakdown.objectiveRisk += single;
+    else if (threat.kind === "gravity_well" || threat.kind === "hazard_zone_soft" || threat.kind === "hazard_disruption") breakdown.controlRisk += single;
     else if (threat.kind === "warning_line" || threat.kind === "warning_circle") breakdown.objectiveRisk += single;
     else breakdown.lethalRisk += single;
   }

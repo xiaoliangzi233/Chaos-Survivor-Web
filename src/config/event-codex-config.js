@@ -19,6 +19,13 @@ export const EVENT_CODEX_ENTRIES = [
   { id: "phase_tear_grid", icon: "X", name: "裂相撕裂", category: "空间异常", desc: "相位裂隙扭曲附近的移动方向，进入范围后会被横向拖拽。", color: "#d946ef" },
   { id: "mirror_laser_gate", icon: "H", name: "镜面光闸", category: "能量封锁", desc: "镜像激光门在玩家附近交错校准，预警结束后形成移动封锁。", color: "#f3f7ff" },
   { id: "inferno_resonance", icon: "F", name: "炎脉共鸣", category: "高温异常", desc: "烈焰信标周期性蓄能，并向玩家方向发射带灼烧效果的三连火球。", color: "#ff7a1a" },
+  { id: "quadrant_verdict", icon: "IV", name: "四域裁决", category: "末日协议", desc: "战场被分成四个裁决象限，对角安全域会按协议交替；危险象限同时审判玩家与敌群。", color: "#ff5a36" },
+  { id: "ember_convoy", icon: "E", name: "余烬迁徙", category: "末日协议", desc: "最后的移动火种沿全场巡航，跟随它才能免于末日曝露，也可把追兵引入净化范围。", color: "#72ffb4" },
+  { id: "doom_ledger", icon: "D", name: "灾厄债册", category: "末日协议", desc: "协议周期性指定替罪者，敌群会被其吸引；及时击杀可让清算冲击反噬周围敌人。", color: "#ffd166" },
+  { id: "causal_echo_route", icon: "C", name: "因果回廊", category: "末日协议", desc: "玩家走过的路线会延迟成为唯一安全回廊，需要提前书写下一轮裁决中的生路。", color: "#72ffb4" },
+  { id: "ceasefire_credit", icon: "II", name: "停火借秒", category: "时间协议", desc: "敌方弹幕被全场时间层暂时冻结并解除碰撞，借来的安全时间结束后将恢复原有轨迹。", color: "#42e8ff" },
+  { id: "sanctuary_quota", icon: "Q", name: "生者配额", category: "末日协议", desc: "赦免区会统计其中的敌人数量；配额超限时安全规则反转，必须果断放弃拥挤避难所。", color: "#ff5a36" },
+  { id: "mercy_faultline", icon: "/", name: "恩赦断层", category: "空间协议", desc: "旋转断层会净化穿越它的敌方弹幕，并把积攒的能量转化成伤害敌群的清算爆发。", color: "#72ffb4" },
 ];
 
 const EVENT_IDS = new Set(EVENT_CODEX_ENTRIES.map((entry) => entry.id));

@@ -26,7 +26,7 @@ import { updatePlayer, updateSpawning, updateEnemies, rebuildGrid, updateGems, u
 import { updateWeapons, STARTER_WEAPONS, UPGRADE_DEFS, activateWeapon, refreshStarterWeapons } from "../systems/weapons.js";
 import { consumeNextWaveSpawnBonus, startWaveItems, updateItems } from "../systems/items.js";
 import { updateEasterEggs } from "../systems/easterEggs.js";
-import { applyWaveStartScenario, resetWaveScenarioState } from "../systems/waveScenarios.js";
+import { applyWaveStartScenario, resetWaveScenarioState, updateWaveScenario } from "../systems/waveScenarios.js";
 import { createShopState } from "../economy/shop.js";
 import * as effects from "../effects.js";
 import { resizeCanvas, updateCamera, render } from "../systems/renderer.js";
@@ -319,6 +319,7 @@ export async function bootGame() {
 
   function completeWave() {
     clearWaveEventNotice();
+    resetWaveScenarioState();
     if (isBossWave(state.wave)) state.bossKills++;
     state.waveTimeLeft = 0;
     state.spawnBudget = 0;
@@ -362,6 +363,7 @@ export async function bootGame() {
 
   function endGame(victory) {
     clearWaveEventNotice();
+    resetWaveScenarioState();
     if (state.debug?.runTainted) {
       if (hasActiveLeaderboardRun()) finishLeaderboardRun(leaderboardSnapshot(), "ABANDONED");
     } else {
@@ -481,6 +483,7 @@ export async function bootGame() {
     state.flash = Math.max(0, state.flash - dt * 3);
     updateItems(dt);
     updatePlayer(dt);
+    updateWaveScenario(dt);
     updateEasterEggs(dt);
     if (!debugFreeze && (bossWave || state.waveTimeLeft > 0)) updateSpawning(dt);
     updateEnemies(dt);

@@ -5,19 +5,31 @@ import { eventCodexIdsForScenario } from "../config/event-codex-config.js";
 import { waveScenarioFor } from "../config/wave-scenario-config.js";
 import { recordCodexEntry } from "./codex.js";
 import { spawnEnemyById } from "./enemyRegistry.js";
+import {
+  clearApocalypseScenarioEvent,
+  startApocalypseScenarioEvent,
+  updateApocalypseScenarioEvent,
+} from "./apocalypseScenarioEvents.js";
 
 export function resetWaveScenarioState() {
+  clearApocalypseScenarioEvent();
   state.waveScenario = null;
   state.spawnedWaveEvents = new Set();
 }
 
 export function applyWaveStartScenario() {
+  clearApocalypseScenarioEvent();
   state.waveScenario = waveScenarioFor(state.difficultyId, state.wave);
   if (!state.waveScenario) return null;
   for (const eventId of eventCodexIdsForScenario(state.waveScenario)) recordCodexEntry("events", eventId);
   spawnScenarioElite(state.waveScenario);
   spawnScenarioEvent(state.waveScenario);
+  startApocalypseScenarioEvent(state.waveScenario.event);
   return state.waveScenario;
+}
+
+export function updateWaveScenario(dt) {
+  updateApocalypseScenarioEvent(dt);
 }
 
 export function activeWaveEffect(effect) {

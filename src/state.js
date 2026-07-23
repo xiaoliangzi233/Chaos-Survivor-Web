@@ -30,6 +30,7 @@ export const state = {
   shop: null,
   easterEggs: null,
   waveScenario: null,
+  waveScenarioRuntime: null,
   spawnedWaveEvents: new Set(),
   difficultyId: "ember",
   difficulty: null,
@@ -236,6 +237,7 @@ export function resetRun(map) {
   state.shop = null;
   state.easterEggs = createEasterEggState();
   state.waveScenario = null;
+  state.waveScenarioRuntime = null;
   state.spawnedWaveEvents = new Set();
   state.difficultyId = state.difficultyId || "ember";
   state.ai = createAiState(previousAi || {});

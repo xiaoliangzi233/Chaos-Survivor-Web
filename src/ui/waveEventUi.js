@@ -17,6 +17,13 @@ const EFFECT_INFO = {
   phase_tear_grid: { label: "裂相撕裂", description: "相位裂隙会扭曲移动路线，别在裂口边缘恋战。", tone: "violet" },
   mirror_laser_gate: { label: "镜面光闸", description: "镜像激光门正在交错校准，观察预警线后穿过空档。", tone: "cyan" },
   inferno_resonance: { label: "炎脉共鸣", description: "烈焰信标正在蓄能并发射灼烧火球，观察火光脉冲后变向。", tone: "danger" },
+  quadrant_verdict: { label: "四域裁决", description: "观察对角安全象限，裁决会同时灼烧危险域内的敌我单位。", tone: "danger" },
+  ember_convoy: { label: "余烬迁徙", description: "跟随移动火种，并把追兵引入火种的净化范围。", tone: "toxic" },
+  doom_ledger: { label: "灾厄债册", description: "替罪者正在聚拢敌群，抢先击杀可让清算反噬追兵。", tone: "gold" },
+  causal_echo_route: { label: "因果回廊", description: "你刚刚走过的路线将延迟成为安全区，提前写出生路。", tone: "toxic" },
+  ceasefire_credit: { label: "停火借秒", description: "敌方弹幕会周期性冻结；停火结束前离开密集弹道。", tone: "cyan" },
+  sanctuary_quota: { label: "生者配额", description: "观察避难所内敌人数，超出配额时安全区域会反转。", tone: "danger" },
+  mercy_faultline: { label: "恩赦断层", description: "引导敌方弹幕穿过断层，积攒净化能量反击敌群。", tone: "toxic" },
 };
 
 const EVENT_INFO = {
@@ -32,6 +39,13 @@ const EVENT_INFO = {
   mirror_laser_gate: EFFECT_INFO.mirror_laser_gate,
   phase_tear_grid: EFFECT_INFO.phase_tear_grid,
   inferno_resonance: EFFECT_INFO.inferno_resonance,
+  quadrant_verdict: EFFECT_INFO.quadrant_verdict,
+  ember_convoy: EFFECT_INFO.ember_convoy,
+  doom_ledger: EFFECT_INFO.doom_ledger,
+  causal_echo_route: EFFECT_INFO.causal_echo_route,
+  ceasefire_credit: EFFECT_INFO.ceasefire_credit,
+  sanctuary_quota: EFFECT_INFO.sanctuary_quota,
+  mercy_faultline: EFFECT_INFO.mercy_faultline,
 };
 
 const HAZARD_INFO = {

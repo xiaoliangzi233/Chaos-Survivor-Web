@@ -9,6 +9,7 @@ import { createDecorativeEnemy, decorativeEnemyIds } from "./enemyRegistry.js";
 import { drawEasterEggObject, drawEasterEggToast } from "./easterEggs.js";
 import { activeWaveEffect } from "./waveScenarios.js";
 import { drawAiDebug, drawAiHud } from "../ai/aiDebugDraw.js";
+import { drawApocalypseScenarioEvent } from "./apocalypseScenarioEvents.js";
 
 export const viewport = { width: 1, height: 1, dpr: 1 };
 
@@ -143,6 +144,7 @@ export function render(ctx) {
   ctx.translate(-camX, -camY);
   drawMap(ctx, state.map, camX, camY, viewW, viewH, state.time);
   drawBounds(ctx);
+  drawApocalypseScenarioEvent(ctx, "background");
   drawGems(ctx);
   drawCoins(ctx);
   drawProjectiles(ctx);
@@ -170,6 +172,7 @@ export function render(ctx) {
   drawPlayer(ctx);
   drawEnemyProjectiles(ctx);
   drawHazards(ctx);
+  drawApocalypseScenarioEvent(ctx, "foreground");
   drawItemObjects(ctx);
   drawBlackhole(ctx);
   drawEffects(ctx);

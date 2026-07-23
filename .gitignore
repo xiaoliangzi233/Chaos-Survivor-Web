@@ -1,6 +1,10 @@
 .superpowers/
 .VSCodeCounter/
 tests/
+!/tests/
+/tests/*
+!/tests/apocalypseWaveScenarios.test.mjs
+!/tests/apocalypseScenarioEvents.test.mjs
 
 # Local notes
 AGENTS.md

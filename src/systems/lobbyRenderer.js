@@ -5,6 +5,7 @@ import { drawWeaponHologram, weaponPreviewColor } from "../ui/weaponPreview.js";
 import { renderScreenLighting } from "./lighting.js";
 import { drawPlayerAvatar } from "./playerAvatar.js";
 import {
+  LOBBY_CORRIDORS,
   LOBBY_DEVICES,
   LOBBY_DOORS,
   LOBBY_HEIGHT,
@@ -153,8 +154,8 @@ function drawStaticShip(ctx) {
   ctx.stroke();
 
   drawHullRibs(ctx, halfW, halfH);
-  drawMainCorridors(ctx);
   for (const room of LOBBY_ROOMS) drawRoomFloor(ctx, room);
+  drawMainCorridors(ctx);
   drawStaticPipes(ctx);
   drawHullWindows(ctx);
   drawStaticLightFixtures(ctx);
@@ -196,35 +197,86 @@ function drawHullRibs(ctx, halfW, halfH) {
 }
 
 function drawMainCorridors(ctx) {
-  const corridors = [
-    { x: 0, y: -520, w: 250, h: 1150, color: "#42e8ff" },
-    { x: 0, y: 690, w: 250, h: 1020, color: "#77ff8a" },
-    { x: -930, y: -468, w: 730, h: 220, color: "#b48cff" },
-    { x: 930, y: -468, w: 730, h: 220, color: "#77ff8a" },
-    { x: -940, y: 518, w: 760, h: 220, color: "#ff7a8a" },
-    { x: 940, y: 518, w: 760, h: 220, color: "#ffb347" },
-  ];
-  for (const corridor of corridors) {
+  for (const corridor of LOBBY_CORRIDORS) {
     const y = corridor.y * LOBBY_Y_SCALE;
     const h = corridor.h * LOBBY_Y_SCALE;
+    const left = corridor.x - corridor.w / 2;
+    const right = corridor.x + corridor.w / 2;
+    const top = y - h / 2;
+    const bottom = y + h / 2;
     ctx.fillStyle = "#0b1822";
-    ctx.fillRect(corridor.x - corridor.w / 2, y - h / 2, corridor.w, h);
+    ctx.fillRect(left, top, corridor.w, h);
     ctx.strokeStyle = hexToRgba(corridor.color, 0.28);
     ctx.lineWidth = 3;
-    ctx.strokeRect(corridor.x - corridor.w / 2, y - h / 2, corridor.w, h);
+    ctx.beginPath();
+    if (corridor.axis === "horizontal") {
+      ctx.moveTo(left, top);
+      ctx.lineTo(right, top);
+      ctx.moveTo(left, bottom);
+      ctx.lineTo(right, bottom);
+    } else {
+      ctx.moveTo(left, top);
+      ctx.lineTo(left, bottom);
+      ctx.moveTo(right, top);
+      ctx.lineTo(right, bottom);
+    }
+    ctx.stroke();
     ctx.setLineDash([20, 18]);
     ctx.strokeStyle = hexToRgba(corridor.color, 0.16);
     ctx.lineWidth = 2;
     ctx.beginPath();
-    if (corridor.w > corridor.h / LOBBY_Y_SCALE) {
-      ctx.moveTo(corridor.x - corridor.w / 2 + 24, y);
-      ctx.lineTo(corridor.x + corridor.w / 2 - 24, y);
+    if (corridor.axis === "horizontal") {
+      ctx.moveTo(left + 24, y);
+      ctx.lineTo(right - 24, y);
     } else {
-      ctx.moveTo(corridor.x, y - h / 2 + 24);
-      ctx.lineTo(corridor.x, y + h / 2 - 24);
+      ctx.moveTo(corridor.x, top + 24);
+      ctx.lineTo(corridor.x, bottom - 24);
     }
     ctx.stroke();
     ctx.setLineDash([]);
+  }
+  drawCorridorJunctions(ctx);
+}
+
+function drawCorridorJunctions(ctx) {
+  const junctions = [
+    { x: 0, y: -450, orientation: "horizontal", color: "#42e8ff" },
+    { x: 0, y: 450, orientation: "horizontal", color: "#42e8ff", accent: "#77ff8a" },
+    { x: -600, y: -650, orientation: "vertical", color: "#42e8ff", accent: "#b48cff" },
+    { x: 600, y: -650, orientation: "vertical", color: "#42e8ff", accent: "#77ff8a" },
+    { x: -600, y: 720, orientation: "vertical", color: "#42e8ff", accent: "#ff7a8a" },
+    { x: 600, y: 720, orientation: "vertical", color: "#42e8ff", accent: "#ffb347" },
+  ];
+  for (const junction of junctions) {
+    const y = junction.y * LOBBY_Y_SCALE;
+    const horizontal = junction.orientation === "horizontal";
+    ctx.save();
+    ctx.translate(junction.x, y);
+    if (!horizontal) ctx.rotate(Math.PI / 2);
+    ctx.strokeStyle = hexToRgba(junction.color, 0.64);
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.moveTo(-118, 0);
+    ctx.lineTo(-30, 0);
+    ctx.moveTo(30, 0);
+    ctx.lineTo(118, 0);
+    ctx.stroke();
+    ctx.strokeStyle = hexToRgba(junction.accent || junction.color, 0.76);
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(-112, 7);
+    ctx.lineTo(-42, 7);
+    ctx.moveTo(42, 7);
+    ctx.lineTo(112, 7);
+    ctx.stroke();
+    for (const side of [-1, 1]) {
+      ctx.fillStyle = "#203746";
+      ctx.strokeStyle = hexToRgba(junction.accent || junction.color, 0.55);
+      ctx.lineWidth = 2;
+      ctx.fillRect(side * 111 - 9, -15, 18, 30);
+      ctx.strokeRect(side * 111 - 9, -15, 18, 30);
+    }
+    ctx.restore();
   }
 }
 
@@ -755,18 +807,18 @@ function drawWeaponStation(ctx, station, time) {
   const y = station.y * LOBBY_Y_SCALE;
   ctx.save();
   ctx.translate(station.x, y);
-  drawInteractionRing(ctx, station.id, color, 100, 36);
-  drawObjectShadow(ctx, 0, 35, 98, 31);
+  drawInteractionRing(ctx, station.id, color, 112, 39);
+  drawObjectShadow(ctx, 0, 36, 104, 33);
   if (selected) {
-    const glow = ctx.createRadialGradient(0, 0, 5, 0, 0, 128);
+    const glow = ctx.createRadialGradient(0, 0, 5, 0, 0, 142);
     glow.addColorStop(0, hexToRgba(color, 0.32));
     glow.addColorStop(1, hexToRgba(color, 0));
     ctx.fillStyle = glow;
     ctx.beginPath();
-    ctx.ellipse(0, 4, 128, 62, 0, 0, TAU);
+    ctx.ellipse(0, 4, 142, 68, 0, 0, TAU);
     ctx.fill();
   }
-  drawMachineBase(ctx, 0, 15, 84, 35, color);
+  drawMachineBase(ctx, 0, 16, 90, 37, color);
   for (const side of [-1, 1]) {
     ctx.strokeStyle = selected ? color : "#3a515f";
     ctx.lineWidth = 7;
@@ -785,19 +837,19 @@ function drawWeaponStation(ctx, station, time) {
       ? Math.max(0.18, 1 - Math.sin((1 - state.lobby.leverPulse / 0.48) * Math.PI))
       : 1;
     ctx.save();
-    ctx.translate(0, -76 + Math.sin(time * 2.5 + station.slot) * 4);
+    ctx.translate(10, -70 + Math.sin(time * 2.5 + station.slot) * 4);
     ctx.globalCompositeOperation = "lighter";
     ctx.strokeStyle = hexToRgba(color, 0.34 * projectionAlpha);
     ctx.lineWidth = 2;
     ctx.beginPath();
-    ctx.moveTo(-54, 82);
-    ctx.lineTo(-30, -39);
-    ctx.lineTo(30, -39);
-    ctx.lineTo(54, 82);
+    ctx.moveTo(-66, 86);
+    ctx.lineTo(-38, -52);
+    ctx.lineTo(38, -52);
+    ctx.lineTo(66, 86);
     ctx.stroke();
-    drawWeaponHologram(ctx, weapon, time, { scale: 0.36, alpha: 0.84 * projectionAlpha, color });
+    drawWeaponHologram(ctx, weapon, time, { scale: 0.5, alpha: 0.88 * projectionAlpha, color });
     ctx.restore();
-    drawTechLabel(ctx, weapon.name, selected ? "当前开场武器" : `武器台 ${station.slot + 1}`, color, 0, 69, true);
+    drawWeaponStationLabel(ctx, weapon.name, color, 0, 82, selected);
   }
   ctx.restore();
 }
@@ -1671,6 +1723,36 @@ function drawTechLabel(ctx, title, subtitle, color, x, y, active) {
   ctx.font = `9px ${FONT}`;
   ctx.fillStyle = hexToRgba(color, active ? 0.85 : 0.4);
   ctx.fillText(subtitle, x, y + 16);
+}
+
+function drawWeaponStationLabel(ctx, title, color, x, y, selected) {
+  ctx.fillStyle = "#07111a";
+  ctx.strokeStyle = hexToRgba(color, selected ? 0.92 : 0.68);
+  ctx.lineWidth = selected ? 3 : 2;
+  roundRect(ctx, x - 108, y - 20, 216, 41, 8);
+  ctx.fill();
+  ctx.stroke();
+  let fontSize = 16;
+  ctx.font = `bold ${fontSize}px ${FONT}`;
+  while (fontSize > 12 && ctx.measureText(title).width > 176) {
+    fontSize -= 1;
+    ctx.font = `bold ${fontSize}px ${FONT}`;
+  }
+  ctx.textAlign = "center";
+  ctx.fillStyle = "#f3fcff";
+  ctx.fillText(title, x, y + 6);
+  if (selected) {
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.moveTo(x - 96, y);
+    ctx.lineTo(x - 88, y - 8);
+    ctx.lineTo(x - 80, y);
+    ctx.lineTo(x - 88, y + 8);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = hexToRgba(color, 0.72);
+    ctx.fillRect(x + 82, y - 8, 12, 16);
+  }
 }
 
 function collectLobbyLights(viewport) {

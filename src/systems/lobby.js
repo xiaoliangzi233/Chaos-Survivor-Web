@@ -32,6 +32,15 @@ export const LOBBY_DOORS = [
   { id: "habitat-door", roomId: "habitat", x: 0, y: 1140, orientation: "horizontal", color: "#77ff8a" },
 ];
 
+export const LOBBY_CORRIDORS = [
+  { id: "north-spine", axis: "vertical", x: 0, y: -735, w: 250, h: 570, color: "#42e8ff", fromRoomId: "core", toRoomId: "bridge" },
+  { id: "south-spine", axis: "vertical", x: 0, y: 795, w: 250, h: 690, color: "#77ff8a", fromRoomId: "core", toRoomId: "habitat" },
+  { id: "data-link", axis: "horizontal", x: -712.5, y: -650, w: 1175, h: 220, color: "#b48cff", fromRoomId: "core", toRoomId: "data" },
+  { id: "science-link", axis: "horizontal", x: 712.5, y: -650, w: 1175, h: 220, color: "#77ff8a", fromRoomId: "core", toRoomId: "science" },
+  { id: "combat-link", axis: "horizontal", x: -700, y: 720, w: 1150, h: 220, color: "#ff7a8a", fromRoomId: "core", toRoomId: "combat" },
+  { id: "engineering-link", axis: "horizontal", x: 700, y: 720, w: 1150, h: 220, color: "#ffb347", fromRoomId: "core", toRoomId: "engineering" },
+];
+
 export const LOBBY_PORTALS = [
   { id: "story-gate", kind: "story", roomId: "bridge", x: 0, y: -1515, color: "#42e8ff", label: "剧情模式", sublabel: "稳定时间线" },
   { id: "random-gate", kind: "random", roomId: "data", x: -2180, y: -1020, color: "#b48cff", label: "随机模式", sublabel: "异常时间线" },
@@ -51,10 +60,10 @@ export const LOBBY_DEVICES = [
 ];
 
 export const LOBBY_WEAPON_STATIONS = [
-  { id: "weapon-station-0", kind: "weaponStation", roomId: "combat", slot: 0, x: -2325, y: 560, color: "#42e8ff", collider: { w: 168, h: 94 } },
-  { id: "weapon-station-1", kind: "weaponStation", roomId: "combat", slot: 1, x: -2040, y: 560, color: "#42e8ff", collider: { w: 168, h: 94 } },
-  { id: "weapon-station-2", kind: "weaponStation", roomId: "combat", slot: 2, x: -1755, y: 560, color: "#42e8ff", collider: { w: 168, h: 94 } },
-  { id: "weapon-station-3", kind: "weaponStation", roomId: "combat", slot: 3, x: -1470, y: 560, color: "#42e8ff", collider: { w: 168, h: 94 } },
+  { id: "weapon-station-0", kind: "weaponStation", roomId: "combat", slot: 0, x: -2260, y: 690, color: "#42e8ff", collider: { w: 178, h: 98 } },
+  { id: "weapon-station-1", kind: "weaponStation", roomId: "combat", slot: 1, x: -2010, y: 690, color: "#42e8ff", collider: { w: 178, h: 98 } },
+  { id: "weapon-station-2", kind: "weaponStation", roomId: "combat", slot: 2, x: -1760, y: 690, color: "#42e8ff", collider: { w: 178, h: 98 } },
+  { id: "weapon-station-3", kind: "weaponStation", roomId: "combat", slot: 3, x: -1510, y: 690, color: "#42e8ff", collider: { w: 178, h: 98 } },
 ];
 
 export const LOBBY_NPCS = [
@@ -94,7 +103,7 @@ export const LOBBY_PROPS = [
   { id: "science-sample-cart", kind: "cart", roomId: "science", x: 1535, y: -1120, color: "#77ff8a", colliders: [{ shape: "rect", oy: 14, w: 112, h: 58 }] },
   { id: "science-sample-rack", kind: "cabinet", roomId: "science", x: 2350, y: -760, color: "#77ff8a", colliders: [{ shape: "rect", oy: 18, w: 120, h: 78 }] },
   { id: "combat-ammo-rack", kind: "cabinet", roomId: "combat", x: -2390, y: 820, color: "#ff7a8a", colliders: [{ shape: "rect", oy: 18, w: 120, h: 78 }] },
-  { id: "combat-tool-cart", kind: "cart", roomId: "combat", x: -1510, y: 780, color: "#ffb347", colliders: [{ shape: "rect", oy: 14, w: 116, h: 58 }] },
+  { id: "combat-tool-cart", kind: "cart", roomId: "combat", x: -1390, y: 1320, color: "#ffb347", colliders: [{ shape: "rect", oy: 14, w: 116, h: 58 }] },
   { id: "engineering-cooler-a", kind: "cooler", roomId: "engineering", x: 1515, y: 500, color: "#ffb347", colliders: [{ shape: "circle", oy: 18, r: 54 }] },
   { id: "engineering-cooler-b", kind: "cooler", roomId: "engineering", x: 1515, y: 1040, color: "#42e8ff", colliders: [{ shape: "circle", oy: 18, r: 54 }] },
   { id: "engineering-cable-reel", kind: "reel", roomId: "engineering", x: 2360, y: 870, color: "#ffb347", colliders: [{ shape: "circle", oy: 14, r: 46 }] },
@@ -135,12 +144,12 @@ export const LOBBY_LIGHTS = [
 ];
 
 export const LOBBY_MOBILE_LIGHTS = [
-  { id: "inspection-north", roomId: "core", color: "#8eefff", radius: 165, speed: 0.12, phase: 0.05, route: [[-430, -390], [430, -390], [430, -610], [-430, -610]] },
-  { id: "inspection-data", roomId: "data", color: "#b48cff", radius: 150, speed: 0.1, phase: 0.32, route: [[-2300, -690], [-1520, -690], [-1520, -940], [-2300, -940]] },
-  { id: "inspection-science", roomId: "science", color: "#9dffb1", radius: 150, speed: 0.105, phase: 0.61, route: [[1510, -690], [2300, -690], [2300, -990], [1510, -990]] },
-  { id: "inspection-combat", roomId: "combat", color: "#ffb0b9", radius: 155, speed: 0.095, phase: 0.18, route: [[-2310, 800], [-1500, 800], [-1500, 1120], [-2310, 1120]] },
-  { id: "inspection-engineering", roomId: "engineering", color: "#ffd18a", radius: 155, speed: 0.09, phase: 0.77, route: [[1510, 780], [2290, 780], [2290, 1080], [1510, 1080]] },
-  { id: "inspection-habitat", roomId: "habitat", color: "#d7ffc7", radius: 145, speed: 0.115, phase: 0.46, route: [[-500, 1370], [500, 1370], [500, 1580], [-500, 1580]] },
+  { id: "inspection-north", roomId: "core", color: "#8eefff", radius: 165, speed: 0.12, phase: 0.05, route: [[-72, -390], [54, -470], [76, -650], [18, -830], [-68, -710], [-82, -520]] },
+  { id: "inspection-data", roomId: "data", color: "#b48cff", radius: 150, speed: 0.1, phase: 0.32, route: [[-2210, -620], [-1990, -585], [-1740, -630], [-1640, -760], [-1810, -850], [-2070, -820], [-2225, -735]] },
+  { id: "inspection-science", roomId: "science", color: "#9dffb1", radius: 150, speed: 0.105, phase: 0.61, route: [[1450, -650], [1650, -450], [1910, -370], [2380, -390], [2460, -620], [2450, -930], [2330, -1190], [1900, -1220], [1450, -1200], [1380, -970]] },
+  { id: "inspection-combat", roomId: "combat", color: "#ffb0b9", radius: 155, speed: 0.095, phase: 0.18, route: [[-2390, 410], [-2130, 365], [-1840, 385], [-1540, 420], [-1380, 520], [-1570, 570], [-1880, 530], [-2200, 555]] },
+  { id: "inspection-engineering", roomId: "engineering", color: "#ffd18a", radius: 155, speed: 0.09, phase: 0.77, route: [[1690, 350], [1940, 320], [2220, 350], [2430, 500], [2460, 760], [2460, 1020], [2440, 1260], [2260, 1340], [1870, 1335], [1640, 1160], [1590, 900], [1660, 650]] },
+  { id: "inspection-habitat", roomId: "habitat", color: "#d7ffc7", radius: 145, speed: 0.115, phase: 0.46, route: [[-570, 1250], [-350, 1200], [-100, 1230], [140, 1210], [380, 1230], [440, 1290], [300, 1350], [80, 1370], [-150, 1340], [-380, 1380], [-560, 1340]] },
 ];
 
 export const LOBBY_PET = {
@@ -369,7 +378,6 @@ export function interactWithLobby(targetId = null) {
   if (interaction.action === "weapon-page") {
     state.lobby.weaponPage = clampLobbyWeaponPage(state.lobby.weaponPage + 1);
     state.lobby.leverPulse = 0.48;
-    setLobbyToast(`全息武器组已切换至 ${state.lobby.weaponPage + 1} / ${lobbyWeaponPageCount()}`, "#ffd166");
     return { ...interaction, page: state.lobby.weaponPage };
   }
   if (interaction.action === "weapon-select") {
@@ -433,12 +441,18 @@ export function lobbyMobileLightPosition(definition, time = state.lobby.mobileLi
   const progress = (((Number(time) || 0) * (definition.speed || 0.1) + (definition.phase || 0)) % 1 + 1) % 1;
   const scaled = progress * route.length;
   const index = Math.floor(scaled) % route.length;
-  const next = (index + 1) % route.length;
   const blend = scaled - Math.floor(scaled);
-  const eased = blend * blend * (3 - 2 * blend);
+  const previous = route[(index - 1 + route.length) % route.length];
+  const current = route[index];
+  const next = route[(index + 1) % route.length];
+  const startX = (previous[0] + current[0]) * 0.5;
+  const startY = (previous[1] + current[1]) * 0.5;
+  const endX = (current[0] + next[0]) * 0.5;
+  const endY = (current[1] + next[1]) * 0.5;
+  const inverse = 1 - blend;
   return {
-    x: route[index][0] + (route[next][0] - route[index][0]) * eased,
-    y: route[index][1] + (route[next][1] - route[index][1]) * eased,
+    x: inverse * inverse * startX + 2 * inverse * blend * current[0] + blend * blend * endX,
+    y: inverse * inverse * startY + 2 * inverse * blend * current[1] + blend * blend * endY,
   };
 }
 

@@ -625,6 +625,19 @@ function ensureStaticMapCache(map) {
   map.staticCache = { canvas, scale: STATIC_CACHE_SCALE };
 }
 
+export function prepareMapCache(map) {
+  if (!map) return null;
+  ensureStaticMapCache(map);
+  return map.staticCache;
+}
+
+export function releaseMapCache(map) {
+  if (!map?.staticCache) return;
+  map.staticCache.canvas.width = 1;
+  map.staticCache.canvas.height = 1;
+  map.staticCache = null;
+}
+
 function drawStaticMapCache(ctx, map, camX, camY, viewW, viewH) {
   const cache = map.staticCache;
   if (!cache) return;

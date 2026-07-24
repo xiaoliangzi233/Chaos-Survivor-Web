@@ -15,6 +15,8 @@ import {
   showEnd,
   loadGameConfig,
   setBootProgress,
+  showRunLoading,
+  hideRunLoading,
 } from "../ui/ui.js";
 import { generateMap } from "../systems/map.js";
 import { bindInput } from "../systems/input.js";
@@ -29,7 +31,12 @@ import { updateEasterEggs } from "../systems/easterEggs.js";
 import { applyWaveStartScenario, resetWaveScenarioState, updateWaveScenario } from "../systems/waveScenarios.js";
 import { createShopState } from "../economy/shop.js";
 import * as effects from "../effects.js";
-import { resizeCanvas, updateCamera, render, viewport } from "../systems/renderer.js";
+import { updateCamera, viewport } from "../systems/renderer.js";
+import { createRenderBackend } from "../systems/renderBackend.js";
+import { PreloadCoordinator } from "../systems/preloadCoordinator.js";
+import { framePerformance } from "../systems/performanceMonitor.js";
+import { monitorRuntimeBudgets } from "../systems/runtimeBudgets.js";
+import { populateDeterministicStressScenario, stressScenarioRequested } from "../systems/stressScenario.js";
 import { playSfx, startMusic, stopMusic, pauseMusic, resumeMusic } from "../audio.js";
 import { CAMERA_ZOOM } from "../constants.js";
 import { difficultyOrder, loadDifficultyProgress, recordDifficultyVictory, selectDifficulty, setupDifficultyConfig } from "../difficulty.js";
@@ -85,7 +92,6 @@ import {
 const LEVEL_CHOICE_REFRESH_COST = 10;
 
 export async function bootGame() {
-  const ctx = ui.canvas.getContext("2d", { alpha: false });
   setBootProgress(6, "正在启动霓虹废墟");
   initInventoryUi();
   initLobbyUi();
@@ -112,31 +118,43 @@ export async function bootGame() {
     },
   });
   setBootProgress(18, "正在同步版本配置");
-  const runtimeGameConfig = await loadGameConfig();
+  const gameConfigPromise = loadGameConfig();
+  const editableDataPromise = loadEditableGameData();
+  const difficultyConfigPromise = setupDifficultyConfig();
+  const enemyRegistryPromise = setupEnemyRegistry();
+  const aiTrainingPromise = loadAiTrainingModeConfig();
+  const aiRunPromise = loadAiRunConfig();
+  const runtimeGameConfig = await gameConfigPromise;
+  setBootProgress(26, "正在初始化渲染后端");
+  const rendererOverride = new URLSearchParams(window.location.search).get("renderer");
+  const renderBackend = await createRenderBackend(ui.canvas, rendererOverride || runtimeGameConfig.renderer);
+  ui.canvas.dataset.renderer = renderBackend.name;
+  const preloadCoordinator = new PreloadCoordinator(renderBackend);
+  await preloadCoordinator.initCore((progress, label) => setBootProgress(26 + progress * 12, label));
+  window.__survivorRendererStats = () => renderBackend.getStats();
   configurePlayerProgress();
   setBootProgress(42, "本地进度已就绪");
   setBootProgress(54, "正在加载武器与道具");
-  await loadEditableGameData();
+  await editableDataPromise;
   refreshStarterWeapons();
   configureLobbyWeapons(STARTER_WEAPONS);
   setBootProgress(66, "正在校准难度曲线");
-  await setupDifficultyConfig();
+  await difficultyConfigPromise;
   setBootProgress(72, "正在同步玩家进度");
   await loadPlayerProgress({ difficultyIds: difficultyOrder });
   loadDifficultyProgress();
   configureLobbyDifficulties(difficultyCards());
   setBootProgress(78, "正在生成敌人档案");
-  await setupEnemyRegistry();
+  await enemyRegistryPromise;
   setBootProgress(88, "正在装配智能模块");
-  const aiTrainingMode = await loadAiTrainingModeConfig();
-  const aiRunConfig = await loadAiRunConfig();
-  setBootProgress(100, "加载完成", { done: true });
+  const [aiTrainingMode, aiRunConfig] = await Promise.all([aiTrainingPromise, aiRunPromise]);
   const MAX_FRAME_RATE = 60;
   const FRAME_MS = 1000 / MAX_FRAME_RATE;
   let lastTime = 0;
   let fps = 60;
   let fpsAcc = 0;
   let fpsFrames = 0;
+  let nextStatsPublishAt = 0;
   let debugUi = null;
 
   function start() {
@@ -181,7 +199,9 @@ export async function bootGame() {
     hideRunSetup();
     leaveLobby();
     selectDifficulty(difficulty.id);
-    resetRun(generateMap());
+    preloadCoordinator.releaseRun();
+    const runMap = generateMap();
+    resetRun(runMap);
     selectDifficulty(difficulty.id);
     configureRandomModeRun({
       runMode: runMode === RUN_MODE_RANDOM ? RUN_MODE_RANDOM : "standard",
@@ -193,14 +213,37 @@ export async function bootGame() {
     state.initialWeaponId = weapon.id;
     activateWeapon(weapon.id);
     state.mode = "story";
-
-    await playDifficultyStoryIfNeeded({
+    let prepareDone = false;
+    let storyDone = false;
+    let latestProgress = 0;
+    let latestLabel = "正在准备战场";
+    const preparePromise = preloadCoordinator.prepareRun({
+      map: runMap,
+      difficultyId: difficulty.id,
+      weaponId: weapon.id,
+      runMode,
+    }, (progress, label) => {
+      latestProgress = progress;
+      latestLabel = label || latestLabel;
+      if (storyDone) showRunLoading(latestProgress, latestLabel);
+    }).finally(() => {
+      prepareDone = true;
+    });
+    const storyPromise = playDifficultyStoryIfNeeded({
       difficultyId: difficulty.id,
       playerId: "local-dev",
       alwaysPlay: Boolean(runtimeGameConfig.storyAlwaysPlay),
+    }).finally(() => {
+      storyDone = true;
+      if (!prepareDone) showRunLoading(latestProgress, latestLabel);
     });
+    await Promise.all([preparePromise, storyPromise]);
+    hideRunLoading();
 
-    if (state.mode !== "story") return false;
+    if (state.mode !== "story") {
+      preloadCoordinator.releaseRun();
+      return false;
+    }
     state.mode = "playing";
     resetWaveScenarioState();
     const scenario = applyWaveStartScenario();
@@ -396,6 +439,7 @@ export async function bootGame() {
     closeLobbyDialogue();
     clearWaveEventNotice();
     stopMusic();
+    preloadCoordinator.releaseRun();
     resetRun(generateMap());
     state.shop = createShopState();
     hideAllOverlays();
@@ -421,7 +465,7 @@ export async function bootGame() {
     });
   }
 
-  function startDebugRun({ difficultyId, weaponId, wave = 1 }) {
+  async function startDebugRun({ difficultyId, weaponId, wave = 1 }) {
     if (!difficultyCards().some((entry) => entry.id === difficultyId)) return false;
     if (!STARTER_WEAPONS.some((entry) => entry.id === weaponId)) return false;
     cancelStoryPlayback();
@@ -432,7 +476,9 @@ export async function bootGame() {
     hideRunSetup();
     leaveLobby();
     selectDifficulty(difficultyId);
-    resetRun(generateMap());
+    preloadCoordinator.releaseRun();
+    const runMap = generateMap();
+    resetRun(runMap);
     selectDifficulty(difficultyId);
     state.shop = createShopState();
     state.initialWeaponId = weaponId;
@@ -443,6 +489,15 @@ export async function bootGame() {
     state.wave = Math.max(1, Math.min(TOTAL_WAVES, Math.floor(Number(wave) || 1)));
     state.waveDuration = waveDurationFor(state.wave);
     state.waveTimeLeft = state.waveDuration;
+    state.mode = "loadingRun";
+    showRunLoading(0, "正在准备调试战场");
+    await preloadCoordinator.prepareRun({
+      map: runMap,
+      difficultyId,
+      weaponId,
+      runMode: "standard",
+    }, showRunLoading);
+    hideRunLoading();
     state.mode = "playing";
     resetWaveScenarioState();
     startWaveItems();
@@ -595,6 +650,7 @@ export async function bootGame() {
     updateCoins(dt);
     effects.updateAmbientParticles?.(dt, ui.canvas.clientWidth / CAMERA_ZOOM, ui.canvas.clientHeight / CAMERA_ZOOM);
     effects.updateEffects(dt);
+    monitorRuntimeBudgets();
     updateCamera(dt);
     checkLevelUps();
     if (state.player.hp <= 0) endGame(false);
@@ -618,16 +674,29 @@ export async function bootGame() {
       fpsAcc = 0;
       fpsFrames = 0;
     }
+    framePerformance.begin("frame", now);
+    framePerformance.begin("update", now);
     update(dt);
-    render(ctx);
+    framePerformance.end("update");
+    renderBackend.renderFrame();
+    framePerformance.begin("hud");
     updateHud(fps);
     updateLobbyUi();
     updateDebugModeUi();
+    framePerformance.end("hud");
+    framePerformance.end("frame");
+    if (now >= nextStatsPublishAt) {
+      const stats = renderBackend.getStats();
+      const frameStats = stats.timings?.frame;
+      ui.canvas.dataset.frameP50 = (frameStats?.p50 || 0).toFixed(2);
+      ui.canvas.dataset.frameP95 = (frameStats?.p95 || 0).toFixed(2);
+      ui.canvas.dataset.frameP99 = (frameStats?.p99 || 0).toFixed(2);
+      nextStatsPublishAt = now + 1000;
+    }
     requestAnimationFrame(loop);
   }
 
-  resizeCanvas(ui.canvas, ctx);
-  window.addEventListener("resize", () => resizeCanvas(ui.canvas, ctx));
+  window.addEventListener("resize", () => renderBackend.resize());
   bindInput({
     start,
     restart: restartRun,
@@ -640,9 +709,14 @@ export async function bootGame() {
     hoverLobbyPointer: (event) => lobbyPointerInteraction(event, false),
     cancelLobbyAction: cancelLobbyLaunch,
   });
-  resetRun(generateMap());
+  const menuMap = generateMap();
+  resetRun(menuMap);
+  await preloadCoordinator.prepareRun({ map: menuMap, runMode: "menu" }, (progress, label) => {
+    setBootProgress(88 + progress * 12, label);
+  });
   state.shop = createShopState();
   state.mode = "menu";
+  setBootProgress(100, "加载完成", { done: true });
   debugUi = initDebugModeUi({
     onQuickStart: startDebugRun,
     onTaintRun: taintRunForDebug,
@@ -673,6 +747,10 @@ export async function bootGame() {
       }),
     },
   });
+  if (stressScenarioRequested()) {
+    await startDebugRun({ difficultyId: "void_crown", weaponId: "arc", wave: 20 });
+    populateDeterministicStressScenario();
+  }
   updateBestText();
   requestAnimationFrame(loop);
 }

@@ -335,6 +335,16 @@
         </div>
       </section>
 
+      <section id="runLoadingOverlay" class="overlay run-loading-overlay" aria-hidden="true">
+        <div class="panel run-loading-panel" role="status" aria-live="polite">
+          <p class="eyebrow">MISSION PRELOAD</p>
+          <h2>正在准备战场</h2>
+          <p id="runLoadingText">生成地图与战斗纹理</p>
+          <div class="run-loading-track"><i id="runLoadingBar"></i></div>
+          <strong id="runLoadingPercent">0%</strong>
+        </div>
+      </section>
+
       <section id="loadoutOverlay" class="overlay loadout-overlay" aria-hidden="true">
         <div class="panel loadout-panel">
           <div class="loadout-fx" aria-hidden="true">

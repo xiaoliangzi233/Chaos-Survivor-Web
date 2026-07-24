@@ -152,7 +152,11 @@ export class BaseEnemy {
 
   shield(dt, dx, dy, d) {
     this.chase(dt, dx, dy, d, 0.45);
-    for (const e of world.enemies) if (e !== this && distSq(e.x, e.y, this.x, this.y) < 180 * 180) e.shielded = true;
+    const applyShield = (enemy) => {
+      if (enemy !== this && !enemy.dead && distSq(enemy.x, enemy.y, this.x, this.y) < 180 * 180) enemy.shielded = true;
+    };
+    if (world.grid.size > 0) world.grid.forEachNearby(this.x, this.y, 180, applyShield);
+    else for (const enemy of world.enemies) applyShield(enemy);
   }
 
   bossMove(dt, dx, dy, d) {

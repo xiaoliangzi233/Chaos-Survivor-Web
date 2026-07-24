@@ -13,12 +13,26 @@ import {
 import { startWeaponPreview } from "./weaponPreview.js";
 
 let stopPreview = null;
-const hudLast = { hp: null, xp: null, kills: null, gold: null, level: null };
+const hudLast = {
+  hp: null,
+  xp: null,
+  kills: null,
+  gold: null,
+  level: null,
+  hpRatio: null,
+  xpRatio: null,
+  waveLabel: null,
+  mode: null,
+  bossWave: null,
+  timerUpdateAt: 0,
+  fpsClass: null,
+};
 const FALLBACK_VERSION = "v0.1.0";
 
 export const gameConfig = {
   version: FALLBACK_VERSION,
   storyAlwaysPlay: false,
+  renderer: "auto",
 };
 
 export const ui = {
@@ -39,6 +53,10 @@ export const ui = {
   fpsText: document.getElementById("fpsText"),
   startOverlay: document.getElementById("startOverlay"),
   levelOverlay: document.getElementById("levelOverlay"),
+  runLoadingOverlay: document.getElementById("runLoadingOverlay"),
+  runLoadingText: document.getElementById("runLoadingText"),
+  runLoadingBar: document.getElementById("runLoadingBar"),
+  runLoadingPercent: document.getElementById("runLoadingPercent"),
   loadoutOverlay: document.getElementById("loadoutOverlay"),
   loadoutModeList: document.getElementById("loadoutModeList"),
   loadoutRandomGoalList: document.getElementById("loadoutRandomGoalList"),
@@ -119,33 +137,69 @@ export function setBootProgress(progress, label, { done = false } = {}) {
   }
 }
 
-export function updateHud(fps) {
-  document.body.classList.toggle("is-menu", state.mode === "menu");
-  document.body.classList.toggle("boss-wave-active", Boolean(state.bossWaveActive));
+export function showRunLoading(progress = 0, label = "正在准备战场") {
+  const normalized = Math.max(0, Math.min(1, Number(progress) || 0));
+  ui.runLoadingOverlay?.classList.add("active");
+  ui.runLoadingOverlay?.setAttribute("aria-hidden", "false");
+  if (ui.runLoadingText && label) ui.runLoadingText.textContent = label;
+  if (ui.runLoadingBar) ui.runLoadingBar.style.setProperty("--run-loading-progress", `${normalized * 100}%`);
+  if (ui.runLoadingPercent) ui.runLoadingPercent.textContent = `${Math.round(normalized * 100)}%`;
+}
+
+export function hideRunLoading() {
+  ui.runLoadingOverlay?.classList.remove("active");
+  ui.runLoadingOverlay?.setAttribute("aria-hidden", "true");
+}
+
+export function updateHud(fps, now = performance.now()) {
+  const bossWave = Boolean(state.bossWaveActive);
+  if (hudLast.mode !== state.mode) {
+    document.body.classList.toggle("is-menu", state.mode === "menu");
+    hudLast.mode = state.mode;
+  }
+  if (hudLast.bossWave !== bossWave) {
+    document.body.classList.toggle("boss-wave-active", bossWave);
+    ui.wavePanel?.classList.toggle("boss-active", bossWave);
+    hudLast.bossWave = bossWave;
+  }
   const p = state.player;
   if (!p) return;
   const hp = Math.max(0, Math.ceil(p.hp));
   const xp = Math.max(0, Math.floor(p.xp));
   const hpRatio = Math.max(0, Math.min(1, p.hp / p.maxHp));
   const xpRatio = Math.max(0, Math.min(1, p.xp / p.xpNeed));
-  ui.hpBar.style.transform = `scaleX(${hpRatio})`;
-  ui.xpBar.style.transform = `scaleX(${xpRatio})`;
-  ui.hpBar.parentElement?.style.setProperty("--value", hpRatio);
-  ui.xpBar.parentElement?.style.setProperty("--value", xpRatio);
-  ui.hpText.textContent = `${hp}`;
-  ui.levelText.textContent = `Lv.${p.level}`;
-  ui.timerText.textContent = state.bossWaveActive ? (world.boss?.name || "BOSS") : formatTime(state.waveTimeLeft);
-  ui.wavePanel?.classList.toggle("boss-active", state.bossWaveActive);
-  ui.waveText.textContent = state.runMode === "random" && state.randomGoal === "endless"
+  if (hudLast.hpRatio !== hpRatio) {
+    ui.hpBar.style.transform = `scaleX(${hpRatio})`;
+    ui.hpBar.parentElement?.style.setProperty("--value", hpRatio);
+    ui.hpMeter?.classList.toggle("low", hpRatio < 0.3);
+    hudLast.hpRatio = hpRatio;
+  }
+  if (hudLast.xpRatio !== xpRatio) {
+    ui.xpBar.style.transform = `scaleX(${xpRatio})`;
+    ui.xpBar.parentElement?.style.setProperty("--value", xpRatio);
+    ui.xpMeter?.classList.toggle("near-level", xpRatio > 0.82);
+    hudLast.xpRatio = xpRatio;
+  }
+  if (hudLast.hp !== hp) ui.hpText.textContent = `${hp}`;
+  if (hudLast.level !== p.level) ui.levelText.textContent = `Lv.${p.level}`;
+  const waveLabel = state.runMode === "random" && state.randomGoal === "endless"
     ? `第 ${state.wave} 波`
     : `第 ${state.wave}/${TOTAL_WAVES} 波`;
-  renderChip(ui.killText, "×", "击败", state.kills);
-  renderChip(ui.goldText, "G", "金币", state.gold);
-  renderChip(ui.fpsText, "F", "FPS", Math.round(fps));
-  ui.coinText.textContent = `金币 ${state.gold}`;
-  setFpsClass(fps);
-  ui.hpMeter?.classList.toggle("low", hpRatio < 0.3);
-  ui.xpMeter?.classList.toggle("near-level", xpRatio > 0.82);
+  if (hudLast.waveLabel !== waveLabel) {
+    ui.waveText.textContent = waveLabel;
+    hudLast.waveLabel = waveLabel;
+  }
+  if (hudLast.kills !== state.kills) renderChip(ui.killText, "×", "击败", state.kills);
+  if (hudLast.gold !== state.gold) {
+    renderChip(ui.goldText, "G", "金币", state.gold);
+    ui.coinText.textContent = `金币 ${state.gold}`;
+  }
+  if (now >= hudLast.timerUpdateAt) {
+    ui.timerText.textContent = bossWave ? (world.boss?.name || "BOSS") : formatTime(state.waveTimeLeft);
+    renderChip(ui.fpsText, "F", "FPS", Math.round(fps));
+    setFpsClass(fps);
+    hudLast.timerUpdateAt = now + 100;
+  }
   if (hudLast.hp !== null && hp < hudLast.hp) flashHudValue(ui.hpMeter, "damage");
   if (hudLast.xp !== null && xp > hudLast.xp) flashHudValue(ui.xpMeter, "gain");
   if (hudLast.level !== null && p.level > hudLast.level) flashHudValue(ui.xpMeter, "pulse");
@@ -206,7 +260,18 @@ function itemStatusPriority(itemId) {
 function renderChip(element, icon, label, value) {
   if (!element) return;
   element.classList.add("hud-chip");
-  element.innerHTML = `<i>${icon}</i><b>${label}</b><strong>${value}</strong>`;
+  let iconNode = element.querySelector("i");
+  let labelNode = element.querySelector("b");
+  let valueNode = element.querySelector("strong");
+  if (!iconNode || !labelNode || !valueNode) {
+    iconNode = document.createElement("i");
+    labelNode = document.createElement("b");
+    valueNode = document.createElement("strong");
+    element.replaceChildren(iconNode, labelNode, valueNode);
+  }
+  if (iconNode.textContent !== String(icon)) iconNode.textContent = icon;
+  if (labelNode.textContent !== String(label)) labelNode.textContent = label;
+  if (valueNode.textContent !== String(value)) valueNode.textContent = value;
 }
 
 function flashHudValue(element, className) {
@@ -219,8 +284,11 @@ function flashHudValue(element, className) {
 
 function setFpsClass(fps) {
   if (!ui.fpsText) return;
+  const className = fps < 30 ? "fps-bad" : fps < 45 ? "fps-warn" : "fps-good";
+  if (hudLast.fpsClass === className) return;
   ui.fpsText.classList.remove("fps-good", "fps-warn", "fps-bad");
-  ui.fpsText.classList.add(fps < 30 ? "fps-bad" : fps < 45 ? "fps-warn" : "fps-good");
+  ui.fpsText.classList.add(className);
+  hudLast.fpsClass = className;
 }
 
 function clampCarouselIndex(index, length) {
@@ -648,6 +716,7 @@ export function hideChoices() {
   ui.levelOverlay.classList.remove("active");
   ui.levelOverlay.classList.remove("level-up-overlay");
   ui.levelOverlay.querySelector(".level-up-fx")?.remove();
+  hideRunLoading();
   ui.levelOverlay.querySelector(".level-choice-actions")?.remove();
   ui.quickActions?.classList.remove("blocked");
 }

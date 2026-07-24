@@ -743,6 +743,53 @@ canvas {
   display: grid;
 }
 
+.run-loading-overlay {
+  z-index: 16;
+  background:
+    radial-gradient(circle at 50% 45%, rgba(66, 232, 255, 0.12), transparent 34%),
+    rgba(2, 5, 12, 0.88);
+  backdrop-filter: blur(8px);
+}
+
+.run-loading-panel {
+  max-width: 520px;
+  text-align: center;
+  border: 1px solid rgba(66, 232, 255, 0.55);
+  background: linear-gradient(145deg, rgba(8, 18, 32, 0.97), rgba(14, 8, 28, 0.96));
+  box-shadow: 0 0 0 3px rgba(66, 232, 255, 0.08), 0 24px 90px rgba(0, 0, 0, 0.55);
+}
+
+.run-loading-panel h2 {
+  margin: 8px 0 12px;
+}
+
+.run-loading-panel > p:not(.eyebrow) {
+  min-height: 1.5em;
+  color: rgba(224, 245, 255, 0.78);
+}
+
+.run-loading-track {
+  height: 12px;
+  margin: 22px 0 10px;
+  overflow: hidden;
+  border: 1px solid rgba(66, 232, 255, 0.42);
+  background: rgba(0, 0, 0, 0.5);
+}
+
+.run-loading-track i {
+  display: block;
+  width: var(--run-loading-progress, 0%);
+  height: 100%;
+  background: linear-gradient(90deg, #42e8ff, #b48cff, #ff4d6d);
+  box-shadow: 0 0 18px rgba(66, 232, 255, 0.75);
+  transition: width 120ms linear;
+}
+
+.run-loading-panel strong {
+  color: #77ff8a;
+  letter-spacing: 0.12em;
+}
+
 .panel {
   width: min(620px, 100%);
   border-radius: 6px;

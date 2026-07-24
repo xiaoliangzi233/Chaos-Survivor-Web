@@ -128,14 +128,14 @@ export function updateCamera(dt) {
   state.cameraY = clampCameraY(state.cameraY);
 }
 
-export function render(ctx) {
+export function render(ctx, options = {}) {
   if (state.mode === "menu") {
     renderMenuScene(ctx);
-    return;
+    return null;
   }
   if (state.mode === "lobby" || state.lobby?.active) {
     renderLobby(ctx, viewport);
-    return;
+    return null;
   }
   const sx = state.shake > 0 ? (Math.random() - 0.5) * state.shake : 0;
   const sy = state.shake > 0 ? (Math.random() - 0.5) * state.shake : 0;
@@ -154,14 +154,20 @@ export function render(ctx) {
   drawBounds(ctx);
   drawApocalypseScenarioEvent(ctx, "background");
   drawVoidCrownScenarioEvent(ctx, "background");
-  drawGems(ctx);
-  drawCoins(ctx);
-  drawProjectiles(ctx);
+  if (!options.skipDrops) {
+    drawGems(ctx);
+    drawCoins(ctx);
+  }
+  if (!options.skipPlayerProjectiles) drawProjectiles(ctx, options.batchPlayerProjectile);
   const invisibleEnemies = activeWaveEffect("invisible_brain_eaters");
   const miniOverdrive = activeWaveEffect("mini_overdrive");
   for (const e of world.enemies) {
     if (!inView(e.x, e.y, e.r + 80)) continue;
     if (invisibleEnemies && !e.boss) continue;
+    if (options.batchEnemy?.(e)) {
+      if (e.shielded && !e.globalShielded) drawEnemyShield(ctx, e);
+      continue;
+    }
     if (miniOverdrive && !e.boss) {
       ctx.save();
       ctx.translate(e.x, e.y);
@@ -179,16 +185,23 @@ export function render(ctx) {
   }
   drawDrones(ctx);
   drawPlayer(ctx);
-  drawEnemyProjectiles(ctx);
+  if (!options.skipEnemyProjectiles) drawEnemyProjectiles(ctx, options.batchEnemyProjectile);
   drawHazards(ctx);
   drawApocalypseScenarioEvent(ctx, "foreground");
   drawVoidCrownScenarioEvent(ctx, "foreground");
   drawItemObjects(ctx);
   drawBlackhole(ctx);
-  drawEffects(ctx);
+  drawEffects(ctx, options.batchParticle);
   drawWeaponFx(ctx);
   ctx.restore();
-  renderLighting(ctx, { camX, camY, viewW, viewH }, viewport);
+  const frame = { camX, camY, viewW, viewH };
+  if (!options.skipScreenOverlay) renderScreenOverlay(ctx, frame);
+  return frame;
+}
+
+export function renderScreenOverlay(ctx, frame) {
+  if (!frame) return;
+  renderLighting(ctx, frame, viewport);
   drawBossBar(ctx);
   drawBossDirectionIndicator(ctx);
   if (state.flash > 0) {
@@ -364,8 +377,13 @@ function drawPlayer(ctx) {
   ctx.restore();
 }
 
-function drawProjectiles(ctx) {
+export function isPixiBatchablePlayerProjectile(projectile) {
+  return !["singularity", "starfall", "phaseNeedle", "missile", "boomerang", "ice"].includes(projectile?.shape);
+}
+
+function drawProjectiles(ctx, skipPredicate) {
   for (const b of world.projectiles) {
+    if (skipPredicate?.(b)) continue;
     if (!inView(b.x, b.y, 60)) continue;
     if (b.shape === "singularity") {
       drawSingularityProjectile(ctx, b);
@@ -2302,8 +2320,35 @@ function drawCoins(ctx) {
   }
 }
 
-function drawEnemyProjectiles(ctx) {
+const COMPLEX_ENEMY_PROJECTILE_SHAPES = new Set([
+  "darkEntityLance",
+  "darkEntityScythe",
+  "darkEntityHunter",
+  "snowflake",
+  "frostComet",
+  "fireball",
+  "voidFireball",
+  "stormBlade",
+  "stormOrb",
+  "stormCrownShard",
+  "riftbladeCrescent",
+  "convictBall",
+  "convictShrapnel",
+  "convictSeeker",
+  "scientistAbyssShard",
+]);
+
+export function isPixiBatchableEnemyProjectile(projectile) {
+  return !COMPLEX_ENEMY_PROJECTILE_SHAPES.has(projectile?.shape);
+}
+
+export function isPixiBatchableEnemy(enemy) {
+  return Boolean(enemy && !enemy.boss && !enemy.elite);
+}
+
+function drawEnemyProjectiles(ctx, skipPredicate) {
   for (const b of world.enemyProjectiles) {
+    if (skipPredicate?.(b)) continue;
     if (!inView(b.x, b.y, Math.max(72, (b.r || 8) * 5))) continue;
     if (b.shape === "darkEntityLance" || b.shape === "darkEntityScythe" || b.shape === "darkEntityHunter") {
       drawDarkEntityProjectile(ctx, b);

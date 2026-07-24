@@ -102,6 +102,18 @@ export function resumeMusic() {
   startMusic();
 }
 
+export async function preloadMusicAssets() {
+  const tracks = await loadMusicTracks();
+  if (!tracks.length) return [];
+  if (!musicElement) musicElement = new Audio();
+  if (!musicElement.src) {
+    musicElement.preload = "auto";
+    musicElement.src = resolveTrackUrl(tracks[0]);
+    musicElement.load();
+  }
+  return tracks;
+}
+
 export async function nextMusicTrack() {
   if (musicTracks?.length) {
     currentTrackIndex = (currentTrackIndex + 1) % musicTracks.length;

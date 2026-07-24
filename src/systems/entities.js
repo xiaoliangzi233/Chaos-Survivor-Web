@@ -1,4 +1,4 @@
-import { CELL_SIZE, ENEMY_LIMIT, TAU, WORLD_SIZE } from "../constants.js";
+import { ENEMY_LIMIT, TAU, WORLD_SIZE } from "../constants.js";
 import { state, world, input } from "../state.js";
 import { clamp, distSq, circleHit } from "../utils.js";
 import { burst, dust, pulse } from "../effects.js";
@@ -229,25 +229,15 @@ export function rebuildGrid() {
   world.grid.clear();
   world.hitTestEnemies.length = 0;
   for (const e of world.enemies) {
-    const key = cellKey(e.x, e.y);
-    if (!world.grid.has(key)) world.grid.set(key, []);
-    world.grid.get(key).push(e);
+    world.grid.insert(e);
     if (e.hitTest) world.hitTestEnemies.push(e);
   }
 }
 
 export function queryEnemies(x, y, radius, out) {
-  const minX = Math.floor((x - radius) / CELL_SIZE);
-  const maxX = Math.floor((x + radius) / CELL_SIZE);
-  const minY = Math.floor((y - radius) / CELL_SIZE);
-  const maxY = Math.floor((y + radius) / CELL_SIZE);
-  for (let gy = minY; gy <= maxY; gy++) {
-    for (let gx = minX; gx <= maxX; gx++) {
-      const bucket = world.grid.get(`${gx},${gy}`);
-      if (!bucket) continue;
-      for (const e of bucket) if (!e.dead && distSq(x, y, e.x, e.y) <= (radius + e.r) ** 2) out.push(e);
-    }
-  }
+  world.grid.forEachBucket(x - radius, y - radius, x + radius, y + radius, (bucket) => {
+    for (const e of bucket) if (!e.dead && distSq(x, y, e.x, e.y) <= (radius + e.r) ** 2) out.push(e);
+  });
   for (const e of world.hitTestEnemies) {
     if (!e.dead && e.hitTest && !out.includes(e) && e.hitTest(x, y, radius)) out.push(e);
   }
@@ -256,24 +246,16 @@ export function queryEnemies(x, y, radius, out) {
 export function nearestEnemy(x, y, range = 900) {
   let best = null;
   let bestD = range * range;
-  const minX = Math.floor((x - range) / CELL_SIZE);
-  const maxX = Math.floor((x + range) / CELL_SIZE);
-  const minY = Math.floor((y - range) / CELL_SIZE);
-  const maxY = Math.floor((y + range) / CELL_SIZE);
-  for (let gy = minY; gy <= maxY; gy++) {
-    for (let gx = minX; gx <= maxX; gx++) {
-      const bucket = world.grid.get(`${gx},${gy}`);
-      if (!bucket) continue;
-      for (const e of bucket) {
-        if (e.dead) continue;
-        const d = distSq(x, y, e.x, e.y);
-        if (d < bestD) {
-          bestD = d;
-          best = e;
-        }
+  world.grid.forEachBucket(x - range, y - range, x + range, y + range, (bucket) => {
+    for (const e of bucket) {
+      if (e.dead) continue;
+      const d = distSq(x, y, e.x, e.y);
+      if (d < bestD) {
+        bestD = d;
+        best = e;
       }
     }
-  }
+  });
   if (!best && world.grid.size === 0) {
     for (const e of world.enemies) {
       if (e.dead) continue;
@@ -1645,8 +1627,5 @@ function defaultKnockbackResistance(e) {
   return clamp((e.r - 10) / 34, 0.18, 0.5);
 }
 
-function cellKey(x, y) {
-  return `${Math.floor(x / CELL_SIZE)},${Math.floor(y / CELL_SIZE)}`;
-}
 
 export { circleHit };

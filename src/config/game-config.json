@@ -1,4 +1,5 @@
 {
   "version": "beta 0.16",
-  "storyAlwaysPlay": true
+  "storyAlwaysPlay": true,
+  "renderer": "auto"
 }

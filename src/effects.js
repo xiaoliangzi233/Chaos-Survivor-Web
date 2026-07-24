@@ -10,11 +10,23 @@ const FX_TRAIL_ALPHA_SCALE = 0.62;
 let ambientTimer = 0;
 
 export function particle(kind, x, y, options = {}) {
+  let replaceIndex = -1;
   if (world.particles.length >= PARTICLE_LIMIT) {
-    if (kind === "trail" || kind === "dust" || kind === "mote") return;
-    world.particles.splice(0, Math.min(16, world.particles.length));
+    const incomingCritical = Boolean(options.critical);
+    if (!incomingCritical && (kind === "trail" || kind === "dust" || kind === "mote" || options.ambient)) return;
+    let shortestLife = Infinity;
+    for (let index = 0; index < world.particles.length; index++) {
+      const candidate = world.particles[index];
+      if (candidate.critical) continue;
+      if (!incomingCritical && !candidate.ambient) continue;
+      if (candidate.life < shortestLife) {
+        shortestLife = candidate.life;
+        replaceIndex = index;
+      }
+    }
+    if (replaceIndex < 0) return;
   }
-  world.particles.push({
+  const nextParticle = {
     kind,
     x,
     y,
@@ -37,7 +49,9 @@ export function particle(kind, x, y, options = {}) {
     critical: Boolean(options.critical),
     ambient: Boolean(options.ambient),
     t: 0,
-  });
+  };
+  if (replaceIndex >= 0) world.particles[replaceIndex] = nextParticle;
+  else world.particles.push(nextParticle);
 }
 
 export function burst(x, y, count, color, speed = 140) {
@@ -258,12 +272,19 @@ export function updateEffects(dt) {
   world.particles.length = writeIndex;
 }
 
-export function drawEffects(ctx) {
+const PIXI_BATCHABLE_PARTICLE_KINDS = new Set(["spark", "dust", "mote", "ember"]);
+
+export function isPixiBatchableParticle(particle) {
+  return PIXI_BATCHABLE_PARTICLE_KINDS.has(particle?.kind);
+}
+
+export function drawEffects(ctx, skipPredicate) {
   const viewW = (window.innerWidth || 1280) / CAMERA_ZOOM;
   const viewH = (window.innerHeight || 720) / CAMERA_ZOOM;
   const maxDx = viewW * 0.65 + 180;
   const maxDy = viewH * 0.65 + 180;
   for (const p of world.particles) {
+    if (skipPredicate?.(p)) continue;
     if (Math.abs(p.x - state.cameraX) > maxDx || Math.abs(p.y - state.cameraY) > maxDy) continue;
     const alpha = clamp(p.life / p.maxLife, 0, 1);
     if (p.kind === "ring") {

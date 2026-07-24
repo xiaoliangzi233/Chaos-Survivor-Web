@@ -1,5 +1,6 @@
-import { FIRST_WAVE_SECONDS, waveDurationFor } from "./constants.js";
+import { CELL_SIZE, FIRST_WAVE_SECONDS, WORLD_SIZE, waveDurationFor } from "./constants.js";
 import { WEAPON_BASE_STATS } from "./config/editableGameData.js";
+import { SpatialGrid } from "./systems/spatialGrid.js";
 
 export const state = {
   mode: "menu",
@@ -54,7 +55,7 @@ export const world = {
   coins: [],
   particles: [],
   weaponFx: [],
-  grid: new Map(),
+  grid: new SpatialGrid(WORLD_SIZE, CELL_SIZE),
   hitTestEnemies: [],
   boss: null,
   blackhole: null,

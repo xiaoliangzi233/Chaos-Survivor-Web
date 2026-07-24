@@ -207,7 +207,7 @@ export function createLobbyState(previous = {}) {
       x: Number(previous.player?.x) || 120,
       y: Number(previous.player?.y) || 150,
       r: 15,
-      speed: 210,
+      speed: 245,
       vx: Number(previous.player?.vx) || 0,
       vy: Number(previous.player?.vy) || 0,
       dirX: Number(previous.player?.dirX) || 0,

@@ -50,7 +50,7 @@ export const LOBBY_PORTALS = [
 
 export const LOBBY_DEVICES = [
   { id: "mission-table", kind: "missionTable", action: "ship-status", roomId: "core", x: 0, y: -90, color: "#42e8ff", label: "星舰任务全息桌", collider: { w: 250, h: 118 } },
-  { id: "difficulty-sync", kind: "difficulty", action: "difficulty", roomId: "core", x: -350, y: 220, color: "#ffd166", label: "难度同步器", collider: { w: 160, h: 100 } },
+  { id: "difficulty-sync", kind: "difficulty", action: "difficulty", roomId: "bridge", x: -480, y: -1180, color: "#ffd166", label: "难度同步器", collider: { w: 160, h: 100 } },
   { id: "adventure-recorder", kind: "recorder", action: "recorder", roomId: "data", x: -2130, y: -520, color: "#ffd166", label: "冒险记录仪", collider: { w: 170, h: 104 } },
   { id: "codex-terminal", kind: "codex", action: "codex", roomId: "data", x: -1640, y: -500, color: "#42e8ff", label: "记录者终端", collider: { w: 175, h: 100 } },
   { id: "random-protocol", kind: "randomProtocol", action: "random-goal", roomId: "data", x: -1600, y: -1040, color: "#b48cff", label: "异常协议仪", collider: { w: 165, h: 102 } },
@@ -95,20 +95,28 @@ export const LOBBY_PROPS = [
   { id: "core-bench-east", kind: "bench", roomId: "core", x: 470, y: -210, color: "#42e8ff", colliders: [{ shape: "rect", oy: 16, w: 150, h: 54 }] },
   { id: "core-cargo-west", kind: "cargo", roomId: "core", x: -515, y: 80, color: "#ffd166", colliders: [{ shape: "rect", oy: 12, w: 92, h: 70 }] },
   { id: "core-cargo-east", kind: "cargo", roomId: "core", x: 515, y: 80, color: "#42e8ff", colliders: [{ shape: "rect", oy: 12, w: 92, h: 70 }] },
+  { id: "core-planter-west", kind: "planter", roomId: "core", x: -520, y: -350, color: "#77ff8a", colliders: [{ shape: "rect", oy: 18, w: 130, h: 62 }] },
+  { id: "core-planter-east", kind: "planter", roomId: "core", x: 520, y: -350, color: "#77ff8a", colliders: [{ shape: "rect", oy: 18, w: 130, h: 62 }] },
   { id: "bridge-console-west", kind: "console", roomId: "bridge", x: -475, y: -1435, color: "#42e8ff", colliders: [{ shape: "rect", oy: 20, w: 185, h: 68 }] },
   { id: "bridge-console-east", kind: "console", roomId: "bridge", x: 520, y: -1435, color: "#42e8ff", colliders: [{ shape: "rect", oy: 20, w: 150, h: 68 }] },
+  { id: "bridge-planter", kind: "planter", roomId: "bridge", x: 560, y: -1160, color: "#77ff8a", colliders: [{ shape: "rect", oy: 18, w: 130, h: 62 }] },
+  { id: "bridge-gyro-console", kind: "console", roomId: "bridge", x: -320, y: -1590, color: "#9ff4ff", colliders: [{ shape: "rect", oy: 20, w: 128, h: 58 }] },
   { id: "data-server-a", kind: "server", roomId: "data", x: -2380, y: -740, color: "#b48cff", colliders: [{ shape: "rect", oy: 18, w: 108, h: 82 }] },
   { id: "data-server-b", kind: "server", roomId: "data", x: -2380, y: -900, color: "#42e8ff", colliders: [{ shape: "rect", oy: 18, w: 108, h: 82 }] },
   { id: "data-cartridges", kind: "cabinet", roomId: "data", x: -1465, y: -820, color: "#b48cff", colliders: [{ shape: "rect", oy: 18, w: 128, h: 72 }] },
+  { id: "data-planter", kind: "planter", roomId: "data", x: -2415, y: -1160, color: "#77ff8a", colliders: [{ shape: "rect", oy: 18, w: 130, h: 62 }] },
+  { id: "data-cache-crate", kind: "cargo", roomId: "data", x: -1390, y: -1160, color: "#b48cff", colliders: [{ shape: "rect", oy: 12, w: 92, h: 70 }] },
   { id: "science-sample-cart", kind: "cart", roomId: "science", x: 1535, y: -1120, color: "#77ff8a", colliders: [{ shape: "rect", oy: 14, w: 112, h: 58 }] },
   { id: "science-sample-rack", kind: "cabinet", roomId: "science", x: 2350, y: -760, color: "#77ff8a", colliders: [{ shape: "rect", oy: 18, w: 120, h: 78 }] },
   { id: "combat-ammo-rack", kind: "cabinet", roomId: "combat", x: -2390, y: 820, color: "#ff7a8a", colliders: [{ shape: "rect", oy: 18, w: 120, h: 78 }] },
   { id: "combat-tool-cart", kind: "cart", roomId: "combat", x: -1390, y: 1320, color: "#ffb347", colliders: [{ shape: "rect", oy: 14, w: 116, h: 58 }] },
+  { id: "combat-spare-parts", kind: "cargo", roomId: "combat", x: -2420, y: 1320, color: "#ff7a8a", colliders: [{ shape: "rect", oy: 12, w: 92, h: 70 }] },
   { id: "engineering-cooler-a", kind: "cooler", roomId: "engineering", x: 1515, y: 500, color: "#ffb347", colliders: [{ shape: "circle", oy: 18, r: 54 }] },
   { id: "engineering-cooler-b", kind: "cooler", roomId: "engineering", x: 1515, y: 1040, color: "#42e8ff", colliders: [{ shape: "circle", oy: 18, r: 54 }] },
   { id: "engineering-cable-reel", kind: "reel", roomId: "engineering", x: 2360, y: 870, color: "#ffb347", colliders: [{ shape: "circle", oy: 14, r: 46 }] },
   { id: "habitat-vendor", kind: "vendor", roomId: "habitat", x: 525, y: 1405, color: "#77ff8a", colliders: [{ shape: "rect", oy: 20, w: 118, h: 82 }] },
   { id: "habitat-planter", kind: "planter", roomId: "habitat", x: -565, y: 1590, color: "#77ff8a", colliders: [{ shape: "rect", oy: 18, w: 130, h: 62 }] },
+  { id: "habitat-planter-east", kind: "planter", roomId: "habitat", x: 575, y: 1660, color: "#77ff8a", colliders: [{ shape: "rect", oy: 18, w: 130, h: 62 }] },
   { id: "corridor-worklight-west", kind: "worklight", roomId: "core", x: -720, y: 520, color: "#ff7a8a", colliders: [{ shape: "circle", oy: 14, r: 34 }] },
   { id: "corridor-worklight-east", kind: "worklight", roomId: "core", x: 720, y: 520, color: "#ffb347", colliders: [{ shape: "circle", oy: 14, r: 34 }] },
 ];
@@ -241,17 +249,17 @@ const NPC_DIALOGUES = {
     topics: [
       ["星舰设施", "中央枢纽连接六个功能翼。舰桥负责航线，数据翼保存记录，科学翼维持生命，战斗翼管理军械，工程翼驱动跃迁，后部则是生活区。"],
       ["基础操作", "使用 WASD 或方向键移动。自动门会识别你，面向高亮的设备、入口或人员后按 E 交互。"],
-      ["战斗与成长", "先在难度同步器、异常协议仪和军械库完成配置，再进入对应传送舱。战斗中的成长、商店和合成规则保持不变。"],
+      ["战斗与成长", "先在舰桥难度同步器、异常协议仪和军械库完成配置，再进入对应传送舱。战斗中的成长、商店和合成规则保持不变。"],
       ["世界背景", "灾变后，中转舰成为少数仍能穿越失稳时间线的载具。每次出击都在替舰队找回一段航路和记忆。"],
     ],
   },
-  tactician: { role: "TACTICAL CONTROL", title: "战术调度", intro: "我负责让你选的难度、武器和航线在同一份出击参数里。别担心，我比传送门更不喜欢意外。", topics: [["当前配置", "难度同步器只会列出已解锁协议。随机航线还会读取数据翼的异常目标，剧情航线则忽略它。"], ["出击建议", "先在军械库确认带强化光环的武器台，再检查难度同步器。入口充能期间离开范围或按 Esc 都可以取消。"]] },
+  tactician: { role: "TACTICAL CONTROL", title: "战术调度", intro: "我负责让你选的难度、武器和航线在同一份出击参数里。别担心，我比传送门更不喜欢意外。", topics: [["当前配置", "舰桥难度同步器只会列出已解锁协议。随机航线还会读取数据翼的异常目标，剧情航线则忽略它。"], ["出击建议", "先在军械库确认带强化光环的武器台，再前往舰桥检查难度同步器。入口充能期间离开范围或按 Esc 都可以取消。"]] },
   statistician: { role: "ADVENTURE LEDGER", title: "统计值守", intro: "记录阵列尚未重新接入主网，所以你现在看到的数字，严格来说只是很昂贵的装饰。", topics: [["工作", "我负责校验冒险次数、生存时间和收益分布。功能恢复前，我不会擅自读写你的局外数据。"], ["其他船员", "洛克总说故障率是情绪问题。我已经为这句话建立了单独的错误分类。"]] },
   archivist: { role: "ARCHIVE KEEPER", title: "记录者", intro: "档案不会替你作出判断。它只负责证明，那些敌人、武器和事件确实曾经存在。", topics: [["记录者", "旁边的终端连接现有图鉴。关闭图鉴后，你会回到当前舱室。"], ["星舰历史", "这艘舰最初并不承担战斗任务，它只是负责把研究人员送到仍然存在的时间线上。"]] },
   geneticist: { role: "BIOSCIENCE LAB", title: "生命科学", intro: "培养舱已经完成净化。强化序列还缺最后一组校准样本——放心，我没有说一定要用你的。", topics: [["基因改造器", "本阶段只保留设备和校准反馈，不会给予局外强化，也不会修改玩家进度。"], ["生命维持", "右侧循环槽培育着整艘舰的净化菌群。它们比大多数船员更可靠，也更安静。"]] },
   engineer: { role: "ENGINEERING CREW", title: "跃迁维护", intro: "反应堆在唱歌，冷却泵在抱怨，说明一切正常。真正危险的时候，它们反而会一起安静。", topics: [["裂隙稳定器", "它是未来远征用的相位锚，本阶段只待机，不提供战斗加成。"], ["动力核心", "舰体靠三组脉冲反应环维持航行。你看到的橙色流光，是能量；闻到的焦味，不关你的事。"]] },
   quartermaster: { role: "ARMORY CONTROL", title: "军械管理", intro: "四个台位，一组四把。拉杆换组，靠近台位按 E 或直接点击，就能把那把武器写进开场配置。", topics: [["当前武器", "被选中的武器台会显示强化光环与“当前装备”。进入传送门后，实际装备读取同一个选择。"], ["军械库", "所有全息投影共用实际武器的视觉定义，新武器接入后也会自动出现在对应组。"]] },
-  navigator: { role: "STABLE TIMELINE", title: "剧情引航", intro: "稳定时间线已经锁定。入口会读取中央同步的难度和军械库的开场武器，不再要求二次确认。", topics: [["剧情航线", "充能完成后会沿用现有剧情播放和标准二十波流程。"], ["舰桥", "前方星图显示的不是距离，而是时间线之间还剩多少共同历史。"]] },
+  navigator: { role: "STABLE TIMELINE", title: "剧情引航", intro: "稳定时间线已经锁定。入口会读取舰桥同步的难度和军械库的开场武器，不再要求二次确认。", topics: [["剧情航线", "充能完成后会沿用现有剧情播放和标准二十波流程。"], ["舰桥", "前方星图显示的不是距离，而是时间线之间还剩多少共同历史。"]] },
   analyst: { role: "ANOMALY ANALYSIS", title: "异常航线", intro: "随机不是没有规律。它只是把规律藏在你还没见过的下一波里。", topics: [["异常协议", "协议仪可以切换二十波通关与无限模式。随机入口会读取当前协议。"], ["概率", "每次航线都会重组敌人、Boss 与事件。记录可能被保留，但路线不会重复承诺。"]] },
   instructor: { role: "TRIAL AUTHORITY", title: "试炼教官", intro: "试炼场只认授权和结果。快速开局会污染成绩，这不是惩罚，是为了让正式记录保持可信。", topics: [["试炼场", "入口仍会打开原有密码认证和调试面板，并把大厅当前武器作为默认选项。"], ["训练", "调试能力不会改变正式模式的解锁与成绩规则。"]] },
   steward: { role: "HABITAT ACCESS", title: "生活区管理", intro: "生活翼仍在运行，但家园坐标没有完成稳定。门锁着不是拒绝，是为了保证你回来时里面还在。", topics: [["家园通道", "本阶段只播放封锁反馈，不会创建家园页面或持久化功能。"], ["船员生活", "食堂、休息舱和环境循环都已恢复。等家园锚点稳定，这里会比现在热闹得多。"]] },
@@ -390,7 +398,6 @@ export function interactWithLobby(targetId = null) {
   }
   if (interaction.action === "difficulty") {
     const difficulty = cycleLobbyDifficulty();
-    if (difficulty) setLobbyToast(`出击难度：${difficulty.name}`, "#ffd166");
     return { ...interaction, difficulty };
   }
   if (interaction.action === "random-goal") {
@@ -824,7 +831,7 @@ function updateLobbyPlayer(dt) {
   }
   const targetVx = ax * player.speed;
   const targetVy = ay * player.speed;
-  const acceleration = length > 0.001 ? 920 : 1180;
+  const acceleration = length > 0.001 ? 1060 : 1280;
   player.vx = approach(player.vx, targetVx, acceleration * dt);
   player.vy = approach(player.vy, targetVy, acceleration * dt);
   player.moving = Math.hypot(player.vx, player.vy) > 12;

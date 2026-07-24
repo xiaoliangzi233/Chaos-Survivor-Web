@@ -55,7 +55,6 @@ export function renderLobby(ctx, viewport) {
     LOBBY_WIDTH,
     LOBBY_HEIGHT * LOBBY_Y_SCALE,
   );
-  drawFloorAnimations(ctx, lobby.time);
 
   const actors = [];
   for (const scenery of LOBBY_SCENERY) {
@@ -295,25 +294,83 @@ function drawRoomFloor(ctx, room) {
   ctx.strokeStyle = hexToRgba(room.color, 0.34);
   ctx.lineWidth = 5;
   ctx.strokeRect(x, top, room.w, h);
-  ctx.strokeStyle = "rgba(138,187,210,0.12)";
-  ctx.lineWidth = 1;
-  for (let gx = x + 48; gx < x + room.w; gx += 72) {
-    ctx.beginPath();
-    ctx.moveTo(gx, top + 20);
-    ctx.lineTo(gx, top + h - 20);
-    ctx.stroke();
-  }
-  for (let gy = top + 42; gy < top + h; gy += 52) {
-    ctx.beginPath();
-    ctx.moveTo(x + 20, gy);
-    ctx.lineTo(x + room.w - 20, gy);
-    ctx.stroke();
-  }
-  ctx.fillStyle = hexToRgba(room.color, 0.48);
-  ctx.font = `bold 14px ${FONT}`;
-  ctx.textAlign = "left";
-  ctx.fillText(`${room.label} // ${room.id.toUpperCase()}`, x + 30, top + 32);
+  drawTechDeckPattern(ctx, room, x, top, h);
   drawRoomBulkheads(ctx, room);
+}
+
+function drawTechDeckPattern(ctx, room, left, top, height) {
+  const right = left + room.w;
+  const bottom = top + height;
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(left + 8, top + 8, room.w - 16, height - 16);
+  ctx.clip();
+
+  const panelW = 112;
+  const panelH = 62;
+  const stepX = 124;
+  const stepY = 74;
+  let row = 0;
+  for (let py = top + 16; py < bottom; py += stepY, row++) {
+    const offset = row % 2 ? stepX * 0.5 : 0;
+    let column = 0;
+    for (let px = left - stepX + offset; px < right; px += stepX, column++) {
+      const chamfer = 11;
+      ctx.beginPath();
+      ctx.moveTo(px + chamfer, py);
+      ctx.lineTo(px + panelW - chamfer, py);
+      ctx.lineTo(px + panelW, py + chamfer);
+      ctx.lineTo(px + panelW, py + panelH - chamfer);
+      ctx.lineTo(px + panelW - chamfer, py + panelH);
+      ctx.lineTo(px + chamfer, py + panelH);
+      ctx.lineTo(px, py + panelH - chamfer);
+      ctx.lineTo(px, py + chamfer);
+      ctx.closePath();
+      ctx.fillStyle = (row + column) % 3 === 0 ? "rgba(18,39,51,0.36)" : "rgba(4,14,22,0.22)";
+      ctx.fill();
+      ctx.strokeStyle = (row + column) % 4 === 0
+        ? hexToRgba(room.color, 0.16)
+        : "rgba(130,179,199,0.085)";
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+
+      ctx.fillStyle = "rgba(148,192,207,0.15)";
+      ctx.fillRect(px + 10, py + 9, 3, 3);
+      ctx.fillRect(px + panelW - 13, py + panelH - 12, 3, 3);
+      if ((row * 3 + column) % 5 === 0) {
+        ctx.strokeStyle = hexToRgba(room.color, 0.22);
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(px + 22, py + panelH * 0.62);
+        ctx.lineTo(px + 48, py + panelH * 0.62);
+        ctx.lineTo(px + 58, py + panelH * 0.42);
+        ctx.lineTo(px + 88, py + panelH * 0.42);
+        ctx.stroke();
+        ctx.fillStyle = hexToRgba(room.color, 0.42);
+        ctx.fillRect(px + 86, py + panelH * 0.42 - 2, 5, 5);
+      }
+    }
+  }
+
+  ctx.strokeStyle = hexToRgba(room.color, 0.2);
+  ctx.lineWidth = 3;
+  ctx.setLineDash([34, 18, 8, 18]);
+  for (const ratio of [0.22, 0.78]) {
+    const trackY = top + height * ratio;
+    ctx.beginPath();
+    ctx.moveTo(left + 26, trackY);
+    ctx.lineTo(right - 26, trackY);
+    ctx.stroke();
+  }
+  ctx.setLineDash([]);
+  ctx.strokeStyle = "rgba(176,211,222,0.11)";
+  ctx.lineWidth = 2;
+  ctx.strokeRect(room.x - 88, top + height / 2 - 38, 176, 76);
+  for (const side of [-1, 1]) {
+    ctx.fillStyle = hexToRgba(room.color, 0.26);
+    ctx.fillRect(room.x + side * 72 - 10, top + height / 2 - 4, 20, 8);
+  }
+  ctx.restore();
 }
 
 function drawRoomBulkheads(ctx, room) {
@@ -416,25 +473,6 @@ function drawStaticLightFixtures(ctx) {
     }
     ctx.restore();
   }
-}
-
-function drawFloorAnimations(ctx, time) {
-  ctx.save();
-  ctx.translate(0, -40 * LOBBY_Y_SCALE);
-  ctx.rotate(time * 0.07);
-  ctx.setLineDash([24, 18]);
-  ctx.lineDashOffset = -time * 28;
-  ctx.strokeStyle = "rgba(66,232,255,0.27)";
-  ctx.lineWidth = 3;
-  ctx.beginPath();
-  ctx.ellipse(0, 0, 330, 155, 0, 0, TAU);
-  ctx.stroke();
-  ctx.rotate(-time * 0.16);
-  ctx.strokeStyle = "rgba(180,140,255,0.2)";
-  ctx.beginPath();
-  ctx.ellipse(0, 0, 260, 120, 0, 0, TAU);
-  ctx.stroke();
-  ctx.restore();
 }
 
 function drawPortal(ctx, portal, time) {
@@ -591,10 +629,33 @@ function drawMissionTable(ctx, device, time) {
   ctx.lineTo(62, -4);
   ctx.closePath();
   ctx.fill();
-  ctx.font = `9px ${FONT}`;
-  ctx.textAlign = "center";
-  ctx.fillStyle = "#dffbff";
-  ctx.fillText("TRANSIT ARK // ALL SYSTEMS NOMINAL", 0, -58);
+  ctx.save();
+  ctx.translate(0, -67);
+  ctx.rotate(time * 0.18);
+  ctx.strokeStyle = "rgba(224,252,255,0.74)";
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(0, -22);
+  ctx.lineTo(18, 0);
+  ctx.lineTo(0, 24);
+  ctx.lineTo(-18, 0);
+  ctx.closePath();
+  ctx.stroke();
+  for (let i = 0; i < 6; i++) {
+    const angle = i * TAU / 6;
+    const px = Math.cos(angle) * 46;
+    const py = Math.sin(angle) * 18;
+    ctx.fillStyle = i % 2 ? "#b48cff" : device.color;
+    ctx.beginPath();
+    ctx.arc(px, py, 3 + (i % 2), 0, TAU);
+    ctx.fill();
+    ctx.strokeStyle = hexToRgba(device.color, 0.34);
+    ctx.beginPath();
+    ctx.moveTo(Math.cos(angle) * 18, Math.sin(angle) * 8);
+    ctx.lineTo(px, py);
+    ctx.stroke();
+  }
+  ctx.restore();
 }
 
 function drawArchiveDevice(ctx, device, time) {
@@ -798,6 +859,19 @@ function drawMachineBase(ctx, x, y, rx, ry, color) {
   ctx.stroke();
   ctx.fillStyle = hexToRgba(color, 0.8);
   for (let i = -2; i <= 2; i++) ctx.fillRect(x + i * rx * 0.27 - 8, y + ry * 0.42, 16, 4);
+  ctx.strokeStyle = hexToRgba(color, 0.32);
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.ellipse(x, y + 2, rx * 0.9, ry * 0.82, 0, 0.08 * Math.PI, 0.42 * Math.PI);
+  ctx.ellipse(x, y + 2, rx * 0.9, ry * 0.82, 0, 1.08 * Math.PI, 1.42 * Math.PI);
+  ctx.stroke();
+  for (let i = 0; i < 6; i++) {
+    const angle = i * TAU / 6;
+    ctx.fillStyle = i % 2 ? "#6f8794" : hexToRgba(color, 0.78);
+    ctx.beginPath();
+    ctx.arc(x + Math.cos(angle) * rx * 0.84, y + Math.sin(angle) * ry * 0.7, 3, 0, TAU);
+    ctx.fill();
+  }
 }
 
 function drawWeaponStation(ctx, station, time) {
@@ -935,23 +1009,37 @@ function drawLobbyProp(ctx, prop, time) {
     ctx.fillStyle = prop.color;
     ctx.fillRect(-6, -24, 12, 12);
   } else if (prop.kind === "planter") {
+    const variant = hashString(prop.id) % 3;
     ctx.fillStyle = "#15232b";
     ctx.strokeStyle = "#4a665d";
     ctx.lineWidth = 3;
     roundRect(ctx, -60, -12, 120, 38, 7);
     ctx.fill();
     ctx.stroke();
-    for (let i = -2; i <= 2; i++) {
-      ctx.strokeStyle = "#4d8060";
-      ctx.lineWidth = 5;
+    ctx.fillStyle = hexToRgba(prop.color, 0.42);
+    ctx.fillRect(-49, 17, 98, 4);
+    const leafCount = variant === 1 ? 7 : 5;
+    for (let i = 0; i < leafCount; i++) {
+      const centered = i - (leafCount - 1) / 2;
+      const rootX = centered * (variant === 1 ? 15 : 21);
+      const sway = Math.sin(time * 1.1 + i * 0.8 + variant) * (4 + variant * 2);
+      const stemHeight = 48 + ((i * 13 + variant * 11) % 31);
+      ctx.strokeStyle = i % 2 ? "#4d8060" : "#3d6d58";
+      ctx.lineWidth = variant === 2 ? 4 : 5;
       ctx.beginPath();
-      ctx.moveTo(i * 21, -9);
-      ctx.quadraticCurveTo(i * 24 + Math.sin(time + i) * 7, -49, i * 18, -72);
+      ctx.moveTo(rootX, -9);
+      ctx.quadraticCurveTo(rootX + sway, -32, rootX + sway * 0.55, -stemHeight);
       ctx.stroke();
-      ctx.fillStyle = hexToRgba(prop.color, 0.7);
+      ctx.fillStyle = hexToRgba(i % 3 === 0 ? "#9dffb1" : prop.color, 0.58 + (i % 2) * 0.15);
       ctx.beginPath();
-      ctx.ellipse(i * 18, -67, 12, 6, i * 0.2, 0, TAU);
+      ctx.ellipse(rootX + sway * 0.55, -stemHeight + 3, 11 + variant * 2, 5 + (i % 2) * 2, centered * 0.22, 0, TAU);
       ctx.fill();
+      if (variant === 2 && i % 2 === 0) {
+        ctx.fillStyle = hexToRgba("#42e8ff", 0.5);
+        ctx.beginPath();
+        ctx.arc(rootX + sway * 0.55, -stemHeight + 3, 3, 0, TAU);
+        ctx.fill();
+      }
     }
   } else {
     ctx.fillStyle = "#17252e";
@@ -1181,47 +1269,34 @@ function drawNpc(ctx, npc, runtime, time) {
   ctx.ellipse(0, 17, 22, 7, 0, 0, TAU);
   ctx.fill();
 
-  const skin = npc.personality === "analyst" ? "#c8b8dc" : npc.personality === "geneticist" ? "#d1ad8e" : "#e7b98e";
+  const skin = {
+    guide: "#efd0ae",
+    tactician: "#d9a878",
+    statistician: "#c98f68",
+    archivist: "#e1b999",
+    geneticist: "#d1ad8e",
+    engineer: "#bd825f",
+    quartermaster: "#d89a7f",
+    navigator: "#e3b58c",
+    analyst: "#c8b8dc",
+    instructor: "#b9866e",
+    steward: "#ddbd9e",
+  }[npc.personality] || "#e7b98e";
+  const headWidth = npc.personality === "instructor" ? 23
+    : npc.personality === "statistician" ? 22
+      : npc.personality === "analyst" ? 20 : 21;
+  const headHeight = npc.personality === "quartermaster" ? 22
+    : npc.personality === "analyst" ? 24 : 23;
   ctx.fillStyle = skin;
   ctx.strokeStyle = "#3f2c25";
   ctx.lineWidth = 2.5;
   ctx.beginPath();
-  ctx.ellipse(0, -8, 21, 23, 0, 0, TAU);
+  ctx.ellipse(0, -8, headWidth, headHeight, 0, 0, TAU);
   ctx.fill();
   ctx.stroke();
 
-  ctx.save();
-  ctx.translate(0, 45);
-  drawNpcHair(ctx, npc.personality, npc.color);
-  ctx.restore();
-  if (npc.personality === "geneticist" || npc.personality === "engineer") {
-    ctx.fillStyle = "#20313a";
-    roundRect(ctx, -16, -10, 32, 12, 4);
-    ctx.fill();
-    ctx.fillStyle = npc.color;
-    ctx.fillRect(-11, -7, 22, 3);
-  } else if (blink) {
-    ctx.fillStyle = "#49342d";
-    ctx.fillRect(-11, -10, 7, 2);
-    ctx.fillRect(4, -10, 7, 2);
-  } else {
-    ctx.fillStyle = "#f7eee6";
-    ctx.fillRect(-11, -13, 7, 7);
-    ctx.fillRect(4, -13, 7, 7);
-    ctx.fillStyle = npc.color;
-    ctx.fillRect(-8, -11, 3, 4);
-    ctx.fillRect(7, -11, 3, 4);
-  }
-  ctx.strokeStyle = npc.personality === "instructor" ? "#5e2c2c" : "#70402f";
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  if (runtime.mode === "social" || runtime.mode === "playerTalk" || runtime.mode === "petSocial") {
-    ctx.arc(0, 2, 7, 0.1 * Math.PI, 0.9 * Math.PI);
-  } else {
-    ctx.moveTo(-5, 4);
-    ctx.quadraticCurveTo(0, 7, 5, 4);
-  }
-  ctx.stroke();
+  drawNpcHair(ctx, npc.personality, npc.color, time);
+  drawNpcFace(ctx, npc, runtime, time, blink);
   ctx.save();
   ctx.translate(0, 43);
   drawNpcFrontEquipment(ctx, npc, time, runtime);
@@ -1290,33 +1365,327 @@ function drawNpcCoatPattern(ctx, personality) {
   }
 }
 
-function drawNpcHair(ctx, personality, color) {
-  ctx.fillStyle = personality === "guide" ? "#d8f7ff"
-    : personality === "analyst" ? "#492b66"
-      : personality === "quartermaster" ? "#7e3046"
-        : personality === "steward" ? "#d7c4a5" : "#17212b";
-  ctx.beginPath();
-  ctx.arc(-2, -59, 19, Math.PI, TAU);
+function drawNpcHair(ctx, personality, color, time) {
+  ctx.lineWidth = 2;
   if (personality === "guide") {
-    ctx.lineTo(18, -50);
-    ctx.lineTo(8, -72);
-  } else if (personality === "analyst") {
-    ctx.lineTo(18, -45);
-    ctx.lineTo(14, -75);
-    ctx.lineTo(-6, -68);
-  } else {
-    ctx.lineTo(17, -50);
-    ctx.lineTo(10, -69);
-  }
-  ctx.closePath();
-  ctx.fill();
-  if (personality === "navigator") {
+    ctx.fillStyle = "#d8f7ff";
+    ctx.beginPath();
+    ctx.moveTo(-20, -17);
+    ctx.quadraticCurveTo(-22, -36, -4, -34);
+    ctx.lineTo(10, -39);
+    ctx.lineTo(20, -26);
+    ctx.lineTo(13, -10);
+    ctx.lineTo(7, -25);
+    ctx.lineTo(-2, -17);
+    ctx.lineTo(-13, -8);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = color;
+    ctx.fillRect(11, -29, 8, 4);
+  } else if (personality === "tactician") {
+    ctx.fillStyle = "#18242b";
+    ctx.beginPath();
+    ctx.arc(0, -12, 21, Math.PI, TAU);
+    ctx.lineTo(18, -15);
+    ctx.lineTo(7, -27);
+    ctx.lineTo(-4, -19);
+    ctx.lineTo(-18, -13);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = "#ffd166";
+    ctx.beginPath();
+    ctx.moveTo(-8, -27);
+    ctx.lineTo(5, -42);
+    ctx.lineTo(11, -24);
+    ctx.closePath();
+    ctx.fill();
+  } else if (personality === "statistician") {
+    ctx.fillStyle = "#4b2e22";
+    ctx.beginPath();
+    ctx.arc(-1, -13, 22, Math.PI, TAU);
+    ctx.lineTo(21, -11);
+    ctx.lineTo(9, -20);
+    ctx.lineTo(-4, -17);
+    ctx.lineTo(-18, -8);
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = "#c8996a";
+    for (let i = 0; i < 3; i++) {
+      ctx.beginPath();
+      ctx.moveTo(-20, -20 + i * 5);
+      ctx.lineTo(-14, -18 + i * 5);
+      ctx.stroke();
+    }
+  } else if (personality === "archivist") {
+    ctx.fillStyle = "#19384f";
+    ctx.beginPath();
+    ctx.moveTo(-21, -6);
+    ctx.lineTo(-21, -25);
+    ctx.quadraticCurveTo(0, -40, 21, -25);
+    ctx.lineTo(19, 4);
+    ctx.lineTo(12, -2);
+    ctx.lineTo(8, -25);
+    ctx.lineTo(-4, -18);
+    ctx.lineTo(-14, 3);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = hexToRgba(color, 0.6);
+    ctx.fillRect(-18, -6, 4, 19);
+    ctx.fillRect(14, -7, 4, 20);
+  } else if (personality === "geneticist") {
+    ctx.fillStyle = "#16372c";
+    ctx.beginPath();
+    ctx.moveTo(-22, -11);
+    ctx.lineTo(-18, -30);
+    ctx.lineTo(-8, -24);
+    ctx.lineTo(-2, -40);
+    ctx.lineTo(6, -25);
+    ctx.lineTo(18, -34);
+    ctx.lineTo(21, -12);
+    ctx.lineTo(9, -20);
+    ctx.lineTo(-5, -17);
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = color;
+    ctx.beginPath();
+    ctx.moveTo(-17, -28);
+    ctx.lineTo(-10, -36);
+    ctx.moveTo(13, -29);
+    ctx.lineTo(19, -37);
+    ctx.stroke();
+  } else if (personality === "engineer") {
+    ctx.fillStyle = "#7b472e";
+    ctx.beginPath();
+    ctx.moveTo(-21, -12);
+    ctx.lineTo(-18, -31);
+    ctx.lineTo(-10, -25);
+    ctx.lineTo(-3, -41);
+    ctx.lineTo(4, -27);
+    ctx.lineTo(14, -39);
+    ctx.lineTo(14, -24);
+    ctx.lineTo(23, -29);
+    ctx.lineTo(18, -10);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = "#aab7bd";
+    ctx.fillRect(-17, -25, 34, 5);
+  } else if (personality === "quartermaster") {
+    ctx.fillStyle = "#7e3046";
+    ctx.fillRect(-5, -39, 11, 29);
+    ctx.beginPath();
+    ctx.moveTo(-5, -36);
+    ctx.lineTo(0, -47);
+    ctx.lineTo(6, -36);
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = hexToRgba(color, 0.75);
+    ctx.beginPath();
+    ctx.moveTo(-18, -24);
+    ctx.lineTo(-10, -20);
+    ctx.moveTo(18, -24);
+    ctx.lineTo(10, -20);
+    ctx.stroke();
+  } else if (personality === "navigator") {
+    ctx.fillStyle = "#18344a";
+    ctx.beginPath();
+    ctx.moveTo(-20, -12);
+    ctx.quadraticCurveTo(-16, -36, 5, -34);
+    ctx.quadraticCurveTo(22, -30, 19, -9);
+    ctx.lineTo(9, -23);
+    ctx.lineTo(-3, -18);
+    ctx.closePath();
+    ctx.fill();
     ctx.strokeStyle = color;
     ctx.lineWidth = 3;
     ctx.beginPath();
-    ctx.arc(0, -58, 23, Math.PI * 1.15, Math.PI * 1.85);
+    ctx.arc(0, -16, 25 + Math.sin(time * 2) * 1.5, Math.PI * 1.15, Math.PI * 1.85);
+    ctx.stroke();
+  } else if (personality === "analyst") {
+    ctx.fillStyle = "#492b66";
+    ctx.beginPath();
+    ctx.moveTo(-21, -10);
+    ctx.lineTo(-16, -31);
+    ctx.lineTo(-5, -25);
+    ctx.lineTo(7, -42);
+    ctx.lineTo(11, -24);
+    ctx.lineTo(22, -31);
+    ctx.lineTo(16, -5);
+    ctx.lineTo(4, -18);
+    ctx.lineTo(-8, -9);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = hexToRgba(color, 0.72);
+    ctx.save();
+    ctx.translate(18, -31);
+    ctx.rotate(time * 0.3);
+    ctx.fillRect(-4, -4, 8, 8);
+    ctx.restore();
+  } else if (personality === "instructor") {
+    ctx.fillStyle = "#737d82";
+    ctx.beginPath();
+    ctx.arc(0, -12, 22, Math.PI, TAU);
+    ctx.lineTo(21, -13);
+    ctx.lineTo(-21, -13);
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = "#aab2b6";
+    for (let x = -13; x <= 13; x += 6) {
+      ctx.beginPath();
+      ctx.moveTo(x, -30);
+      ctx.lineTo(x + 3, -23);
+      ctx.stroke();
+    }
+  } else {
+    ctx.fillStyle = "#d7c4a5";
+    ctx.beginPath();
+    ctx.arc(0, -12, 21, Math.PI, TAU);
+    ctx.lineTo(18, -9);
+    ctx.lineTo(8, -21);
+    ctx.lineTo(-8, -17);
+    ctx.lineTo(-18, -8);
+    ctx.closePath();
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(16, -27, 9, 0, TAU);
+    ctx.fill();
+    ctx.strokeStyle = color;
+    ctx.beginPath();
+    ctx.moveTo(-18, -9);
+    ctx.quadraticCurveTo(-25, 1, -17, 9);
     ctx.stroke();
   }
+}
+
+function drawNpcFace(ctx, npc, runtime, time, blink) {
+  const personality = npc.personality;
+  const talking = runtime.mode === "social" || runtime.mode === "playerTalk" || runtime.mode === "petSocial";
+  const eyeY = -11;
+  ctx.lineCap = "round";
+
+  if (blink) {
+    ctx.strokeStyle = "#49342d";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(-11, eyeY);
+    ctx.lineTo(-4, eyeY);
+    ctx.moveTo(4, eyeY);
+    ctx.lineTo(11, eyeY);
+    ctx.stroke();
+  } else if (personality === "geneticist") {
+    ctx.fillStyle = "#14251f";
+    ctx.strokeStyle = npc.color;
+    ctx.lineWidth = 2;
+    for (const x of [-8, 8]) {
+      ctx.beginPath();
+      ctx.arc(x, eyeY, 7, 0, TAU);
+      ctx.fill();
+      ctx.stroke();
+      ctx.fillStyle = "#d9ffe1";
+      ctx.fillRect(x - 1, eyeY - 2, 3, 4);
+      ctx.fillStyle = "#14251f";
+    }
+    ctx.beginPath();
+    ctx.moveTo(-1, eyeY);
+    ctx.lineTo(1, eyeY);
+    ctx.stroke();
+  } else if (personality === "engineer") {
+    ctx.fillStyle = "#1c272d";
+    roundRect(ctx, -17, -17, 34, 13, 4);
+    ctx.fill();
+    ctx.fillStyle = "#ffb347";
+    ctx.fillRect(-12, -13, 24, 4);
+    ctx.fillStyle = "rgba(255,255,255,0.65)";
+    ctx.fillRect(-9, -12, 8, 2);
+  } else if (personality === "archivist") {
+    ctx.strokeStyle = "#244b61";
+    ctx.lineWidth = 2;
+    for (const x of [-8, 8]) {
+      ctx.beginPath();
+      ctx.arc(x, eyeY, 6, 0, TAU);
+      ctx.stroke();
+      ctx.fillStyle = "#263640";
+      ctx.beginPath();
+      ctx.arc(x, eyeY, 2, 0, TAU);
+      ctx.fill();
+    }
+    ctx.beginPath();
+    ctx.moveTo(-2, eyeY);
+    ctx.lineTo(2, eyeY);
+    ctx.stroke();
+  } else if (personality === "statistician") {
+    ctx.fillStyle = "#2b211c";
+    ctx.beginPath();
+    ctx.arc(-8, eyeY, 2.5, 0, TAU);
+    ctx.arc(8, eyeY + 1, 2, 0, TAU);
+    ctx.fill();
+    ctx.strokeStyle = "#ffd166";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(-8, eyeY, 7, 0, TAU);
+    ctx.moveTo(-15, eyeY + 5);
+    ctx.lineTo(-20, eyeY + 10);
+    ctx.stroke();
+    ctx.strokeStyle = "#5a3828";
+    ctx.beginPath();
+    ctx.moveTo(3, eyeY - 6);
+    ctx.lineTo(12, eyeY - 4);
+    ctx.stroke();
+  } else {
+    ctx.fillStyle = "#f7eee6";
+    if (personality === "tactician" || personality === "instructor") {
+      ctx.fillRect(-12, eyeY - 2, 8, 4);
+      ctx.fillRect(4, eyeY - 2, 8, 4);
+    } else {
+      ctx.beginPath();
+      ctx.ellipse(-8, eyeY, personality === "guide" ? 4 : 3.5, 4, 0, 0, TAU);
+      ctx.ellipse(8, eyeY, personality === "guide" ? 4 : 3.5, 4, 0, 0, TAU);
+      ctx.fill();
+    }
+    ctx.fillStyle = npc.color;
+    if (personality === "navigator") {
+      for (const x of [-8, 8]) {
+        ctx.save();
+        ctx.translate(x, eyeY);
+        ctx.rotate(Math.PI / 4);
+        ctx.fillRect(-2, -2, 4, 4);
+        ctx.restore();
+      }
+    } else if (personality === "analyst") {
+      ctx.fillRect(-10, eyeY - 1, 5, 2);
+      ctx.fillRect(6, eyeY - 3, 3, 6);
+    } else {
+      ctx.fillRect(-9, eyeY - 1, 3, 3);
+      ctx.fillRect(7, eyeY - 1, 3, 3);
+    }
+    if (personality === "instructor") {
+      ctx.strokeStyle = "#7b3c36";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(12, -20);
+      ctx.lineTo(7, -3);
+      ctx.stroke();
+    }
+  }
+
+  ctx.strokeStyle = personality === "instructor" ? "#5e2c2c" : "#70402f";
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  if (talking) {
+    ctx.ellipse(0, 4, personality === "engineer" ? 8 : 6, 4 + Math.sin(time * 8) * 1.2, 0, 0, TAU);
+  } else if (personality === "instructor") {
+    ctx.moveTo(-6, 5);
+    ctx.lineTo(6, 5);
+  } else if (personality === "analyst" || personality === "quartermaster") {
+    ctx.moveTo(-6, 5);
+    ctx.quadraticCurveTo(2, 10, 7, 3);
+  } else if (personality === "statistician") {
+    ctx.moveTo(-5, 7);
+    ctx.quadraticCurveTo(0, 3, 6, 5);
+  } else {
+    ctx.arc(0, 1, 7, 0.15 * Math.PI, 0.85 * Math.PI);
+  }
+  ctx.stroke();
+  ctx.lineCap = "butt";
 }
 
 function drawNpcFrontEquipment(ctx, npc, time, runtime) {
@@ -1676,14 +2045,6 @@ function drawRoomRoofs(ctx, time) {
         ctx.stroke();
       }
     }
-    ctx.globalAlpha = Math.min(1, alpha + 0.18);
-    ctx.fillStyle = hexToRgba(room.color, 0.7);
-    ctx.font = `bold 16px ${FONT}`;
-    ctx.textAlign = "center";
-    ctx.fillText(`${room.label} // 气密舱`, room.x, y - 6);
-    ctx.font = `10px ${FONT}`;
-    ctx.fillStyle = "rgba(214,235,242,0.62)";
-    ctx.fillText("进入房间以解除视觉隔离", room.x, y + 15);
     ctx.restore();
   }
 }

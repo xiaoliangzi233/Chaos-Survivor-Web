@@ -6586,24 +6586,6 @@ body.is-lobby .menu-actions {
   transition: width 60ms linear;
 }
 
-.lobby-control-hint {
-  position: absolute;
-  right: 28px;
-  bottom: 22px;
-  margin: 0;
-  color: rgba(194, 224, 236, 0.56);
-  font-size: 10px;
-  letter-spacing: 0.04em;
-  text-shadow: 0 2px 4px #000;
-}
-
-.lobby-control-hint kbd {
-  border: 1px solid rgba(66, 232, 255, 0.35);
-  background: rgba(5, 17, 27, 0.8);
-  color: #dffbff;
-  padding: 2px 5px;
-}
-
 .lobby-dialogue-overlay {
   z-index: 84;
   align-items: flex-end;
@@ -6615,12 +6597,8 @@ body.is-lobby .menu-actions {
   display: flex;
 }
 
-body:has(.lobby-dialogue-overlay.active, .debug-auth-overlay.active, .debug-panel-overlay.active, .codex-overlay.active, .help-overlay.active) .lobby-control-hint {
-  display: none;
-}
-
 .lobby-dialogue-panel {
-  width: min(980px, 100%);
+  width: min(1080px, 100%);
   margin: 0 auto;
   border: 1px solid rgba(66, 232, 255, 0.48);
   background:
@@ -6657,7 +6635,7 @@ body:has(.lobby-dialogue-overlay.active, .debug-auth-overlay.active, .debug-pane
 
 .lobby-dialogue-panel h2 {
   margin-top: 3px;
-  font-size: 18px;
+  font-size: 21px;
 }
 
 #lobbyDialogueCloseButton {
@@ -6792,16 +6770,16 @@ body:has(.lobby-dialogue-overlay.active, .debug-auth-overlay.active, .debug-pane
 .lobby-dialogue-copy > strong {
   display: block;
   color: #fff;
-  font-size: 16px;
+  font-size: 18px;
   letter-spacing: 0.08em;
 }
 
 .lobby-dialogue-copy > p {
-  min-height: 62px;
+  min-height: 72px;
   margin-top: 12px;
   color: #b7d0dc;
-  font-size: 13px;
-  line-height: 1.8;
+  font-size: 16px;
+  line-height: 1.85;
 }
 
 .lobby-dialogue-topics {
@@ -6816,8 +6794,8 @@ body:has(.lobby-dialogue-overlay.active, .debug-auth-overlay.active, .debug-pane
   border: 1px solid rgba(66, 232, 255, 0.34);
   background: rgba(9, 24, 35, 0.9);
   color: #cfeaf4;
-  font: 11px/1.2 var(--pixel-font, monospace);
-  padding: 10px 12px;
+  font: 13px/1.25 var(--pixel-font, monospace);
+  padding: 12px 14px;
 }
 
 .lobby-dialogue-topics button:hover,
@@ -6840,12 +6818,6 @@ body:has(.lobby-dialogue-overlay.active, .debug-auth-overlay.active, .debug-pane
   20% { opacity: 1; }
   80% { opacity: 0.7; }
   100% { transform: translateY(54px); opacity: 0; }
-}
-
-@media (max-width: 899px) {
-  .lobby-control-hint {
-    right: 14px;
-  }
 }
 
 @media (max-width: 720px) {

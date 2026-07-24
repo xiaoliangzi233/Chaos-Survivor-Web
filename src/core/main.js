@@ -37,7 +37,7 @@ import { PreloadCoordinator } from "../systems/preloadCoordinator.js";
 import { framePerformance } from "../systems/performanceMonitor.js";
 import { monitorRuntimeBudgets } from "../systems/runtimeBudgets.js";
 import { populateDeterministicStressScenario, stressScenarioRequested } from "../systems/stressScenario.js";
-import { playSfx, startMusic, stopMusic, pauseMusic, resumeMusic } from "../audio.js";
+import { playSfx, startMusic, stopMusic, pauseMusic, resumeMusic, setMusicScene } from "../audio.js";
 import { CAMERA_ZOOM } from "../constants.js";
 import { difficultyOrder, loadDifficultyProgress, recordDifficultyVictory, selectDifficulty, setupDifficultyConfig } from "../difficulty.js";
 import { loadEditableGameData } from "../config/editableGameData.js";
@@ -52,6 +52,7 @@ import {
   queueLobbyFirstClearReactions,
   recordBestSurvivalSeconds,
   recordBestRandomEndlessWave,
+  recordAdventureResult,
 } from "../systems/playerProgress.js";
 import { closeHelp, initHelpUi, isHelpOpen } from "../ui/helpUi.js";
 import { clearWaveEventNotice, initWaveEventUi, showWaveEventNotice } from "../ui/waveEventUi.js";
@@ -88,6 +89,11 @@ import {
   openNpcDialogue,
   updateLobbyUi,
 } from "../ui/lobbyUi.js";
+import {
+  closeAdventureStats,
+  initAdventureStatsUi,
+  openAdventureStats,
+} from "../ui/adventureStatsUi.js";
 
 const LEVEL_CHOICE_REFRESH_COST = 10;
 
@@ -95,6 +101,12 @@ export async function bootGame() {
   setBootProgress(6, "正在启动霓虹废墟");
   initInventoryUi();
   initLobbyUi();
+  initAdventureStatsUi({
+    getDifficulties: difficultyCards,
+    onModalChange: (open) => {
+      if (state.lobby.active) setLobbyModalOpen(open);
+    },
+  });
   initCodexUi({
     onOpen: () => {
       if (state.lobby.active) setLobbyModalOpen(true);
@@ -161,10 +173,12 @@ export async function bootGame() {
     if (isHelpOpen()) return;
     closeCodex();
     closeHelp();
+    closeAdventureStats();
     closeLobbyDialogue();
     clearWaveEventNotice();
     hideAllOverlays();
     enterLobby({ resetPosition: true });
+    setMusicScene("lobby");
     playSfx("select");
   }
 
@@ -172,9 +186,11 @@ export async function bootGame() {
     closeCodex();
     closeHelp();
     closeLobbyDialogue();
+    closeAdventureStats();
     clearWaveEventNotice();
     hideAllOverlays();
     leaveLobby();
+    setMusicScene("battle", { autoplay: false });
     state.mode = "choosingWeapon";
     showRunSetup({
       weapons: STARTER_WEAPONS,
@@ -194,10 +210,12 @@ export async function bootGame() {
     };
     closeCodex();
     closeHelp();
+    closeAdventureStats();
     clearWaveEventNotice();
     hideAllOverlays();
     hideRunSetup();
     leaveLobby();
+    setMusicScene("battle", { autoplay: false });
     selectDifficulty(difficulty.id);
     preloadCoordinator.releaseRun();
     const runMap = generateMap();
@@ -387,6 +405,7 @@ export async function bootGame() {
     resetWaveScenarioState();
     state.mode = "ended";
     state.victory = victory;
+    recordCurrentAdventure(victory ? "victory" : "defeat");
     if (victory && !state.debug?.runTainted && !isRandomMode()) {
       const result = recordDifficultyVictory();
       if (result?.firstClear && result.difficultyId) {
@@ -433,9 +452,11 @@ export async function bootGame() {
   }
 
   function returnToLobby() {
+    if (["playing", "paused", "shop", "leveling"].includes(state.mode)) recordCurrentAdventure("abandoned");
     cancelStoryPlayback();
     closeCodex();
     closeHelp();
+    closeAdventureStats();
     closeLobbyDialogue();
     clearWaveEventNotice();
     stopMusic();
@@ -447,6 +468,37 @@ export async function bootGame() {
     updateBestText();
     configureLobbyDifficulties(difficultyCards());
     enterLobby({ resetPosition: true });
+    setMusicScene("lobby");
+  }
+
+  function recordCurrentAdventure(outcome) {
+    if (state.runStatsRecorded) return false;
+    if (state.debug?.runTainted || state.debug?.enabled) {
+      state.runStatsRecorded = true;
+      return false;
+    }
+    if (!state.initialWeaponId || state.time <= 0) return false;
+    const starter = STARTER_WEAPONS.find((entry) => entry.id === state.initialWeaponId);
+    const items = state.inventory?.items || [];
+    const saved = recordAdventureResult({
+      outcome,
+      runMode: state.runMode,
+      randomGoal: state.randomGoal,
+      difficultyId: state.difficultyId,
+      difficultyName: state.difficulty?.name || state.difficultyId,
+      weaponId: state.initialWeaponId,
+      weaponName: starter?.name || state.initialWeaponId,
+      seconds: Math.floor(state.time),
+      wave: state.wave,
+      kills: state.kills,
+      bossKills: state.bossKills,
+      gold: state.gold,
+      level: state.player?.level || 1,
+      weaponCount: state.inventory?.weaponSlots?.length || 0,
+      itemCount: items.reduce((sum, item) => sum + Math.max(1, Number(item.quantity) || 1), 0),
+    });
+    state.runStatsRecorded = Boolean(saved);
+    return Boolean(saved);
   }
 
   function restartRun() {
@@ -471,6 +523,7 @@ export async function bootGame() {
     cancelStoryPlayback();
     closeCodex();
     closeHelp();
+    closeAdventureStats();
     clearWaveEventNotice();
     hideAllOverlays();
     hideRunSetup();
@@ -482,10 +535,11 @@ export async function bootGame() {
     selectDifficulty(difficultyId);
     state.shop = createShopState();
     state.initialWeaponId = weaponId;
-    activateWeapon(weaponId);
     state.debug.enabled = true;
     state.debug.unlocked = true;
     state.debug.runTainted = true;
+    activateWeapon(weaponId);
+    setMusicScene("battle", { autoplay: false });
     state.wave = Math.max(1, Math.min(TOTAL_WAVES, Math.floor(Number(wave) || 1)));
     state.waveDuration = waveDurationFor(state.wave);
     state.waveTimeLeft = state.waveDuration;
@@ -546,6 +600,12 @@ export async function bootGame() {
       playSfx("select");
       return true;
     }
+    if (interaction.action === "recorder") {
+      setLobbyModalOpen(true);
+      openAdventureStats();
+      playSfx("select");
+      return true;
+    }
     if (interaction.action === "npc-talk") {
       const dialogue = lobbyNpcDialogue(interaction.npcId);
       if (dialogue && openNpcDialogue(dialogue) && dialogue.firstClearDifficultyId) {
@@ -561,13 +621,6 @@ export async function bootGame() {
         speaker: "通道管理员 · 赫塔",
         text: "家园区的空间坐标仍在漂移。等稳定锚点修复后，我会重新开放这条通道；现在强行接入只会把你送进墙里。",
         color: "#77ff8a",
-      },
-      recorder: {
-        role: "ADVENTURE LEDGER // OFFLINE",
-        title: "冒险记录仪",
-        speaker: "统计员 · 米洛",
-        text: "记录仪的计数核心还能亮，但统计阵列尚未接回主网。本阶段仅保留设备与值守终端，冒险次数和详细统计不会被读取或写入。",
-        color: "#ffd166",
       },
       gene: {
         role: "GENE FORGE // CALIBRATION",
@@ -603,7 +656,7 @@ export async function bootGame() {
   function lobbyPointerInteraction(event, activate = false) {
     if (state.mode !== "lobby" || state.lobby.modalOpen || !event) {
       setLobbyHoveredInteraction(null);
-      ui.canvas.style.cursor = "";
+      ui.canvas.classList.remove("lobby-target-hover");
       return false;
     }
     const rect = ui.canvas.getBoundingClientRect();
@@ -614,7 +667,7 @@ export async function bootGame() {
     state.lobby.pointerWorldY = worldPoint.y;
     const target = findLobbyInteractionAtWorld(worldPoint.x, worldPoint.y);
     setLobbyHoveredInteraction(target?.id || null);
-    ui.canvas.style.cursor = target ? "pointer" : "";
+    ui.canvas.classList.toggle("lobby-target-hover", Boolean(target));
     if (!activate || !target) return Boolean(target);
     return handleLobbyInteraction(target.id);
   }

@@ -23,6 +23,7 @@ export const state = {
   gold: 0,
   spawnBudget: 0,
   victory: false,
+  runStatsRecorded: false,
   shake: 0,
   flash: 0,
   cameraX: 0,
@@ -301,6 +302,7 @@ export function resetRun(map) {
   state.gold = 0;
   state.spawnBudget = 0;
   state.victory = false;
+  state.runStatsRecorded = false;
   state.shake = 0;
   state.flash = 0;
   state.cameraX = 0;

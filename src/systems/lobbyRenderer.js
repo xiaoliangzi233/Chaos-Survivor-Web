@@ -960,9 +960,11 @@ function drawLobbyProp(ctx, prop, time) {
     ctx.fillStyle = "#263d4b";
     ctx.fillRect(-58, 17, 12, 18);
     ctx.fillRect(46, 17, 12, 18);
-  } else if (prop.kind === "cargo" || prop.kind === "cabinet" || prop.kind === "server" || prop.kind === "vendor") {
-    const w = prop.kind === "server" ? 94 : prop.kind === "vendor" ? 108 : 102;
-    const h = prop.kind === "server" ? 108 : prop.kind === "vendor" ? 96 : 76;
+  } else if (prop.kind === "vendor") {
+    drawInterstellarVendor(ctx, prop, time, pulse);
+  } else if (prop.kind === "cargo" || prop.kind === "cabinet" || prop.kind === "server") {
+    const w = prop.kind === "server" ? 94 : 102;
+    const h = prop.kind === "server" ? 108 : 76;
     ctx.fillStyle = "#0b1720";
     ctx.strokeStyle = "#405564";
     ctx.lineWidth = 4;
@@ -1057,6 +1059,80 @@ function drawLobbyProp(ctx, prop, time) {
     ctx.fillRect(-11, -42, 22, 34);
   }
   ctx.restore();
+}
+
+function drawInterstellarVendor(ctx, prop, time, pulse) {
+  const color = prop.color || "#77ff8a";
+  ctx.fillStyle = "#07141d";
+  ctx.strokeStyle = "#516b78";
+  ctx.lineWidth = 4;
+  roundRect(ctx, -62, -128, 124, 148, 9);
+  ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = "#152b36";
+  ctx.fillRect(-55, -120, 110, 20);
+  ctx.fillStyle = hexToRgba(color, 0.8);
+  ctx.fillRect(-45, -114, 62, 6);
+  ctx.fillStyle = "#dffeff";
+  ctx.font = `bold 7px ${FONT}`;
+  ctx.textAlign = "center";
+  ctx.fillText("ORBITAL SUPPLY", -8, -104);
+
+  ctx.fillStyle = "rgba(2,13,20,0.9)";
+  ctx.strokeStyle = hexToRgba(color, 0.62);
+  ctx.lineWidth = 2;
+  roundRect(ctx, -49, -94, 70, 91, 5);
+  ctx.fill();
+  ctx.stroke();
+  for (let shelf = 0; shelf < 3; shelf++) {
+    const y = -78 + shelf * 27;
+    ctx.fillStyle = "#29404b";
+    ctx.fillRect(-44, y + 15, 59, 3);
+    for (let slot = 0; slot < 3; slot++) {
+      const productColor = ["#42e8ff", "#ffd166", "#ff7a8a", "#b48cff", "#77ff8a"][(shelf * 3 + slot) % 5];
+      const x = -35 + slot * 20;
+      ctx.fillStyle = "#142932";
+      roundRect(ctx, x - 6, y - 3, 13, 18, 3);
+      ctx.fill();
+      ctx.strokeStyle = productColor;
+      ctx.stroke();
+      ctx.fillStyle = hexToRgba(productColor, 0.48 + pulse * 0.22);
+      ctx.fillRect(x - 3, y + 1, 7, 8);
+    }
+  }
+
+  ctx.fillStyle = "#0b2029";
+  ctx.strokeStyle = "#526f7c";
+  roundRect(ctx, 27, -91, 27, 62, 5);
+  ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = hexToRgba("#ffd166", 0.7 + Math.sin(time * 3.4) * 0.15);
+  ctx.fillRect(34, -80, 13, 16);
+  ctx.fillStyle = "#bcd6df";
+  ctx.fillRect(35, -55, 11, 4);
+  ctx.fillRect(35, -46, 8, 3);
+
+  ctx.fillStyle = "#0a1821";
+  ctx.strokeStyle = hexToRgba(color, 0.75);
+  roundRect(ctx, -30, 2, 59, 15, 4);
+  ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = hexToRgba(color, 0.55 + Math.sin(time * 2) * 0.15);
+  ctx.fillRect(-20, 7, 39, 4);
+  ctx.fillStyle = "#263d49";
+  ctx.fillRect(-52, 18, 18, 11);
+  ctx.fillRect(34, 18, 18, 11);
+
+  for (const side of [-1, 1]) {
+    ctx.strokeStyle = hexToRgba("#9ed9e5", 0.2 + pulse * 0.12);
+    ctx.lineWidth = 2;
+    for (let index = 0; index < 3; index++) {
+      ctx.beginPath();
+      ctx.moveTo(side * 61, -95 + index * 18);
+      ctx.lineTo(side * 72, -90 + index * 18);
+      ctx.stroke();
+    }
+  }
 }
 
 function drawStarMap(ctx, scenery, time) {
@@ -1248,7 +1324,6 @@ function drawNpc(ctx, npc, runtime, time) {
   const speedRatio = Math.min(1, speed / 108);
   const bob = Math.sin(time * (runtime.moving ? 5.8 : 2.1) + runtime.stride * 0.18 + hashString(npc.id)) * (1.2 + speedRatio * 2);
   const face = Math.cos(runtime.facingAngle || 0) < -0.08 ? -1 : 1;
-  const blink = Math.sin(time * 1.7 + hashString(npc.id)) > 0.986;
   const tilt = clamp(runtime.vx / 108, -1, 1) * 0.1;
   ctx.save();
   ctx.translate(runtime.x, y);
@@ -1256,19 +1331,39 @@ function drawNpc(ctx, npc, runtime, time) {
   drawObjectShadow(ctx, 0, 22 + speedRatio * 3, 30 - speedRatio * 3, 10);
   ctx.translate(0, -19 + bob);
   ctx.rotate(tilt);
+  drawLobbyNpcAvatar(ctx, npc, runtime, { time, face, speedRatio, drawRing: true });
+  ctx.restore();
+
+  drawNpcLabelAndBubble(ctx, npc, runtime, y);
+}
+
+export function drawLobbyNpcAvatar(ctx, npcOrId, runtime = {}, options = {}) {
+  const npc = typeof npcOrId === "string"
+    ? LOBBY_NPCS.find((entry) => entry.id === npcOrId || entry.personality === npcOrId)
+    : npcOrId;
+  if (!ctx || !npc) return false;
+  const time = Number(options.time) || 0;
+  const speedRatio = Number.isFinite(options.speedRatio)
+    ? clamp(options.speedRatio, 0, 1)
+    : Math.min(1, Math.hypot(runtime.vx || 0, runtime.vy || 0) / 108);
+  const face = options.face === -1 ? -1 : 1;
+  const blink = options.blink ?? Math.sin(time * 1.7 + hashString(npc.id)) > 0.986;
+  ctx.save();
+  if (options.x || options.y) ctx.translate(options.x || 0, options.y || 0);
+  if (options.scale) ctx.scale(options.scale, options.scale);
   ctx.scale(face, 1);
-
-  const ringPulse = 0.7 + Math.sin(time * 4 + hashString(npc.id)) * 0.12;
-  ctx.strokeStyle = hexToRgba(npc.color, ringPulse);
-  ctx.lineWidth = 3;
-  ctx.beginPath();
-  ctx.ellipse(0, 18, 26 + speedRatio * 3, 9, 0, 0, TAU);
-  ctx.stroke();
-  ctx.fillStyle = hexToRgba(npc.color, 0.12);
-  ctx.beginPath();
-  ctx.ellipse(0, 17, 22, 7, 0, 0, TAU);
-  ctx.fill();
-
+  if (options.drawRing) {
+    const ringPulse = 0.7 + Math.sin(time * 4 + hashString(npc.id)) * 0.12;
+    ctx.strokeStyle = hexToRgba(npc.color, ringPulse);
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.ellipse(0, 18, 26 + speedRatio * 3, 9, 0, 0, TAU);
+    ctx.stroke();
+    ctx.fillStyle = hexToRgba(npc.color, 0.12);
+    ctx.beginPath();
+    ctx.ellipse(0, 17, 22, 7, 0, 0, TAU);
+    ctx.fill();
+  }
   const skin = {
     guide: "#efd0ae",
     tactician: "#d9a878",
@@ -1294,7 +1389,6 @@ function drawNpc(ctx, npc, runtime, time) {
   ctx.ellipse(0, -8, headWidth, headHeight, 0, 0, TAU);
   ctx.fill();
   ctx.stroke();
-
   drawNpcHair(ctx, npc.personality, npc.color, time);
   drawNpcFace(ctx, npc, runtime, time, blink);
   ctx.save();
@@ -1302,8 +1396,7 @@ function drawNpc(ctx, npc, runtime, time) {
   drawNpcFrontEquipment(ctx, npc, time, runtime);
   ctx.restore();
   ctx.restore();
-
-  drawNpcLabelAndBubble(ctx, npc, runtime, y);
+  return true;
 }
 
 function drawNpcBackEquipment(ctx, npc, time) {
@@ -1847,21 +1940,28 @@ function drawLobbyPlayer(ctx, player, time) {
 function drawLobbyPet(ctx, pet, time) {
   const y = pet.y * LOBBY_Y_SCALE;
   const moving = Math.hypot(pet.vx, pet.vy) > 8;
+  const sleeping = pet.mode === "sleep";
+  const sitting = pet.mode === "sit";
+  const sniffing = pet.mode === "sniff";
+  const chasing = pet.mode === "chaseLight";
+  const greeting = pet.mode === "greet" || pet.mode === "petSocial";
   const gait = Math.sin(pet.stride);
   const face = Math.cos(pet.facingAngle || 0) < 0 ? -1 : 1;
-  const bob = Math.sin(time * (moving ? 7 : 3.2) + pet.stride * 0.2) * (moving ? 2.5 : 1.1);
+  const bob = Math.sin(time * (moving ? chasing ? 10 : 7 : 3.2) + pet.stride * 0.2) * (sleeping ? 0.35 : moving ? 2.5 : 1.1);
+  const headDrop = sleeping ? 13 : sniffing ? 7 + Math.sin(time * 7) * 3 : 0;
   ctx.save();
   ctx.translate(pet.x, y);
   drawInteractionRing(ctx, LOBBY_PET.id, LOBBY_PET.color, 42, 18);
-  drawObjectShadow(ctx, 0, 18, 35, 10);
-  ctx.translate(0, -10 + bob);
+  drawObjectShadow(ctx, sleeping ? 4 : 0, sleeping ? 23 : 18, sleeping ? 44 : 35, sleeping ? 8 : 10);
+  ctx.translate(chasing ? 4 : 0, -10 + bob + (sleeping ? 10 : sitting ? 4 : 0));
   ctx.scale(face, 1);
+  if (sleeping) ctx.scale(1.08, 0.76);
 
   ctx.strokeStyle = "#7892a0";
   ctx.lineWidth = 5;
   ctx.beginPath();
   ctx.moveTo(-27, 1);
-  ctx.quadraticCurveTo(-45, -10 - Math.sin(pet.tailPhase) * 7, -52, -28);
+  ctx.quadraticCurveTo(-45, -10 - Math.sin(pet.tailPhase) * (greeting ? 13 : sleeping ? 2 : 7), -52, sleeping ? -12 : -28);
   ctx.stroke();
   ctx.fillStyle = hexToRgba(LOBBY_PET.color, 0.8);
   ctx.beginPath();
@@ -1885,9 +1985,10 @@ function drawLobbyPet(ctx, pet, time) {
     ctx.strokeStyle = "#6c8290";
     ctx.lineWidth = 6;
     ctx.beginPath();
-    ctx.moveTo(side * 20, 8);
-    ctx.lineTo(side * 24 + gait * side * 3, 24);
-    ctx.lineTo(side * 30 - gait * side * 3, 31);
+    const rearDrop = sitting && side < 0 ? 9 : 0;
+    ctx.moveTo(side * 20, 8 + rearDrop);
+    ctx.lineTo(side * 24 + (sleeping ? 0 : gait * side * 3), sleeping ? 18 : 24 + rearDrop);
+    ctx.lineTo(side * (sleeping ? 35 : 30) - (sleeping ? 0 : gait * side * 3), sleeping ? 20 : 31 + rearDrop);
     ctx.stroke();
     ctx.fillStyle = "#213b48";
     ctx.fillRect(side * 30 - (side > 0 ? 5 : 8), 27, 13, 6);
@@ -1897,37 +1998,68 @@ function drawLobbyPet(ctx, pet, time) {
   ctx.strokeStyle = "#7593a2";
   ctx.lineWidth = 3;
   ctx.beginPath();
-  ctx.moveTo(18, -18);
-  ctx.lineTo(38, -28);
-  ctx.lineTo(49, -14);
-  ctx.lineTo(43, 5);
-  ctx.lineTo(22, 9);
+  ctx.moveTo(18, -18 + headDrop);
+  ctx.lineTo(38, -28 + headDrop);
+  ctx.lineTo(49, -14 + headDrop);
+  ctx.lineTo(43, 5 + headDrop);
+  ctx.lineTo(22, 9 + headDrop);
   ctx.closePath();
   ctx.fill();
   ctx.stroke();
   ctx.fillStyle = "#0b1821";
-  ctx.fillRect(35, -14, 14, 13);
+  ctx.fillRect(35, -14 + headDrop, 14, 13);
   ctx.fillStyle = LOBBY_PET.color;
-  ctx.fillRect(40, -11, 8, 6);
+  ctx.fillRect(40, (sleeping ? -8 : -11) + headDrop, 8, sleeping ? 2 : 6);
   ctx.fillStyle = "#243e4c";
   ctx.beginPath();
-  ctx.moveTo(23, -22);
-  ctx.lineTo(27, -41);
-  ctx.lineTo(36, -24);
+  ctx.moveTo(23, -22 + headDrop);
+  ctx.lineTo(27, -41 + headDrop);
+  ctx.lineTo(36, -24 + headDrop);
   ctx.closePath();
   ctx.fill();
   ctx.stroke();
   ctx.strokeStyle = hexToRgba(LOBBY_PET.color, 0.8);
   ctx.lineWidth = 2;
   ctx.beginPath();
-  ctx.moveTo(31, -26);
-  ctx.lineTo(30, -48);
+  ctx.moveTo(31, -26 + headDrop);
+  ctx.lineTo(30, -48 + headDrop);
   ctx.stroke();
   ctx.fillStyle = "#ff7a8a";
   ctx.beginPath();
-  ctx.arc(30, -50, 4, 0, TAU);
+  ctx.arc(30, -50 + headDrop, 4, 0, TAU);
   ctx.fill();
   ctx.restore();
+
+  if (sniffing || sleeping || chasing) {
+    ctx.save();
+    ctx.translate(pet.x, y);
+    if (sniffing) {
+      ctx.strokeStyle = hexToRgba(LOBBY_PET.color, 0.52);
+      ctx.lineWidth = 2;
+      for (let index = 0; index < 3; index++) {
+        const radius = 14 + index * 9 + (time * 18 % 9);
+        ctx.beginPath();
+        ctx.arc(face * 52, -18, radius, -0.7, 0.7);
+        ctx.stroke();
+      }
+    } else if (sleeping) {
+      ctx.fillStyle = hexToRgba(LOBBY_PET.color, 0.75);
+      ctx.font = `bold 12px ${FONT}`;
+      ctx.fillText("Z", 35, -57 - Math.sin(time * 2) * 4);
+      ctx.font = `bold 9px ${FONT}`;
+      ctx.fillText("z", 51, -72 - Math.sin(time * 2 + 1) * 5);
+    } else {
+      ctx.strokeStyle = hexToRgba(LOBBY_PET.color, 0.4);
+      ctx.lineWidth = 3;
+      for (let index = 0; index < 3; index++) {
+        ctx.beginPath();
+        ctx.moveTo(-45 - index * 12, 0 + index * 5);
+        ctx.lineTo(-68 - index * 15, 0 + index * 5);
+        ctx.stroke();
+      }
+    }
+    ctx.restore();
+  }
 
   if (pet.bubble && pet.bubbleLife > 0) {
     ctx.save();

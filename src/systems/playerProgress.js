@@ -1,3 +1,5 @@
+import { state } from "../state.js";
+
 const STORAGE_KEY = "pixel-survivor-player-progress-v1:local-dev";
 const LEGACY_STORAGE_KEYS = [
   "pixel-survivor-best",
@@ -5,6 +7,7 @@ const LEGACY_STORAGE_KEYS = [
   "pixel-survivor-codex",
 ];
 const CODEX_TYPES = ["enemies", "weapons", "items", "events"];
+export const ADVENTURE_HISTORY_LIMIT = 200;
 
 let difficultyIds = [];
 let progress = emptyProgress();
@@ -31,6 +34,10 @@ export function getPlayerDifficultyProgress() {
 
 export function getPlayerCodex() {
   return cloneValue(progress.codex);
+}
+
+export function getAdventureStats() {
+  return cloneValue(progress.adventureStats);
 }
 
 export function getBestSurvivalSeconds() {
@@ -91,6 +98,48 @@ export function recordPlayerCodexEntry(type, id) {
   return true;
 }
 
+export function recordAdventureResult(summary = {}) {
+  if (summary.tainted || state.debug?.enabled || state.debug?.runTainted) return false;
+  const outcome = ["victory", "defeat", "abandoned"].includes(summary.outcome) ? summary.outcome : null;
+  if (!outcome) return false;
+  const current = progress.adventureStats;
+  const id = String(summary.id || `run-${Date.now()}-${current.revision + 1}`).slice(0, 96);
+  if (current.history.some((entry) => entry.id === id)) return false;
+  const runMode = summary.runMode === "random" ? "random" : "standard";
+  const randomGoal = summary.randomGoal === "endless" ? "endless" : "twenty_waves";
+  const modeKey = runMode === "random" ? `random_${randomGoal}` : "standard";
+  const difficultyId = String(summary.difficultyId || "unknown").slice(0, 64);
+  const record = {
+    id,
+    completedAt: validCompletedAt(summary.completedAt) ? summary.completedAt : new Date().toISOString(),
+    outcome,
+    runMode,
+    randomGoal,
+    modeKey,
+    difficultyId,
+    difficultyName: String(summary.difficultyName || difficultyId).slice(0, 64),
+    weaponId: String(summary.weaponId || "").slice(0, 64),
+    weaponName: String(summary.weaponName || summary.weaponId || "未知武器").slice(0, 64),
+    seconds: boundedInteger(summary.seconds, 0, 86400 * 30),
+    wave: boundedInteger(summary.wave, 0, 1_000_000),
+    kills: boundedInteger(summary.kills, 0, 100_000_000),
+    bossKills: boundedInteger(summary.bossKills, 0, 1_000_000),
+    gold: boundedInteger(summary.gold, 0, 1_000_000_000),
+    level: boundedInteger(summary.level, 1, 1_000_000),
+    weaponCount: boundedInteger(summary.weaponCount, 0, 1_000),
+    itemCount: boundedInteger(summary.itemCount, 0, 1_000_000),
+  };
+  current.revision++;
+  current.updatedAt = record.completedAt;
+  incrementAdventureBucket(current.totals, record);
+  incrementAdventureBucket(current.byMode[modeKey] ||= emptyAdventureBucket(), record);
+  incrementAdventureBucket(current.byDifficulty[difficultyId] ||= emptyAdventureBucket(), record);
+  current.history.unshift(record);
+  current.history.length = Math.min(current.history.length, ADVENTURE_HISTORY_LIMIT);
+  persistCurrentProgress();
+  return cloneValue(record);
+}
+
 export function recordBestSurvivalSeconds(seconds) {
   const normalized = boundedInteger(seconds, 0, 86400);
   if (normalized <= progress.bestSurvivalSeconds) return false;
@@ -143,6 +192,7 @@ function normalizeProgress(value) {
     difficultyProgress: normalizedDifficulty,
     codex: Object.fromEntries(CODEX_TYPES.map((type) => [type, uniqueStrings(value?.codex?.[type])])),
     lobbyFirstClearReactions: normalizeReactionQueues(value?.lobbyFirstClearReactions),
+    adventureStats: normalizeAdventureStats(value?.adventureStats),
   };
 }
 
@@ -173,8 +223,109 @@ function mergeProgress(...values) {
         ...queue,
       ]).filter((id) => difficultyIds.includes(id));
     }
+    if (source.adventureStats.revision > merged.adventureStats.revision) {
+      merged.adventureStats = cloneValue(source.adventureStats);
+    }
   }
   return normalizeProgress(merged);
+}
+
+function normalizeAdventureStats(value) {
+  const totals = normalizeAdventureBucket(value?.totals);
+  const byMode = {};
+  const byDifficulty = {};
+  for (const [key, bucket] of Object.entries(value?.byMode || {})) {
+    const normalizedKey = String(key || "").trim();
+    if (normalizedKey) byMode[normalizedKey] = normalizeAdventureBucket(bucket);
+  }
+  for (const [key, bucket] of Object.entries(value?.byDifficulty || {})) {
+    const normalizedKey = String(key || "").trim();
+    if (normalizedKey) byDifficulty[normalizedKey] = normalizeAdventureBucket(bucket);
+  }
+  const history = Array.isArray(value?.history)
+    ? value.history.slice(0, ADVENTURE_HISTORY_LIMIT).map(normalizeAdventureRun).filter(Boolean)
+    : [];
+  return {
+    revision: boundedInteger(value?.revision, 0, Number.MAX_SAFE_INTEGER),
+    updatedAt: validCompletedAt(value?.updatedAt) ? value.updatedAt : "",
+    totals,
+    byMode,
+    byDifficulty,
+    history,
+  };
+}
+
+function emptyAdventureBucket() {
+  return {
+    runs: 0,
+    victories: 0,
+    defeats: 0,
+    abandoned: 0,
+    seconds: 0,
+    kills: 0,
+    bossKills: 0,
+    gold: 0,
+    highestWave: 0,
+    bestKills: 0,
+    longestSeconds: 0,
+    bestVictorySeconds: 0,
+    lastVictoryAt: "",
+  };
+}
+
+function normalizeAdventureBucket(value) {
+  const bucket = emptyAdventureBucket();
+  for (const key of ["runs", "victories", "defeats", "abandoned", "seconds", "kills", "bossKills", "gold", "highestWave", "bestKills", "longestSeconds", "bestVictorySeconds"]) {
+    bucket[key] = boundedInteger(value?.[key], 0, Number.MAX_SAFE_INTEGER);
+  }
+  bucket.lastVictoryAt = validCompletedAt(value?.lastVictoryAt) ? value.lastVictoryAt : "";
+  return bucket;
+}
+
+function normalizeAdventureRun(value) {
+  if (!value || typeof value !== "object") return null;
+  const outcome = ["victory", "defeat", "abandoned"].includes(value.outcome) ? value.outcome : null;
+  if (!outcome) return null;
+  const runMode = value.runMode === "random" ? "random" : "standard";
+  const randomGoal = value.randomGoal === "endless" ? "endless" : "twenty_waves";
+  return {
+    id: String(value.id || "").slice(0, 96),
+    completedAt: validCompletedAt(value.completedAt) ? value.completedAt : "",
+    outcome,
+    runMode,
+    randomGoal,
+    modeKey: runMode === "random" ? `random_${randomGoal}` : "standard",
+    difficultyId: String(value.difficultyId || "unknown").slice(0, 64),
+    difficultyName: String(value.difficultyName || value.difficultyId || "未知难度").slice(0, 64),
+    weaponId: String(value.weaponId || "").slice(0, 64),
+    weaponName: String(value.weaponName || value.weaponId || "未知武器").slice(0, 64),
+    seconds: boundedInteger(value.seconds, 0, 86400 * 30),
+    wave: boundedInteger(value.wave, 0, 1_000_000),
+    kills: boundedInteger(value.kills, 0, 100_000_000),
+    bossKills: boundedInteger(value.bossKills, 0, 1_000_000),
+    gold: boundedInteger(value.gold, 0, 1_000_000_000),
+    level: boundedInteger(value.level, 1, 1_000_000),
+    weaponCount: boundedInteger(value.weaponCount, 0, 1_000),
+    itemCount: boundedInteger(value.itemCount, 0, 1_000_000),
+  };
+}
+
+function incrementAdventureBucket(bucket, record) {
+  bucket.runs++;
+  bucket.victories += record.outcome === "victory" ? 1 : 0;
+  bucket.defeats += record.outcome === "defeat" ? 1 : 0;
+  bucket.abandoned += record.outcome === "abandoned" ? 1 : 0;
+  bucket.seconds += record.seconds;
+  bucket.kills += record.kills;
+  bucket.bossKills += record.bossKills;
+  bucket.gold += record.gold;
+  bucket.highestWave = Math.max(bucket.highestWave, record.wave);
+  bucket.bestKills = Math.max(bucket.bestKills, record.kills);
+  bucket.longestSeconds = Math.max(bucket.longestSeconds, record.seconds);
+  if (record.outcome === "victory") {
+    bucket.bestVictorySeconds = minimumPositive(bucket.bestVictorySeconds, record.seconds);
+    bucket.lastVictoryAt = record.completedAt;
+  }
 }
 
 function readCachedProgress() {

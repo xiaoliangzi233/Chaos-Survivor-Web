@@ -123,7 +123,7 @@
             <button id="lobbyDialogueCloseButton" type="button" aria-label="关闭对话">×</button>
           </header>
           <div class="lobby-dialogue-body">
-            <div id="lobbyDialoguePortrait" class="lobby-dialogue-portrait" aria-hidden="true"><i></i><b></b><em></em></div>
+            <canvas id="lobbyDialoguePortrait" class="lobby-dialogue-portrait" width="300" height="360" aria-hidden="true"></canvas>
             <div class="lobby-dialogue-copy">
               <strong id="lobbyDialogueSpeaker">向导 · 伊芙</strong>
               <p id="lobbyDialogueText"></p>
@@ -131,8 +131,51 @@
             </div>
           </div>
           <footer>
-            <span>选择主题继续阅读</span>
-            <button id="lobbyDialogueConfirmButton" type="button">结束交谈</button>
+            <span id="lobbyDialoguePage">CHANNEL READY</span>
+            <div class="lobby-dialogue-actions">
+              <button id="lobbyDialogueEndButton" type="button">结束交谈</button>
+              <button id="lobbyDialogueConfirmButton" type="button">继续</button>
+            </div>
+          </footer>
+        </div>
+      </section>
+
+      <section id="adventureStatsOverlay" class="overlay adventure-stats-overlay" aria-hidden="true">
+        <div class="adventure-stats-panel" role="dialog" aria-modal="true" aria-labelledby="adventureStatsTitle">
+          <header>
+            <div>
+              <p class="eyebrow">ADVENTURE LEDGER // ONLINE</p>
+              <h2 id="adventureStatsTitle">冒险记录仪</h2>
+            </div>
+            <button id="adventureStatsCloseButton" type="button" aria-label="关闭冒险统计">×</button>
+          </header>
+          <nav id="adventureStatsTabs" class="adventure-stats-tabs" aria-label="统计分类">
+            <button type="button" data-stats-tab="overview" class="active">总览</button>
+            <button type="button" data-stats-tab="difficulty">难度</button>
+            <button type="button" data-stats-tab="history">历史</button>
+          </nav>
+          <div id="adventureStatsFilters" class="adventure-stats-filters" hidden>
+            <label>模式
+              <select id="adventureStatsModeFilter">
+                <option value="all">全部模式</option>
+                <option value="standard">剧情模式</option>
+                <option value="random_twenty_waves">随机 · 20 波</option>
+                <option value="random_endless">随机 · 无限</option>
+              </select>
+            </label>
+            <label>结果
+              <select id="adventureStatsOutcomeFilter">
+                <option value="all">全部结果</option>
+                <option value="victory">胜利</option>
+                <option value="defeat">战败</option>
+                <option value="abandoned">中途返航</option>
+              </select>
+            </label>
+          </div>
+          <div id="adventureStatsContent" class="adventure-stats-content"></div>
+          <footer>
+            <span id="adventureStatsStatus">LOCAL ARCHIVE // 0 RUNS</span>
+            <button id="adventureStatsFooterCloseButton" type="button">返回大厅</button>
           </footer>
         </div>
       </section>

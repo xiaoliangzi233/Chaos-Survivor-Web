@@ -11,12 +11,17 @@ let proceduralPaused = false;
 let musicStep = 0;
 let musicSection = 0;
 let nextMusicTime = 0;
+let musicScene = "battle";
+let lobbyMusicTimer = null;
+let lobbyMusicGain = null;
+let lobbyMusicStep = 0;
 const lastPlayed = new Map();
 const MUSIC_PLAYLIST = "assets/music/playlist.json";
 const MUSIC_BPM = 152;
 const MUSIC_STEP_MS = Math.round(60000 / MUSIC_BPM / 2);
 const MUSIC_STEP_SECONDS = MUSIC_STEP_MS / 1000;
 const MUSIC_MASTER_GAIN = 0.11;
+const LOBBY_MUSIC_GAIN = 0.075;
 const MUSIC_LOOKAHEAD_STEPS = 6;
 const MUSIC_SCALE = [55, 61.74, 65.41, 73.42, 82.41, 92.5, 98, 110, 123.47, 130.81, 146.83, 164.81, 196];
 const LEAD_PATTERN = [12, 14, 15, 17, 19, 17, 15, 14, 12, 10, 8, 10, 12, 15, 17, 22, 24, 22, 19, 17, 15, 17, 19, 15, 14, 12, 10, 12, 15, 17, 19, 22];
@@ -27,8 +32,14 @@ const CHORD_ROOTS = [0, 5, 3, 7, 0, 8, 5, 3];
 export function setMuted(value) {
   muted = value;
   if (musicGain) musicGain.gain.value = muted ? 0.0001 : MUSIC_MASTER_GAIN;
+  if (lobbyMusicGain) lobbyMusicGain.gain.value = muted ? 0.0001 : LOBBY_MUSIC_GAIN;
   if (musicElement) musicElement.muted = muted;
-  if (!muted && !proceduralTimer) startMusic();
+  if (muted) {
+    stopProceduralMusic();
+    stopLobbyMusic();
+  } else if (!proceduralTimer && !lobbyMusicTimer) {
+    startMusic();
+  }
 }
 
 export function isMuted() {
@@ -69,6 +80,13 @@ export function playSfx(name) {
 
 export async function startMusic() {
   if (muted) return;
+  if (musicScene === "lobby") {
+    stopExternalMusic();
+    stopProceduralMusic();
+    startLobbyMusic();
+    return;
+  }
+  stopLobbyMusic();
   if (await startExternalMusic()) return;
   if (proceduralTimer) return;
   if (proceduralPaused) {
@@ -84,6 +102,7 @@ export function stopMusic() {
   proceduralPaused = false;
   stopExternalMusic();
   stopProceduralMusic();
+  stopLobbyMusic();
 }
 
 export function pauseMusic() {
@@ -95,11 +114,34 @@ export function pauseMusic() {
     stopProceduralMusic();
     proceduralPaused = true;
   }
+  if (lobbyMusicTimer) {
+    stopLobbyMusic();
+    proceduralPaused = true;
+  }
 }
 
 export function resumeMusic() {
   if (muted) return;
   startMusic();
+}
+
+export function setMusicScene(scene, { autoplay = true } = {}) {
+  const next = scene === "lobby" ? "lobby" : "battle";
+  if (next === musicScene) {
+    if (autoplay && !muted) startMusic();
+    return musicScene;
+  }
+  musicScene = next;
+  proceduralPaused = false;
+  stopExternalMusic();
+  stopProceduralMusic();
+  stopLobbyMusic();
+  if (autoplay && !muted) startMusic();
+  return musicScene;
+}
+
+export function getMusicScene() {
+  return musicScene;
 }
 
 export async function preloadMusicAssets() {
@@ -115,6 +157,11 @@ export async function preloadMusicAssets() {
 }
 
 export async function nextMusicTrack() {
+  if (musicScene === "lobby") {
+    lobbyMusicStep = (lobbyMusicStep + 1) % 4;
+    if (!lobbyMusicTimer && !muted) startLobbyMusic();
+    return;
+  }
   if (musicTracks?.length) {
     currentTrackIndex = (currentTrackIndex + 1) % musicTracks.length;
     await startExternalMusic(true);
@@ -134,7 +181,84 @@ export function proceduralMusicArrangement() {
     lookaheadSteps: MUSIC_LOOKAHEAD_STEPS,
     key: "external playlist",
     instruments: ["external audio"],
+    lobby: {
+      bpm: 68,
+      masterGain: LOBBY_MUSIC_GAIN,
+      instruments: ["warm pad", "navigation pulse", "glass chime", "reactor sub"],
+    },
   };
+}
+
+function startLobbyMusic() {
+  if (muted || lobbyMusicTimer) return;
+  try {
+    const ctx = ensureAudio();
+    lobbyMusicGain ||= ctx.createGain();
+    try {
+      lobbyMusicGain.disconnect();
+    } catch {}
+    lobbyMusicGain.connect(ctx.destination);
+    lobbyMusicGain.gain.cancelScheduledValues(ctx.currentTime);
+    lobbyMusicGain.gain.setValueAtTime(0.0001, ctx.currentTime);
+    lobbyMusicGain.gain.exponentialRampToValueAtTime(LOBBY_MUSIC_GAIN, ctx.currentTime + 0.8);
+    let nextAt = ctx.currentTime + 0.04;
+    const schedule = () => {
+      if (muted || musicScene !== "lobby") return;
+      while (nextAt < ctx.currentTime + 7) {
+        scheduleLobbyPhrase(lobbyMusicStep++, nextAt);
+        nextAt += 3.5;
+      }
+    };
+    schedule();
+    lobbyMusicTimer = window.setInterval(schedule, 900);
+  } catch {
+    muted = true;
+  }
+}
+
+function stopLobbyMusic() {
+  if (lobbyMusicTimer) {
+    window.clearInterval(lobbyMusicTimer);
+    lobbyMusicTimer = null;
+  }
+  if (lobbyMusicGain && audio) {
+    const now = audio.currentTime;
+    lobbyMusicGain.gain.cancelScheduledValues(now);
+    lobbyMusicGain.gain.setTargetAtTime(0.0001, now, 0.18);
+  }
+}
+
+function scheduleLobbyPhrase(step, at) {
+  const roots = [55, 65.41, 73.42, 61.74];
+  const root = roots[step % roots.length];
+  playLobbyNote(root * 0.5, 5.8, "sine", 0.15, at);
+  playLobbyNote(root, 5.2, "triangle", 0.085, at + 0.08);
+  playLobbyNote(root * 1.5, 4.7, "sine", 0.055, at + 0.16);
+  playLobbyNote(root * 2, 3.8, "sine", 0.035, at + 0.24);
+  if (step % 2 === 0) {
+    playLobbyNote(root * 6, 0.7, "sine", 0.04, at + 1.1);
+    playLobbyNote(root * 8, 0.46, "triangle", 0.022, at + 2.25);
+  }
+  if (step % 4 === 3) playLobbyNote(110, 1.1, "sine", 0.04, at + 2.8);
+}
+
+function playLobbyNote(freq, duration, type, gainValue, at) {
+  const ctx = ensureAudio();
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  const filter = ctx.createBiquadFilter();
+  osc.type = type;
+  osc.frequency.setValueAtTime(freq, at);
+  filter.type = "lowpass";
+  filter.frequency.setValueAtTime(type === "triangle" ? 1600 : 900, at);
+  gain.gain.setValueAtTime(0.0001, at);
+  gain.gain.exponentialRampToValueAtTime(gainValue, at + 0.35);
+  gain.gain.exponentialRampToValueAtTime(0.0001, at + duration);
+  osc.connect(filter);
+  filter.connect(gain);
+  gain.connect(lobbyMusicGain || ctx.destination);
+  osc.start(at);
+  osc.stop(at + duration + 0.08);
 }
 
 function startProceduralMusic() {
@@ -180,7 +304,9 @@ function stopProceduralMusic() {
 
 async function startExternalMusic(forceReload = false) {
   try {
+    if (musicScene !== "battle") return false;
     const tracks = await loadMusicTracks();
+    if (musicScene !== "battle") return false;
     if (!tracks.length) return false;
     musicElement ||= new Audio();
     musicElement.preload = "auto";
@@ -192,7 +318,7 @@ async function startExternalMusic(forceReload = false) {
     }
     musicElement.loop = tracks.length <= 1;
     musicElement.muted = muted;
-    musicElement.volume = 1;
+    musicElement.volume = 0;
     musicElement.onended = () => {
       if (!musicTracks?.length || muted) return;
       currentTrackIndex = (currentTrackIndex + 1) % musicTracks.length;
@@ -201,10 +327,22 @@ async function startExternalMusic(forceReload = false) {
     stopProceduralMusic();
     proceduralPaused = false;
     await musicElement.play();
+    fadeExternalMusicIn();
     return true;
   } catch {
     return false;
   }
+}
+
+function fadeExternalMusicIn() {
+  if (!musicElement) return;
+  const startedAt = performance.now();
+  const tick = (now) => {
+    if (!musicElement || musicElement.paused || musicScene !== "battle") return;
+    musicElement.volume = Math.min(1, (now - startedAt) / 700);
+    if (musicElement.volume < 1) window.requestAnimationFrame(tick);
+  };
+  window.requestAnimationFrame(tick);
 }
 
 async function loadMusicTracks() {

@@ -2,8 +2,10 @@ import { state } from "../state.js";
 import {
   allLobbyInteractions,
   endLobbyNpcConversation,
+  lobbyNpcRuntime,
   setLobbyModalOpen,
 } from "../systems/lobby.js";
+import { drawLobbyNpcAvatar } from "../systems/lobbyRenderer.js";
 
 const GUIDE_TOPICS = [
   {
@@ -30,6 +32,8 @@ const GUIDE_TOPICS = [
 
 const dom = {};
 let onModalChange = null;
+let dialogueState = null;
+let portraitFrame = 0;
 
 export function initLobbyUi(options = {}) {
   onModalChange = options.onModalChange || null;
@@ -48,10 +52,13 @@ export function initLobbyUi(options = {}) {
   dom.dialogueText = document.getElementById("lobbyDialogueText");
   dom.dialogueTopics = document.getElementById("lobbyDialogueTopics");
   dom.dialoguePortrait = document.getElementById("lobbyDialoguePortrait");
+  dom.dialoguePage = document.getElementById("lobbyDialoguePage");
   dom.dialogueClose = document.getElementById("lobbyDialogueCloseButton");
+  dom.dialogueEnd = document.getElementById("lobbyDialogueEndButton");
   dom.dialogueConfirm = document.getElementById("lobbyDialogueConfirmButton");
   dom.dialogueClose?.addEventListener("click", closeLobbyDialogue);
-  dom.dialogueConfirm?.addEventListener("click", closeLobbyDialogue);
+  dom.dialogueEnd?.addEventListener("click", closeLobbyDialogue);
+  dom.dialogueConfirm?.addEventListener("click", continueLobbyDialogue);
   dom.dialogue?.addEventListener("click", (event) => {
     if (event.target === dom.dialogue) closeLobbyDialogue();
   });
@@ -60,6 +67,9 @@ export function initLobbyUi(options = {}) {
       event.preventDefault();
       event.stopPropagation();
       closeLobbyDialogue();
+    } else if (event.key === "Enter" && isLobbyDialogueOpen() && !dom.dialogueConfirm?.hidden) {
+      event.preventDefault();
+      continueLobbyDialogue();
     }
   }, { capture: true });
 }
@@ -126,23 +136,35 @@ export function openLobbyMessage({ role = "FACILITY STATUS", title, speaker, tex
   });
 }
 
-export function openLobbyDialogue({ role, title, speaker, text, color = "#42e8ff", portrait = "system", topics = [] }) {
+export function openLobbyDialogue({ role, title, speaker, text, pages, color = "#42e8ff", portrait = "system", npcId = null, topics = [] }) {
   if (!dom.dialogue) return false;
   dom.dialogueRole.textContent = role || "TRANSIT HUB";
   dom.dialogueTitle.textContent = title || "中转站通讯";
   dom.dialogueSpeaker.textContent = speaker || "中转站系统";
-  dom.dialogueText.textContent = text || "";
   dom.dialogueTopics.replaceChildren();
   dom.dialoguePortrait?.style.setProperty("--dialogue-color", color);
   if (dom.dialoguePortrait) dom.dialoguePortrait.dataset.portrait = portrait;
-  for (const topic of topics) {
+  dialogueState = {
+    introPages: normalizeDialoguePages(pages, text),
+    pages: normalizeDialoguePages(pages, text),
+    pageIndex: 0,
+    activeTopicId: null,
+    portrait,
+    npcId: npcId || (portrait !== "system" ? portrait : null),
+    color,
+    topics: topics.map((topic) => ({ ...topic, pages: normalizeDialoguePages(topic.pages, topic.text) })),
+  };
+  for (const topic of dialogueState.topics) {
     const button = document.createElement("button");
     button.type = "button";
     button.textContent = topic.label;
     button.addEventListener("click", () => {
       for (const sibling of dom.dialogueTopics.querySelectorAll("button")) sibling.classList.remove("active");
       button.classList.add("active");
-      dom.dialogueText.textContent = topic.text;
+      dialogueState.activeTopicId = topic.id;
+      dialogueState.pages = topic.pages;
+      dialogueState.pageIndex = 0;
+      renderDialoguePage();
     });
     dom.dialogueTopics.appendChild(button);
   }
@@ -150,8 +172,94 @@ export function openLobbyDialogue({ role, title, speaker, text, color = "#42e8ff
   dom.dialogue.setAttribute("aria-hidden", "false");
   setLobbyModalOpen(true);
   onModalChange?.(true);
-  window.setTimeout(() => (topics[0] ? dom.dialogueTopics.querySelector("button") : dom.dialogueConfirm)?.focus({ preventScroll: true }), 0);
+  renderDialoguePage();
+  startPortraitAnimation();
+  window.setTimeout(() => dom.dialogueConfirm?.focus({ preventScroll: true }), 0);
   return true;
+}
+
+export function normalizeDialoguePages(pages, text = "") {
+  const source = Array.isArray(pages) && pages.length ? pages : [text];
+  return source.map((entry) => String(entry || "").trim()).filter(Boolean).slice(0, 32);
+}
+
+export function continueLobbyDialogue() {
+  if (!dialogueState) return false;
+  if (dialogueState.pageIndex < dialogueState.pages.length - 1) {
+    dialogueState.pageIndex++;
+    renderDialoguePage();
+    return true;
+  }
+  if (dialogueState.activeTopicId) {
+    dialogueState.activeTopicId = null;
+    dialogueState.pages = dialogueState.introPages;
+    dialogueState.pageIndex = Math.max(0, dialogueState.introPages.length - 1);
+    for (const button of dom.dialogueTopics.querySelectorAll("button")) button.classList.remove("active");
+    renderDialoguePage();
+    dom.dialogueTopics.querySelector("button")?.focus({ preventScroll: true });
+    return true;
+  }
+  return false;
+}
+
+function renderDialoguePage() {
+  if (!dialogueState) return;
+  const count = dialogueState.pages.length;
+  const index = Math.min(Math.max(0, dialogueState.pageIndex), Math.max(0, count - 1));
+  dom.dialogueText.textContent = dialogueState.pages[index] || "";
+  if (dom.dialoguePage) {
+    dom.dialoguePage.textContent = count > 1 ? `${String(index + 1).padStart(2, "0")} / ${String(count).padStart(2, "0")}` : "CHANNEL READY";
+  }
+  const hasNext = index < count - 1;
+  const returnsToTopics = !hasNext && Boolean(dialogueState.activeTopicId);
+  if (dom.dialogueConfirm) {
+    dom.dialogueConfirm.hidden = !hasNext && !returnsToTopics;
+    dom.dialogueConfirm.textContent = returnsToTopics ? "返回话题" : "继续";
+  }
+}
+
+function startPortraitAnimation() {
+  window.cancelAnimationFrame(portraitFrame);
+  const render = (now) => {
+    if (!isLobbyDialogueOpen() || !dialogueState || !dom.dialoguePortrait) return;
+    const canvas = dom.dialoguePortrait;
+    const ctx = canvas.getContext("2d");
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    if (dialogueState.npcId) {
+      const runtime = lobbyNpcRuntime(dialogueState.npcId) || {};
+      drawLobbyNpcAvatar(ctx, dialogueState.npcId, { ...runtime, mode: "playerTalk" }, {
+        time: now / 1000,
+        x: canvas.width / 2,
+        y: canvas.height * 0.43,
+        scale: 2.55,
+        face: 1,
+        drawRing: true,
+      });
+    } else {
+      drawSystemPortrait(ctx, canvas, dialogueState.color, now / 1000);
+    }
+    portraitFrame = window.requestAnimationFrame(render);
+  };
+  portraitFrame = window.requestAnimationFrame(render);
+}
+
+function drawSystemPortrait(ctx, canvas, color, time) {
+  const cx = canvas.width / 2;
+  const cy = canvas.height * 0.48;
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.strokeStyle = color;
+  ctx.fillStyle = `${color}22`;
+  ctx.lineWidth = 5;
+  for (let index = 0; index < 3; index++) {
+    ctx.beginPath();
+    ctx.arc(0, 0, 34 + index * 24, time * (0.5 + index * 0.12), time * (0.5 + index * 0.12) + Math.PI * 1.35);
+    ctx.stroke();
+  }
+  ctx.rotate(time * 0.45);
+  ctx.fillRect(-24, -24, 48, 48);
+  ctx.strokeRect(-24, -24, 48, 48);
+  ctx.restore();
 }
 
 export function closeLobbyDialogue() {
@@ -159,6 +267,9 @@ export function closeLobbyDialogue() {
   dom.dialogue.classList.remove("active");
   dom.dialogue.setAttribute("aria-hidden", "true");
   endLobbyNpcConversation();
+  window.cancelAnimationFrame(portraitFrame);
+  portraitFrame = 0;
+  dialogueState = null;
   setLobbyModalOpen(false);
   onModalChange?.(false);
   return true;

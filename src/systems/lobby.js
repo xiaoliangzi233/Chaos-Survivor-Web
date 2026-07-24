@@ -513,7 +513,7 @@ export function allLobbyInteractions(player = state.lobby.player) {
       difficulty: `切换已解锁难度 · 当前 ${selectedLobbyDifficulty()?.name || "未同步"}`,
       randomProtocol: `切换随机目标 · 当前 ${lobbyRandomGoalLabel()}`,
       missionTable: "查看霓虹中转舰运行状态",
-      recorder: "统计阵列仍在离线校准",
+      recorder: "查看正式冒险总览、难度档案与单局历史",
       codex: "查阅敌人、武器、道具与事件记录",
       gene: "局外强化模块尚未开放",
       rift: "远征相位锚等待下一阶段校准",
@@ -691,6 +691,24 @@ export function lobbyRoomAt(x, y) {
   )) || null;
 }
 
+export function lobbyRoomInteriorDepth(room, x, y) {
+  if (!room?.roof) return room?.id === "core" ? Infinity : -Infinity;
+  const left = room.x - room.w / 2;
+  const right = room.x + room.w / 2;
+  const top = room.y - room.h / 2;
+  const bottom = room.y + room.h / 2;
+  if (x < left || x > right || y < top || y > bottom) return -Infinity;
+  if (room.doorSide === "left") return x - left;
+  if (room.doorSide === "right") return right - x;
+  if (room.doorSide === "top") return y - top;
+  if (room.doorSide === "bottom") return bottom - y;
+  return Math.min(x - left, right - x, y - top, bottom - y);
+}
+
+export function lobbyInteriorRoomAt(x, y, minimumDepth = 24) {
+  return LOBBY_ROOMS.find((room) => room.roof && lobbyRoomInteriorDepth(room, x, y) >= minimumDepth) || null;
+}
+
 export function isLobbyRoomVisible(roomId) {
   if (!roomId || roomId === "core") return true;
   return roomId === state.lobby.currentRoomId || (state.lobby.roomReveal[roomId] || 0) > 0.12;
@@ -725,11 +743,35 @@ export function lobbyNpcDialogue(id) {
     title: base.title,
     speaker: `${npc.role} · ${npc.name}`,
     color: npc.color,
-    portrait: npc.personality,
-    text: firstClearText || `${base.intro} ${context}`,
-    topics: base.topics.map(([label, text], index) => ({ id: `${id}-${index}`, label, text })),
+    portrait: npc.id,
+    npcId: npc.id,
+    text: firstClearText || base.intro,
+    pages: firstClearText ? splitLobbyDialogue(firstClearText) : [base.intro, context],
+    topics: base.topics.map(([label, text], index) => ({
+      id: `${id}-${index}`,
+      label,
+      text,
+      pages: splitLobbyDialogue(text),
+    })),
     firstClearDifficultyId: firstClearText ? firstClearDifficultyId : null,
   };
+}
+
+function splitLobbyDialogue(text) {
+  const sentences = String(text || "").match(/[^。！？!?]+[。！？!?]?/g)?.map((entry) => entry.trim()).filter(Boolean) || [];
+  if (sentences.length <= 1) return sentences.length ? sentences : [String(text || "")];
+  const pages = [];
+  let page = "";
+  for (const sentence of sentences) {
+    if (page && page.length + sentence.length > 48) {
+      pages.push(page);
+      page = sentence;
+    } else {
+      page += sentence;
+    }
+  }
+  if (page) pages.push(page);
+  return pages;
 }
 
 export function beginLobbyNpcConversation(id) {
@@ -813,6 +855,12 @@ function initializeLobbyRuntime() {
     partnerId: null, bubble: "", bubbleLife: 0, stride: 0, tailPhase: 0,
     stuckTime: 0, lastX: LOBBY_PET.x, lastY: LOBBY_PET.y, lastSafeNodeId: LOBBY_PET.homeNode,
   };
+  lobby.pet.behaviorTimer ??= 0;
+  lobby.pet.interestId ??= null;
+  lobby.pet.interestType ??= null;
+  lobby.pet.interestX ??= lobby.pet.x;
+  lobby.pet.interestY ??= lobby.pet.y;
+  lobby.pet.lightId ??= null;
 }
 
 function updateLobbyPlayer(dt) {
@@ -847,8 +895,14 @@ function updateLobbyPlayer(dt) {
 
 function updatePlayerRoom(dt) {
   const lobby = state.lobby;
-  const room = lobbyRoomAt(lobby.player.x, lobby.player.y);
-  lobby.currentRoomId = room?.roof ? room.id : null;
+  const current = LOBBY_ROOMS.find((room) => room.id === lobby.currentRoomId && room.roof);
+  const stillInside = current && lobbyRoomInteriorDepth(current, lobby.player.x, lobby.player.y) >= 0;
+  const entered = stillInside ? current : lobbyInteriorRoomAt(
+    lobby.player.x,
+    lobby.player.y,
+    Math.max(22, lobby.player.r + 8),
+  );
+  lobby.currentRoomId = entered?.id || null;
   for (const definition of LOBBY_ROOMS) {
     const target = !definition.roof || definition.id === lobby.currentRoomId ? 1 : 0;
     const current = lobby.roomReveal[definition.id] || 0;
@@ -1113,7 +1167,8 @@ function updateLobbyPet(dt) {
   pet.socialCooldown = Math.max(0, pet.socialCooldown - dt);
   pet.bubbleLife = Math.max(0, pet.bubbleLife - dt);
   if (pet.bubbleLife <= 0) pet.bubble = "";
-  pet.tailPhase += dt * (pet.moving ? 12 : 5);
+  const activeTail = pet.mode === "greet" || pet.mode === "petSocial";
+  pet.tailPhase += dt * (activeTail ? 20 : pet.moving ? 12 : pet.mode === "sleep" ? 1.2 : 5);
   pet.stride += Math.hypot(pet.vx, pet.vy) * dt * 0.085;
 
   if (pet.mode === "petSocial") {
@@ -1135,12 +1190,48 @@ function updateLobbyPet(dt) {
     return;
   }
 
+  if (["sniff", "sit", "sleep", "greet"].includes(pet.mode)) {
+    pet.wait -= dt;
+    pet.vx = approach(pet.vx, 0, 620 * dt);
+    pet.vy = approach(pet.vy, 0, 620 * dt);
+    pet.moving = false;
+    facePetInterest(pet, dt);
+    if (pet.wait <= 0) {
+      pet.mode = "roam";
+      pet.interestId = null;
+      pet.interestType = null;
+      choosePetDestination(pet);
+    }
+    pet.dirX = Math.cos(pet.facingAngle);
+    pet.dirY = Math.sin(pet.facingAngle);
+    return;
+  }
+
+  if (pet.mode === "chaseLight") {
+    pet.wait -= dt;
+    const light = LOBBY_MOBILE_LIGHTS.find((entry) => entry.id === pet.lightId);
+    const lightPosition = light ? lobbyMobileLightPosition(light) : null;
+    const petRoom = lobbyRoomAt(pet.x, pet.y)?.id || "core";
+    if (!light || light.roomId !== petRoom || pet.wait <= 0 || !lightPosition) {
+      pet.lightId = null;
+      pet.mode = "roam";
+      choosePetDestination(pet);
+      return;
+    }
+    const reached = movePetToward(pet, lightPosition.x, lightPosition.y, dt, 154);
+    if (reached) {
+      pet.bubble = "追踪光点……锁定！";
+      pet.bubbleLife = Math.max(pet.bubbleLife, 0.45);
+    }
+    return;
+  }
+
   if (!pet.path.length || pet.pathIndex >= pet.path.length) {
     pet.wait -= dt;
     pet.vx = approach(pet.vx, 0, 650 * dt);
     pet.vy = approach(pet.vy, 0, 650 * dt);
     pet.moving = false;
-    if (pet.wait <= 0) choosePetDestination(pet);
+    if (pet.wait <= 0) choosePetBehavior(pet);
     return;
   }
 
@@ -1157,7 +1248,7 @@ function updateLobbyPet(dt) {
     pet.pathIndex++;
     if (pet.pathIndex >= pet.path.length) {
       pet.path = [];
-      pet.wait = 2 + Math.random() * 4;
+      pet.wait = 0.6 + Math.random() * 1.2;
     }
     return;
   }
@@ -1193,6 +1284,128 @@ function updateLobbyPet(dt) {
     pet.pathIndex = pet.path[0] === nearest.id ? 1 : 0;
     pet.stuckTime = 0;
   }
+}
+
+function choosePetBehavior(pet) {
+  const roll = Math.random();
+  const nearbyCharacter = nearestPetInterest(pet, "character", 260);
+  const nearbyObject = nearestPetInterest(pet, "object", 235);
+  const currentRoomId = lobbyRoomAt(pet.x, pet.y)?.id || "core";
+  const nearbyLight = LOBBY_MOBILE_LIGHTS
+    .filter((light) => light.roomId === currentRoomId)
+    .map((light) => ({ light, position: lobbyMobileLightPosition(light) }))
+    .filter(({ position }) => distSq(position.x, position.y, pet.x, pet.y) <= 600 * 600)
+    .sort((a, b) => distSq(a.position.x, a.position.y, pet.x, pet.y) - distSq(b.position.x, b.position.y, pet.x, pet.y))[0];
+  pet.path = [];
+  pet.pathIndex = 0;
+  if (roll < 0.2) {
+    pet.mode = "sit";
+    pet.wait = 3 + Math.random() * 3;
+    pet.interestType = nearbyCharacter ? "character" : "air";
+    pet.interestId = nearbyCharacter?.id || null;
+    pet.interestX = nearbyCharacter?.x ?? pet.x + Math.cos(pet.facingAngle) * 80;
+    pet.interestY = nearbyCharacter?.y ?? pet.y + Math.sin(pet.facingAngle) * 80;
+    return;
+  }
+  const nearDoor = LOBBY_DOORS.some((door) => distSq(door.x, door.y, pet.x, pet.y) < 150 * 150);
+  if (roll < 0.34 && !nearDoor) {
+    pet.mode = "sleep";
+    pet.wait = 6 + Math.random() * 6;
+    pet.interestType = null;
+    return;
+  }
+  if (roll < 0.58) {
+    const target = nearbyCharacter || nearbyObject;
+    pet.mode = "sniff";
+    pet.wait = 2.2 + Math.random() * 2.8;
+    pet.interestType = target?.type || "air";
+    pet.interestId = target?.id || null;
+    pet.interestX = target?.x ?? pet.x + (Math.random() - 0.5) * 150;
+    pet.interestY = target?.y ?? pet.y + (Math.random() - 0.5) * 110;
+    pet.bubble = target ? "嗅探目标中……" : "空气样本：正常。";
+    pet.bubbleLife = 1.4;
+    return;
+  }
+  if (roll < 0.72 && nearbyCharacter) {
+    pet.mode = "greet";
+    pet.wait = 2.4 + Math.random() * 1.8;
+    pet.interestType = "character";
+    pet.interestId = nearbyCharacter.id;
+    pet.interestX = nearbyCharacter.x;
+    pet.interestY = nearbyCharacter.y;
+    pet.bubble = "汪！识别到朋友。";
+    pet.bubbleLife = 1.6;
+    return;
+  }
+  if (roll < 0.88 && nearbyLight) {
+    pet.mode = "chaseLight";
+    pet.lightId = nearbyLight.light.id;
+    pet.wait = 4.5 + Math.random() * 4;
+    pet.bubble = "移动光点！";
+    pet.bubbleLife = 1.2;
+    return;
+  }
+  choosePetDestination(pet);
+}
+
+function nearestPetInterest(pet, kind, radius) {
+  const candidates = [];
+  if (kind === "character") {
+    candidates.push({ id: "player", type: "character", x: state.lobby.player.x, y: state.lobby.player.y });
+    for (const definition of LOBBY_NPCS) {
+      const runtime = state.lobby.npcs[definition.id];
+      if (runtime) candidates.push({ id: definition.id, type: "character", x: runtime.x, y: runtime.y });
+    }
+  } else {
+    for (const entity of [...LOBBY_DEVICES, ...LOBBY_PROPS, ...LOBBY_SCENERY]) {
+      candidates.push({ id: entity.id, type: "object", x: entity.x, y: entity.y });
+    }
+  }
+  return candidates
+    .filter((entry) => distSq(entry.x, entry.y, pet.x, pet.y) <= radius * radius)
+    .sort((a, b) => distSq(a.x, a.y, pet.x, pet.y) - distSq(b.x, b.y, pet.x, pet.y))[0] || null;
+}
+
+function facePetInterest(pet, dt) {
+  if (pet.interestType === "character" && pet.interestId) {
+    const target = pet.interestId === "player" ? state.lobby.player : state.lobby.npcs[pet.interestId];
+    if (target) {
+      pet.interestX = target.x;
+      pet.interestY = target.y;
+    }
+  }
+  const dx = (pet.interestX ?? pet.x + 1) - pet.x;
+  const dy = (pet.interestY ?? pet.y) - pet.y;
+  if (Math.hypot(dx, dy) > 1) {
+    pet.facingAngle = lerpAngle(pet.facingAngle, Math.atan2(dy, dx), Math.min(1, dt * 8));
+  }
+}
+
+function movePetToward(pet, targetX, targetY, dt, speed) {
+  const dx = targetX - pet.x;
+  const dy = targetY - pet.y;
+  const distance = Math.hypot(dx, dy);
+  if (distance < 34) {
+    pet.vx = approach(pet.vx, 0, 720 * dt);
+    pet.vy = approach(pet.vy, 0, 720 * dt);
+    pet.moving = false;
+    return true;
+  }
+  const avoidance = mobileAgentAvoidance(LOBBY_PET.id, pet.x, pet.y);
+  pet.vx = approach(pet.vx, dx / distance * speed + avoidance.x, 580 * dt);
+  pet.vy = approach(pet.vy, dy / distance * speed + avoidance.y, 580 * dt);
+  pet.moving = Math.hypot(pet.vx, pet.vy) > 9;
+  pet.facingAngle = lerpAngle(pet.facingAngle, Math.atan2(pet.vy, pet.vx), Math.min(1, dt * 10));
+  pet.dirX = Math.cos(pet.facingAngle);
+  pet.dirY = Math.sin(pet.facingAngle);
+  const desiredX = pet.x + pet.vx * dt;
+  const resolvedX = resolveLobbyPosition(desiredX, pet.y, 12);
+  pet.x = resolvedX.x;
+  const desiredY = pet.y + pet.vy * dt;
+  const resolvedY = resolveLobbyPosition(pet.x, desiredY, 12);
+  pet.y = resolvedY.y;
+  if (Math.abs(resolvedX.x - desiredX) > 1 || Math.abs(resolvedY.y - desiredY) > 1) pet.wait = Math.min(pet.wait, 0.7);
+  return false;
 }
 
 function choosePetDestination(pet) {
@@ -1317,8 +1530,10 @@ function cycleLobbyDifficulty() {
 
 function interactionVisibleToPlayer(entry, player) {
   if (!entry.roomId || entry.roomId === "core") return true;
-  const playerRoom = lobbyRoomAt(player?.x, player?.y);
-  return playerRoom?.id === entry.roomId || isLobbyRoomVisible(entry.roomId);
+  const interiorRoom = lobbyInteriorRoomAt(player?.x, player?.y, Math.max(22, (player?.r || 15) + 8));
+  return state.lobby.currentRoomId === entry.roomId
+    || interiorRoom?.id === entry.roomId
+    || isLobbyRoomVisible(entry.roomId);
 }
 
 function outerWallColliders() {

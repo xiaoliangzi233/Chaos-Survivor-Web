@@ -322,6 +322,7 @@ export function enterLobby({ resetPosition = true } = {}) {
   state.lobby.nearbyInteractionId = null;
   state.lobby.toast = null;
   clearLobbyInput();
+  cancelLobbyPlayerMove();
   state.mode = "lobby";
   updatePlayerRoom(0.25);
 }
@@ -333,6 +334,7 @@ export function leaveLobby() {
   state.lobby.pendingLaunch = null;
   state.lobby.nearbyInteractionId = null;
   clearLobbyInput();
+  cancelLobbyPlayerMove();
 }
 
 export function updateLobby(dt) {
@@ -627,6 +629,7 @@ export function setLobbyModalOpen(open) {
     cancelLobbyLaunch("", true);
     state.lobby.nearbyInteractionId = null;
     clearLobbyInput();
+    cancelLobbyPlayerMove();
   }
 }
 
@@ -641,6 +644,54 @@ export function clearLobbyInput() {
   input.right = false;
   input.vx = 0;
   input.vy = 0;
+}
+
+export function setLobbyPlayerMoveTarget(x, y) {
+  const player = state.lobby.player;
+  if (!player || state.mode !== "lobby" || state.lobby.modalOpen) return false;
+  const destination = resolveLobbyPosition(Number(x) || 0, Number(y) || 0, player.r);
+  const direct = lobbySegmentWalkable(player.x, player.y, destination.x, destination.y, player.r);
+  const path = [];
+  if (!direct) {
+    const start = nearestNavNode(player.x, player.y);
+    const target = nearestNavNode(destination.x, destination.y);
+    for (const id of findLobbyPath(start.id, target.id)) {
+      const node = NAV_BY_ID.get(id);
+      if (node) path.push({ x: node.x, y: node.y });
+    }
+  }
+  const last = path[path.length - 1];
+  if (!last || Math.hypot(last.x - destination.x, last.y - destination.y) > 6) path.push(destination);
+  player.movePath = path;
+  player.movePathIndex = 0;
+  player.moveTargetX = destination.x;
+  player.moveTargetY = destination.y;
+  player.moveTargetActive = path.length > 0;
+  return player.moveTargetActive;
+}
+
+export function cancelLobbyPlayerMove() {
+  const player = state.lobby.player;
+  if (!player) return;
+  player.moveTargetActive = false;
+  player.moveTargetX = player.x;
+  player.moveTargetY = player.y;
+  player.movePath ||= [];
+  player.movePath.length = 0;
+  player.movePathIndex = 0;
+}
+
+export function lobbySegmentWalkable(x1, y1, x2, y2, radius = 15) {
+  const distance = Math.hypot(x2 - x1, y2 - y1);
+  const samples = Math.max(1, Math.ceil(distance / Math.max(10, radius * 0.8)));
+  for (let index = 1; index <= samples; index++) {
+    const t = index / samples;
+    const x = x1 + (x2 - x1) * t;
+    const y = y1 + (y2 - y1) * t;
+    const resolved = resolveLobbyPosition(x, y, radius);
+    if (Math.hypot(resolved.x - x, resolved.y - y) > 0.75) return false;
+  }
+  return true;
 }
 
 export function resolveLobbyPosition(x, y, radius = 15) {
@@ -867,7 +918,32 @@ function updateLobbyPlayer(dt) {
   const player = state.lobby.player;
   let ax = (input.right ? 1 : 0) - (input.left ? 1 : 0);
   let ay = (input.down ? 1 : 0) - (input.up ? 1 : 0);
-  const length = Math.hypot(ax, ay);
+  let length = Math.hypot(ax, ay);
+  if (length > 0.001) {
+    cancelLobbyPlayerMove();
+  } else if (player.moveTargetActive) {
+    const path = player.movePath || [];
+    let waypoint = path[player.movePathIndex];
+    while (waypoint) {
+      const dx = waypoint.x - player.x;
+      const dy = waypoint.y - player.y;
+      const distance = Math.hypot(dx, dy);
+      const final = player.movePathIndex >= path.length - 1;
+      if (distance <= (final ? 6 : 18)) {
+        player.movePathIndex++;
+        waypoint = path[player.movePathIndex];
+        if (!waypoint) {
+          cancelLobbyPlayerMove();
+          break;
+        }
+        continue;
+      }
+      ax = dx / Math.max(0.001, distance);
+      ay = dy / Math.max(0.001, distance);
+      length = 1;
+      break;
+    }
+  }
   if (length > 0.001) {
     ax /= length;
     ay /= length;

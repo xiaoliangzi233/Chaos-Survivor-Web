@@ -1,10 +1,18 @@
 import { TAU, WORLD_SIZE } from "../constants.js";
-import { state, world } from "../state.js";
+import { state } from "../state.js";
 import { burst, pulse, trail } from "../effects.js";
 import { clamp } from "../utils.js";
 import { playSfx } from "../audio.js";
 import { BaseEnemy } from "./BaseEnemy.js";
 import { applyPlayerDamage } from "../systems/items.js";
+import {
+  addBossHazard,
+  addBossProjectile,
+  bossHazardCount,
+  bossProjectileCount,
+  clearBossEffects,
+  findBossHazard,
+} from "../systems/bossEffectRegistry.js";
 
 export const STORM_TYRANT_PHASE_THRESHOLDS = [0.68, 0.34];
 export const STORM_TYRANT_SAFE_CORRIDORS = Object.freeze({
@@ -23,6 +31,7 @@ export const STORM_TYRANT_SCREEN_PRESSURE = Object.freeze({
 const HALF_WORLD = WORLD_SIZE / 2;
 const PHASE_COLORS = ["#42e8ff", "#b48cff", "#ffd166"];
 const PHASE_CORES = ["#e8feff", "#f5edff", "#fff6c7"];
+const STORM_BODY_SPRITES = new Map();
 const SKILL_COOLDOWNS = Object.freeze({
   thunder_lance: 2.5,
   crown_volley: 2.8,
@@ -569,7 +578,13 @@ export class StormTyrant extends BaseEnemy {
     cageWave = 0,
     throneIndex = 0,
   }) {
-    if (this.ownedHazardCount() >= STORM_TYRANT_SCREEN_PRESSURE.peakHazards) return null;
+    const directionX = Math.cos(angle);
+    const directionY = Math.sin(angle);
+    const halfLength = length * 0.5;
+    const x1 = x - directionX * halfLength;
+    const y1 = y - directionY * halfLength;
+    const x2 = x + directionX * halfLength;
+    const y2 = y + directionY * halfLength;
     const hazard = {
       kind: "storm_laser_net",
       x,
@@ -589,15 +604,23 @@ export class StormTyrant extends BaseEnemy {
       style,
       cageWave,
       throneIndex,
+      directionX,
+      directionY,
+      x1,
+      y1,
+      x2,
+      y2,
+      minX: Math.min(x1, x2) - width,
+      minY: Math.min(y1, y2) - width,
+      maxX: Math.max(x1, x2) + width,
+      maxY: Math.max(y1, y2) + width,
       bossOwner: this,
       stormTyrantOwner: this,
     };
-    world.hazards.push(hazard);
-    return hazard;
+    return addBossHazard(this, hazard, STORM_TYRANT_SCREEN_PRESSURE.peakHazards);
   }
 
   spawnStormStrike(x, y, radius, armTime) {
-    if (this.ownedHazardCount() >= STORM_TYRANT_SCREEN_PRESSURE.peakHazards) return null;
     const hazard = {
       kind: "storm_strike",
       warningType: "circle",
@@ -614,12 +637,10 @@ export class StormTyrant extends BaseEnemy {
       bossOwner: this,
       stormTyrantOwner: this,
     };
-    world.hazards.push(hazard);
-    return hazard;
+    return addBossHazard(this, hazard, STORM_TYRANT_SCREEN_PRESSURE.peakHazards);
   }
 
   shoot(angle, speed, radius, shape, damage) {
-    if (this.ownedProjectileCount() >= STORM_TYRANT_SCREEN_PRESSURE.peakProjectiles) return null;
     const projectile = {
       x: this.x + Math.cos(angle) * this.r * 0.72,
       y: this.y + Math.sin(angle) * this.r * 0.72,
@@ -636,8 +657,7 @@ export class StormTyrant extends BaseEnemy {
       bossOwner: this,
       stormTyrantOwner: this,
     };
-    world.enemyProjectiles.push(projectile);
-    return projectile;
+    return addBossProjectile(this, projectile, STORM_TYRANT_SCREEN_PRESSURE.peakProjectiles);
   }
 
   finishAttack(recovery = null, forceLong = false, countAttack = true) {
@@ -732,21 +752,15 @@ export class StormTyrant extends BaseEnemy {
   }
 
   hasOwnedActiveHazards() {
-    return world.hazards.some((hazard) => hazard.stormTyrantOwner === this && (hazard.armTime || 0) <= 0);
+    return Boolean(findBossHazard(this, (hazard) => (hazard.armTime || 0) <= 0));
   }
 
   ownedProjectileCount() {
-    return world.enemyProjectiles.reduce(
-      (count, projectile) => count + (projectile.stormTyrantOwner === this ? 1 : 0),
-      0,
-    );
+    return bossProjectileCount(this);
   }
 
   ownedHazardCount() {
-    return world.hazards.reduce(
-      (count, hazard) => count + (hazard.stormTyrantOwner === this ? 1 : 0),
-      0,
-    );
+    return bossHazardCount(this);
   }
 
   takeDamage(amount, x, y, options = {}) {
@@ -784,12 +798,7 @@ export class StormTyrant extends BaseEnemy {
   }
 
   clearOwnedEffects() {
-    for (let i = world.enemyProjectiles.length - 1; i >= 0; i--) {
-      if (world.enemyProjectiles[i].stormTyrantOwner === this) world.enemyProjectiles.splice(i, 1);
-    }
-    for (let i = world.hazards.length - 1; i >= 0; i--) {
-      if (world.hazards[i].stormTyrantOwner === this) world.hazards.splice(i, 1);
-    }
+    clearBossEffects(this);
   }
 
   kill() {
@@ -808,22 +817,10 @@ export class StormTyrant extends BaseEnemy {
   draw(ctx) {
     ctx.save();
     ctx.translate(Math.round(this.x), Math.round(this.y));
-    drawSceneVeil(ctx, this);
     drawSkillTelegraph(ctx, this);
     drawStormTyrant(ctx, this);
     ctx.restore();
   }
-}
-
-function drawSceneVeil(ctx, boss) {
-  const scene = boss.mode === "storm_cage_scene"
-    || boss.mode === "storm_skyfall_scene"
-    || boss.mode === "storm_tempest_throne"
-    || boss.mode === "phase_transition";
-  if (!scene) return;
-  const alpha = boss.mode === "storm_tempest_throne" ? 0.16 : boss.mode === "phase_transition" ? 0.12 : 0.085;
-  ctx.fillStyle = hex(boss.phaseColor(), alpha);
-  ctx.fillRect(-HALF_WORLD - boss.x, -HALF_WORLD - boss.y, WORLD_SIZE, WORLD_SIZE);
 }
 
 function drawSkillTelegraph(ctx, boss) {
@@ -888,12 +885,37 @@ function drawStormTyrant(ctx, boss) {
   ctx.translate(0, bob);
   drawShadow(ctx, boss);
   drawStormVanes(ctx, boss, color);
-  drawRoyalMantle(ctx, boss, color);
-  drawFloatingGreaves(ctx, boss, color);
-  drawTorsoArmor(ctx, boss, color, core);
+  const body = stormBodySprite(boss);
+  ctx.drawImage(body, -body.width / 2, -body.height / 2);
   drawArmsAndSpear(ctx, boss, color, core);
-  drawCrownHelm(ctx, boss, color, core);
   drawPhaseAura(ctx, boss, color);
+}
+
+function stormBodySprite(boss) {
+  const key = `${boss.phaseLevel}:${boss.flash > 0 ? 1 : 0}`;
+  const cached = STORM_BODY_SPRITES.get(key);
+  if (cached) return cached;
+  const canvas = document.createElement("canvas");
+  canvas.width = 256;
+  canvas.height = 288;
+  const ctx = canvas.getContext("2d", { alpha: true });
+  const pose = {
+    ...boss,
+    anim: 0,
+    sceneSpin: 0,
+    phasePulse: 0,
+    flash: boss.flash > 0 ? 1 : 0,
+    coreColor: () => PHASE_CORES[boss.phaseLevel - 1],
+  };
+  const color = PHASE_COLORS[boss.phaseLevel - 1];
+  const core = PHASE_CORES[boss.phaseLevel - 1];
+  ctx.translate(canvas.width / 2, canvas.height / 2 + 8);
+  drawRoyalMantle(ctx, pose, color);
+  drawFloatingGreaves(ctx, pose, color);
+  drawTorsoArmor(ctx, pose, color, core);
+  drawCrownHelm(ctx, pose, color, core);
+  STORM_BODY_SPRITES.set(key, canvas);
+  return canvas;
 }
 
 function drawShadow(ctx, boss) {

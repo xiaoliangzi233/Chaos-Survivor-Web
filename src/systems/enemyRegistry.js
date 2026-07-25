@@ -1,4 +1,4 @@
-import { WORLD_SIZE, TAU, ENEMY_LIMIT } from "../constants.js";
+import { CAMERA_ZOOM, WORLD_SIZE, TAU, ENEMY_LIMIT } from "../constants.js";
 import { state, world } from "../state.js";
 import { clamp } from "../utils.js";
 import { setSpawnConfigured } from "../enemies/BaseEnemy.js";
@@ -129,13 +129,13 @@ export async function setupEnemyRegistry() {
   setSpawnConfigured((id, x, y) => spawnEnemyById(id, x, y));
 }
 
-export function spawnEnemyById(id, x = null, y = null) {
+export function spawnEnemyById(id, x = null, y = null, options = null) {
+  const cfg = enemyConfig[id];
+  if (!cfg) return null;
   const difficulty = currentDifficulty();
   const enemyLimit = isRandomMode() ? randomEnemyLimitForWave(state.wave) : (difficulty.enemyLimit || ENEMY_LIMIT);
-  if (world.enemies.length >= enemyLimit) return null;
-  const cfg = enemyConfig[id];
+  if (!options?.ignoreLimit && !cfg.boss && world.enemies.length >= enemyLimit) return null;
   const Klass = classes[id] || Zombie;
-  if (!cfg) return null;
   if (!canSpawnLimitedEnemy(id)) return null;
   const pos = x == null || y == null ? randomSpawnPosition(cfg.radius) : { x, y };
   const e = new Klass(cfg, pos.x, pos.y);
@@ -254,16 +254,37 @@ export function createDecorativeEnemy(id, x, y) {
   return enemy;
 }
 
-function randomSpawnPosition(radius) {
+export function randomSpawnPosition(radius) {
   const scenarioPosition = voidCrownSpawnPosition(radius);
   if (scenarioPosition) return scenarioPosition;
   const p = state.player;
-  const angle = Math.random() * TAU;
-  const dist = 720 + Math.random() * 220;
   const half = WORLD_SIZE / 2;
-  return {
-    x: clamp(p.x + Math.cos(angle) * dist, -half + radius, half - radius),
-    y: clamp(p.y + Math.sin(angle) * dist, -half + radius, half - radius),
+  const viewHalfWidth = (globalThis.innerWidth || 1280) / CAMERA_ZOOM * 0.5;
+  const viewHalfHeight = (globalThis.innerHeight || 720) / CAMERA_ZOOM * 0.5;
+  const minimumDistance = Math.min(
+    half - radius,
+    Math.max(560, Math.hypot(viewHalfWidth, viewHalfHeight) + 90),
+  );
+  let best = null;
+  let bestScore = -Infinity;
+  for (let attempt = 0; attempt < 12; attempt++) {
+    const angle = Math.random() * TAU;
+    const distance = minimumDistance + Math.random() * Math.max(40, half - radius - minimumDistance);
+    const x = clamp(p.x + Math.cos(angle) * distance, -half + radius, half - radius);
+    const y = clamp(p.y + Math.sin(angle) * distance, -half + radius, half - radius);
+    const dx = x - p.x;
+    const dy = y - p.y;
+    const outsideView = Math.abs(dx) > viewHalfWidth + radius + 48
+      || Math.abs(dy) > viewHalfHeight + radius + 48;
+    const score = Math.hypot(dx, dy) + (outsideView ? WORLD_SIZE : 0);
+    if (score > bestScore) {
+      bestScore = score;
+      best = { x, y };
+    }
+  }
+  return best || {
+    x: clamp(p.x + minimumDistance, -half + radius, half - radius),
+    y: clamp(p.y, -half + radius, half - radius),
   };
 }
 

@@ -86,7 +86,12 @@ function compactOwned(array, owned, owner) {
   let write = 0;
   for (let read = 0; read < array.length; read++) {
     const entry = array[read];
-    if (owned.has(entry) || entry.bossOwner === owner || entry.convictOwner === owner) {
+    if (
+      owned.has(entry)
+      || entry.bossOwner === owner
+      || entry.convictOwner === owner
+      || entry.stormTyrantOwner === owner
+    ) {
       entry.__bossEffectOwner = null;
       continue;
     }

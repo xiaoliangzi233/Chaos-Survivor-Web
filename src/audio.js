@@ -4,7 +4,9 @@ let proceduralTimer = null;
 let musicGain = null;
 let musicCompressor = null;
 let musicElement = null;
+let lobbyMusicElement = null;
 let musicTracks = null;
+let lobbyMusicTrack = "";
 let musicTrackBase = "";
 let currentTrackIndex = 0;
 let proceduralPaused = false;
@@ -34,6 +36,7 @@ export function setMuted(value) {
   if (musicGain) musicGain.gain.value = muted ? 0.0001 : MUSIC_MASTER_GAIN;
   if (lobbyMusicGain) lobbyMusicGain.gain.value = muted ? 0.0001 : LOBBY_MUSIC_GAIN;
   if (musicElement) musicElement.muted = muted;
+  if (lobbyMusicElement) lobbyMusicElement.muted = muted;
   if (muted) {
     stopProceduralMusic();
     stopLobbyMusic();
@@ -83,9 +86,11 @@ export async function startMusic() {
   if (musicScene === "lobby") {
     stopExternalMusic();
     stopProceduralMusic();
+    if (await startExternalLobbyMusic()) return;
     startLobbyMusic();
     return;
   }
+  stopExternalLobbyMusic();
   stopLobbyMusic();
   if (await startExternalMusic()) return;
   if (proceduralTimer) return;
@@ -101,6 +106,7 @@ export async function startMusic() {
 export function stopMusic() {
   proceduralPaused = false;
   stopExternalMusic();
+  stopExternalLobbyMusic();
   stopProceduralMusic();
   stopLobbyMusic();
 }
@@ -108,6 +114,10 @@ export function stopMusic() {
 export function pauseMusic() {
   if (musicElement && !musicElement.paused) {
     musicElement.pause();
+    proceduralPaused = true;
+  }
+  if (lobbyMusicElement && !lobbyMusicElement.paused) {
+    lobbyMusicElement.pause();
     proceduralPaused = true;
   }
   if (proceduralTimer) {
@@ -134,6 +144,7 @@ export function setMusicScene(scene, { autoplay = true } = {}) {
   musicScene = next;
   proceduralPaused = false;
   stopExternalMusic();
+  stopExternalLobbyMusic();
   stopProceduralMusic();
   stopLobbyMusic();
   if (autoplay && !muted) startMusic();
@@ -146,18 +157,27 @@ export function getMusicScene() {
 
 export async function preloadMusicAssets() {
   const tracks = await loadMusicTracks();
-  if (!tracks.length) return [];
-  if (!musicElement) musicElement = new Audio();
-  if (!musicElement.src) {
+  if (tracks.length) {
+    musicElement ||= new Audio();
     musicElement.preload = "auto";
-    musicElement.src = resolveTrackUrl(tracks[0]);
+    if (!musicElement.src) musicElement.src = resolveTrackUrl(tracks[0]);
     musicElement.load();
+  }
+  if (lobbyMusicTrack) {
+    lobbyMusicElement ||= new Audio();
+    lobbyMusicElement.preload = "auto";
+    if (!lobbyMusicElement.src) lobbyMusicElement.src = resolveTrackUrl(lobbyMusicTrack);
+    lobbyMusicElement.load();
   }
   return tracks;
 }
 
 export async function nextMusicTrack() {
   if (musicScene === "lobby") {
+    if (lobbyMusicElement && !lobbyMusicElement.paused) {
+      lobbyMusicElement.currentTime = 0;
+      return;
+    }
     lobbyMusicStep = (lobbyMusicStep + 1) % 4;
     if (!lobbyMusicTimer && !muted) startLobbyMusic();
     return;
@@ -327,20 +347,44 @@ async function startExternalMusic(forceReload = false) {
     stopProceduralMusic();
     proceduralPaused = false;
     await musicElement.play();
-    fadeExternalMusicIn();
+    fadeExternalMusicIn(musicElement, "battle");
     return true;
   } catch {
     return false;
   }
 }
 
-function fadeExternalMusicIn() {
-  if (!musicElement) return;
+async function startExternalLobbyMusic(forceReload = false) {
+  try {
+    await loadMusicTracks();
+    if (musicScene !== "lobby" || !lobbyMusicTrack) return false;
+    lobbyMusicElement ||= new Audio();
+    lobbyMusicElement.preload = "auto";
+    const src = resolveTrackUrl(lobbyMusicTrack);
+    if (forceReload || lobbyMusicElement.src !== new URL(src, window.location.href).href) {
+      lobbyMusicElement.src = src;
+      lobbyMusicElement.load();
+    }
+    lobbyMusicElement.loop = true;
+    lobbyMusicElement.muted = muted;
+    lobbyMusicElement.volume = 0;
+    stopLobbyMusic();
+    proceduralPaused = false;
+    await lobbyMusicElement.play();
+    fadeExternalMusicIn(lobbyMusicElement, "lobby");
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function fadeExternalMusicIn(element, scene) {
+  if (!element) return;
   const startedAt = performance.now();
   const tick = (now) => {
-    if (!musicElement || musicElement.paused || musicScene !== "battle") return;
-    musicElement.volume = Math.min(1, (now - startedAt) / 700);
-    if (musicElement.volume < 1) window.requestAnimationFrame(tick);
+    if (!element || element.paused || musicScene !== scene) return;
+    element.volume = Math.min(1, (now - startedAt) / 700);
+    if (element.volume < 1) window.requestAnimationFrame(tick);
   };
   window.requestAnimationFrame(tick);
 }
@@ -354,10 +398,12 @@ async function loadMusicTracks() {
     musicTracks = (data.tracks || [])
       .map((track) => typeof track === "string" ? track : track?.file)
       .filter(Boolean);
+    lobbyMusicTrack = typeof data.lobbyTrack === "string" ? data.lobbyTrack : data.lobbyTrack?.file || "";
     musicTrackBase = MUSIC_PLAYLIST.slice(0, MUSIC_PLAYLIST.lastIndexOf("/") + 1);
     return musicTracks;
   } catch {}
   musicTracks = [];
+  lobbyMusicTrack = "";
   return musicTracks;
 }
 
@@ -370,6 +416,12 @@ function stopExternalMusic() {
   if (!musicElement) return;
   musicElement.pause();
   musicElement.currentTime = 0;
+}
+
+function stopExternalLobbyMusic() {
+  if (!lobbyMusicElement) return;
+  lobbyMusicElement.pause();
+  lobbyMusicElement.currentTime = 0;
 }
 
 function playMusicNote(freq, duration, type, gainValue, delay = 0, at = null) {

@@ -2,7 +2,7 @@
   "ember": {
     "name": "废弃实验室 难度1",
     "desc": "适合熟悉武器、商店和怪物机制。",
-    "enemyLimit": 250,
+    "enemyLimit": 83,
     "spawnRate": 0.66,
     "enemyHp": 0.85,
     "enemyDamage": 0.8,
@@ -16,7 +16,7 @@
   "neon": {
     "name": "废弃实验室 难度2",
     "desc": "标准体验，按照当前平衡运行。",
-    "enemyLimit": 300,
+    "enemyLimit": 100,
     "spawnRate": 0.68,
     "enemyHp": 1,
     "enemyDamage": 1,
@@ -30,7 +30,7 @@
   "overclock": {
     "name": "废弃实验室 难度3",
     "desc": "怪潮更密集，远程压力更明显。",
-    "enemyLimit": 350,
+    "enemyLimit": 116,
     "spawnRate": 0.94,
     "enemyHp": 1.16,
     "enemyDamage": 1.15,
@@ -44,7 +44,7 @@
   "singularity": {
     "name": "废弃实验室 难度4",
     "desc": "后期敌人更快进入压制节奏。",
-    "enemyLimit": 410,
+    "enemyLimit": 136,
     "spawnRate": 1.00,
     "enemyHp": 1.25,
     "enemyDamage": 1.2,
@@ -58,7 +58,7 @@
   "apocalypse": {
     "name": "废弃实验室 难度5",
     "desc": "怪物数量、伤害和 Boss 压迫全面提高。",
-    "enemyLimit": 420,
+    "enemyLimit": 140,
     "spawnRate": 1.05,
     "enemyHp": 1.50,
     "enemyDamage": 1.35,
@@ -72,7 +72,7 @@
   "void_crown": {
     "name": "废弃实验室 难度6",
     "desc": "最疯狂的难度，怪潮和 Boss 都会进入极限压制，不是人能打的。",
-    "enemyLimit": 430,
+    "enemyLimit": 143,
     "spawnRate": 1.10,
     "enemyHp": 1.8,
     "enemyDamage": 1.5,

@@ -81,6 +81,7 @@ export function generateMap() {
   addDoorwayDecals(rng, doors, floorDecals);
 
   const map = { tileSize, palette: LAB_PALETTE, rooms, corridors, doors, tiles, props, energyLines, floorDecals, cableRuns, fogBanks };
+  constrainMapGeometry(map, half);
   finalizeMapLayers(map);
   return map;
 }
@@ -97,23 +98,43 @@ export function drawMap(ctx, map, camX, camY, viewW, viewH, time) {
 
 function createLabRooms(rng, half) {
   const rooms = [
-    { id: "core", x: -560, y: -420, w: 1120, h: 840, zone: "reactor" },
-    { id: "west-lab", x: -2050, y: -920, w: 960, h: 720, zone: "bio" },
-    { id: "east-lab", x: 1110, y: -940, w: 980, h: 740, zone: "cryo" },
-    { id: "storage", x: -2050, y: 560, w: 1020, h: 740, zone: "storage" },
-    { id: "control", x: 1050, y: 580, w: 1020, h: 700, zone: "control" },
-    { id: "north-hall", x: -680, y: -1910, w: 1360, h: 520, zone: "service" },
-    { id: "south-hall", x: -720, y: 1410, w: 1440, h: 540, zone: "service" },
+    { id: "core", x: -420, y: -300, w: 840, h: 600, zone: "reactor" },
+    { id: "west-lab", x: -1120, y: -900, w: 620, h: 500, zone: "bio" },
+    { id: "east-lab", x: 500, y: -900, w: 620, h: 500, zone: "cryo" },
+    { id: "storage", x: -1120, y: 400, w: 620, h: 500, zone: "storage" },
+    { id: "control", x: 500, y: 400, w: 620, h: 500, zone: "control" },
+    { id: "north-hall", x: -350, y: -1130, w: 700, h: 260, zone: "service" },
+    { id: "south-hall", x: -350, y: 870, w: 700, h: 260, zone: "service" },
   ];
-  for (let i = 0; i < 6; i++) {
-    const w = 520 + Math.floor(rng() * 4) * 96;
-    const h = 420 + Math.floor(rng() * 3) * 96;
-    const side = i % 4;
-    const x = side < 2 ? (side === 0 ? -half + 230 + rng() * 420 : half - 230 - w - rng() * 420) : -w / 2 + (rng() - 0.5) * 860;
-    const y = side >= 2 ? (side === 2 ? -half + 260 + rng() * 360 : half - 260 - h - rng() * 360) : -h / 2 + (rng() - 0.5) * 920;
-    rooms.push({ id: `annex-${i}`, x, y, w, h, zone: i % 2 ? "service" : "storage" });
+  const annexes = [
+    [-1120, -330, 300, 240],
+    [820, -330, 300, 240],
+    [-1120, 90, 300, 240],
+    [820, 90, 300, 240],
+    [-470, -820, 300, 260],
+    [170, 560, 300, 260],
+  ];
+  for (let i = 0; i < annexes.length; i++) {
+    const [x, y, w, h] = annexes[i];
+    rooms.push({
+      id: `annex-${i}`,
+      x,
+      y,
+      w,
+      h,
+      zone: i % 2 ? "service" : "storage",
+      detailSeed: rng(),
+    });
+  }
+  for (const room of rooms) {
+    room.x = clampToMap(room.x, room.w, half);
+    room.y = clampToMap(room.y, room.h, half);
   }
   return rooms;
+}
+
+function clampToMap(position, span, half) {
+  return Math.max(-half, Math.min(half - span, position));
 }
 
 function createCorridors(rooms) {
@@ -433,6 +454,40 @@ function createEnergyLine(rng, x, y, horizontal, length, color) {
 
 function createFog(x, y, rx, ry, color, alpha) {
   return { x, y, rx, ry, color, alpha, phase: Math.random() * TAU };
+}
+
+function constrainMapGeometry(map, half) {
+  for (const prop of map.props) {
+    const margin = Math.min(half - 1, Math.max(8, prop.size || 0));
+    prop.x = Math.max(-half + margin, Math.min(half - margin, prop.x));
+    prop.y = Math.max(-half + margin, Math.min(half - margin, prop.y));
+  }
+  for (const decal of map.floorDecals) {
+    const marginX = Math.min(half - 1, Math.max(4, (decal.w || 0) * 0.5));
+    const marginY = Math.min(half - 1, Math.max(4, (decal.h || 0) * 0.5));
+    decal.x = Math.max(-half + marginX, Math.min(half - marginX, decal.x));
+    decal.y = Math.max(-half + marginY, Math.min(half - marginY, decal.y));
+  }
+  for (const cable of map.cableRuns) {
+    cable.x = Math.max(-half + 8, Math.min(half - 8, cable.x));
+    cable.y = Math.max(-half + 8, Math.min(half - 8, cable.y));
+    const available = cable.horizontal
+      ? Math.max(16, 2 * Math.min(cable.x + half, half - cable.x))
+      : Math.max(16, 2 * Math.min(cable.y + half, half - cable.y));
+    cable.length = Math.min(cable.length, available);
+  }
+  for (const line of map.energyLines) {
+    line.x1 = Math.max(-half, Math.min(half, line.x1));
+    line.y1 = Math.max(-half, Math.min(half, line.y1));
+    line.x2 = Math.max(-half, Math.min(half, line.x2));
+    line.y2 = Math.max(-half, Math.min(half, line.y2));
+  }
+  for (const fog of map.fogBanks) {
+    fog.rx = Math.min(fog.rx, half - 1);
+    fog.ry = Math.min(fog.ry, half - 1);
+    fog.x = Math.max(-half + fog.rx, Math.min(half - fog.rx, fog.x));
+    fog.y = Math.max(-half + fog.ry, Math.min(half - fog.ry, fog.y));
+  }
 }
 
 function finalizeMapLayers(map) {

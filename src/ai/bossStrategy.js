@@ -1,3 +1,5 @@
+import { WORLD_SIZE } from "../constants.js";
+
 const BOSS_RANGES = {
   ice: { min: 520, max: 760, ideal: 640 },
   missile: { min: 620, max: 900, ideal: 760 },
@@ -145,7 +147,7 @@ function sideSign(state, world, context) {
   const base = state.time % 7 < 3.5 ? 1 : -1;
   const p = state.player;
   if (!p) return base;
-  const half = 2400 - 260;
+  const half = WORLD_SIZE / 2 - 260;
   if (Math.abs(p.x) > half) return p.x > 0 ? -1 : 1;
   if (Math.abs(p.y) > half) return p.y > 0 ? 1 : -1;
   return context.laserLike ? -base : base;

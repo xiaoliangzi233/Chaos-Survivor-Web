@@ -215,7 +215,7 @@ export function slimeProfile(base, overrides = {}) {
   return { ...SLIME_PROFILES[base], ...overrides };
 }
 
-const SLIME_VARIANTS = {
+export const SLIME_VARIANTS = Object.freeze({
   green: { body: "#77ff8a", core: "#9dffac", dark: "#2f8b4b", light: "#caffb8", trail: "#b8ffba", face: "#173b1c", mouth: "#20662d" },
   mint: { body: "#6fffd6", core: "#9affe7", dark: "#228f7a", light: "#c9fff1", trail: "#9fffea", face: "#123f39", mouth: "#1b7d6b" },
   aqua: { body: "#72d7ff", core: "#9be8ff", dark: "#276f9a", light: "#d1f4ff", trail: "#a6ebff", face: "#14324a", mouth: "#23688c" },
@@ -231,7 +231,20 @@ const SLIME_VARIANTS = {
   devil: { body: "#ff4d6d", core: "#ff9ab0", dark: "#8f1d38", light: "#ffd1da", trail: "#ff7a9d", face: "#3f0f1c", mouth: "#9f1f3c" },
   angel: { body: "#f8fafc", core: "#fff2a8", dark: "#9aa7b4", light: "#ffffff", trail: "#d9fbff", face: "#334155", mouth: "#64748b" },
   rainbow: { body: "#ff4dd8", core: "#fff16a", dark: "#5b21b6", light: "#7df9ff", trail: "#ff9df2", face: "#24103f", mouth: "#ffffff" },
-};
+});
+
+export function slimeVisualVariantIds(enemy) {
+  if (enemy?.profile?.fixedVariant) return [enemy.profile.fixedVariant];
+  return [...new Set([...(enemy?.profile?.variants || ["green"]), "rainbow"])];
+}
+
+export function applySlimeVisualVariant(enemy, id) {
+  if (!enemy) return;
+  const colors = SLIME_VARIANTS[id] || SLIME_VARIANTS.green;
+  enemy.slimeVariant = SLIME_VARIANTS[id] ? id : "green";
+  enemy.slimeColors = colors;
+  enemy.color = colors.body;
+}
 
 function pickSlimeVariant(profile) {
   if (profile.fixedVariant) return { id: profile.fixedVariant, colors: SLIME_VARIANTS[profile.fixedVariant] || SLIME_VARIANTS.green };

@@ -1,4 +1,5 @@
 {
   "formats": ["mp3", "ogg", "wav", "m4a"],
-  "tracks": ["map1.mp3"]
+  "tracks": ["map1.mp3"],
+  "lobbyTrack": "lobby.mp3"
 }

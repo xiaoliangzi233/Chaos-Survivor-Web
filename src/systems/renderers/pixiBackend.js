@@ -15,9 +15,12 @@ import { framePerformance } from "../performanceMonitor.js";
 import { availableEnemyIdsForWave, createDecorativeEnemy, decorativeEnemyIds } from "../enemyRegistry.js";
 import { activeWaveEffect } from "../waveScenarios.js";
 import {
+  applyEnemyVisualVariant,
   applyEnemyBakePose,
   enemyVisualProfile,
   enemyVisualState,
+  enemyVisualVariantIds,
+  enemyVisualVariantKey,
   ENEMY_VISUAL_CLIPS,
   projectileVisualProfile,
   projectileVisualIds,
@@ -48,8 +51,10 @@ export class PixiBackend {
     this.visualHandles = new WeakMap();
     this.visualFrameId = 0;
     this.glyphTextures = new Map();
+    this.glyphAtlasTexture = null;
     this.enemyTextures = new Map();
     this.enemyAtlasTextures = [];
+    this.enemyPageLayers = new Map();
     this.enemyAtlasSignature = "";
     this.specialVisualSources = new WeakMap();
     this.colorCache = new Map();
@@ -96,8 +101,9 @@ export class PixiBackend {
     this.layers.drops = this.createParticleLayer("drops", "normal");
     this.layers.playerProjectiles = this.createParticleLayer("player-projectiles", "add");
     this.layers.enemyTethers = this.createParticleLayer("enemy-tethers", "add");
-    this.layers.enemies = this.createParticleLayer("enemies", "normal");
+    this.layers.enemies = new Container({ label: "enemy-atlas-pages" });
     this.layers.wormSegments = this.createParticleLayer("worm-segments", "normal");
+    this.layers.bossActors = this.createParticleLayer("boss-actors", "normal");
     this.layers.enemyProjectiles = this.createParticleLayer("enemy-projectiles", "add");
     this.layers.bossHazards = this.createParticleLayer("boss-hazards", "add");
     this.layers.particles = this.createParticleLayer("particles", "add");
@@ -107,6 +113,7 @@ export class PixiBackend {
       this.layers.enemyTethers,
       this.layers.enemies,
       this.layers.wormSegments,
+      this.layers.bossActors,
       this.layers.enemyProjectiles,
       this.layers.bossHazards,
       this.layers.particles,
@@ -122,19 +129,23 @@ export class PixiBackend {
       this.contextLost = false;
       this.baseTexture?.source?.update();
       this.overlayTexture?.source?.update();
+      this.glyphAtlasTexture?.source?.update();
+      for (const texture of this.enemyAtlasTextures) texture.source?.update();
     };
     canvas.addEventListener("webglcontextlost", this.onContextLost);
     canvas.addEventListener("webglcontextrestored", this.onContextRestored);
   }
 
-  createParticleLayer(label, blendMode) {
+  createParticleLayer(label, blendMode, texture = null) {
     const { ParticleContainer } = this.PIXI;
     const layer = new ParticleContainer({
       label,
+      texture,
       dynamicProperties: {
         position: true,
         rotation: true,
         vertex: true,
+        uvs: true,
         color: true,
       },
     });
@@ -183,12 +194,13 @@ export class PixiBackend {
       this.runTextures.push(mapTexture);
     }
     onProgress(0.65, "上传战斗纹理");
-    for (const texture of [...this.glyphTextures.values(), ...this.enemyAtlasTextures]) texture.source?.update();
+    this.glyphAtlasTexture?.source?.update();
+    for (const texture of this.enemyAtlasTextures) texture.source?.update();
     this.baseTexture?.source?.update();
     this.overlayTexture?.source?.update();
     const prepare = this.app.renderer.prepare;
     if (prepare?.upload) {
-      for (const texture of [...this.glyphTextures.values(), ...this.enemyAtlasTextures, ...this.runTextures]) {
+      for (const texture of [this.glyphAtlasTexture, ...this.enemyAtlasTextures, ...this.runTextures].filter(Boolean)) {
         await prepare.upload(texture);
       }
     }
@@ -288,8 +300,9 @@ export class PixiBackend {
       const item = this.nextItem("drop-items", particles, coin);
       item.x = coin.x;
       item.y = coin.y + Math.sin(state.time * 5.2 + (coin.phase || 0)) * 1.5;
-      item.displayWidth = (tier === "high" ? 24 : tier === "mid" ? 21 : 18) * CAMERA_ZOOM * (magnetized ? 1.16 : 1);
-      item.displayHeight = (tier === "high" ? 24 : tier === "mid" ? 21 : 18) * CAMERA_ZOOM * (magnetized ? 0.82 : 1);
+      const displaySize = (tier === "high" ? 24 : tier === "mid" ? 21 : 18) * CAMERA_ZOOM * (magnetized ? 1.1 : 1);
+      item.displayWidth = displaySize;
+      item.displayHeight = displaySize;
       item.rotation = magnetized ? Math.atan2(state.player.y - coin.y, state.player.x - coin.x) : 0;
       item.texture = this.glyphTexture(`coin-${tier}:${animation}`);
     }
@@ -333,22 +346,36 @@ export class PixiBackend {
   }
 
   syncEnemies(frame) {
-    const particles = this.beginItems("enemy-items");
+    const pageItems = new Map();
+    for (const pageKey of this.enemyPageLayers.keys()) {
+      pageItems.set(pageKey, this.beginItems(`enemy-items:${pageKey}`));
+    }
     const wormParticles = this.beginItems("worm-items");
+    const bossActorParticles = this.beginItems("boss-actor-items");
     const tetherParticles = this.beginItems("tether-items");
     for (const enemy of world.enemies) {
       if (!isPixiBatchableEnemy(enemy) || !this.isVisible(enemy, frame, (enemy.r || 16) + 80)) continue;
+      if (enemy.type === "storm_tyrant") {
+        this.appendStormTyrantParticles(enemy, bossActorParticles);
+        continue;
+      }
       if (enemy.type === "mech_worm") {
         this.appendWormParticles(enemy, wormParticles);
         continue;
       }
-      const clips = this.enemyTextures.get(enemy.type);
+      const variants = this.enemyTextures.get(enemy.type);
+      if (!variants) continue;
+      const variantKey = enemyVisualVariantKey(enemy);
+      const clips = variants.get(variantKey) || variants.get("default") || variants.values().next().value;
       if (!clips) continue;
       const visual = enemyVisualState(enemy);
       const frames = clips.get(visual.clip) || clips.get("move");
       if (!frames?.length) continue;
       const frameIndex = Math.min(frames.length - 1, Math.floor(visual.progress * frames.length));
-      const texture = frames[Math.max(0, frameIndex)];
+      const textureFrame = frames[Math.max(0, frameIndex)];
+      const texture = textureFrame.texture;
+      const particles = pageItems.get(textureFrame.pageKey);
+      if (!particles) continue;
       const miniScale = activeWaveEffect("mini_overdrive") ? 0.5 : 1;
       let poseScaleX = 1;
       let poseScaleY = 1;
@@ -378,7 +405,7 @@ export class PixiBackend {
         poseRotation = -visual.facing * stagger * 0.12;
         poseOffset = -stagger * Math.min(6, (enemy.r || 16) * 0.28);
       }
-      const item = this.nextItem("enemy-items", particles, enemy);
+      const item = this.nextItem(`enemy-items:${textureFrame.pageKey}`, particles, enemy);
       item.x = enemy.x + Math.cos(visual.heading || 0) * poseOffset;
       item.y = enemy.y + Math.sin(visual.heading || 0) * poseOffset;
       item.displayWidth = texture.width * CAMERA_ZOOM * miniScale * poseScaleX;
@@ -404,12 +431,32 @@ export class PixiBackend {
       }
     }
     this.syncParticleLayer(this.layers.enemyTethers, "enemy-tethers", tetherParticles, frame);
-    this.syncParticleLayer(this.layers.enemies, "enemies", particles, frame);
+    for (const [pageKey, layer] of this.enemyPageLayers) {
+      this.syncParticleLayer(layer, `enemies-page:${pageKey}`, pageItems.get(pageKey) || [], frame);
+    }
     this.syncParticleLayer(this.layers.wormSegments, "worm-segments", wormParticles, frame);
+    this.syncParticleLayer(this.layers.bossActors, "boss-actors", bossActorParticles, frame);
   }
 
   appendWormParticles(enemy, target) {
     const miniScale = activeWaveEffect("mini_overdrive") ? 0.5 : 1;
+    let previous = { x: enemy.x, y: enemy.y };
+    for (let index = 0; index < enemy.segments.length; index++) {
+      const segment = enemy.segments[index];
+      const dx = segment.x - previous.x;
+      const dy = segment.y - previous.y;
+      const distance = Math.max(1, Math.hypot(dx, dy));
+      const taper = Math.max(0.52, 0.76 - index * 0.016);
+      const connector = this.nextItem("worm-items", target, this.specialSource(enemy, `connector-${index}`));
+      connector.x = previous.x + dx * 0.5;
+      connector.y = previous.y + dy * 0.5;
+      connector.displayWidth = (distance + enemy.r * 0.78) * CAMERA_ZOOM * miniScale;
+      connector.displayHeight = enemy.r * taper * 1.05 * CAMERA_ZOOM * miniScale;
+      connector.rotation = Math.atan2(dy, dx);
+      connector.tint = enemy.flash > 0 ? 0xffffff : 0xd9b8ff;
+      connector.texture = this.glyphTexture("wormConnector");
+      previous = segment;
+    }
     for (let index = enemy.segments.length - 1; index >= 0; index--) {
       const segment = enemy.segments[index];
       const taper = Math.max(0.58, 0.82 - index * 0.018);
@@ -431,6 +478,80 @@ export class PixiBackend {
     head.texture = this.glyphTexture(enemy.state === "charge" || enemy.state === "strike" ? "wormHeadHot" : "wormHead");
   }
 
+  appendStormTyrantParticles(boss, target) {
+    const bob = Math.sin(boss.anim * 1.32) * 4;
+    const phase = Math.max(1, Math.min(3, boss.phaseLevel || 1));
+    const color = phase === 3 ? 0xffd166 : phase === 2 ? 0xb48cff : 0x42e8ff;
+    for (let index = 0; index < 4; index++) {
+      const angle = boss.crownSpin * (index % 2 ? -0.72 : 0.84) + index * Math.PI / 2;
+      const vane = this.nextItem("boss-actor-items", target, this.specialSource(boss, `vane-${index}`));
+      vane.x = boss.x + Math.cos(angle) * (82 + phase * 8);
+      vane.y = boss.y + bob + Math.sin(angle) * 32 - 8;
+      vane.displayWidth = 42 * CAMERA_ZOOM;
+      vane.displayHeight = 64 * CAMERA_ZOOM;
+      vane.rotation = angle + Math.PI / 2;
+      vane.tint = boss.flash > 0 ? 0xffffff : color;
+      vane.alpha = boss.alpha ?? 1;
+      vane.texture = this.glyphTexture("stormTyrantVane");
+    }
+
+    const body = this.nextItem("boss-actor-items", target, boss);
+    body.x = boss.x;
+    body.y = boss.y + bob;
+    body.displayWidth = 244 * CAMERA_ZOOM;
+    body.displayHeight = 276 * CAMERA_ZOOM;
+    body.rotation = 0;
+    body.tint = boss.flash > 0 ? 0xffffff : 0xffffff;
+    body.alpha = boss.alpha ?? 1;
+    body.texture = this.glyphTexture(`stormTyrantBody${phase}`);
+
+    const cast = boss.mode?.includes("scene") || boss.mode === "storm_tempest_throne" || boss.mode === "phase_transition";
+    const attacking = boss.mode?.includes("dash") || boss.mode === "windup";
+    const spearAngle = cast ? -1.46 : attacking ? 0.02 : boss.weaponAngle || -0.52;
+    const spear = this.nextItem("boss-actor-items", target, this.specialSource(boss, "spear"));
+    spear.x = boss.x + 54 + Math.cos(spearAngle) * 88;
+    spear.y = boss.y + bob - 20 + Math.sin(spearAngle) * 88;
+    spear.displayWidth = 184 * CAMERA_ZOOM;
+    spear.displayHeight = 40 * CAMERA_ZOOM;
+    spear.rotation = spearAngle;
+    spear.tint = boss.flash > 0 ? 0xffffff : color;
+    spear.alpha = boss.alpha ?? 1;
+    spear.texture = this.glyphTexture("stormTyrantSpear");
+
+    const core = this.nextItem("boss-actor-items", target, this.specialSource(boss, "core"));
+    core.x = boss.x;
+    core.y = boss.y + bob + 12;
+    const pulse = 34 + Math.sin(boss.sceneSpin * 2.4) * 4 + (boss.phasePulse || 0) * 18;
+    core.displayWidth = pulse * CAMERA_ZOOM;
+    core.displayHeight = pulse * CAMERA_ZOOM;
+    core.rotation = boss.sceneSpin * 0.18;
+    core.tint = boss.flash > 0 ? 0xffffff : color;
+    core.alpha = 0.9;
+    core.texture = this.glyphTexture("orbGlow");
+
+    if (boss.mode === "windup" && boss.currentSkill === "crown_volley") {
+      const cone = this.nextItem("boss-actor-items", target, this.specialSource(boss, "volley-cone"));
+      cone.x = boss.x + Math.cos(boss.lockAngle || 0) * 160;
+      cone.y = boss.y + Math.sin(boss.lockAngle || 0) * 160;
+      cone.displayWidth = 320 * CAMERA_ZOOM;
+      cone.displayHeight = 220 * CAMERA_ZOOM;
+      cone.rotation = boss.lockAngle || 0;
+      cone.tint = color;
+      cone.alpha = 0.46 + Math.sin(boss.anim * 10) * 0.14;
+      cone.texture = this.glyphTexture("stormTyrantCone");
+    } else if (boss.mode === "windup" && !["thunder_lance", "echo_lance"].includes(boss.currentSkill)) {
+      const ring = this.nextItem("boss-actor-items", target, this.specialSource(boss, "cast-ring"));
+      ring.x = boss.x;
+      ring.y = boss.y + bob;
+      ring.displayWidth = (boss.r + 88) * 2 * CAMERA_ZOOM;
+      ring.displayHeight = (boss.r + 88) * 2 * CAMERA_ZOOM;
+      ring.rotation = boss.sceneSpin;
+      ring.tint = color;
+      ring.alpha = 0.52;
+      ring.texture = this.glyphTexture("stormTyrantRing");
+    }
+  }
+
   syncBossHazards(frame) {
     framePerformance.begin("hazardSync");
     const particles = this.beginItems("boss-hazard-items");
@@ -438,6 +559,40 @@ export class PixiBackend {
       if (!isPixiBatchableHazard(hazard)) continue;
       const armed = (hazard.armTime || 0) <= 0;
       const alpha = Math.max(0, Math.min(1, hazard.life / Math.max(0.001, hazard.maxLife || hazard.life || 1)));
+      if (hazard.kind === "storm_laser_net") {
+        const angle = hazard.angle || 0;
+        const halfLength = (hazard.length || WORLD_SIZE) * 0.5;
+        const directionX = Number.isFinite(hazard.directionX) ? hazard.directionX : Math.cos(angle);
+        const directionY = Number.isFinite(hazard.directionY) ? hazard.directionY : Math.sin(angle);
+        this.appendHazardLine(particles, hazard, {
+          x1: Number.isFinite(hazard.x1) ? hazard.x1 : hazard.x - directionX * halfLength,
+          y1: Number.isFinite(hazard.y1) ? hazard.y1 : hazard.y - directionY * halfLength,
+          x2: Number.isFinite(hazard.x2) ? hazard.x2 : hazard.x + directionX * halfLength,
+          y2: Number.isFinite(hazard.y2) ? hazard.y2 : hazard.y + directionY * halfLength,
+        }, 0, frame, {
+          armed,
+          alpha,
+          chain: false,
+          color: hazard.color,
+          coreColor: "#ffffff",
+          warningColor: "#ffffff",
+          width: hazard.width,
+        });
+        continue;
+      }
+      if (hazard.kind === "storm_strike") {
+        if (!this.isVisible(hazard, frame, (hazard.r || 68) + 80)) continue;
+        const item = this.nextItem("boss-hazard-items", particles, hazard);
+        item.x = hazard.x;
+        item.y = hazard.y;
+        item.displayWidth = (hazard.r || 68) * 2.45 * CAMERA_ZOOM;
+        item.displayHeight = (hazard.r || 68) * 2.45 * CAMERA_ZOOM;
+        item.rotation = hazard.spin || 0;
+        item.tint = this.colorNumber(hazard.color, 0x42e8ff);
+        item.alpha = alpha;
+        item.texture = this.glyphTexture(armed ? "stormStrikeActive" : "stormStrikeWarning");
+        continue;
+      }
       if (hazard.kind === "convict_ball_slam") {
         if (!this.isVisible(hazard, frame, (hazard.r || 80) + 60)) continue;
         const item = this.nextItem("boss-hazard-items", particles, hazard);
@@ -655,7 +810,7 @@ export class PixiBackend {
     for (const handle of activeHandles) {
       if (handle.seenFrame === frameId) continue;
       layer.removeParticle(handle.particle);
-      this.visualHandles.delete(handle.source);
+      if (this.visualHandles.get(handle.source) === handle) this.visualHandles.delete(handle.source);
       freePool.push(handle.particle);
     }
     activeHandles.length = 0;
@@ -665,24 +820,57 @@ export class PixiBackend {
   }
 
   ensureGlyphTextures() {
-    for (const name of ["diamond", "diamondGlow", "orbGlow", "bolt", "squareGlow", "tether", "wormSegment", "wormHead", "wormHeadHot",
+    if (this.glyphAtlasTexture) return;
+    const names = ["diamond", "diamondGlow", "orbGlow", "bolt", "squareGlow", "tether", "wormConnector", "wormSegment", "wormHead", "wormHeadHot",
+      "stormTyrantBody1", "stormTyrantBody2", "stormTyrantBody3", "stormTyrantVane", "stormTyrantSpear",
+      "stormTyrantCone", "stormTyrantRing",
       "chainLink", "warningDash", "hazardBeam", "warningBeam", "hazardCore", "hazardSlamActive", "hazardSlamWarning",
-      "negativeStarActive", "negativeStarWarning"]) this.glyphTexture(name);
+      "negativeStarActive", "negativeStarWarning", "stormStrikeActive", "stormStrikeWarning"];
     for (const tier of ["low", "mid", "high"]) {
       for (let frame = 0; frame < 8; frame++) {
-        this.glyphTexture(`coin-${tier}:${frame}`);
-        this.glyphTexture(`xp-${tier}:${frame}`);
+        names.push(`coin-${tier}:${frame}`, `xp-${tier}:${frame}`);
       }
     }
     for (const id of projectileVisualIds()) {
       const profile = projectileVisualProfile(id);
-      for (let frame = 0; frame < profile.frames; frame++) this.glyphTexture(`${profile.texture}:${frame}`);
+      for (let frame = 0; frame < profile.frames; frame++) names.push(`${profile.texture}:${frame}`);
+    }
+    const uniqueNames = [...new Set(names)];
+    const cellSize = 64;
+    const columns = 16;
+    const canvas = document.createElement("canvas");
+    canvas.width = columns * cellSize;
+    canvas.height = Math.ceil(uniqueNames.length / columns) * cellSize;
+    const ctx = canvas.getContext("2d");
+    ctx.imageSmoothingEnabled = false;
+    for (let index = 0; index < uniqueNames.length; index++) {
+      const column = index % columns;
+      const row = Math.floor(index / columns);
+      ctx.save();
+      ctx.translate(column * cellSize + cellSize / 2, row * cellSize + cellSize / 2);
+      drawGlyphByName(ctx, uniqueNames[index]);
+      ctx.restore();
+    }
+    const { Rectangle, Texture } = this.PIXI;
+    this.glyphAtlasTexture = Texture.from(canvas);
+    this.glyphAtlasTexture.label = "shared-glyph-atlas";
+    for (let index = 0; index < uniqueNames.length; index++) {
+      const name = uniqueNames[index];
+      const texture = new Texture({
+        source: this.glyphAtlasTexture.source,
+        frame: new Rectangle((index % columns) * cellSize, Math.floor(index / columns) * cellSize, cellSize, cellSize),
+      });
+      texture.label = `glyph-${name}`;
+      this.glyphTextures.set(name, texture);
+    }
+    for (const [poolKey, layer] of Object.entries(this.layerByPoolKey)) {
+      if (!poolKey.startsWith("enemies-page:")) layer.texture = this.glyphAtlasTexture;
     }
   }
 
   ensureEnemyTextures(requestedIds, onProgress) {
     const allowed = new Set(decorativeEnemyIds());
-    const ids = requestedIds.filter((id) => allowed.has(id) && enemyVisualProfile(id)?.strategy !== "segmented");
+    const ids = [...new Set(requestedIds.filter((id) => allowed.has(id) && enemyVisualProfile(id)?.strategy !== "segmented"))];
     const signature = [...ids].sort().join("|");
     if (this.enemyTextures.size && this.enemyAtlasSignature === signature) {
       onProgress?.(ids.length, ids.length);
@@ -692,66 +880,149 @@ export class PixiBackend {
     this.enemyAtlasSignature = signature;
     const cellSize = 128;
     const pageSize = 2048;
-    const columns = pageSize / cellSize;
-    const slotsPerPage = columns * columns;
     const { Rectangle, Texture } = this.PIXI;
     const slots = [];
     for (const id of ids) {
-      const clips = new Map();
-      this.enemyTextures.set(id, clips);
-      for (const [clip, frameCount] of Object.entries(ENEMY_VISUAL_CLIPS)) {
-        const frames = [];
-        clips.set(clip, frames);
-        for (let frame = 0; frame < frameCount; frame++) slots.push({ id, clip, frame, frameCount, frames });
+      const probe = createDecorativeEnemy(id, 0, 0);
+      if (!probe) continue;
+      const variants = new Map();
+      this.enemyTextures.set(id, variants);
+      for (const variantKey of enemyVisualVariantIds(probe)) {
+        const enemy = createDecorativeEnemy(id, 0, 0);
+        applyEnemyVisualVariant(enemy, variantKey);
+        const clips = new Map();
+        variants.set(variantKey, clips);
+        for (const [clip, frameCount] of Object.entries(ENEMY_VISUAL_CLIPS)) {
+          const frames = [];
+          clips.set(clip, frames);
+          for (let frame = 0; frame < frameCount; frame++) {
+            slots.push({ id, variantKey, clip, frame, frameCount, frames, enemy, packed: null });
+          }
+        }
       }
     }
 
-    const preparedIds = new Set();
-    for (let pageStart = 0, pageIndex = 0; pageStart < slots.length; pageStart += slotsPerPage, pageIndex++) {
-      const pageSlots = slots.slice(pageStart, pageStart + slotsPerPage);
-      const rows = Math.ceil(pageSlots.length / columns);
+    const pages = [];
+    const createPage = () => {
       const canvas = document.createElement("canvas");
       canvas.width = pageSize;
-      canvas.height = rows * cellSize;
-      const ctx = canvas.getContext("2d");
-      ctx.imageSmoothingEnabled = false;
-      for (let localSlot = 0; localSlot < pageSlots.length; localSlot++) {
-        const descriptor = pageSlots[localSlot];
-        const enemy = createDecorativeEnemy(descriptor.id, 0, 0);
-        if (!enemy) continue;
-        const column = localSlot % columns;
-        const row = Math.floor(localSlot / columns);
-        applyEnemyBakePose(enemy, descriptor.clip, descriptor.frame / descriptor.frameCount);
-        ctx.save();
-        ctx.translate(column * cellSize + cellSize / 2, row * cellSize + cellSize / 2);
-        enemy.x = 0;
-        enemy.y = 0;
-        enemy.draw(ctx);
-        ctx.restore();
-        preparedIds.add(descriptor.id);
+      canvas.height = pageSize;
+      const page = {
+        canvas,
+        ctx: canvas.getContext("2d"),
+        index: pages.length,
+        x: 2,
+        y: 2,
+        rowHeight: 0,
+        maxX: 4,
+        maxY: 4,
+        slots: [],
+      };
+      page.ctx.imageSmoothingEnabled = false;
+      pages.push(page);
+      return page;
+    };
+    let packingPage = createPage();
+    const place = (width, height) => {
+      if (packingPage.x + width + 2 > pageSize) {
+        packingPage.x = 2;
+        packingPage.y += packingPage.rowHeight + 2;
+        packingPage.rowHeight = 0;
       }
+      if (packingPage.y + height + 2 > pageSize) packingPage = createPage();
+      const placed = { page: packingPage, x: packingPage.x, y: packingPage.y };
+      packingPage.x += width + 2;
+      packingPage.rowHeight = Math.max(packingPage.rowHeight, height);
+      packingPage.maxX = Math.max(packingPage.maxX, placed.x + width + 2);
+      packingPage.maxY = Math.max(packingPage.maxY, placed.y + height + 2);
+      return placed;
+    };
+    const bakeCanvas = document.createElement("canvas");
+    bakeCanvas.width = cellSize;
+    bakeCanvas.height = cellSize;
+    const bakeCtx = bakeCanvas.getContext("2d", { willReadFrequently: true });
+    bakeCtx.imageSmoothingEnabled = false;
+    const preparedIds = new Set();
+    for (const descriptor of slots) {
+      const enemy = descriptor.enemy;
+      bakeCtx.setTransform(1, 0, 0, 1, 0, 0);
+      bakeCtx.clearRect(0, 0, cellSize, cellSize);
+      applyEnemyVisualVariant(enemy, descriptor.variantKey);
+      applyEnemyBakePose(enemy, descriptor.clip, descriptor.frame / descriptor.frameCount);
+      bakeCtx.save();
+      bakeCtx.translate(cellSize / 2, cellSize / 2);
+      enemy.x = 0;
+      enemy.y = 0;
+      enemy.draw(bakeCtx);
+      bakeCtx.restore();
+      const bounds = alphaBounds(bakeCtx, cellSize, cellSize);
+      const placed = place(bounds.width, bounds.height);
+      placed.page.ctx.drawImage(
+        bakeCanvas,
+        bounds.x,
+        bounds.y,
+        bounds.width,
+        bounds.height,
+        placed.x,
+        placed.y,
+        bounds.width,
+        bounds.height,
+      );
+      descriptor.packed = {
+        pageIndex: placed.page.index,
+        x: placed.x,
+        y: placed.y,
+        width: bounds.width,
+        height: bounds.height,
+        trimX: bounds.x,
+        trimY: bounds.y,
+      };
+      placed.page.slots.push(descriptor);
+      preparedIds.add(descriptor.id);
+      onProgress?.(preparedIds.size, ids.length);
+    }
+
+    for (const page of pages) {
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.min(pageSize, alignTextureSize(page.maxX));
+      canvas.height = Math.min(pageSize, alignTextureSize(page.maxY));
+      canvas.getContext("2d").drawImage(page.canvas, 0, 0);
       const atlasTexture = Texture.from(canvas);
+      const pageIndex = page.index;
       atlasTexture.label = `enemy-state-atlas-${pageIndex}`;
       this.enemyAtlasTextures.push(atlasTexture);
-      for (let localSlot = 0; localSlot < pageSlots.length; localSlot++) {
-        const descriptor = pageSlots[localSlot];
-        const column = localSlot % columns;
-        const row = Math.floor(localSlot / columns);
+      const pageKey = `enemy-atlas-${pageIndex}`;
+      const poolKey = `enemies-page:${pageKey}`;
+      const layer = this.createParticleLayer(poolKey, "normal", atlasTexture);
+      this.enemyPageLayers.set(pageKey, layer);
+      this.layers.enemies.addChild(layer);
+      for (const descriptor of page.slots) {
+        const packed = descriptor.packed;
         const texture = new Texture({
           source: atlasTexture.source,
-          frame: new Rectangle(column * cellSize, row * cellSize, cellSize, cellSize),
+          frame: new Rectangle(packed.x, packed.y, packed.width, packed.height),
+          orig: new Rectangle(0, 0, cellSize, cellSize),
+          trim: new Rectangle(packed.trimX, packed.trimY, packed.width, packed.height),
         });
-        texture.label = `enemy-${descriptor.id}-${descriptor.clip}-${descriptor.frame}`;
-        descriptor.frames.push(texture);
+        texture.label = `enemy-${descriptor.id}-${descriptor.variantKey}-${descriptor.clip}-${descriptor.frame}`;
+        descriptor.frames.push({
+          texture,
+          pageKey,
+          enemyId: descriptor.id,
+          variantKey: descriptor.variantKey,
+          clip: descriptor.clip,
+          frame: descriptor.frame,
+        });
       }
-      onProgress?.(preparedIds.size, ids.length);
     }
   }
 
   allEnemyTextures() {
     const textures = [];
-    for (const clips of this.enemyTextures.values()) {
-      for (const frames of clips.values()) textures.push(...frames);
+    for (const variants of this.enemyTextures.values()) {
+      for (const clips of variants.values()) {
+        for (const frames of clips.values()) textures.push(...frames.map((entry) => entry.texture));
+      }
     }
     return textures;
   }
@@ -767,6 +1038,18 @@ export class PixiBackend {
   }
 
   releaseEnemyTextures() {
+    for (const [pageKey, layer] of this.enemyPageLayers) {
+      const poolKey = `enemies-page:${pageKey}`;
+      for (const handle of this.layerActive[poolKey] || []) this.visualHandles.delete(handle.source);
+      this.layers.enemies?.removeChild(layer);
+      layer.destroy(false);
+      delete this.layerPools[poolKey];
+      delete this.layerActive[poolKey];
+      delete this.layerNext[poolKey];
+      delete this.layerByPoolKey[poolKey];
+      delete this.frameCounts[poolKey];
+    }
+    this.enemyPageLayers.clear();
     for (const texture of this.allEnemyTextures()) texture.destroy(false);
     this.enemyTextures.clear();
     for (const texture of this.enemyAtlasTextures) texture.destroy(true);
@@ -775,34 +1058,8 @@ export class PixiBackend {
   }
 
   glyphTexture(name) {
-    let texture = this.glyphTextures.get(name);
-    if (texture) return texture;
-    const canvas = document.createElement("canvas");
-    canvas.width = 64;
-    canvas.height = 64;
-    const ctx = canvas.getContext("2d");
-    ctx.translate(32, 32);
-    const separator = name.lastIndexOf(":");
-    const baseName = separator >= 0 ? name.slice(0, separator) : name;
-    const frame = separator >= 0 ? Number(name.slice(separator + 1)) || 0 : 0;
-    if (baseName.startsWith("coin-")) drawMechanicalCoinGlyph(ctx, baseName.slice(5), frame);
-    else if (baseName.startsWith("xp-")) drawExperienceCoreGlyph(ctx, baseName.slice(3), frame);
-    else if (baseName === "orbGlow") drawOrbGlyph(ctx);
-    else if (baseName === "bolt") drawBoltGlyph(ctx);
-    else if (baseName === "squareGlow") drawSquareGlyph(ctx);
-    else if (baseName === "tether") drawTetherGlyph(ctx);
-    else if (baseName === "wormSegment") drawWormSegmentGlyph(ctx);
-    else if (baseName === "wormHead" || baseName === "wormHeadHot") drawWormHeadGlyph(ctx, baseName === "wormHeadHot");
-    else if (baseName === "chainLink") drawChainLinkGlyph(ctx);
-    else if (baseName === "warningDash") drawWarningDashGlyph(ctx);
-    else if (baseName === "hazardBeam" || baseName === "warningBeam" || baseName === "hazardCore") drawHazardBeamGlyph(ctx, baseName);
-    else if (baseName === "hazardSlamActive" || baseName === "hazardSlamWarning") drawHazardSlamGlyph(ctx, baseName.endsWith("Active"));
-    else if (baseName === "negativeStarActive" || baseName === "negativeStarWarning") drawNegativeStarGlyph(ctx, baseName.endsWith("Active"));
-    else if (drawEnemyProjectileGlyph(ctx, baseName, frame)) {}
-    else drawDiamondGlyph(ctx, baseName === "diamondGlow");
-    texture = this.PIXI.Texture.from(canvas);
-    this.glyphTextures.set(name, texture);
-    return texture;
+    if (!this.glyphAtlasTexture) this.ensureGlyphTextures();
+    return this.glyphTextures.get(name) || this.glyphTextures.get("diamond");
   }
 
   isVisible(object, frame, margin) {
@@ -849,8 +1106,10 @@ export class PixiBackend {
   destroy() {
     this.canvas?.removeEventListener("webglcontextlost", this.onContextLost);
     this.canvas?.removeEventListener("webglcontextrestored", this.onContextRestored);
-    for (const texture of this.glyphTextures.values()) texture.destroy();
+    for (const texture of this.glyphTextures.values()) texture.destroy(false);
     this.glyphTextures.clear();
+    this.glyphAtlasTexture?.destroy(true);
+    this.glyphAtlasTexture = null;
     this.colorCache.clear();
     this.releaseEnemyTextures();
     this.releaseRunTextures();
@@ -870,6 +1129,61 @@ export class PixiBackend {
       ...framePerformance.getStats(),
     };
   }
+}
+
+function drawGlyphByName(ctx, name) {
+  const separator = name.lastIndexOf(":");
+  const baseName = separator >= 0 ? name.slice(0, separator) : name;
+  const frame = separator >= 0 ? Number(name.slice(separator + 1)) || 0 : 0;
+  if (baseName.startsWith("coin-")) drawMechanicalCoinGlyph(ctx, baseName.slice(5), frame);
+  else if (baseName.startsWith("xp-")) drawExperienceCoreGlyph(ctx, baseName.slice(3), frame);
+  else if (baseName === "orbGlow") drawOrbGlyph(ctx);
+  else if (baseName === "bolt") drawBoltGlyph(ctx);
+  else if (baseName === "squareGlow") drawSquareGlyph(ctx);
+  else if (baseName === "tether") drawTetherGlyph(ctx);
+  else if (baseName === "wormConnector") drawWormConnectorGlyph(ctx);
+  else if (baseName === "wormSegment") drawWormSegmentGlyph(ctx);
+  else if (baseName === "wormHead" || baseName === "wormHeadHot") drawWormHeadGlyph(ctx, baseName === "wormHeadHot");
+  else if (baseName.startsWith("stormTyrantBody")) drawStormTyrantBodyGlyph(ctx, Number(baseName.at(-1)) || 1);
+  else if (baseName === "stormTyrantVane") drawStormTyrantVaneGlyph(ctx);
+  else if (baseName === "stormTyrantSpear") drawStormTyrantSpearGlyph(ctx);
+  else if (baseName === "stormTyrantCone") drawStormTyrantConeGlyph(ctx);
+  else if (baseName === "stormTyrantRing") drawStormTyrantRingGlyph(ctx);
+  else if (baseName === "chainLink") drawChainLinkGlyph(ctx);
+  else if (baseName === "warningDash") drawWarningDashGlyph(ctx);
+  else if (baseName === "hazardBeam" || baseName === "warningBeam" || baseName === "hazardCore") drawHazardBeamGlyph(ctx, baseName);
+  else if (baseName === "hazardSlamActive" || baseName === "hazardSlamWarning") drawHazardSlamGlyph(ctx, baseName.endsWith("Active"));
+  else if (baseName === "negativeStarActive" || baseName === "negativeStarWarning") drawNegativeStarGlyph(ctx, baseName.endsWith("Active"));
+  else if (baseName === "stormStrikeActive" || baseName === "stormStrikeWarning") drawStormStrikeGlyph(ctx, baseName.endsWith("Active"));
+  else if (drawEnemyProjectileGlyph(ctx, baseName, frame)) {}
+  else drawDiamondGlyph(ctx, baseName === "diamondGlow");
+}
+
+function alphaBounds(ctx, width, height) {
+  const data = ctx.getImageData(0, 0, width, height).data;
+  let minX = width;
+  let minY = height;
+  let maxX = -1;
+  let maxY = -1;
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      if (data[(y * width + x) * 4 + 3] <= 2) continue;
+      minX = Math.min(minX, x);
+      minY = Math.min(minY, y);
+      maxX = Math.max(maxX, x);
+      maxY = Math.max(maxY, y);
+    }
+  }
+  if (maxX < minX || maxY < minY) return { x: width / 2 | 0, y: height / 2 | 0, width: 1, height: 1 };
+  minX = Math.max(0, minX - 2);
+  minY = Math.max(0, minY - 2);
+  maxX = Math.min(width - 1, maxX + 2);
+  maxY = Math.min(height - 1, maxY + 2);
+  return { x: minX, y: minY, width: maxX - minX + 1, height: maxY - minY + 1 };
+}
+
+function alignTextureSize(value) {
+  return Math.max(4, Math.ceil(value / 4) * 4);
 }
 
 function colorToNumber(color, fallback) {
@@ -956,13 +1270,12 @@ function drawSquareGlyph(ctx) {
 
 function drawMechanicalCoinGlyph(ctx, tier, frame) {
   const phase = frame / 8 * Math.PI * 2;
-  const widthScale = 0.34 + Math.abs(Math.cos(phase)) * 0.66;
   const radius = tier === "high" ? 20 : tier === "mid" ? 18 : 16;
   const accent = tier === "high" ? "#fff3b0" : tier === "mid" ? "#ffd166" : "#ffb84d";
-  ctx.scale(widthScale, 1);
+  ctx.rotate(phase * 0.12);
   const glow = ctx.createRadialGradient(0, 0, 2, 0, 0, radius + 10);
-  glow.addColorStop(0, "rgba(255,255,255,0.6)");
-  glow.addColorStop(0.48, "rgba(255,209,102,0.28)");
+  glow.addColorStop(0, "rgba(255,255,255,0.68)");
+  glow.addColorStop(0.48, "rgba(255,209,102,0.38)");
   glow.addColorStop(1, "rgba(255,160,40,0)");
   ctx.fillStyle = glow;
   ctx.fillRect(-30, -30, 60, 60);
@@ -1045,6 +1358,114 @@ function drawEnemyProjectileGlyph(ctx, name, frame) {
   const phase = frame * Math.PI / 3;
   if (name === "enemyPellet") {
     drawLayeredOrb(ctx, "#ff4d6d", phase, 10);
+  } else if (name === "bioSpore") {
+    ctx.rotate(phase * 0.42);
+    ctx.fillStyle = "rgba(255,255,255,0.24)";
+    for (let index = 0; index < 3; index++) {
+      const angle = phase + index * Math.PI * 2 / 3;
+      ctx.beginPath();
+      ctx.arc(Math.cos(angle) * 19, Math.sin(angle) * 13, 3 - index * 0.35, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.fillStyle = "rgba(18,30,22,0.96)";
+    ctx.strokeStyle = "#ffffff";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    for (let index = 0; index < 12; index++) {
+      const angle = index / 12 * Math.PI * 2;
+      const radius = index % 2 ? 10 : 15 + Math.sin(phase + index) * 2;
+      const x = Math.cos(angle) * radius;
+      const y = Math.sin(angle) * radius;
+      if (index) ctx.lineTo(x, y);
+      else ctx.moveTo(x, y);
+    }
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = "#ffffff";
+    ctx.beginPath();
+    ctx.arc(3, -3, 5, 0, Math.PI * 2);
+    ctx.fill();
+  } else if (name === "arcaneNeedle") {
+    const gradient = ctx.createLinearGradient(-29, 0, 22, 0);
+    gradient.addColorStop(0, "rgba(255,255,255,0)");
+    gradient.addColorStop(0.58, "rgba(255,255,255,0.34)");
+    gradient.addColorStop(1, "#ffffff");
+    ctx.fillStyle = gradient;
+    ctx.beginPath();
+    ctx.moveTo(27, 0);
+    ctx.lineTo(2, -8);
+    ctx.lineTo(-21, -4);
+    ctx.lineTo(-29, 0);
+    ctx.lineTo(-21, 4);
+    ctx.lineTo(2, 8);
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = "#ffffff";
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.ellipse(-2, 0, 15, 10, phase * 0.2, 0, Math.PI * 2);
+    ctx.stroke();
+  } else if (name === "mechSlug") {
+    ctx.fillStyle = "#151b25";
+    ctx.strokeStyle = "#ffffff";
+    ctx.lineWidth = 1.8;
+    ctx.beginPath();
+    ctx.moveTo(28, 0);
+    ctx.lineTo(12, -8);
+    ctx.lineTo(-14, -7);
+    ctx.lineTo(-24, -2);
+    ctx.lineTo(-24, 2);
+    ctx.lineTo(-14, 7);
+    ctx.lineTo(12, 8);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(-11, -3, 26, 6);
+    ctx.fillStyle = "rgba(255,255,255,0.45)";
+    ctx.fillRect(-30, -5, 9 + Math.sin(phase) * 3, 10);
+  } else if (name === "frostNeedle") {
+    ctx.fillStyle = "rgba(255,255,255,0.28)";
+    ctx.beginPath();
+    ctx.moveTo(-30, 0);
+    ctx.lineTo(-5, -9);
+    ctx.lineTo(18, 0);
+    ctx.lineTo(-5, 9);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = "#ffffff";
+    ctx.strokeStyle = "rgba(255,255,255,0.68)";
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(29, 0);
+    ctx.lineTo(2, -10);
+    ctx.lineTo(-17, 0);
+    ctx.lineTo(2, 10);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(-2, -8);
+    ctx.lineTo(4, 0);
+    ctx.lineTo(-2, 8);
+    ctx.stroke();
+  } else if (name === "bossSigil") {
+    drawLayeredOrb(ctx, "#ffffff", phase, 13);
+    ctx.rotate(phase);
+    ctx.strokeStyle = "#ffffff";
+    ctx.lineWidth = 1.8;
+    ctx.beginPath();
+    for (let index = 0; index < 6; index++) {
+      const angle = index / 6 * Math.PI * 2;
+      const radius = index % 2 ? 12 : 23;
+      const x = Math.cos(angle) * radius;
+      const y = Math.sin(angle) * radius;
+      if (index) ctx.lineTo(x, y);
+      else ctx.moveTo(x, y);
+    }
+    ctx.closePath();
+    ctx.stroke();
   } else if (name === "arcaneOrb") {
     drawLayeredOrb(ctx, "#b48cff", phase, 13);
     ctx.strokeStyle = "#ffd166";
@@ -1483,24 +1904,223 @@ function drawWormSegmentGlyph(ctx) {
   ctx.stroke();
 }
 
-function drawWormHeadGlyph(ctx, hot) {
-  ctx.fillStyle = "#141827";
-  ctx.strokeStyle = hot ? "#ffffff" : "#ff65d8";
-  ctx.lineWidth = 3;
+function drawWormConnectorGlyph(ctx) {
+  const glow = ctx.createLinearGradient(-30, 0, 30, 0);
+  glow.addColorStop(0, "rgba(255,101,216,0.08)");
+  glow.addColorStop(0.5, "rgba(255,101,216,0.38)");
+  glow.addColorStop(1, "rgba(255,101,216,0.08)");
+  ctx.fillStyle = glow;
+  ctx.fillRect(-32, -11, 64, 22);
+  ctx.fillStyle = "#211331";
+  ctx.strokeStyle = "#ff65d8";
+  ctx.lineWidth = 2;
   ctx.beginPath();
-  ctx.moveTo(28, 0);
-  ctx.lineTo(9, -20);
-  ctx.lineTo(-22, -15);
-  ctx.lineTo(-27, 15);
-  ctx.lineTo(9, 20);
+  ctx.roundRect(-32, -7, 64, 14, 7);
+  ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = "rgba(217,184,255,0.72)";
+  for (let x = -24; x <= 24; x += 12) ctx.fillRect(x - 2, -4, 4, 8);
+}
+
+function drawWormHeadGlyph(ctx, hot) {
+  const accent = hot ? "#ffffff" : "#ff65d8";
+  ctx.fillStyle = "#141827";
+  ctx.strokeStyle = accent;
+  ctx.lineWidth = 2.8;
+  ctx.beginPath();
+  ctx.moveTo(30, 0);
+  ctx.lineTo(20, -13);
+  ctx.lineTo(4, -20);
+  ctx.lineTo(-24, -14);
+  ctx.lineTo(-29, 0);
+  ctx.lineTo(-24, 14);
+  ctx.lineTo(4, 20);
+  ctx.lineTo(20, 13);
   ctx.closePath();
   ctx.fill();
   ctx.stroke();
+  ctx.fillStyle = "#291638";
+  ctx.beginPath();
+  ctx.moveTo(30, 0);
+  ctx.lineTo(14, -2);
+  ctx.lineTo(4, 0);
+  ctx.lineTo(14, 6);
+  ctx.lineTo(25, 5);
+  ctx.closePath();
+  ctx.fill();
+  ctx.strokeStyle = "rgba(255,255,255,0.55)";
+  ctx.lineWidth = 1.4;
+  ctx.stroke();
   ctx.fillStyle = hot ? "#ffffff" : "#ffb8f2";
-  ctx.fillRect(4, -10, 10, 5);
-  ctx.fillRect(4, 5, 10, 5);
+  ctx.beginPath();
+  ctx.moveTo(8, -9);
+  ctx.lineTo(17, -7);
+  ctx.lineTo(10, -3);
+  ctx.closePath();
+  ctx.fill();
+  ctx.beginPath();
+  ctx.moveTo(8, 9);
+  ctx.lineTo(17, 7);
+  ctx.lineTo(10, 3);
+  ctx.closePath();
+  ctx.fill();
+  ctx.fillStyle = "#ffffff";
+  ctx.beginPath();
+  ctx.moveTo(20, -2);
+  ctx.lineTo(15, 8);
+  ctx.lineTo(13, 0);
+  ctx.closePath();
+  ctx.fill();
+  ctx.beginPath();
+  ctx.moveTo(25, 1);
+  ctx.lineTo(20, 9);
+  ctx.lineTo(19, 2);
+  ctx.closePath();
+  ctx.fill();
   ctx.fillStyle = "#42e8ff";
-  ctx.fillRect(-16, -3, 28, 6);
+  ctx.fillRect(-18, -3, 20, 6);
+  ctx.fillStyle = accent;
+  ctx.fillRect(22, -7, 3, 2);
+}
+
+function drawStormTyrantBodyGlyph(ctx, phase) {
+  const color = phase === 3 ? "#ffd166" : phase === 2 ? "#b48cff" : "#42e8ff";
+  const core = phase === 3 ? "#fff6c7" : phase === 2 ? "#f5edff" : "#e8feff";
+  ctx.fillStyle = phase === 3 ? "#3a2812" : "#050a19";
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 1.6;
+  ctx.beginPath();
+  ctx.moveTo(-12, -8);
+  ctx.lineTo(-24, 18);
+  ctx.lineTo(-15, 31);
+  ctx.lineTo(0, 22);
+  ctx.lineTo(15, 31);
+  ctx.lineTo(24, 18);
+  ctx.lineTo(12, -8);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+
+  ctx.fillStyle = "#10182a";
+  ctx.beginPath();
+  ctx.moveTo(-17, -12);
+  ctx.lineTo(-23, 1);
+  ctx.lineTo(-13, 18);
+  ctx.lineTo(0, 23);
+  ctx.lineTo(13, 18);
+  ctx.lineTo(23, 1);
+  ctx.lineTo(17, -12);
+  ctx.lineTo(0, -18);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+
+  ctx.fillStyle = core;
+  drawStar(ctx, 0, 6, 7 + phase, 3, 6, core, color);
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(-2, 4, 4, 4);
+
+  ctx.fillStyle = "#09111f";
+  ctx.beginPath();
+  ctx.moveTo(-13, -18);
+  ctx.lineTo(-15, -27);
+  ctx.lineTo(-8, -31);
+  ctx.lineTo(-4, -25);
+  ctx.lineTo(0, -34);
+  ctx.lineTo(4, -25);
+  ctx.lineTo(8, -31);
+  ctx.lineTo(15, -27);
+  ctx.lineTo(13, -18);
+  ctx.lineTo(0, -13);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = core;
+  ctx.fillRect(-9, -24, 18, 3);
+
+  ctx.fillStyle = "#0b1325";
+  ctx.strokeStyle = color;
+  for (const side of [-1, 1]) {
+    ctx.fillRect(side * 6 - 4, 21, 8, 10);
+    ctx.strokeRect(side * 6 - 4, 21, 8, 10);
+  }
+}
+
+function drawStormTyrantVaneGlyph(ctx) {
+  ctx.fillStyle = "#07101d";
+  ctx.strokeStyle = "#ffffff";
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(0, -27);
+  ctx.lineTo(10, -7);
+  ctx.lineTo(5, 23);
+  ctx.lineTo(0, 13);
+  ctx.lineTo(-5, 23);
+  ctx.lineTo(-10, -7);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = "#ffffff";
+  ctx.beginPath();
+  ctx.moveTo(0, -16);
+  ctx.lineTo(3, 2);
+  ctx.lineTo(0, 12);
+  ctx.lineTo(-3, 2);
+  ctx.closePath();
+  ctx.fill();
+}
+
+function drawStormTyrantSpearGlyph(ctx) {
+  ctx.strokeStyle = "#07101d";
+  ctx.lineWidth = 8;
+  ctx.beginPath();
+  ctx.moveTo(-27, 0);
+  ctx.lineTo(23, 0);
+  ctx.stroke();
+  ctx.strokeStyle = "#ffffff";
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(-27, 0);
+  ctx.lineTo(25, 0);
+  ctx.stroke();
+  ctx.fillStyle = "#ffffff";
+  ctx.beginPath();
+  ctx.moveTo(31, 0);
+  ctx.lineTo(19, -8);
+  ctx.lineTo(23, 0);
+  ctx.lineTo(19, 8);
+  ctx.closePath();
+  ctx.fill();
+}
+
+function drawStormTyrantConeGlyph(ctx) {
+  const gradient = ctx.createLinearGradient(-32, 0, 32, 0);
+  gradient.addColorStop(0, "rgba(255,255,255,0)");
+  gradient.addColorStop(1, "rgba(255,255,255,0.42)");
+  ctx.fillStyle = gradient;
+  ctx.strokeStyle = "rgba(255,255,255,0.88)";
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(-32, 0);
+  ctx.lineTo(32, -27);
+  ctx.lineTo(32, 27);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+}
+
+function drawStormTyrantRingGlyph(ctx) {
+  ctx.strokeStyle = "rgba(255,255,255,0.92)";
+  ctx.lineWidth = 2.2;
+  ctx.setLineDash([8, 5]);
+  ctx.beginPath();
+  ctx.arc(0, 0, 27, 0, Math.PI * 1.65);
+  ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.arc(0, 0, 18, Math.PI * 0.2, Math.PI * 1.72);
+  ctx.stroke();
 }
 
 function drawChainLinkGlyph(ctx) {
@@ -1563,6 +2183,51 @@ function drawNegativeStarGlyph(ctx, active) {
   ctx.fillRect(-4, -4, 8, 8);
 }
 
+function drawStormStrikeGlyph(ctx, active) {
+  ctx.globalCompositeOperation = "lighter";
+  if (!active) {
+    ctx.strokeStyle = "rgba(255,255,255,0.92)";
+    ctx.lineWidth = 2;
+    ctx.setLineDash([7, 5]);
+    ctx.beginPath();
+    ctx.arc(0, 0, 25, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.strokeStyle = "rgba(255,255,255,0.58)";
+    for (let index = 0; index < 4; index++) {
+      ctx.rotate(Math.PI / 2);
+      ctx.beginPath();
+      ctx.moveTo(8, 0);
+      ctx.lineTo(23, 0);
+      ctx.stroke();
+    }
+    return;
+  }
+  const glow = ctx.createRadialGradient(0, 0, 2, 0, 0, 30);
+  glow.addColorStop(0, "rgba(255,255,255,1)");
+  glow.addColorStop(0.42, "rgba(255,255,255,0.48)");
+  glow.addColorStop(1, "rgba(255,255,255,0)");
+  ctx.fillStyle = glow;
+  ctx.fillRect(-32, -32, 64, 64);
+  ctx.strokeStyle = "#ffffff";
+  ctx.lineWidth = 4;
+  ctx.lineJoin = "bevel";
+  ctx.beginPath();
+  ctx.moveTo(3, -29);
+  ctx.lineTo(-7, -5);
+  ctx.lineTo(3, -1);
+  ctx.lineTo(-5, 13);
+  ctx.lineTo(1, 29);
+  ctx.lineTo(12, 7);
+  ctx.lineTo(4, 2);
+  ctx.lineTo(12, -13);
+  ctx.stroke();
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.arc(0, 0, 25, 0, Math.PI * 2);
+  ctx.stroke();
+}
+
 function darkHazardLines(hazard) {
   if (Array.isArray(hazard.lines)) return hazard.lines;
   if (hazard.variant === "lane_guide") {
@@ -1570,7 +2235,7 @@ function darkHazardLines(hazard) {
     const sideY = Math.cos(hazard.angle || 0);
     const forwardX = Math.cos(hazard.angle || 0);
     const forwardY = Math.sin(hazard.angle || 0);
-    const half = (hazard.length || 2400) / 2;
+    const half = (hazard.length || WORLD_SIZE) / 2;
     return [-1, 1].map((side) => {
       const offset = side * (hazard.width || 170) / 2;
       return {

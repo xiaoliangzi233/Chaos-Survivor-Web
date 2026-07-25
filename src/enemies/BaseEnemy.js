@@ -105,7 +105,15 @@ export class BaseEnemy {
     this.y += (dy / d) * this.speed * dir * dt;
     if (this.cooldown <= 0) {
       this.cooldown = this.elite ? 0.75 : 1.25;
-      spawnEnemyBullet(this.x, this.y, Math.atan2(dy, dx), this.color, this.elite ? 220 : 180, this.damage * 0.65);
+      spawnEnemyBullet(
+        this.x,
+        this.y,
+        Math.atan2(dy, dx),
+        this.color,
+        this.elite ? 220 : 180,
+        this.damage * 0.65,
+        { sourceType: this.type, visualId: basicProjectileVisualId(this) },
+      );
     }
   }
 
@@ -165,7 +173,13 @@ export class BaseEnemy {
     if (this.cooldown <= 0) {
       this.cooldown = this.behavior === "boss_crystal" ? 1.0 : 1.45;
       const count = this.behavior === "boss_crystal" ? 18 : 10;
-      for (let i = 0; i < count; i++) spawnEnemyBullet(this.x, this.y, (i / count) * TAU + this.phase, this.color, 170, this.damage * 0.45, { bossProjectile: true });
+      for (let i = 0; i < count; i++) {
+        spawnEnemyBullet(this.x, this.y, (i / count) * TAU + this.phase, this.color, 170, this.damage * 0.45, {
+          bossProjectile: true,
+          sourceType: this.type,
+          visualId: "bossSigil",
+        });
+      }
       if (this.behavior === "boss_void") addHazard(state.player.x, state.player.y, this.color, this.damage * 0.5);
     }
   }
@@ -247,7 +261,49 @@ export function setSpawnConfigured(fn) {
 }
 
 export function spawnEnemyBullet(x, y, angle, color, speed, damage, options = {}) {
-  world.enemyProjectiles.push({ x, y, vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed, r: 5, color, damage, life: 4, ...options });
+  const visualId = options.visualId
+    || options.shape
+    || (options.sourceType ? basicProjectileVisualId({
+      type: options.sourceType,
+      behavior: options.sourceBehavior,
+      boss: options.bossProjectile,
+    }) : "defaultEnemyBullet");
+  world.enemyProjectiles.push({
+    x,
+    y,
+    vx: Math.cos(angle) * speed,
+    vy: Math.sin(angle) * speed,
+    r: 5,
+    color,
+    damage,
+    life: 4,
+    shape: visualId,
+    ...options,
+    visualId,
+  });
+}
+
+export function basicProjectileVisualId(enemy) {
+  const type = enemy?.type || "";
+  if (type === "wisp" || type.includes("crystal") || type.includes("frost")) return "frostNeedle";
+  if (
+    type.includes("slime")
+    || type === "zombie"
+    || type === "brood_seeder"
+    || type === "magrail_brood_matriarch"
+  ) return "bioSpore";
+  if (
+    type === "wizard"
+    || type === "blackhole_mage"
+    || type === "phase_mirage"
+    || type === "shield_caster"
+    || type === "prism_medic"
+    || enemy?.behavior === "wizard"
+    || enemy?.behavior === "hazard_mage"
+    || enemy?.behavior === "boss_void"
+  ) return enemy?.boss ? "bossSigil" : "arcaneNeedle";
+  if (enemy?.boss) return "bossSigil";
+  return "mechSlug";
 }
 
 function spawnMinion(x, y) {

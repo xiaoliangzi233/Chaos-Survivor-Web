@@ -13,7 +13,7 @@ const fallbackDifficulty = {
   id: "neon",
   name: "霓虹荒野",
   desc: "标准体验。",
-  enemyLimit: 420,
+  enemyLimit: 140,
   spawnRate: 1,
   enemyHp: 1,
   enemyDamage: 1,

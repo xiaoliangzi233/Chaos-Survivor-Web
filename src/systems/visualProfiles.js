@@ -1,4 +1,6 @@
 import { TAU } from "../constants.js";
+import { ZOMBIE_VISUAL_VARIANTS } from "../enemies/zombie.js";
+import { applySlimeVisualVariant, slimeVisualVariantIds } from "../enemies/slime_shared.js";
 
 export const ENEMY_VISUAL_IDS = Object.freeze([
   "zombie", "lancer", "wisp",
@@ -26,6 +28,13 @@ const COMPOUND_ENEMIES = new Set(["blackhole_mage"]);
 
 const PROJECTILE_PROFILES = Object.freeze({
   defaultEnemyBullet: { texture: "enemyPellet", frames: 4, rotation: "velocity", scale: 2.15 },
+  orb: { texture: "orbGlow", frames: 1, rotation: "spin", scale: 2.35 },
+  bolt: { texture: "bolt", frames: 1, rotation: "velocity", scale: 2.45 },
+  bioSpore: { texture: "bioSpore", frames: 4, rotation: "spin", scale: 2.65 },
+  arcaneNeedle: { texture: "arcaneNeedle", frames: 4, rotation: "velocity", scale: 2.8 },
+  mechSlug: { texture: "mechSlug", frames: 4, rotation: "velocity", scale: 2.75 },
+  frostNeedle: { texture: "frostNeedle", frames: 4, rotation: "velocity", scale: 2.9 },
+  bossSigil: { texture: "bossSigil", frames: 6, rotation: "spin", scale: 3.35 },
   razorBoomerang: { texture: "razorBoomerang", frames: 4, rotation: "spin", scale: 2.6 },
   arcaneOrb: { texture: "arcaneOrb", frames: 6, rotation: "spin", scale: 2.8 },
   starShard: { texture: "starShard", frames: 4, rotation: "spin", scale: 2.8 },
@@ -54,6 +63,7 @@ const PROJECTILE_PROFILES = Object.freeze({
   darkEntityScythe: { texture: "darkEntityScythe", frames: 6, rotation: "spin", scale: 4.2 },
   darkEntityHunter: { texture: "darkEntityHunter", frames: 5, rotation: "velocity", scale: 4.0 },
 });
+const WARNED_PROJECTILE_VISUALS = new Set();
 
 export function enemyVisualProfile(id) {
   if (!ENEMY_VISUAL_IDS.includes(id)) return null;
@@ -62,6 +72,27 @@ export function enemyVisualProfile(id) {
     strategy: SEGMENTED_ENEMIES.has(id) ? "segmented" : COMPOUND_ENEMIES.has(id) ? "compound" : "atlas",
     clips: ENEMY_VISUAL_CLIPS,
   };
+}
+
+export function enemyVisualVariantIds(enemy) {
+  if (!enemy) return ["default"];
+  if (enemy.type === "zombie") return [...ZOMBIE_VISUAL_VARIANTS];
+  if (enemy.type?.startsWith("slime_")) return slimeVisualVariantIds(enemy);
+  return ["default"];
+}
+
+export function enemyVisualVariantKey(enemy) {
+  if (!enemy) return "default";
+  if (enemy.type === "zombie") return enemy.clothingVariant || "street";
+  if (enemy.type?.startsWith("slime_")) return enemy.slimeVariant || "green";
+  return "default";
+}
+
+export function applyEnemyVisualVariant(enemy, variantKey) {
+  if (!enemy || variantKey === "default") return enemy;
+  if (enemy.type === "zombie") enemy.clothingVariant = ZOMBIE_VISUAL_VARIANTS.includes(variantKey) ? variantKey : "street";
+  else if (enemy.type?.startsWith("slime_")) applySlimeVisualVariant(enemy, variantKey);
+  return enemy;
 }
 
 export function enemyVisualState(enemy) {
@@ -133,7 +164,13 @@ export function projectileVisualProfile(projectileOrShape) {
 }
 
 export function hasProjectileVisualProfile(shape) {
-  return Boolean(PROJECTILE_PROFILES[shape || "defaultEnemyBullet"]);
+  const id = shape || "defaultEnemyBullet";
+  const registered = Boolean(PROJECTILE_PROFILES[id]);
+  if (!registered && !WARNED_PROJECTILE_VISUALS.has(id)) {
+    WARNED_PROJECTILE_VISUALS.add(id);
+    globalThis.console?.warn?.(`[render] 未注册的敌方弹幕视觉: ${id}`);
+  }
+  return registered;
 }
 
 export function projectileVisualIds() {

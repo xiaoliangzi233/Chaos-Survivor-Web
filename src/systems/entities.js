@@ -325,6 +325,8 @@ function updateEnemyProjectiles(dt) {
   let removed = 0;
   for (let i = world.enemyProjectiles.length - 1; i >= 0; i--) {
     const b = world.enemyProjectiles[i];
+    b.visualId ||= b.shape || "defaultEnemyBullet";
+    b.shape ||= b.visualId;
     updateSpecialEnemyProjectile(b, dt);
     updatePrismRefraction(b);
     const speedScale = (activeWaveEffect("mini_overdrive") && !b.bossProjectile ? 1.5 : 1) * (activeWaveEffect("overclock_pulse") && !b.bossProjectile ? overclockPulseMultiplier() : 1);
@@ -504,7 +506,9 @@ function updateHazards(dt) {
       ? scientistHazardHit(h, p)
       : convictHazard
       ? convictHazardHit(h, p)
-      : h.kind === "storm_laser_net" || h.kind === "polar_ice_lane" || h.kind === "riftblade_slash"
+      : h.kind === "storm_laser_net"
+        ? stormLineHazardHit(h, p)
+      : h.kind === "polar_ice_lane" || h.kind === "riftblade_slash"
         ? pointLineDistance(p.x, p.y, h.x, h.y, h.angle || 0, h.length || 1200) < p.r + (h.width || 18)
         : distSq(h.x, h.y, p.x, p.y) < (h.r + p.r) ** 2;
     if (hit && p.invuln <= 0 && canDamage && !h.playerHit) {
@@ -870,6 +874,26 @@ function pointLineDistance(px, py, x, y, angle, length) {
   const half = length / 2;
   if (forward < -half || forward > half) return Infinity;
   return Math.abs(dx * -vy + dy * vx);
+}
+
+export function stormLineHazardHit(hazard, body) {
+  const padding = (body.r || 0) + (hazard.width || 18);
+  if (
+    Number.isFinite(hazard.minX)
+    && (
+      body.x + padding < hazard.minX
+      || body.x - padding > hazard.maxX
+      || body.y + padding < hazard.minY
+      || body.y - padding > hazard.maxY
+    )
+  ) return false;
+  const vx = Number.isFinite(hazard.directionX) ? hazard.directionX : Math.cos(hazard.angle || 0);
+  const vy = Number.isFinite(hazard.directionY) ? hazard.directionY : Math.sin(hazard.angle || 0);
+  const dx = body.x - hazard.x;
+  const dy = body.y - hazard.y;
+  const forward = dx * vx + dy * vy;
+  if (Math.abs(forward) > (hazard.length || 1200) * 0.5) return false;
+  return Math.abs(dx * -vy + dy * vx) < padding;
 }
 
 function updateEmberMine(h, dt) {
@@ -1353,6 +1377,16 @@ function updateStormLaserNet(h, dt) {
   if (h.armTime > 0) h.armTime = Math.max(0, h.armTime - dt);
   h.x += (h.vx || 0) * dt;
   h.y += (h.vy || 0) * dt;
+  if (Number.isFinite(h.sweepEnd)) {
+    const axis = h.sweepAxis === "y" ? "y" : "x";
+    const velocityKey = axis === "y" ? "vy" : "vx";
+    const velocity = h[velocityKey] || 0;
+    if ((velocity >= 0 && h[axis] >= h.sweepEnd) || (velocity < 0 && h[axis] <= h.sweepEnd)) {
+      h[axis] = h.sweepEnd;
+      h[velocityKey] = 0;
+    }
+    return;
+  }
   const half = WORLD_SIZE / 2 + 180;
   if (h.fullWave && h.x < -half) h.x = half;
   if (h.fullWave && h.x > half) h.x = -half;
@@ -1616,8 +1650,17 @@ function updateSpecialEnemyProjectile(b, dt) {
       b.vx += (dx / d * speed - b.vx) * Math.min(1, dt * 6.5);
       b.vy += (dy / d * speed - b.vy) * Math.min(1, dt * 6.5);
     }
-  } else if (b.shape === "fastGear" || b.shape === "starShard" || b.shape === "phaseShard" || b.shape === "arcaneOrb" || b.shape === "slimeOrb" || b.shape === "zombieClot") {
-    b.spin = (b.spin || 0) + dt * (b.shape === "fastGear" ? 18 : 6);
+  } else if (
+    b.shape === "fastGear"
+    || b.shape === "starShard"
+    || b.shape === "phaseShard"
+    || b.shape === "arcaneOrb"
+    || b.shape === "slimeOrb"
+    || b.shape === "zombieClot"
+    || b.shape === "bioSpore"
+    || b.shape === "bossSigil"
+  ) {
+    b.spin = (b.spin || 0) + dt * (b.shape === "fastGear" ? 18 : b.shape === "bossSigil" ? 9 : 6);
   }
 }
 

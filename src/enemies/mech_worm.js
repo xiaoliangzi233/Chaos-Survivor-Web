@@ -270,11 +270,40 @@ export class MechWorm extends BaseEnemy {
     const flash = this.flash > 0;
     ctx.save();
     drawWormShadow(ctx, this);
+    drawWormBodyRibbon(ctx, this, flash);
     for (let i = this.segments.length - 1; i >= 0; i--) drawSegment(ctx, this, this.segments[i], i, flash);
     drawHead(ctx, this, flash);
     if (this.state === "charge") drawCharge(ctx, this);
     ctx.restore();
   }
+}
+
+function drawWormBodyRibbon(ctx, e, flash) {
+  if (!e.segments.length) return;
+  const points = [{ x: e.x, y: e.y }, ...e.segments];
+  const trace = () => {
+    ctx.beginPath();
+    ctx.moveTo(points[0].x, points[0].y);
+    for (let index = 1; index < points.length - 1; index++) {
+      const current = points[index];
+      const next = points[index + 1];
+      ctx.quadraticCurveTo(current.x, current.y, (current.x + next.x) * 0.5, (current.y + next.y) * 0.5);
+    }
+    const tail = points[points.length - 1];
+    ctx.lineTo(tail.x, tail.y);
+  };
+  ctx.save();
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+  ctx.strokeStyle = flash ? "#ffffff" : "#211331";
+  ctx.lineWidth = e.r * 1.08;
+  trace();
+  ctx.stroke();
+  ctx.strokeStyle = flash ? "rgba(255,255,255,0.9)" : "rgba(255,101,216,0.78)";
+  ctx.lineWidth = e.r * 0.34;
+  trace();
+  ctx.stroke();
+  ctx.restore();
 }
 
 function drawWormShadow(ctx, e) {
@@ -327,19 +356,51 @@ function drawHead(ctx, e, flash) {
   const accent = flash ? "#ffffff" : e.color;
   ctx.fillStyle = body;
   ctx.beginPath();
-  ctx.moveTo(e.r * 1.35, 0);
-  ctx.lineTo(e.r * 0.42, -e.r * 0.82);
-  ctx.lineTo(-e.r * 0.9, -e.r * 0.6);
-  ctx.lineTo(-e.r * 1.08, e.r * 0.6);
-  ctx.lineTo(e.r * 0.42, e.r * 0.82);
+  ctx.moveTo(e.r * 1.55, 0);
+  ctx.lineTo(e.r * 1.05, -e.r * 0.6);
+  ctx.lineTo(e.r * 0.2, -e.r * 0.88);
+  ctx.lineTo(-e.r * 1.05, -e.r * 0.58);
+  ctx.lineTo(-e.r * 1.22, 0);
+  ctx.lineTo(-e.r * 1.05, e.r * 0.58);
+  ctx.lineTo(e.r * 0.2, e.r * 0.88);
+  ctx.lineTo(e.r * 1.05, e.r * 0.6);
   ctx.closePath();
   ctx.fill();
   ctx.strokeStyle = accent;
   ctx.lineWidth = 2.2;
   ctx.stroke();
+  ctx.fillStyle = "#291638";
+  ctx.beginPath();
+  ctx.moveTo(e.r * 1.55, 0);
+  ctx.lineTo(e.r * 0.9, -e.r * 0.08);
+  ctx.lineTo(e.r * 0.28, 0);
+  ctx.lineTo(e.r * 0.9, e.r * 0.36);
+  ctx.lineTo(e.r * 1.34, e.r * 0.3);
+  ctx.closePath();
+  ctx.fill();
+  ctx.strokeStyle = "rgba(255,255,255,0.46)";
+  ctx.lineWidth = 1.2;
+  ctx.stroke();
   ctx.fillStyle = charge || strike ? "#ffffff" : "#ffb8f2";
-  ctx.fillRect(e.r * 0.18, -e.r * 0.35, e.r * 0.44, e.r * 0.18);
-  ctx.fillRect(e.r * 0.18, e.r * 0.17, e.r * 0.44, e.r * 0.18);
+  for (const side of [-1, 1]) {
+    ctx.beginPath();
+    ctx.moveTo(e.r * 0.28, side * e.r * 0.43);
+    ctx.lineTo(e.r * 0.82, side * e.r * 0.32);
+    ctx.lineTo(e.r * 0.44, side * e.r * 0.12);
+    ctx.closePath();
+    ctx.fill();
+  }
+  ctx.fillStyle = "#ffffff";
+  for (const [x, y] of [[1.03, -0.05], [1.31, 0.08]]) {
+    ctx.beginPath();
+    ctx.moveTo(e.r * x, e.r * y);
+    ctx.lineTo(e.r * (x - 0.22), e.r * 0.46);
+    ctx.lineTo(e.r * (x - 0.29), e.r * 0.02);
+    ctx.closePath();
+    ctx.fill();
+  }
+  ctx.fillStyle = accent;
+  ctx.fillRect(e.r * 1.18, -e.r * 0.38, e.r * 0.14, e.r * 0.09);
   ctx.strokeStyle = "rgba(255,255,255,0.5)";
   ctx.beginPath();
   ctx.moveTo(-e.r * 0.7, 0);

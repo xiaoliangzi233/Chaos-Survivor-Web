@@ -208,15 +208,20 @@ function spawnSweepingLaserMaze(event) {
   const horizontal = Math.random() < 0.5;
   const fromNegative = Math.random() < 0.5;
   const span = WORLD_SIZE * 1.34;
-  const startEdge = (fromNegative ? -1 : 1) * (WORLD_SIZE / 2 + 120);
+  const travel = sweepingLaserTravelPlan(event, {
+    fromNegative,
+    playerRadius: state.player.r,
+    waveDuration: state.waveDuration,
+  });
+  const startEdge = travel.start;
   const target = horizontal ? state.player.y : state.player.x;
   const direction = Math.sign(target - startEdge) || (fromNegative ? 1 : -1);
   world.hazards.push({
     kind: "storm_laser_net",
     x: horizontal ? 0 : startEdge,
     y: horizontal ? startEdge : 0,
-    vx: horizontal ? 0 : direction * (event.speed || 150),
-    vy: horizontal ? direction * (event.speed || 150) : 0,
+    vx: horizontal ? 0 : direction * travel.speed,
+    vy: horizontal ? direction * travel.speed : 0,
     angle: horizontal ? 0 : Math.PI / 2,
     length: span,
     width: event.width || 34,
@@ -227,8 +232,34 @@ function spawnSweepingLaserMaze(event) {
     armTime: event.armTime || 1.1,
     armDuration: event.armTime || 1.1,
     fullWave: Boolean(event.fullWave),
+    sweepEnd: travel.end,
+    sweepAxis: horizontal ? "y" : "x",
     surgeTime: 0.32,
   });
+}
+
+export function sweepingLaserTravelPlan(event, {
+  fromNegative = true,
+  playerRadius = 15,
+  waveDuration = 36,
+} = {}) {
+  const half = WORLD_SIZE / 2;
+  const start = (fromNegative ? -1 : 1) * (half + 120);
+  const direction = fromNegative ? 1 : -1;
+  if (!Number.isFinite(event?.endSafetyPadding)) {
+    return { start, end: null, speed: event?.speed || 150 };
+  }
+  const collisionWidth = Math.max(0, Number(event.width) || 34);
+  const safePassage = Math.max(0, playerRadius * 2 + Number(event.endSafetyPadding));
+  const end = direction > 0
+    ? half - collisionWidth - safePassage
+    : -half + collisionWidth + safePassage;
+  return {
+    start,
+    end,
+    speed: Math.abs(end - start) / Math.max(0.001, Number(waveDuration) || 36),
+    safePassage,
+  };
 }
 
 function spawnMirrorLaserGate(event) {

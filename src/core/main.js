@@ -69,6 +69,7 @@ import {
 } from "../systems/randomMode.js";
 import {
   cancelLobbyLaunch,
+  cancelLobbyPlayerMove,
   configureLobbyDifficulties,
   configureLobbyWeapons,
   enterLobby,
@@ -79,6 +80,7 @@ import {
   selectedLobbyWeapon,
   setLobbyHoveredInteraction,
   setLobbyModalOpen,
+  setLobbyPlayerMoveTarget,
   updateLobby,
 } from "../systems/lobby.js";
 import { lobbyScreenToWorld } from "../systems/lobbyRenderer.js";
@@ -668,7 +670,12 @@ export async function bootGame() {
     const target = findLobbyInteractionAtWorld(worldPoint.x, worldPoint.y);
     setLobbyHoveredInteraction(target?.id || null);
     ui.canvas.classList.toggle("lobby-target-hover", Boolean(target));
-    if (!activate || !target) return Boolean(target);
+    if (!activate) return Boolean(target);
+    if (!target) {
+      ui.canvas.classList.remove("lobby-target-hover");
+      return setLobbyPlayerMoveTarget(worldPoint.x, worldPoint.y);
+    }
+    cancelLobbyPlayerMove();
     return handleLobbyInteraction(target.id);
   }
 

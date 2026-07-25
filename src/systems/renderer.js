@@ -18,6 +18,7 @@ import { hasProjectileVisualProfile } from "./visualProfiles.js";
 
 export const viewport = { width: 1, height: 1, dpr: 1 };
 const darkEntityProjectileSprites = new Map();
+const themedEnemyProjectileSprites = new Map();
 
 export function bossHudLayout(view, boss) {
   const twin = Boolean(boss?.shared?.members);
@@ -205,6 +206,7 @@ export function render(ctx, options = {}) {
 
 export function renderScreenOverlay(ctx, frame) {
   if (!frame) return;
+  drawStormSceneOverlay(ctx);
   renderLighting(ctx, frame, viewport);
   drawBossBar(ctx);
   drawBossDirectionIndicator(ctx);
@@ -216,6 +218,19 @@ export function renderScreenOverlay(ctx, frame) {
   drawAiDebug(ctx, viewport, { x: state.cameraX, y: state.cameraY });
   drawAiHud(ctx, viewport);
   drawEasterEggToast(ctx, viewport);
+}
+
+function drawStormSceneOverlay(ctx) {
+  const boss = world.boss;
+  if (!boss || boss.type !== "storm_tyrant") return;
+  const scene = boss.mode === "storm_cage_scene"
+    || boss.mode === "storm_skyfall_scene"
+    || boss.mode === "storm_tempest_throne"
+    || boss.mode === "phase_transition";
+  if (!scene) return;
+  const alpha = boss.mode === "storm_tempest_throne" ? 0.16 : boss.mode === "phase_transition" ? 0.12 : 0.085;
+  ctx.fillStyle = hexToRgba(boss.phaseColor(), alpha);
+  ctx.fillRect(0, 0, viewport.width, viewport.height);
 }
 
 function renderMenuScene(ctx) {
@@ -2383,7 +2398,13 @@ function drawCoins(ctx) {
     ctx.save();
     ctx.translate(c.x, c.y + Math.sin(phase * 0.55) * 1.4);
     ctx.rotate(phase * (magnetized ? 1.8 : 0.35));
-    ctx.scale(magnetized ? 1.16 : 1, magnetized ? 0.82 : 1);
+    const uniformScale = magnetized ? 1.1 : 1;
+    ctx.scale(uniformScale, uniformScale);
+    const coinGlow = ctx.createRadialGradient(0, 0, r * 0.35, 0, 0, r * 2.1);
+    coinGlow.addColorStop(0, hexToRgba(tier === 2 ? "#ff8bd8" : "#ffd166", 0.32));
+    coinGlow.addColorStop(1, hexToRgba("#ffd166", 0));
+    ctx.fillStyle = coinGlow;
+    ctx.fillRect(-r * 2.2, -r * 2.2, r * 4.4, r * 4.4);
     ctx.fillStyle = "#5b3109";
     ctx.strokeStyle = tier === 2 ? "#ff8bd8" : "#ffd166";
     ctx.lineWidth = 1.6;
@@ -2427,7 +2448,7 @@ export function isPixiBatchableEnemyProjectile(projectile) {
 }
 
 export function isPixiBatchableEnemy(enemy) {
-  return Boolean(enemy && !enemy.boss && !enemy.elite);
+  return Boolean(enemy && !enemy.elite && (!enemy.boss || enemy.type === "storm_tyrant"));
 }
 
 function drawEnemyProjectiles(ctx, skipPredicate) {
@@ -2480,6 +2501,10 @@ function drawEnemyProjectiles(ctx, skipPredicate) {
     }
     if (b.shape === "slimeOrb") {
       drawSlimeOrbProjectile(ctx, b);
+      continue;
+    }
+    if (b.shape === "bioSpore" || b.shape === "arcaneNeedle" || b.shape === "mechSlug" || b.shape === "frostNeedle" || b.shape === "bossSigil") {
+      drawThemedEnemyProjectile(ctx, b);
       continue;
     }
     if (b.shape === "pylonBolt" || b.shape === "gunnerShot" || b.shape === "laserShard") {
@@ -3247,7 +3272,119 @@ export function isPixiBatchableHazard(hazard) {
   return hazard?.kind === "convict_chain_arc"
     || hazard?.kind === "convict_ball_slam"
     || hazard?.kind === "convict_chain_line"
-    || hazard?.kind === "convict_chain_path";
+    || hazard?.kind === "convict_chain_path"
+    || hazard?.kind === "storm_laser_net"
+    || hazard?.kind === "storm_strike";
+}
+
+function drawThemedEnemyProjectile(ctx, projectile) {
+  const radius = Math.max(4, Math.round((projectile.r || 5) * 2) / 2);
+  const color = projectile.color || "#ff4d6d";
+  const key = `${projectile.shape}:${radius}:${color}`;
+  let sprite = themedEnemyProjectileSprites.get(key);
+  if (!sprite) {
+    const width = projectile.shape === "bossSigil" ? 72 : 88;
+    const height = projectile.shape === "bossSigil" ? 72 : 52;
+    const scale = 2;
+    const canvas = document.createElement("canvas");
+    canvas.width = width * scale;
+    canvas.height = height * scale;
+    const spriteCtx = canvas.getContext("2d", { alpha: true });
+    spriteCtx.scale(scale, scale);
+    spriteCtx.translate(width / 2, height / 2);
+    paintThemedEnemyProjectile(spriteCtx, projectile.shape, radius, color);
+    sprite = { canvas, width, height };
+    themedEnemyProjectileSprites.set(key, sprite);
+  }
+  const velocityAngle = Math.atan2(projectile.vy || 0, projectile.vx || 1);
+  const rotation = projectile.shape === "bioSpore" || projectile.shape === "bossSigil"
+    ? projectile.spin || 0
+    : velocityAngle;
+  ctx.save();
+  ctx.translate(projectile.x, projectile.y);
+  ctx.rotate(rotation);
+  ctx.globalCompositeOperation = "lighter";
+  ctx.drawImage(sprite.canvas, -sprite.width / 2, -sprite.height / 2, sprite.width, sprite.height);
+  ctx.restore();
+}
+
+function paintThemedEnemyProjectile(ctx, shape, radius, color) {
+  const glowGradient = ctx.createRadialGradient(0, 0, 1, 0, 0, radius * 3.1);
+  glowGradient.addColorStop(0, hexToRgba(color, 0.64));
+  glowGradient.addColorStop(1, hexToRgba(color, 0));
+  ctx.fillStyle = glowGradient;
+  ctx.fillRect(-radius * 3.2, -radius * 3.2, radius * 6.4, radius * 6.4);
+
+  if (shape === "bioSpore") {
+    ctx.fillStyle = "#14261b";
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 1.6;
+    ctx.beginPath();
+    for (let index = 0; index < 12; index++) {
+      const angle = index / 12 * TAU;
+      const r = radius * (index % 2 ? 1.05 : 1.55);
+      const x = Math.cos(angle) * r;
+      const y = Math.sin(angle) * r;
+      if (index) ctx.lineTo(x, y);
+      else ctx.moveTo(x, y);
+    }
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = "#ffffff";
+    ctx.beginPath();
+    ctx.arc(radius * 0.28, -radius * 0.25, radius * 0.46, 0, TAU);
+    ctx.fill();
+    return;
+  }
+
+  if (shape === "bossSigil") {
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(0, 0, radius * 2, 0, TAU);
+    ctx.stroke();
+    ctx.rotate(Math.PI / 6);
+    polygon(ctx, 0, 0, radius * 1.55, 6, 0, color, false);
+    ctx.fillStyle = "#ffffff";
+    ctx.beginPath();
+    ctx.arc(0, 0, radius * 0.72, 0, TAU);
+    ctx.fill();
+    return;
+  }
+
+  const tail = ctx.createLinearGradient(-radius * 5, 0, radius * 2.5, 0);
+  tail.addColorStop(0, hexToRgba(color, 0));
+  tail.addColorStop(0.58, hexToRgba(color, 0.42));
+  tail.addColorStop(1, "#ffffff");
+  ctx.fillStyle = tail;
+  ctx.strokeStyle = shape === "mechSlug" ? color : "#ffffff";
+  ctx.lineWidth = 1.4;
+  ctx.beginPath();
+  if (shape === "mechSlug") {
+    ctx.moveTo(radius * 2.8, 0);
+    ctx.lineTo(radius, -radius);
+    ctx.lineTo(-radius * 2.2, -radius * 0.72);
+    ctx.lineTo(-radius * 4.3, 0);
+    ctx.lineTo(-radius * 2.2, radius * 0.72);
+    ctx.lineTo(radius, radius);
+  } else {
+    ctx.moveTo(radius * 3.1, 0);
+    ctx.lineTo(radius * 0.2, -radius * 1.2);
+    ctx.lineTo(-radius * 3.8, 0);
+    ctx.lineTo(radius * 0.2, radius * 1.2);
+  }
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(-radius * 0.6, -radius * 0.25, radius * 2.2, radius * 0.5);
+  if (shape === "arcaneNeedle") {
+    ctx.strokeStyle = color;
+    ctx.beginPath();
+    ctx.ellipse(-radius * 0.4, 0, radius * 1.7, radius, 0, 0, TAU);
+    ctx.stroke();
+  }
 }
 
 function drawHazards(ctx, skipPredicate) {

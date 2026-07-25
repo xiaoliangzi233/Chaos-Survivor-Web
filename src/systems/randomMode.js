@@ -9,8 +9,8 @@ export const RANDOM_GOAL_TWENTY_WAVES = "twenty_waves";
 export const RANDOM_GOAL_ENDLESS = "endless";
 export const RANDOM_WAVE_SECONDS = 60;
 
-const RANDOM_NORMAL_CAP = 360;
-const RANDOM_BOSS_CAP = 220;
+const RANDOM_NORMAL_CAP = 120;
+const RANDOM_BOSS_CAP = 73;
 const DEFAULT_RANDOM_SEED = 0x51f15e;
 
 const EVENT_BLUEPRINTS = {

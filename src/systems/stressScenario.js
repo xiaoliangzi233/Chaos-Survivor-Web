@@ -31,6 +31,7 @@ export function populateDeterministicStressScenario(seed = 0x51f15e) {
         ordinaryEnemyIds[index % ordinaryEnemyIds.length],
         Math.cos(angle) * radius,
         Math.sin(angle) * radius,
+        { ignoreLimit: true },
       );
     }
     for (const enemy of world.enemies) {

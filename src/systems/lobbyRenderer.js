@@ -2036,10 +2036,11 @@ function drawLobbyPet(ctx, pet, time) {
     if (sniffing) {
       ctx.strokeStyle = hexToRgba(LOBBY_PET.color, 0.52);
       ctx.lineWidth = 2;
+      const arc = lobbyPetSniffArc(face);
       for (let index = 0; index < 3; index++) {
         const radius = 14 + index * 9 + (time * 18 % 9);
         ctx.beginPath();
-        ctx.arc(face * 52, -18, radius, -0.7, 0.7);
+        ctx.arc(arc.centerX, -18, radius, arc.startAngle, arc.endAngle);
         ctx.stroke();
       }
     } else if (sleeping) {
@@ -2076,6 +2077,15 @@ function drawLobbyPet(ctx, pet, time) {
     ctx.fillText(pet.bubble, 0, -75);
     ctx.restore();
   }
+}
+
+export function lobbyPetSniffArc(face) {
+  const direction = face < 0 ? -1 : 1;
+  return {
+    centerX: direction * 52,
+    startAngle: direction < 0 ? Math.PI - 0.7 : -0.7,
+    endAngle: direction < 0 ? Math.PI + 0.7 : 0.7,
+  };
 }
 
 function drawMobileLight(ctx, light, position, time) {

@@ -18,8 +18,10 @@ import {
   setupEnemyRegistry,
 } from "../src/systems/enemyRegistry.js";
 import {
+  applyEnemyVisualVariant,
   applyEnemyBakePose,
   ENEMY_VISUAL_CLIPS,
+  enemyVisualVariantIds,
   projectileVisualIds,
   projectileVisualProfile,
 } from "../src/systems/visualProfiles.js";
@@ -400,15 +402,19 @@ function addEnemyTasks(tasks, mode) {
   const ids = Object.keys(enemyConfig).sort();
   const selectedIds = mode === "smoke" ? ids.slice(0, 2) : ids;
   for (const id of selectedIds) {
-    for (const [clip, frameCount] of Object.entries(ENEMY_VISUAL_CLIPS)) {
-      const count = mode === "smoke" ? 1 : frameCount;
-      for (let frame = 0; frame < count; frame++) {
-        tasks.push(task(
-          "enemies",
-          `${id}-${clip}-${frame}`,
-          `enemies/${safeId(id)}/${clip}/${frameName(frame)}.png`,
-          () => drawEnemyFrame(id, clip, frame, frameCount),
-        ));
+    const probe = createDecorativeEnemy(id, 0, 0);
+    const variants = enemyVisualVariantIds(probe);
+    for (const variantKey of mode === "smoke" ? variants.slice(0, 1) : variants) {
+      for (const [clip, frameCount] of Object.entries(ENEMY_VISUAL_CLIPS)) {
+        const count = mode === "smoke" ? 1 : frameCount;
+        for (let frame = 0; frame < count; frame++) {
+          tasks.push(task(
+            "enemies",
+            `${id}-${variantKey}-${clip}-${frame}`,
+            `enemies/${safeId(id)}/${safeId(variantKey)}/${clip}/${frameName(frame)}.png`,
+            () => drawEnemyFrame(id, variantKey, clip, frame, frameCount),
+          ));
+        }
       }
     }
   }
@@ -662,7 +668,7 @@ function drawPlayerFrame(clip, frame, frameCount) {
   return canvas;
 }
 
-function drawEnemyFrame(id, clip, frame, frameCount) {
+function drawEnemyFrame(id, variantKey, clip, frame, frameCount) {
   const config = enemyConfig[id];
   const size = config?.boss ? 640 : 192;
   const canvas = createCanvas(size, size);
@@ -672,6 +678,7 @@ function drawEnemyFrame(id, clip, frame, frameCount) {
   state.player.y = 0;
   state.time = frame / frameCount * 2;
   const enemy = createDecorativeEnemy(id, 0, 0);
+  applyEnemyVisualVariant(enemy, variantKey);
   if (!enemy) throw new Error(`敌人 ${id} 没有注册绘制类`);
   applyEnemyBakePose(enemy, clip, frame / frameCount);
   enemy.x = 0;
@@ -772,7 +779,8 @@ function drawPixiGlyph(name, size) {
   const ctx = canvas.getContext("2d");
   ctx.imageSmoothingEnabled = false;
   const inset = Math.round(size * 0.08);
-  ctx.drawImage(source, inset, inset, size - inset * 2, size - inset * 2);
+  const frame = texture.frame;
+  ctx.drawImage(source, frame.x, frame.y, frame.width, frame.height, inset, inset, size - inset * 2, size - inset * 2);
   return canvas;
 }
 

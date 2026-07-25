@@ -223,6 +223,55 @@ canvas {
   display: grid;
 }
 
+.debuff-status-bar {
+  position: relative;
+  z-index: 1;
+  display: none;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 5px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(255, 107, 122, 0.2);
+}
+
+.debuff-status-bar.active {
+  display: grid;
+}
+
+.debuff-status-chip {
+  --debuff-color: #d58cff;
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+  padding: 4px 6px;
+  border: 1px solid color-mix(in srgb, var(--debuff-color) 55%, transparent);
+  border-radius: 3px;
+  background: linear-gradient(90deg, color-mix(in srgb, var(--debuff-color) 18%, transparent), rgba(2, 7, 16, 0.72));
+  box-shadow: inset 2px 0 0 var(--debuff-color), 0 0 12px color-mix(in srgb, var(--debuff-color) 16%, transparent);
+}
+
+.debuff-status-chip i {
+  color: var(--debuff-color);
+  font-style: normal;
+  text-align: center;
+  text-shadow: 0 0 8px var(--debuff-color);
+}
+
+.debuff-status-chip b {
+  overflow: hidden;
+  color: var(--ink);
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.debuff-status-chip strong {
+  color: var(--debuff-color);
+  font-size: 9px;
+  white-space: nowrap;
+}
+
 .item-status-chip {
   position: relative;
   display: grid;
@@ -5642,6 +5691,24 @@ body.story-open .menu-actions {
 }
 
 @media (max-width: 760px) {
+  .debuff-status-bar {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .debuff-status-chip {
+    grid-template-columns: 18px 1fr;
+    padding: 3px 4px;
+  }
+
+  .debuff-status-chip b {
+    display: none;
+  }
+
+  .debuff-status-chip strong {
+    grid-column: 1 / -1;
+    text-align: center;
+  }
+
   .quick-actions {
     display: block;
     inset: 0;

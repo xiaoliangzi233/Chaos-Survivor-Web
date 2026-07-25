@@ -393,6 +393,18 @@ function drawPlayer(ctx) {
   ctx.fillStyle = "rgba(0,0,0,0.28)";
   ctx.beginPath(); ctx.ellipse(0, 21, 22, 7, 0, 0, TAU); ctx.fill();
   drawPlayerAvatar(ctx, p, { time: state.time, moving, hurt, low, mood });
+  if (p.statusFlash > 0 || Object.keys(p.statusEffects || {}).length) {
+    const color = p.statusFlashColor || Object.values(p.statusEffects || {})[0]?.color || "#d58cff";
+    ctx.globalCompositeOperation = "lighter";
+    ctx.strokeStyle = color;
+    ctx.globalAlpha = 0.34 + Math.sin(state.time * 10) * 0.08;
+    ctx.lineWidth = 2;
+    ctx.setLineDash([5, 4]);
+    ctx.beginPath();
+    ctx.ellipse(0, 0, 22, 27, 0, 0, TAU);
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
   ctx.restore();
 }
 
@@ -3269,6 +3281,11 @@ export function isPixiBatchableHazard(hazard) {
       || hazard.variant === "wing_guide"
       || Array.isArray(hazard.lines);
   }
+  if (hazard?.minionSkill) {
+    return hazard.kind !== "brood_pod"
+      && hazard.kind !== "prism_reflector"
+      && hazard.kind !== "magnetic_node";
+  }
   return hazard?.kind === "convict_chain_arc"
     || hazard?.kind === "convict_ball_slam"
     || hazard?.kind === "convict_chain_line"
@@ -3391,6 +3408,10 @@ function drawHazards(ctx, skipPredicate) {
   for (const h of world.hazards) {
     if (skipPredicate?.(h)) continue;
     const alpha = Math.max(0, h.life / h.maxLife);
+    if (h.minionSkill && h.kind !== "brood_pod" && h.kind !== "prism_reflector" && h.kind !== "magnetic_node") {
+      drawMinionMechanicHazard(ctx, h, alpha);
+      continue;
+    }
     if (h.kind === "dark_entity_field") {
       if (h.variant === "negative_star" && !inView(h.x, h.y, (h.r || 72) + 80)) continue;
       drawDarkEntityFieldHazard(ctx, h, alpha);
@@ -3524,6 +3545,60 @@ function drawHazards(ctx, skipPredicate) {
     ctx.beginPath(); ctx.arc(0, 0, h.r, 0, TAU); ctx.fill();
     ctx.restore();
   }
+}
+
+function drawMinionMechanicHazard(ctx, h, alpha) {
+  const armed = (h.armTime || 0) <= 0;
+  const color = h.color || "#d58cff";
+  const flicker = 0.76 + Math.sin(state.time * 10 + (h.spin || 0)) * 0.18;
+  ctx.save();
+  ctx.globalCompositeOperation = "lighter";
+  ctx.globalAlpha = Math.max(0.18, alpha) * flicker;
+  ctx.strokeStyle = color;
+  ctx.fillStyle = hexToRgba(color, armed ? 0.12 : 0.05);
+  ctx.lineWidth = armed ? Math.max(2, h.width || 3) : 2;
+  ctx.setLineDash(armed ? [] : [9, 7]);
+  if (h.x1 != null && h.x2 != null) {
+    ctx.beginPath();
+    ctx.moveTo(h.x1, h.y1);
+    ctx.lineTo(h.x2, h.y2);
+    ctx.stroke();
+    if (armed) {
+      ctx.globalAlpha *= 0.44;
+      ctx.lineWidth = Math.max(5, (h.width || 12) * 1.8);
+      ctx.stroke();
+    }
+  } else {
+    ctx.translate(h.x, h.y);
+    ctx.rotate(h.spin || 0);
+    ctx.beginPath();
+    if (h.coneAngle != null) {
+      ctx.rotate(-(h.spin || 0));
+      ctx.moveTo(0, 0);
+      ctx.arc(0, 0, h.r || 54, h.coneAngle - (h.coneArc || 0.8) * 0.5, h.coneAngle + (h.coneArc || 0.8) * 0.5);
+      ctx.closePath();
+    } else if (h.polygonSides) {
+      for (let i = 0; i < h.polygonSides * 2; i++) {
+        const angle = -Math.PI / 2 + i * Math.PI * 2 / (h.polygonSides * 2);
+        const radius = i % 2 ? h.r * 0.42 : h.r;
+        const x = Math.cos(angle) * radius;
+        const y = Math.sin(angle) * radius;
+        if (!i) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      }
+      ctx.closePath();
+    } else {
+      ctx.arc(0, 0, h.r || 54, 0, TAU);
+    }
+    ctx.fill();
+    ctx.stroke();
+    ctx.globalAlpha *= 0.6;
+    ctx.beginPath();
+    ctx.arc(0, 0, (h.r || 54) * (armed ? 0.72 : 0.48), 0, TAU);
+    ctx.stroke();
+  }
+  ctx.setLineDash([]);
+  ctx.restore();
 }
 
 // Used by the offline visual asset exporter. Keeping this small bridge here

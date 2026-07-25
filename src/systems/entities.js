@@ -12,18 +12,36 @@ import { waveScenarioSpawnRate } from "../config/wave-scenario-config.js";
 import { activeWaveEffect } from "./waveScenarios.js";
 import { isRandomMode, randomEnemyLimitForWave } from "./randomMode.js";
 export { applyFrostMark } from "./statusEffects.js";
-import { applyFrostMark } from "./statusEffects.js";
+import {
+  applyFrostMark,
+  applyPlayerStatus,
+  clearPlayerStatusEffects,
+  playerStatusModifiers,
+  updatePlayerStatusEffects,
+} from "./statusEffects.js";
 import { coinAmountForEnemy, dropCoin, dropGem } from "./rewards.js";
 import { framePerformance } from "./performanceMonitor.js";
 import { releaseBossEffect } from "./bossEffectRegistry.js";
+import {
+  addMinionHazard,
+  applyMinionHazardStatus,
+  beginMinionMechanicFrame,
+  endMinionMechanicFrame,
+  expireMinionProjectile,
+  notifyMinionKilled,
+  updateMinionHazard,
+} from "./minionMechanics.js";
 
 export { coinAmountForEnemy, dropCoin, dropGem } from "./rewards.js";
 
+const AI_PRIORITY_MINION_TYPES = new Set(["doctor", "shield_caster", "prism_medic", "brood_seeder", "slime_angel"]);
+
 export function updatePlayer(dt) {
   const p = state.player;
+  updatePlayerStatusEffects(dt, p);
+  updateLegacyPlayerEffects(dt, p);
   if (p.frozenTimer > 0) {
     p.frozenTimer = Math.max(0, p.frozenTimer - dt);
-    p.frostTimer = Math.max(0, p.frostTimer - dt);
     p.invuln = Math.max(0, p.invuln - dt);
     return;
   }
@@ -39,7 +57,7 @@ export function updatePlayer(dt) {
     vx = 0;
     vy = 0;
   }
-  const frostScale = 1 - Math.min(0.42, p.frostSlow || 0);
+  const frostScale = 1 - Math.min(0.42, Math.max(p.frostSlow || 0, playerStatusModifiers(p).moveSlow));
   const debugSpeedScale = state.debug?.enabled && state.debug.doubleSpeed ? 2 : 1;
   const moveSpeed = p.speed * frostScale * debugSpeedScale;
   const skating = activeWaveEffect("ice_skate");
@@ -75,6 +93,13 @@ export function updatePlayer(dt) {
       dust(p.x - trailVx / trailLen * 12, p.y - trailVy / trailLen * 12, -trailVx / trailLen, -trailVy / trailLen);
     }
   }
+  const half = WORLD_SIZE / 2 - 60;
+  p.x = clamp(p.x, -half, half);
+  p.y = clamp(p.y, -half, half);
+  p.invuln = Math.max(0, p.invuln - dt);
+}
+
+function updateLegacyPlayerEffects(dt, p) {
   if (p.burnTimer > 0) {
     if (state.debug?.enabled && state.debug.invincible) {
       p.burnTimer = 0;
@@ -94,10 +119,6 @@ export function updatePlayer(dt) {
     p.frostMarkTimer = Math.max(0, p.frostMarkTimer - dt);
     if (p.frostMarkTimer <= 0) p.frostMarks = 0;
   }
-  const half = WORLD_SIZE / 2 - 60;
-  p.x = clamp(p.x, -half, half);
-  p.y = clamp(p.y, -half, half);
-  p.invuln = Math.max(0, p.invuln - dt);
 }
 
 export function updateSpawning(dt) {
@@ -149,9 +170,11 @@ export function updateEnemies(dt) {
     if (activeWaveEffect("mini_overdrive") && !e.boss) e.speed *= 1.5;
     if (activeWaveEffect("overclock_pulse") && !e.boss) e.speed *= overclockPulseMultiplier();
     if (!updateEliteDashTrap(e, dt)) {
+      const minionFrame = beginMinionMechanicFrame(e);
       if (e.boss) framePerformance.begin("bossUpdate");
       e.update(dt);
       if (e.boss) framePerformance.end("bossUpdate");
+      endMinionMechanicFrame(e, dt, minionFrame);
     }
     if (assisted) e.speed = baseSpeed;
     if ((activeWaveEffect("mini_overdrive") || activeWaveEffect("overclock_pulse")) && !e.boss) e.speed = baseSpeed;
@@ -189,13 +212,14 @@ export function applyKnockback(e, dx, dy, force) {
 
 export function updateGems(dt) {
   const p = state.player;
+  const magnetRadius = p.magnet * playerStatusModifiers(p).magnetScale;
   for (let i = world.gems.length - 1; i >= 0; i--) {
     const g = world.gems[i];
     const dx = p.x - g.x;
     const dy = p.y - g.y;
     const dist = Math.max(1, Math.hypot(dx, dy));
-    if (dist < p.magnet) {
-      const pull = (1 - dist / p.magnet) * 520 + 120;
+    if (dist < magnetRadius) {
+      const pull = (1 - dist / magnetRadius) * 520 + 120;
       g.x += (dx / dist) * pull * dt;
       g.y += (dy / dist) * pull * dt;
     }
@@ -210,12 +234,13 @@ export function updateGems(dt) {
 
 export function updateCoins(dt) {
   const p = state.player;
+  const magnetScale = playerStatusModifiers(p).magnetScale;
   for (let i = world.coins.length - 1; i >= 0; i--) {
     const c = world.coins[i];
     const dx = p.x - c.x;
     const dy = p.y - c.y;
     let dist = Math.max(1, Math.hypot(dx, dy));
-    const magnetRadius = p.magnet * 1.12;
+    const magnetRadius = p.magnet * 1.12 * magnetScale;
     if (dist < magnetRadius) {
       const pull = coinPullSpeed(p.speed, dist, magnetRadius);
       const step = Math.min(dist, pull * dt);
@@ -257,13 +282,15 @@ export function queryEnemies(x, y, radius, out) {
 
 export function nearestEnemy(x, y, range = 900) {
   let best = null;
-  let bestD = range * range;
+  let bestScore = range * range;
+  const aiTargeting = Boolean(state.ai?.runtime?.enabled);
   world.grid.forEachBucket(x - range, y - range, x + range, y + range, (bucket) => {
     for (const e of bucket) {
       if (e.dead) continue;
       const d = distSq(x, y, e.x, e.y);
-      if (d < bestD) {
-        bestD = d;
+      const score = aiTargeting && AI_PRIORITY_MINION_TYPES.has(e.type) ? d * 0.36 : d;
+      if (d <= range * range && score < bestScore) {
+        bestScore = score;
         best = e;
       }
     }
@@ -272,8 +299,9 @@ export function nearestEnemy(x, y, range = 900) {
     for (const e of world.enemies) {
       if (e.dead) continue;
       const d = distSq(x, y, e.x, e.y);
-      if (d < bestD) {
-        bestD = d;
+      const score = aiTargeting && AI_PRIORITY_MINION_TYPES.has(e.type) ? d * 0.36 : d;
+      if (d <= range * range && score < bestScore) {
+        bestScore = score;
         best = e;
       }
     }
@@ -299,6 +327,7 @@ export function collectAllCoins() {
 }
 
 export function clearEnemies({ dropRewards = true } = {}) {
+  for (const e of world.enemies) notifyMinionKilled(e);
   if (dropRewards) {
     for (const e of world.enemies) {
       const amount = coinAmountForEnemy(e);
@@ -310,6 +339,7 @@ export function clearEnemies({ dropRewards = true } = {}) {
   world.projectiles.length = 0;
   world.enemyProjectiles.length = 0;
   world.hazards.length = 0;
+  clearPlayerStatusEffects(state.player);
   for (let i = world.itemObjects.length - 1; i >= 0; i--) {
     const kind = world.itemObjects[i]?.kind;
     if (kind !== "easter_signature" && kind !== "easter_terminal") world.itemObjects.splice(i, 1);
@@ -333,7 +363,17 @@ function updateEnemyProjectiles(dt) {
     b.x += b.vx * dt * speedScale;
     b.y += b.vy * dt * speedScale;
     b.life -= dt;
-    const outsideMap = isEnemyProjectileOutsideMap(b);
+    let outsideMap = isEnemyProjectileOutsideMap(b);
+    if (outsideMap && (b.bounceRemaining || 0) > 0) {
+      const half = WORLD_SIZE / 2;
+      if (Math.abs(b.x) >= half) b.vx *= -1;
+      if (Math.abs(b.y) >= half) b.vy *= -1;
+      b.x = clamp(b.x, -half + b.r, half - b.r);
+      b.y = clamp(b.y, -half + b.r, half - b.r);
+      b.bounceRemaining--;
+      outsideMap = false;
+      pulse(b.x, b.y, 22, b.color, 0.1);
+    }
     if (b.landTrapAtY != null && b.y >= b.landTrapAtY) b.life = 0;
     const projectileActive = !b.nonColliding && (!b.activeWhenArmed || (b.linkedHazard?.armTime || 0) <= 0);
     if (projectileActive && circleHit(b.x, b.y, b.r, p.x, p.y, p.r) && p.invuln <= 0) {
@@ -354,15 +394,24 @@ function updateEnemyProjectiles(dt) {
           p.frostSlow = Math.max(p.frostSlow || 0, b.frostSlow || 0.18);
         }
       }
+      if (result.damaged && b.statusId) {
+        applyPlayerStatus(p, b.statusId, {
+          duration: b.statusDuration,
+          stacks: b.statusStacks || 1,
+          source: b.owner || b,
+        });
+      }
       burst(p.x, p.y, 8, b.color, 100);
       playSfx("hurt");
       if (b.landTrapOnHit) placeGearProjectileTrap(b);
+      expireMinionProjectile(b);
       releaseBossEffect(b);
       b.__removeFromWorld = true;
       removed++;
     } else if ((b.bossProjectile && (outsideMap || (b.expireWithLife && b.life <= 0))) || (!b.bossProjectile && b.life <= 0)) {
       if (b.splitOnExpire) splitEnemyProjectile(b);
       if (b.landTrapOnExpire) placeGearProjectileTrap(b);
+      expireMinionProjectile(b);
       releaseBossEffect(b);
       b.__removeFromWorld = true;
       removed++;
@@ -389,6 +438,12 @@ function placeGearProjectileTrap(b) {
     life: b.trapLife || 2.8,
     maxLife: b.trapLife || 2.8,
     spin: b.spin || Math.random() * TAU,
+    minionSkill: Boolean(b.owner && !b.owner.boss),
+    minionOwner: b.owner || null,
+    ownerType: b.sourceType || b.owner?.type || "",
+    statusId: b.trapStatusId || "",
+    statusDuration: 2,
+    pull: b.trapPull || 0,
   });
   pulse(b.x, b.y, Math.max(36, b.r * 1.4), b.color || "#f59e0b", 0.12);
 }
@@ -444,6 +499,7 @@ function updateHazards(dt) {
   for (let i = world.hazards.length - 1; i >= 0; i--) {
     const h = world.hazards[i];
     h.life -= dt;
+    if (h.minionSkill) updateMinionHazard(h, dt);
     switch (h.kind) {
       case "ember_mine": updateEmberMine(h, dt); break;
       case "gravity_well": updateGravityWell(h, dt); break;
@@ -511,6 +567,7 @@ function updateHazards(dt) {
       : h.kind === "polar_ice_lane" || h.kind === "riftblade_slash"
         ? pointLineDistance(p.x, p.y, h.x, h.y, h.angle || 0, h.length || 1200) < p.r + (h.width || 18)
         : distSq(h.x, h.y, p.x, p.y) < (h.r + p.r) ** 2;
+    if (h.minionSkill) applyMinionHazardStatus(h, p);
     if (hit && p.invuln <= 0 && canDamage && !h.playerHit) {
       const damage = darkEntityHazard ? darkEntityHazardDamage(h) : convictHazard ? convictHazardDamage(h, p) : h.damage;
       const result = applyPlayerDamage(damage, h);
@@ -526,6 +583,13 @@ function updateHazards(dt) {
       if ((result.damaged || h.kind === "toxic_residue") && h.poisonDuration > 0) {
         p.burnTimer = Math.max(p.burnTimer || 0, h.poisonDuration);
         p.burnDps = Math.max(p.burnDps || 0, h.poisonDps || 0);
+      }
+      if (result.damaged && h.statusId) {
+        applyPlayerStatus(p, h.statusId, {
+          duration: h.statusDuration,
+          stacks: h.statusStacks || 1,
+          source: h.minionOwner || h,
+        });
       }
       playSfx("hurt");
       if (h.kind === "ember_mine") h.life = 0;
@@ -935,6 +999,7 @@ function updateMagneticNode(h, dt) {
 }
 
 function updateBroodPod(h, dt) {
+  if (h.life <= 0 || (h.hp != null && h.hp <= 0)) return;
   h.armTime = Math.max(0, (h.armTime || 0) - dt);
   h.spin = (h.spin || 0) + dt * 2.4;
   if (h.armTime > 0 || h.hatched) return;
@@ -942,7 +1007,7 @@ function updateBroodPod(h, dt) {
   h.life = Math.min(h.life, 0.5);
   const existing = world.enemies.filter((e) => e.type === "zombie" || e.type === "slime_small").length;
   if (existing > 70 || world.enemies.length > 160) return;
-  const count = 2 + (state.wave >= 16 ? 1 : 0);
+  const count = h.hatchCount || 2 + (state.wave >= 16 ? 1 : 0);
   for (let i = 0; i < count; i++) {
     const a = h.spin + i / count * TAU;
     spawnEnemyById(i % 2 ? "slime_small" : "zombie", h.x + Math.cos(a) * 34, h.y + Math.sin(a) * 34);
@@ -1481,18 +1546,10 @@ function updatePrismRefraction(b) {
     const side = Math.random() < 0.5 ? -1 : 1;
     const a = base + side * 0.42;
     const speed = Math.max(120, Math.hypot(b.vx || 0, b.vy || 0) * 0.82);
-    world.enemyProjectiles.push({
-      x: b.x,
-      y: b.y,
-      vx: Math.cos(a) * speed,
-      vy: Math.sin(a) * speed,
-      r: Math.max(3, (b.r || 5) * 0.78),
-      color: "#f3f7ff",
-      damage: (b.damage || 1) * 0.38,
-      life: Math.min(1.8, b.life || 1.8),
-      shape: "laserShard",
-      prismReflected: true,
-    });
+    b.vx = Math.cos(a) * speed;
+    b.vy = Math.sin(a) * speed;
+    b.spin = a;
+    b.color = "#f3f7ff";
     pulse(h.x, h.y, h.r * 0.55, "#f3f7ff", 0.12);
     break;
   }
@@ -1518,6 +1575,23 @@ function updateArtilleryBlast(h, dt) {
     }
     burst(h.x, h.y, 18, h.color, 190);
     state.shake = Math.max(state.shake, 5);
+    if (h.leaveMinionCrater && !h.minionCraterCreated) {
+      h.minionCraterCreated = true;
+      addMinionHazard(h.minionOwner || null, {
+        kind: "minion_artillery_crater",
+        skillKey: "artillery-crater",
+        x: h.x,
+        y: h.y,
+        r: h.finalRadius || h.r,
+        life: 2.8,
+        color: h.color,
+        statusId: "wound",
+        statusDuration: 2.4,
+        secondaryStatusId: "chill",
+        secondaryStatusDuration: 1.5,
+        armTime: 0.55,
+      }, { cap: 2 });
+    }
   }
   h.r = Math.min(h.finalRadius || h.r, h.r + dt * 190);
 }
@@ -1555,6 +1629,27 @@ function updateEnemyKnockback(e, dt) {
 }
 
 function updateSpecialEnemyProjectile(b, dt) {
+  if (b.patternMotion) {
+    b.patternAge = (b.patternAge || 0) + dt;
+    const speed = Math.max(1, Math.hypot(b.vx, b.vy));
+    let turn = 0;
+    if (b.patternMotion === "triangle") {
+      const desired = Math.atan2(state.player.y - b.y, state.player.x - b.x);
+      turn = clamp(wrapAngle(desired - Math.atan2(b.vy, b.vx)), -0.5 * dt, 0.5 * dt);
+    } else if (b.patternMotion === "square") {
+      turn = Math.sin(b.patternAge * 7 + (b.patternIndex || 0) * Math.PI * 0.5) * 0.72 * dt;
+    } else if (b.patternMotion === "hexagon") {
+      turn = ((b.patternIndex || 0) % 2 ? -1 : 1) * 0.62 * dt;
+    } else if (b.patternMotion === "circle") {
+      turn = 0.34 * dt;
+    }
+    if (turn) {
+      const angle = Math.atan2(b.vy, b.vx) + turn;
+      b.vx = Math.cos(angle) * speed;
+      b.vy = Math.sin(angle) * speed;
+      b.spin = angle;
+    }
+  }
   if (b.shape === "darkEntityHunter") {
     const nextT = Math.min(1, (b.pathT || 0) + dt / Math.max(0.01, b.pathDuration || 2));
     const point = quadraticPoint(b.pathStart, b.pathControl, b.pathEnd, nextT);

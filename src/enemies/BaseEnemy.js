@@ -8,6 +8,7 @@ import { applyPlayerDamage } from "../systems/items.js";
 import { maybeTriggerBossSignature } from "../systems/easterEggs.js";
 import { dropEnemyRewards } from "../systems/rewards.js";
 import { randomGrowthMultiplierForWave } from "../systems/randomMode.js";
+import { notifyMinionDamaged, notifyMinionKilled } from "../systems/minionMechanics.js";
 
 export class BaseEnemy {
   constructor(config, x, y) {
@@ -189,6 +190,7 @@ export class BaseEnemy {
     const scaled = amount * (this.shielded ? 0.35 : 1) * state.player.damageScale;
     const reduced = Math.max(1, scaled - (this.defense || 0));
     this.hp -= reduced;
+    if (!this.boss) notifyMinionDamaged(this, reduced);
     const damageText = options.damageText || (!options.statusEffect ? spawnDamageText : null);
     damageText?.(reduced, this, options);
     if (!options.statusEffect) {
@@ -200,6 +202,7 @@ export class BaseEnemy {
 
   kill() {
     this.dead = true;
+    if (!this.boss) notifyMinionKilled(this);
     state.kills++;
     if (this.boss) maybeTriggerBossSignature(this);
     if (this.boss && world.boss === this) world.boss = null;

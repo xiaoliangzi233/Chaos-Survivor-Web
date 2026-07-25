@@ -2,7 +2,8 @@ import { TAU, WORLD_SIZE } from "../constants.js";
 import { state, world } from "../state.js";
 import { burst, particle, pulse } from "../effects.js";
 import { clamp } from "../utils.js";
-import { BaseEnemy, spawnConfigured } from "./BaseEnemy.js";
+import { BaseEnemy } from "./BaseEnemy.js";
+import { createBroodPod } from "../systems/minionMechanics.js";
 
 const SUMMON_LIMIT = 7;
 const KEEP_RANGE = 280;
@@ -57,12 +58,7 @@ export class BroodSeeder extends BaseEnemy {
 
   spawnBrood() {
     const count = Math.min(SUMMON_LIMIT, 2 + Math.floor(state.wave / 8));
-    const choice = state.wave > 13 && Math.random() < 0.38 ? "slime_small" : "zombie";
-    const offset = Math.random() * TAU;
-    for (let i = 0; i < count; i++) {
-      const a = offset + i * TAU / count;
-      spawnConfigured(choice, this.x + Math.cos(a) * 40, this.y + Math.sin(a) * 40);
-    }
+    createBroodPod(this, count);
     burst(this.x, this.y, 12, this.color, 120);
   }
 

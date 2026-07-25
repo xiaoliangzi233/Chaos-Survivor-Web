@@ -13,6 +13,8 @@ export class ShieldCaster extends BaseEnemy {
     this.behavior = "shield";
     this.cooldown = 0.6;
     this.channel = 0;
+    this.shieldWindup = 0;
+    this.shieldActive = 0;
     this.knockbackResistance = Math.max(this.knockbackResistance, 0.4);
   }
 
@@ -24,6 +26,7 @@ export class ShieldCaster extends BaseEnemy {
     this.anim += dt * 3.8;
     this.cooldown -= dt;
     this.channel = Math.max(0, this.channel - dt);
+    this.shieldActive = Math.max(0, this.shieldActive - dt);
     this.flash = Math.max(0, this.flash - dt * 8);
     this.hitTimer = Math.max(0, this.hitTimer - dt);
     this.flip = dx < 0 ? -1 : 1;
@@ -44,20 +47,31 @@ export class ShieldCaster extends BaseEnemy {
       this.y += (dy / d * dir + dx / d * strafe) * this.speed * dt;
     }
 
+    if (this.shieldWindup > 0) {
+      this.shieldWindup = Math.max(0, this.shieldWindup - dt);
+      this.channel = Math.max(this.channel, this.shieldWindup);
+      if (this.shieldWindup <= 0) this.shieldActive = 1.6;
+    } else if (cluster && this.cooldown <= 0 && this.shieldActive <= 0) {
+      this.shieldWindup = 0.65;
+      this.cooldown = 3.4;
+      pulse(this.x, this.y, SHIELD_RANGE, this.color, 0.28);
+    }
+
     let shielded = 0;
-    for (const e of world.enemies) {
-      if (e === this || e.dead || e.boss) continue;
-      if (distSq(e.x, e.y, this.x, this.y) <= SHIELD_RANGE * SHIELD_RANGE) {
-        e.shielded = true;
-        e.shieldPulse = Math.max(e.shieldPulse || 0, 0.18);
-        shielded++;
-        if (shielded <= 2 && Math.random() < dt * 4) trail(this.x, this.y, e.x, e.y, this.color, 2);
+    if (this.shieldActive > 0) {
+      for (const e of world.enemies) {
+        if (e === this || e.dead || e.boss) continue;
+        if (distSq(e.x, e.y, this.x, this.y) <= SHIELD_RANGE * SHIELD_RANGE) {
+          e.shielded = true;
+          e.shieldPulse = Math.max(e.shieldPulse || 0, 0.18);
+          shielded++;
+          if (shielded <= 2 && Math.random() < dt * 4) trail(this.x, this.y, e.x, e.y, this.color, 2);
+        }
       }
     }
 
-    if (shielded > 0 && this.cooldown <= 0) {
-      this.cooldown = 1.1;
-      this.channel = 0.35;
+    if (shielded > 0 && this.channel <= 0) {
+      this.channel = 0.22;
       pulse(this.x, this.y, SHIELD_RANGE * 0.36, this.color, 0.16);
     }
     if (this.channel > 0 && Math.random() < dt * 12) particle("mote", this.x, this.y, { color: this.color, life: 0.35, size: 2.5, alpha: 0.72 });

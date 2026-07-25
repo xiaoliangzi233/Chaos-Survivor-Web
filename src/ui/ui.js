@@ -11,6 +11,7 @@ import {
   WEAPON_INFO,
 } from "../economy/inventory.js";
 import { startWeaponPreview } from "./weaponPreview.js";
+import { activePlayerStatusEffects } from "../systems/statusEffects.js";
 
 let stopPreview = null;
 const hudLast = {
@@ -26,6 +27,7 @@ const hudLast = {
   bossWave: null,
   timerUpdateAt: 0,
   fpsClass: null,
+  debuffs: "",
 };
 const FALLBACK_VERSION = "v0.1.0";
 
@@ -44,6 +46,7 @@ export const ui = {
   xpBar: document.getElementById("xpBar"),
   xpMeter: document.getElementById("xpMeter"),
   levelText: document.getElementById("levelText"),
+  debuffStatusBar: document.getElementById("debuffStatusBar"),
   wavePanel: document.getElementById("wavePanel"),
   timerText: document.getElementById("timerText"),
   waveText: document.getElementById("waveText"),
@@ -210,6 +213,32 @@ export function updateHud(fps, now = performance.now()) {
   hudLast.kills = state.kills;
   hudLast.gold = state.gold;
   hudLast.level = p.level;
+  renderDebuffStatusBar(p);
+}
+
+function renderDebuffStatusBar(player) {
+  if (!ui.debuffStatusBar) return;
+  const effects = activePlayerStatusEffects(player);
+  const signature = effects.map((effect) => `${effect.id}:${effect.stacks}:${Math.ceil(effect.timer * 5)}`).join("|");
+  if (signature === hudLast.debuffs) return;
+  hudLast.debuffs = signature;
+  ui.debuffStatusBar.replaceChildren();
+  ui.debuffStatusBar.classList.toggle("active", effects.length > 0);
+  ui.debuffStatusBar.setAttribute("aria-hidden", effects.length ? "false" : "true");
+  for (const effect of effects) {
+    const chip = document.createElement("span");
+    chip.className = `debuff-status-chip debuff-${effect.id}`;
+    chip.style.setProperty("--debuff-color", effect.color);
+    chip.title = `${effect.name} · ${effect.timer.toFixed(1)}s`;
+    const icon = document.createElement("i");
+    icon.textContent = effect.icon;
+    const label = document.createElement("b");
+    label.textContent = effect.name;
+    const timer = document.createElement("strong");
+    timer.textContent = `${effect.stacks > 1 ? `×${effect.stacks} ` : ""}${effect.timer.toFixed(1)}s`;
+    chip.append(icon, label, timer);
+    ui.debuffStatusBar.appendChild(chip);
+  }
 }
 
 function renderItemStatusBar(player) {

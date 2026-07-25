@@ -559,6 +559,35 @@ export class PixiBackend {
       if (!isPixiBatchableHazard(hazard)) continue;
       const armed = (hazard.armTime || 0) <= 0;
       const alpha = Math.max(0, Math.min(1, hazard.life / Math.max(0.001, hazard.maxLife || hazard.life || 1)));
+      if (hazard.minionSkill) {
+        if (hazard.x1 != null && hazard.x2 != null) {
+          this.appendHazardLine(particles, hazard, {
+            x1: hazard.x1,
+            y1: hazard.y1,
+            x2: hazard.x2,
+            y2: hazard.y2,
+          }, 0, frame, {
+            armed,
+            alpha,
+            chain: false,
+            color: hazard.color,
+            coreColor: "#ffffff",
+            warningColor: hazard.color,
+            width: hazard.width,
+          });
+        } else if (this.isVisible(hazard, frame, (hazard.r || 54) + 50)) {
+          const item = this.nextItem("boss-hazard-items", particles, hazard);
+          item.x = hazard.x;
+          item.y = hazard.y;
+          item.displayWidth = (hazard.r || 54) * 2.15 * CAMERA_ZOOM;
+          item.displayHeight = (hazard.r || 54) * 2.15 * CAMERA_ZOOM;
+          item.rotation = hazard.spin || 0;
+          item.tint = this.colorNumber(hazard.color, 0xd58cff);
+          item.alpha = armed ? alpha * 0.82 : alpha * 0.58;
+          item.texture = this.glyphTexture(armed ? "hazardSlamActive" : "hazardSlamWarning");
+        }
+        continue;
+      }
       if (hazard.kind === "storm_laser_net") {
         const angle = hazard.angle || 0;
         const halfLength = (hazard.length || WORLD_SIZE) * 0.5;

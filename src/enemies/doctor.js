@@ -32,8 +32,9 @@ export class Doctor extends BaseEnemy {
 
     this.healTargets = this.findHealTargets();
     this.healTarget = null;
-    if (this.healTargets.length && this.cooldown <= 0) {
+    if (this.healTargets.length && this.cooldown <= 0 && this.channel <= 0) {
       this.channel = 0.9;
+      this.cooldown = 3.3;
       for (const target of this.healTargets) particle("healPlus", target.x, target.y - target.r - 8, { color: "#72ffb4", life: 0.42, size: 9, alpha: 0.9, vy: -18 });
     }
     if (this.channel > 0 && this.healTargets.length) {

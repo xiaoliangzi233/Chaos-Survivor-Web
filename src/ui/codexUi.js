@@ -4,6 +4,7 @@ import { createDecorativeEnemy, enemyConfig } from "../systems/enemyRegistry.js"
 import { getCodexEntries } from "../systems/codex.js";
 import { ITEM_DEFS, itemDescription } from "../systems/items.js";
 import { drawWeaponPreview } from "./weaponPreview.js";
+import { MINION_MECHANIC_TIPS } from "../systems/minionMechanics.js";
 
 const CATEGORIES = [
   { id: "enemies", label: "敌人", eyebrow: "遭遇记录" },
@@ -123,7 +124,9 @@ function entriesFor(type) {
         icon: entry.boss ? "B" : "!",
         name: entry.name || entry.id,
         tag: entry.boss ? "Boss" : enemyRole(entry),
-        desc: entry.desc || enemyRole(entry),
+        desc: MINION_MECHANIC_TIPS[entry.id]
+          ? `${entry.desc || enemyRole(entry)}\n\n机制提示：${MINION_MECHANIC_TIPS[entry.id]}`
+          : entry.desc || enemyRole(entry),
         color: entry.color || "#42e8ff",
         raw: entry,
       }))

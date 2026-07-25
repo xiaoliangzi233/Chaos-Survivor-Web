@@ -6,6 +6,8 @@ import { burst, pulse, trail } from "../effects.js";
 import { playSfx } from "../audio.js";
 import { addWeaponToInventory, QUALITY_INFO, QUALITY_ORDER, WEAPON_INFO } from "../economy/inventory.js";
 import { attackSpeedMultiplier, weaponProjectileBonus, weaponRangeBonus, weaponRangeScale } from "./items.js";
+import { isPlayerProjectileBlocked } from "./minionMechanics.js";
+import { restorePlayerHealth } from "./statusEffects.js";
 
 const STARTER_WEAPON_IDS = ["arc", "ice", "missile", "boomerang", "drone", "prism_railgun", "void_singularity", "tesla_mine_chain", "starfall_scepter", "phase_needler", "echo_tuning_fork", "rift_loom"];
 
@@ -26,7 +28,7 @@ export const UPGRADE_DEFS = [
     desc: "最大生命提高，并立即恢复一段生命。",
     apply: () => {
       state.player.maxHp += 10;
-      state.player.hp = Math.min(state.player.maxHp, state.player.hp + 40);
+      restorePlayerHealth(state.player, 40);
     },
   },
   {
@@ -1720,6 +1722,11 @@ function updateProjectiles(dt) {
     if (b.shape === "boomerang" && b.farBurst && !b.farBurstDone && b.returnTimer >= b.returnAfter) {
       b.farBurstDone = true;
       bladeBloom(b);
+    }
+    if (isPlayerProjectileBlocked(b)) {
+      burst(b.x, b.y, 6, "#9de8ff", 90);
+      world.projectiles.splice(i, 1);
+      continue;
     }
 
     hits.length = 0;

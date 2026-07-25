@@ -32,7 +32,8 @@ export function collectThreats(state, world, options = {}) {
       || h.kind === "scientist_seal_line"
       || h.kind === "scientist_tendril_path"
       || h.kind === "scientist_memory_path"
-      || h.kind === "scientist_entropy_field";
+      || h.kind === "scientist_entropy_field"
+      || (h.minionSkill && h.x1 != null && h.x2 != null);
     if (!lineHazard && distanceSq(p, h) > (queryRadius + (h.r || 0) + 120) ** 2) continue;
     threats.push(normalizeThreat("hazard", h, hazardWeight(h)));
   }
@@ -85,7 +86,8 @@ export function normalizeThreat(kind, source, weight = 1) {
     life: source.life ?? source.modeTimer ?? 1,
     weight,
     armTime: source.armTime || 0,
-    line: source.kind === "storm_laser_net"
+    line: (source.minionSkill && source.x1 != null && source.x2 != null)
+      || source.kind === "storm_laser_net"
       || source.kind === "polar_ice_lane"
       || source.kind === "riftblade_slash"
       || (source.kind === "riftblade_bladefall" && !source.lines)
@@ -93,6 +95,10 @@ export function normalizeThreat(kind, source, weight = 1) {
     angle: source.angle || 0,
     length: source.length || 0,
     width: source.width || 0,
+    x1: source.x1,
+    y1: source.y1,
+    x2: source.x2,
+    y2: source.y2,
     sourceKind: source.kind || "",
     lines: source.lines || null,
     points: source.points || null,
@@ -116,6 +122,10 @@ export function classifyThreat(source, kind) {
     return "projectile";
   }
   if (kind === "hazard") {
+    if (source.minionSkill) {
+      if ((source.armTime || 0) > 0) return source.x1 != null ? "warning_line" : "warning_circle";
+      return source.statusId || source.pull || source.push ? "hazard_zone_soft" : "hazard_zone_hard";
+    }
     if (source.kind === "blizzard_core") return "hazard_zone_soft";
     if (source.kind === "dark_entity_field") return (source.armTime || 0) > 0 ? "warning_line" : "hazard_zone_hard";
     if (source.kind === "storm_strike") return (source.armTime || 0) > 0 ? "warning_circle" : "hazard_armed";
@@ -392,6 +402,11 @@ function gravityRisk(point, threat) {
 }
 
 function lineRisk(point, threat) {
+  if (threat.x1 != null && threat.x2 != null) {
+    const safe = (point.r || 14) + (threat.width || 18) + 14;
+    return segmentRisk(point, threat.x1, threat.y1, threat.x2, threat.y2, safe, threat)
+      * (threat.armTime > 0 ? windupScale(threat) : 1);
+  }
   const vx = Math.cos(threat.angle);
   const vy = Math.sin(threat.angle);
   const dx = point.x - threat.x;

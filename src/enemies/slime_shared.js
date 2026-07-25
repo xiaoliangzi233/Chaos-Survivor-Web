@@ -71,8 +71,12 @@ export class SlimeEnemy extends BaseEnemy {
 
   startHop(dx, dy, d) {
     const wobble = Math.sin(state.time * 2.3 + this.x * 0.01) * this.profile.wobble;
-    const nx = dx / d;
-    const ny = dy / d;
+    const lead = this.type === "slime_medium" && this.mechanicTier > 0 ? this.hopDuration * this.speed * 0.34 : 0;
+    const aimedDx = dx + (state.player.dirX || 0) * lead;
+    const aimedDy = dy + (state.player.dirY || 0) * lead;
+    const aimedD = Math.max(1, Math.hypot(aimedDx, aimedDy));
+    const nx = aimedDx / aimedD;
+    const ny = aimedDy / aimedD;
     const tx = nx + -ny * wobble;
     const ty = ny + nx * wobble;
     const len = Math.max(1, Math.hypot(tx, ty));

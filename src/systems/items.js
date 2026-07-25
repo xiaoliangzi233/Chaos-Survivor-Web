@@ -6,6 +6,7 @@ import { playSfx } from "../audio.js";
 import { QUALITY_INFO, QUALITY_ORDER, recomputeAllWeapons } from "../economy/inventory.js";
 import { recordCodexEntry } from "./codex.js";
 import { ITEM_DATA_DEFS, onEditableDataChanged } from "../config/editableGameData.js";
+import { playerStatusModifiers, restorePlayerHealth } from "./statusEffects.js";
 
 const QUALITY_VALUES = {
   heart_container: [5, 10, 20, 35, 50],
@@ -23,8 +24,8 @@ const QUALITY_SCALE = {
 };
 
 const ITEM_EFFECTS = {
-  heart_container: ({ player, quality }) => { const value = qualityValue("heart_container", quality); player.maxHp += value; player.hp = Math.min(player.maxHp, player.hp + value); },
-  healing_potion: ({ player, quality }) => { player.hp = Math.min(player.maxHp, player.hp + qualityValue("healing_potion", quality)); },
+  heart_container: ({ player, quality }) => { const value = qualityValue("heart_container", quality); player.maxHp += value; restorePlayerHealth(player, value); },
+  healing_potion: ({ player, quality }) => { restorePlayerHealth(player, qualityValue("healing_potion", quality)); },
   shackles: ({ player }) => { player.speed -= 12; player.attackRangeBonus += 80; },
   dodge_cloak: ({ player }) => { player.dodge = clamp(player.dodge + 0.05, 0, 0.7); player.maxHp = Math.max(30, player.maxHp - 20); player.hp = Math.min(player.hp, player.maxHp); },
   bait: ({ player }) => { player.nextWaveSpawnBonus += 0.5; },
@@ -73,7 +74,9 @@ export function applyItemPurchase(offer) {
 export function updateItems(dt) {
   const p = state.player;
   if (!p) return;
-  if (p.regen > 0 && p.hp > 0) p.hp = Math.min(p.maxHp, p.hp + p.regen * dt);
+  if (p.regen > 0 && p.hp > 0) {
+    p.hp = Math.min(p.maxHp, p.hp + p.regen * playerStatusModifiers(p).healingScale * dt);
+  }
   updateAirburst(p, dt);
   updateBleeds(dt);
   updateItemObjects(dt);
@@ -132,11 +135,12 @@ export function rollWeaponDamage(amount, weapon = null) {
 
 export function weaponRangeBonus() {
   const bonus = state.player?.attackRangeBonus || 0;
-  return state.waveScenario?.effect === "blind" ? bonus * 0.25 : bonus;
+  const statusScale = playerStatusModifiers(state.player).weaponRangeScale;
+  return (state.waveScenario?.effect === "blind" ? bonus * 0.25 : bonus) * statusScale;
 }
 
 export function weaponRangeScale() {
-  return state.waveScenario?.effect === "blind" ? 0.25 : 1;
+  return (state.waveScenario?.effect === "blind" ? 0.25 : 1) * playerStatusModifiers(state.player).weaponRangeScale;
 }
 
 export function attackSpeedMultiplier() {

@@ -15,6 +15,8 @@ export class Exploder extends BaseEnemy {
     this.behavior = "exploder";
     this.fuse = 0;
     this.armed = false;
+    this.leapWindup = 0;
+    this.leapTime = 0;
     this.knockbackResistance = Math.max(this.knockbackResistance, 0.18);
   }
 
@@ -28,17 +30,34 @@ export class Exploder extends BaseEnemy {
     this.hitTimer = Math.max(0, this.hitTimer - dt);
     this.flip = dx < 0 ? -1 : 1;
 
-    if (!this.armed && d < ARM_RANGE) {
+    if (this.leapWindup > 0) {
+      this.leapWindup = Math.max(0, this.leapWindup - dt);
+      if (this.leapWindup <= 0) {
+        this.leapTime = 0.28;
+        this.leapVx = ((this.leapTargetX ?? this.x) - this.x) / this.leapTime;
+        this.leapVy = ((this.leapTargetY ?? this.y) - this.y) / this.leapTime;
+      }
+    } else if (this.leapTime > 0) {
+      const step = Math.min(dt, this.leapTime);
+      this.x += this.leapVx * step;
+      this.y += this.leapVy * step;
+      this.leapTime = Math.max(0, this.leapTime - dt);
+      if (this.leapTime <= 0) {
+        this.armed = true;
+        this.fuse = 1.05;
+        pulse(this.x, this.y, EXPLODE_RADIUS, this.color, 0.25);
+      }
+    } else if (!this.armed && d < ARM_RANGE) {
       this.armed = true;
       this.fuse = 1.05;
       pulse(this.x, this.y, EXPLODE_RADIUS, this.color, 0.25);
     }
-    if (this.armed) {
+    if (this.armed && this.leapTime <= 0) {
       this.fuse -= dt;
       this.x += (dx / d) * this.speed * 0.42 * dt;
       this.y += (dy / d) * this.speed * 0.42 * dt;
       if (this.fuse <= 0) this.explode();
-    } else {
+    } else if (this.leapWindup <= 0 && this.leapTime <= 0) {
       this.x += (dx / d) * this.speed * dt;
       this.y += (dy / d) * this.speed * dt;
     }

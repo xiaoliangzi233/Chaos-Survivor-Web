@@ -1,5 +1,6 @@
 import { TAU, TOTAL_WAVES, WORLD_SIZE, waveDurationFor } from "../constants.js";
 import { state, world } from "../state.js";
+import { clearPlayerStatusEffects } from "../systems/statusEffects.js";
 import { difficultyCards, selectDifficulty } from "../difficulty.js";
 import { enemyConfig, spawnEnemyById } from "../systems/enemyRegistry.js";
 import { clearEnemies } from "../systems/entities.js";
@@ -199,12 +200,7 @@ export function initDebugModeUi({ onQuickStart, onTaintRun, onPauseForDebug, onR
     if (!state.player) return setPanelMessage(elements, "当前没有玩家实体。", true);
     markDebugUse("玩家生命和负面状态已重置。");
     state.player.hp = state.player.maxHp;
-    state.player.burnTimer = 0;
-    state.player.burnDps = 0;
-    state.player.frostTimer = 0;
-    state.player.frostSlow = 0;
-    state.player.frostMarks = 0;
-    state.player.frozenTimer = 0;
+    clearPlayerStatusEffects(state.player);
   }
 
   function grantGold() {

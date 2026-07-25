@@ -19,6 +19,7 @@ export class SlimeEnemy extends BaseEnemy {
     this.lastX = x;
     this.lastY = y;
     this.landSquash = 0;
+    this.landAge = 99;
     this.faceBlink = Math.random() * 1.4;
     const variant = pickSlimeVariant(profile);
     this.slimeVariant = variant.id;
@@ -38,6 +39,7 @@ export class SlimeEnemy extends BaseEnemy {
     this.flash = Math.max(0, this.flash - dt * 8);
     this.hitTimer = Math.max(0, this.hitTimer - dt);
     this.landSquash = Math.max(0, this.landSquash - dt * 5.5);
+    this.landAge += dt;
     this.faceBlink -= dt;
     this.flip = dx < 0 ? -1 : 1;
 
@@ -88,6 +90,7 @@ export class SlimeEnemy extends BaseEnemy {
     this.hopVx = 0;
     this.hopVy = 0;
     this.landSquash = 1;
+    this.landAge = 0;
     pulse(this.x, this.y + this.r * 0.45, this.r * this.profile.landPulse, this.slimeColors.trail, 0.18);
     if (this.profile.landBurst > 0) burst(this.x, this.y + this.r * 0.35, this.profile.landBurst, this.slimeColors.trail, 70);
     playSfx("slimeLand");
@@ -96,19 +99,25 @@ export class SlimeEnemy extends BaseEnemy {
   jumpLift() {
     if (this.hopState !== "air") return 0;
     const t = clamp(this.hopElapsed / Math.max(0.001, this.hopDuration), 0, 1);
-    return Math.sin(t * Math.PI);
+    return Math.sin(t * Math.PI) ** 0.82;
   }
 
   draw(ctx) {
     const lift = this.jumpLift();
     const bounce = Math.sin(this.anim * 2.4) * this.profile.idleBounce;
-    const squash = this.landSquash * this.profile.squash;
-    const stretch = lift * this.profile.stretch;
-    const scaleX = 1 + squash - stretch * 0.36;
-    const scaleY = 1 - squash * 0.55 + stretch;
+    const anticipation = this.hopState === "ground"
+      ? clamp(1 - this.hopTimer / Math.max(0.08, this.profile.restTime * 0.42), 0, 1)
+      : 0;
+    const landingSpring = this.landAge < 0.34
+      ? Math.sin((this.landAge / 0.34) * Math.PI * 2) * Math.exp(-this.landAge * 5.2)
+      : 0;
+    const squash = this.landSquash * this.profile.squash + anticipation * this.profile.squash * 0.58 + Math.max(0, landingSpring) * 0.1;
+    const stretch = lift * this.profile.stretch + Math.max(0, -landingSpring) * 0.08;
+    const scaleX = 1 + squash - stretch * 0.4;
+    const scaleY = 1 - squash * 0.58 + stretch;
 
     ctx.save();
-    ctx.translate(Math.round(this.x), Math.round(this.y - lift * this.profile.jumpHeight + bounce));
+    ctx.translate(Math.round(this.x), Math.round(this.y - lift * this.profile.jumpHeight + bounce + anticipation * 2));
     drawSlimeShadow(ctx, this, lift);
     ctx.scale((this.flip || 1) * scaleX, scaleY);
     drawSlimeBody(ctx, this, lift);
@@ -118,6 +127,21 @@ export class SlimeEnemy extends BaseEnemy {
     drawSlimeVariantDetails(ctx, this, lift, "front");
     drawSlimeGloss(ctx, this, lift);
     ctx.restore();
+  }
+
+  getVisualState() {
+    if (this.hopState === "air") {
+      return {
+        clip: "move",
+        progress: clamp(this.hopElapsed / Math.max(0.001, this.hopDuration), 0, 0.999999),
+        facing: this.flip,
+      };
+    }
+    if (this.landAge < 0.34) {
+      return { clip: "recover", progress: clamp(this.landAge / 0.34, 0, 0.999999), facing: this.flip };
+    }
+    const anticipation = clamp(1 - this.hopTimer / Math.max(0.08, this.profile.restTime * 0.42), 0, 0.999999);
+    return { clip: anticipation > 0 ? "windup" : "move", progress: anticipation || (((this.anim % TAU) + TAU) % TAU / TAU), facing: this.flip };
   }
 }
 

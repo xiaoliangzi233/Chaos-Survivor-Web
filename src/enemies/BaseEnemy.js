@@ -205,6 +205,40 @@ export class BaseEnemy {
     else drawEnemyShape(ctx, this);
     ctx.restore();
   }
+
+  getVisualState() {
+    const progress = ((this.anim || 0) % TAU + TAU) % TAU / TAU;
+    if (this.flash > 0 || this.hitTimer > 0) {
+      return { clip: "hurt", progress: 1 - Math.min(1, Math.max(this.flash || 0, this.hitTimer || 0)), facing: this.flip };
+    }
+    if (this.hopState) {
+      if (this.hopState === "air") {
+        return {
+          clip: "move",
+          progress: Math.max(0, Math.min(0.999999, this.hopElapsed / Math.max(0.001, this.hopDuration))),
+          facing: this.flip,
+        };
+      }
+      if ((this.landAge || 99) < 0.32) {
+        return { clip: "recover", progress: Math.min(0.999999, this.landAge / 0.32), facing: this.flip };
+      }
+    }
+
+    const mode = [this.state, this.mode, this.attackState, this.phaseState, this.moveState].filter(Boolean).join(" ");
+    const windup = this.windup > 0 || this.throwWindup > 0 || this.castTime > 0 || this.charge > 0
+      || this.aimTime > 0 || this.spawnWindup > 0 || this.plantTime > 0 || (this.armed && this.fuse > 0)
+      || /windup|warn|aim|cast|charge/.test(mode);
+    const attack = this.fireTime > 0 || this.strikeTimer > 0 || this.channel > 0 || this.burstLeft > 0 || this.seedPulse > 0
+      || /attack|dash|fire|channel|strike|sweep|throw|active/.test(mode);
+    const recover = /recover|coast|return/.test(mode);
+    const idle = /idle|keep|hold/.test(mode) || this.speed <= 0.01;
+    return {
+      clip: windup ? "windup" : attack ? "attack" : recover ? "recover" : idle ? "idle" : "move",
+      progress,
+      facing: this.flip,
+      heading: this.headAngle ?? this.angle ?? 0,
+    };
+  }
 }
 
 export let spawnConfigured = () => {};

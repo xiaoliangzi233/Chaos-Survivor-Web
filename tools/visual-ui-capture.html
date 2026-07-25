@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=1920, initial-scale=1">
+  <title>UI Capture</title>
+  <style>
+    html, body, iframe {
+      width: 1920px;
+      height: 1080px;
+      margin: 0;
+      overflow: hidden;
+      border: 0;
+      background: #02050b;
+    }
+    iframe {
+      display: block;
+    }
+  </style>
+</head>
+<body>
+  <iframe id="source" src="../index.html?visual-export=ui"></iframe>
+  <script>
+    const id = new URLSearchParams(location.search).get("id") || "startOverlay";
+    const frame = document.querySelector("#source");
+
+    function isolateTarget() {
+      const doc = frame.contentDocument;
+      const root = doc?.querySelector("#gameRoot");
+      const target = doc?.getElementById(id);
+      if (!doc || !root || !target) return false;
+      doc.documentElement.style.cssText = "width:1920px;height:1080px;overflow:hidden;background:#02050b;";
+      doc.body.className = "";
+      doc.body.style.cssText = "width:1920px;height:1080px;margin:0;overflow:hidden;background:#02050b;";
+      root.style.cssText = "position:relative;width:1920px;height:1080px;overflow:hidden;background:#02050b;";
+      for (const child of root.children) {
+        child.style.setProperty("display", "none", "important");
+        child.style.setProperty("visibility", "hidden", "important");
+      }
+      target.hidden = false;
+      target.classList.add("active");
+      target.setAttribute("aria-hidden", "false");
+      target.style.setProperty("display", id === "hud" || id === "lobbyHud" ? "block" : "flex", "important");
+      target.style.setProperty("visibility", "visible", "important");
+      target.style.setProperty("opacity", "1", "important");
+      target.style.setProperty("pointer-events", "none", "important");
+      target.style.setProperty("width", "1920px", "important");
+      target.style.setProperty("height", "1080px", "important");
+      target.style.setProperty("inset", "0", "important");
+      document.body.dataset.ready = id;
+      return true;
+    }
+
+    frame.addEventListener("load", () => {
+      isolateTarget();
+      setTimeout(isolateTarget, 800);
+      setTimeout(isolateTarget, 1800);
+    });
+  </script>
+</body>
+</html>

@@ -13,6 +13,8 @@ import { drawApocalypseScenarioEvent } from "./apocalypseScenarioEvents.js";
 import { drawVoidCrownScenarioEvent } from "./voidCrownScenarioEvents.js";
 import { renderLobby } from "./lobbyRenderer.js";
 import { drawPlayerAvatar } from "./playerAvatar.js";
+import { framePerformance } from "./performanceMonitor.js";
+import { hasProjectileVisualProfile } from "./visualProfiles.js";
 
 export const viewport = { width: 1, height: 1, dpr: 1 };
 const darkEntityProjectileSprites = new Map();
@@ -186,7 +188,9 @@ export function render(ctx, options = {}) {
   drawDrones(ctx);
   drawPlayer(ctx);
   if (!options.skipEnemyProjectiles) drawEnemyProjectiles(ctx, options.batchEnemyProjectile);
-  drawHazards(ctx);
+  framePerformance.begin("hazardRender");
+  drawHazards(ctx, options.batchHazard);
+  framePerformance.end("hazardRender");
   drawApocalypseScenarioEvent(ctx, "foreground");
   drawVoidCrownScenarioEvent(ctx, "foreground");
   drawItemObjects(ctx);
@@ -2297,49 +2301,129 @@ function strokePolyline(ctx, points) {
 function drawGems(ctx) {
   for (const g of world.gems) {
     if (!inView(g.x, g.y, 40)) continue;
-    ctx.fillStyle = g.value >= 15 ? "#b48cff" : g.value >= 8 ? "#77ff8a" : "#42e8ff";
-    diamondAt(ctx, g.x, g.y + Math.sin(state.time * 6 + g.phase) * 2, 6);
+    const tier = g.value >= 15 ? 2 : g.value >= 8 ? 1 : 0;
+    const color = tier === 2 ? "#b48cff" : tier === 1 ? "#77ff8a" : "#42e8ff";
+    const phase = state.time * 5.4 + (g.phase || 0);
+    const gemDx = g.x - state.player.x;
+    const gemDy = g.y - state.player.y;
+    const magnetized = gemDx * gemDx + gemDy * gemDy < state.player.magnet ** 2;
+    ctx.save();
+    ctx.translate(g.x, g.y + Math.sin(phase) * 2);
+    ctx.rotate(magnetized ? Math.atan2(state.player.y - g.y, state.player.x - g.x) + Math.PI / 2 : Math.sin(phase * 0.55) * 0.16);
+    ctx.scale(magnetized ? 1.16 : 1, magnetized ? 0.86 : 1);
+    const radius = 7 + tier * 1.4;
+    ctx.fillStyle = hexToRgba(color, 0.18);
+    ctx.beginPath();
+    ctx.moveTo(0, -radius * 1.8);
+    ctx.lineTo(radius * 1.35, 0);
+    ctx.lineTo(0, radius * 1.8);
+    ctx.lineTo(-radius * 1.35, 0);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = "#0a1822";
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 1.6;
+    ctx.beginPath();
+    ctx.moveTo(0, -radius * 1.25);
+    ctx.lineTo(radius, -radius * 0.16);
+    ctx.lineTo(radius * 0.58, radius * 1.12);
+    ctx.lineTo(0, radius * 1.42);
+    ctx.lineTo(-radius * 0.7, radius * 0.8);
+    ctx.lineTo(-radius, -radius * 0.18);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.moveTo(0, -radius * 0.78);
+    ctx.lineTo(radius * 0.55, 0);
+    ctx.lineTo(0, radius * 0.82);
+    ctx.lineTo(-radius * 0.55, 0);
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = "rgba(255,255,255,0.72)";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(0, -radius * 1.2);
+    ctx.lineTo(0, radius * 1.35);
+    ctx.moveTo(-radius * 0.94, -radius * 0.15);
+    ctx.lineTo(radius * 0.95, -radius * 0.15);
+    ctx.stroke();
+    ctx.fillStyle = "#ffffff";
+    for (let index = 0; index < 3; index++) {
+      const angle = phase * (magnetized ? 2.4 : 1) + index * TAU / 3;
+      const orbit = radius * (1.48 + tier * 0.08);
+      ctx.save();
+      ctx.translate(Math.cos(angle) * orbit, Math.sin(angle) * orbit * 0.58);
+      ctx.rotate(angle);
+      ctx.fillRect(-1.4, -2.6, 2.8, 5.2);
+      ctx.restore();
+    }
+    ctx.restore();
   }
+}
+
+// Used by the offline visual asset exporter. The caller is responsible for
+// positioning the canvas in world space and for restoring world.weaponFx.
+export function drawWeaponFxForExport(ctx) {
+  drawWeaponFx(ctx);
 }
 
 function drawCoins(ctx) {
   for (const c of world.coins) {
     if (!inView(c.x, c.y, 40)) continue;
-    const r = c.value >= 5 ? 5.5 : 4.5;
-    ctx.fillStyle = "#ffd166";
+    const tier = c.value >= 8 ? 2 : c.value >= 4 ? 1 : 0;
+    const phase = state.time * 7.5 + (c.phase || 0);
+    const magnetRadius = state.player.magnet * 1.12;
+    const coinDx = c.x - state.player.x;
+    const coinDy = c.y - state.player.y;
+    const magnetized = coinDx * coinDx + coinDy * coinDy < magnetRadius * magnetRadius;
+    const r = 7 + tier * 1.25;
+    const teeth = 8 + tier * 2;
+    ctx.save();
+    ctx.translate(c.x, c.y + Math.sin(phase * 0.55) * 1.4);
+    ctx.rotate(phase * (magnetized ? 1.8 : 0.35));
+    ctx.scale(magnetized ? 1.16 : 1, magnetized ? 0.82 : 1);
+    ctx.fillStyle = "#5b3109";
+    ctx.strokeStyle = tier === 2 ? "#ff8bd8" : "#ffd166";
+    ctx.lineWidth = 1.6;
     ctx.beginPath();
-    ctx.arc(c.x, c.y, r, 0, TAU);
+    for (let index = 0; index < teeth * 2; index++) {
+      const angle = index / (teeth * 2) * TAU;
+      const radius = index % 2 ? r * 1.02 : r * 1.32;
+      const x = Math.cos(angle) * radius;
+      const y = Math.sin(angle) * radius;
+      if (index) ctx.lineTo(x, y);
+      else ctx.moveTo(x, y);
+    }
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = "#c06d13";
+    ctx.beginPath();
+    ctx.arc(0, 0, r, 0, TAU);
     ctx.fill();
     ctx.strokeStyle = "#fff3b0";
     ctx.lineWidth = 1;
     ctx.beginPath();
-    ctx.arc(c.x, c.y, r * 0.58, 0, TAU);
+    ctx.arc(0, 0, r * 0.72, 0, TAU);
     ctx.stroke();
-    ctx.fillStyle = "rgba(3,6,12,0.45)";
-    ctx.fillRect(c.x - 1, c.y - r * 0.42, 2, r * 0.84);
+    ctx.fillStyle = tier === 2 ? "#ff8bd8" : tier === 1 ? "#fff3b0" : "#ffd166";
+    ctx.fillRect(-r * 0.38, -r * 0.38, r * 0.76, r * 0.76);
+    ctx.fillStyle = "#261507";
+    ctx.fillRect(-r * 0.15, -r * 0.58, r * 0.3, r * 1.16);
+    ctx.fillStyle = hexToRgba("#ffffff", 0.84);
+    ctx.save();
+    ctx.rotate(-phase * 0.55);
+    ctx.fillRect(-r * 0.55, -r * 0.72, r * 0.28, r * 0.12);
+    ctx.restore();
+    ctx.restore();
   }
 }
 
-const COMPLEX_ENEMY_PROJECTILE_SHAPES = new Set([
-  "darkEntityLance",
-  "darkEntityScythe",
-  "darkEntityHunter",
-  "snowflake",
-  "frostComet",
-  "fireball",
-  "voidFireball",
-  "stormBlade",
-  "stormOrb",
-  "stormCrownShard",
-  "riftbladeCrescent",
-  "convictBall",
-  "convictShrapnel",
-  "convictSeeker",
-  "scientistAbyssShard",
-]);
-
 export function isPixiBatchableEnemyProjectile(projectile) {
-  return !COMPLEX_ENEMY_PROJECTILE_SHAPES.has(projectile?.shape);
+  return !projectile?.hidden
+    && hasProjectileVisualProfile(projectile?.visualId || projectile?.shape);
 }
 
 export function isPixiBatchableEnemy(enemy) {
@@ -3153,8 +3237,22 @@ function drawSnowflakeProjectile(ctx, b) {
   ctx.restore();
 }
 
-function drawHazards(ctx) {
+export function isPixiBatchableHazard(hazard) {
+  if (hazard?.kind === "dark_entity_field") {
+    return hazard.variant === "negative_star"
+      || hazard.variant === "lane_guide"
+      || hazard.variant === "wing_guide"
+      || Array.isArray(hazard.lines);
+  }
+  return hazard?.kind === "convict_chain_arc"
+    || hazard?.kind === "convict_ball_slam"
+    || hazard?.kind === "convict_chain_line"
+    || hazard?.kind === "convict_chain_path";
+}
+
+function drawHazards(ctx, skipPredicate) {
   for (const h of world.hazards) {
+    if (skipPredicate?.(h)) continue;
     const alpha = Math.max(0, h.life / h.maxLife);
     if (h.kind === "dark_entity_field") {
       if (h.variant === "negative_star" && !inView(h.x, h.y, (h.r || 72) + 80)) continue;
@@ -3289,6 +3387,12 @@ function drawHazards(ctx) {
     ctx.beginPath(); ctx.arc(0, 0, h.r, 0, TAU); ctx.fill();
     ctx.restore();
   }
+}
+
+// Used by the offline visual asset exporter. Keeping this small bridge here
+// ensures exported hazards use the same drawing code as the live game.
+export function drawHazardsForExport(ctx) {
+  drawHazards(ctx);
 }
 
 function drawDarkEntityFieldHazard(ctx, h, alpha) {

@@ -14,6 +14,8 @@ import { isRandomMode, randomEnemyLimitForWave } from "./randomMode.js";
 export { applyFrostMark } from "./statusEffects.js";
 import { applyFrostMark } from "./statusEffects.js";
 import { coinAmountForEnemy, dropCoin, dropGem } from "./rewards.js";
+import { framePerformance } from "./performanceMonitor.js";
+import { releaseBossEffect } from "./bossEffectRegistry.js";
 
 export { coinAmountForEnemy, dropCoin, dropGem } from "./rewards.js";
 
@@ -146,14 +148,22 @@ export function updateEnemies(dt) {
     if (assisted) e.speed *= e.prismAssistSpeedMult || 1.22;
     if (activeWaveEffect("mini_overdrive") && !e.boss) e.speed *= 1.5;
     if (activeWaveEffect("overclock_pulse") && !e.boss) e.speed *= overclockPulseMultiplier();
-    if (!updateEliteDashTrap(e, dt)) e.update(dt);
+    if (!updateEliteDashTrap(e, dt)) {
+      if (e.boss) framePerformance.begin("bossUpdate");
+      e.update(dt);
+      if (e.boss) framePerformance.end("bossUpdate");
+    }
     if (assisted) e.speed = baseSpeed;
     if ((activeWaveEffect("mini_overdrive") || activeWaveEffect("overclock_pulse")) && !e.boss) e.speed = baseSpeed;
     updateEliteSkill(e, dt);
     applyDifficultyCooldownScale(e, beforeCooldowns);
   }
+  framePerformance.begin("enemyProjectileUpdate");
   updateEnemyProjectiles(dt);
+  framePerformance.end("enemyProjectileUpdate");
+  framePerformance.begin("hazardUpdate");
   updateHazards(dt);
+  framePerformance.end("hazardUpdate");
   updateBlackhole(dt);
 }
 
@@ -191,6 +201,7 @@ export function updateGems(dt) {
     }
     if (dist < p.r + 12) {
       p.xp += g.value;
+      pulse(g.x, g.y, g.value >= 15 ? 28 : g.value >= 8 ? 23 : 19, g.value >= 15 ? "#b48cff" : g.value >= 8 ? "#77ff8a" : "#42e8ff", 0.12);
       world.gems.splice(i, 1);
       playSfx("gem");
     }
@@ -214,6 +225,7 @@ export function updateCoins(dt) {
     }
     if (dist < p.r + 12) {
       state.gold += c.value;
+      pulse(c.x, c.y, c.value >= 8 ? 27 : c.value >= 4 ? 22 : 18, c.value >= 8 ? "#ff8bd8" : "#ffd166", 0.12);
       world.coins.splice(i, 1);
       playSfx("coin");
     }
@@ -310,6 +322,7 @@ export function clearEnemies({ dropRewards = true } = {}) {
 
 function updateEnemyProjectiles(dt) {
   const p = state.player;
+  let removed = 0;
   for (let i = world.enemyProjectiles.length - 1; i >= 0; i--) {
     const b = world.enemyProjectiles[i];
     updateSpecialEnemyProjectile(b, dt);
@@ -342,13 +355,18 @@ function updateEnemyProjectiles(dt) {
       burst(p.x, p.y, 8, b.color, 100);
       playSfx("hurt");
       if (b.landTrapOnHit) placeGearProjectileTrap(b);
-      world.enemyProjectiles.splice(i, 1);
+      releaseBossEffect(b);
+      b.__removeFromWorld = true;
+      removed++;
     } else if ((b.bossProjectile && (outsideMap || (b.expireWithLife && b.life <= 0))) || (!b.bossProjectile && b.life <= 0)) {
       if (b.splitOnExpire) splitEnemyProjectile(b);
       if (b.landTrapOnExpire) placeGearProjectileTrap(b);
-      world.enemyProjectiles.splice(i, 1);
+      releaseBossEffect(b);
+      b.__removeFromWorld = true;
+      removed++;
     }
   }
+  if (removed) compactRemoved(world.enemyProjectiles);
 }
 
 function isEnemyProjectileOutsideMap(b) {
@@ -420,24 +438,37 @@ function splitEnemyProjectile(b) {
 
 function updateHazards(dt) {
   const p = state.player;
+  let removed = 0;
   for (let i = world.hazards.length - 1; i >= 0; i--) {
     const h = world.hazards[i];
     h.life -= dt;
-    if (h.kind === "ember_mine") updateEmberMine(h, dt);
-    if (h.kind === "gravity_well") updateGravityWell(h, dt);
-    if (h.kind === "magnetic_node") updateMagneticNode(h, dt);
-    if (h.kind === "brood_pod") updateBroodPod(h, dt);
-    if (h.kind === "storm_laser_net") updateStormLaserNet(h, dt);
-    if (h.kind === "storm_strike") updateStormStrike(h, dt);
-    if (h.kind === "polar_ice_lane") updatePolarIceLane(h, dt);
-    if (h.kind === "riftblade_slash" || h.kind === "riftblade_bladefall") updateRiftbladeHazard(h, dt);
-    if (h.kind === "convict_chain_arc" || h.kind === "convict_ball_slam" || h.kind === "convict_chain_line" || h.kind === "convict_chain_path") updateConvictHazard(h, dt);
-    if (isScientistHazard(h)) updateScientistHazard(h, dt);
-    if (isDarkEntityHazard(h)) updateDarkEntityHazard(h, dt);
-    if (h.kind === "phase_tear") updatePhaseTear(h, dt);
-    if (h.kind === "inferno_beacon") updateInfernoBeacon(h, dt);
-    if (h.kind === "artillery_blast") updateArtilleryBlast(h, dt);
-    if (h.kind === "ice_spike" || h.kind === "ice_seal") updateIceHazard(h, dt);
+    switch (h.kind) {
+      case "ember_mine": updateEmberMine(h, dt); break;
+      case "gravity_well": updateGravityWell(h, dt); break;
+      case "magnetic_node": updateMagneticNode(h, dt); break;
+      case "brood_pod": updateBroodPod(h, dt); break;
+      case "storm_laser_net": updateStormLaserNet(h, dt); break;
+      case "storm_strike": updateStormStrike(h, dt); break;
+      case "polar_ice_lane": updatePolarIceLane(h, dt); break;
+      case "riftblade_slash":
+      case "riftblade_bladefall": updateRiftbladeHazard(h, dt); break;
+      case "convict_chain_arc":
+      case "convict_ball_slam":
+      case "convict_chain_line":
+      case "convict_chain_path": updateConvictHazard(h, dt); break;
+      case "scientist_seal_line":
+      case "scientist_vial_blast":
+      case "scientist_tendril_path":
+      case "scientist_entropy_field":
+      case "scientist_memory_path":
+      case "scientist_void_node": updateScientistHazard(h, dt); break;
+      case "dark_entity_field": updateDarkEntityHazard(h, dt); break;
+      case "phase_tear": updatePhaseTear(h, dt); break;
+      case "inferno_beacon": updateInfernoBeacon(h, dt); break;
+      case "artillery_blast": updateArtilleryBlast(h, dt); break;
+      case "ice_spike":
+      case "ice_seal": updateIceHazard(h, dt); break;
+    }
     if (distSq(h.x, h.y, p.x, p.y) < ((h.triggerRadius || h.r) + p.r) ** 2 && h.kind === "ember_mine") h.triggered = true;
     const canDamage =
       !h.kind ||
@@ -496,8 +527,23 @@ function updateHazards(dt) {
       if (h.kind === "ember_mine") h.life = 0;
       if (h.kind === "artillery_blast") h.life = Math.min(h.life, 0.12);
     }
-    if (h.life <= 0) world.hazards.splice(i, 1);
+    if (h.life <= 0) {
+      releaseBossEffect(h);
+      h.__removeFromWorld = true;
+      removed++;
+    }
   }
+  if (removed) compactRemoved(world.hazards);
+}
+
+function compactRemoved(array) {
+  let write = 0;
+  for (let read = 0; read < array.length; read++) {
+    const entry = array[read];
+    if (entry?.__removeFromWorld) continue;
+    array[write++] = entry;
+  }
+  array.length = write;
 }
 
 function updateEliteSkill(e, dt) {
@@ -881,12 +927,18 @@ function updateBroodPod(h, dt) {
 }
 
 function pointSegmentDistance(px, py, x1, y1, x2, y2) {
+  return Math.sqrt(pointSegmentDistanceSq(px, py, x1, y1, x2, y2));
+}
+
+function pointSegmentDistanceSq(px, py, x1, y1, x2, y2) {
   const dx = x2 - x1;
   const dy = y2 - y1;
   const lengthSq = dx * dx + dy * dy;
-  if (lengthSq <= 0.0001) return Math.hypot(px - x1, py - y1);
+  if (lengthSq <= 0.0001) return (px - x1) ** 2 + (py - y1) ** 2;
   const t = clamp(((px - x1) * dx + (py - y1) * dy) / lengthSq, 0, 1);
-  return Math.hypot(px - (x1 + dx * t), py - (y1 + dy * t));
+  const tx = px - (x1 + dx * t);
+  const ty = py - (y1 + dy * t);
+  return tx * tx + ty * ty;
 }
 
 function updateConvictHazard(h, dt) {
@@ -926,17 +978,20 @@ function convictHazardHit(h, player) {
   if (h.kind === "convict_chain_arc") {
     const ballHit = Math.hypot(player.x - h.ballX, player.y - h.ballY) < player.r + (h.ballRadius || 28);
     if (h.chainDamage === false) return ballHit;
-    return pointSegmentDistance(player.x, player.y, h.centerX, h.centerY, h.ballX, h.ballY) < player.r + (h.width || 18) || ballHit;
+    const padding = player.r + (h.width || 18);
+    return pointSegmentDistanceSq(player.x, player.y, h.centerX, h.centerY, h.ballX, h.ballY) < padding * padding || ballHit;
   }
   if (h.kind === "convict_chain_line") {
     const lines = h.lines || [{ x1: h.x1, y1: h.y1, x2: h.x2, y2: h.y2 }];
-    return lines.some((line) => pointSegmentDistance(player.x, player.y, line.x1, line.y1, line.x2, line.y2) < player.r + (h.width || 18));
+    const padding = player.r + (h.width || 18);
+    return lines.some((line) => pointSegmentDistanceSq(player.x, player.y, line.x1, line.y1, line.x2, line.y2) < padding * padding);
   }
   if (h.kind === "convict_chain_path") {
     for (let i = 1; i < (h.points || []).length; i++) {
       const a = h.points[i - 1];
       const b = h.points[i];
-      if (pointSegmentDistance(player.x, player.y, a.x, a.y, b.x, b.y) < player.r + (h.width || 18)) return true;
+      const padding = player.r + (h.width || 18);
+      if (pointSegmentDistanceSq(player.x, player.y, a.x, a.y, b.x, b.y) < padding * padding) return true;
     }
   }
   return false;
@@ -1182,7 +1237,7 @@ function darkEntityHazardHit(h, player) {
       || player.y < line.minY - padding
       || player.y > line.maxY + padding
     )) continue;
-    if (pointSegmentDistance(player.x, player.y, line.x1, line.y1, line.x2, line.y2) < player.r + width) {
+    if (pointSegmentDistanceSq(player.x, player.y, line.x1, line.y1, line.x2, line.y2) < (player.r + width) ** 2) {
       h.currentHitDamage = line.damage ?? h.damage;
       return true;
     }

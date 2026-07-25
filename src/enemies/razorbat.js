@@ -14,6 +14,7 @@ export class Razorbat extends BaseEnemy {
     this.cooldown = 0.9 + Math.random();
     this.swoop = Math.random() * TAU;
     this.throwWindup = 0;
+    this.throwRelease = 0;
     this.throwAngle = 0;
   }
 
@@ -25,6 +26,7 @@ export class Razorbat extends BaseEnemy {
     this.anim += dt * 10;
     this.swoop += dt * 2.4;
     this.cooldown -= dt;
+    this.throwRelease = Math.max(0, this.throwRelease - dt);
     this.flash = Math.max(0, this.flash - dt * 8);
     this.hitTimer = Math.max(0, this.hitTimer - dt);
     this.flip = dx < 0 ? -1 : 1;
@@ -52,6 +54,7 @@ export class Razorbat extends BaseEnemy {
   throwBlade() {
     this.cooldown = this.elite ? 1.15 : 1.75;
     const a = this.throwAngle;
+    this.throwRelease = 0.18;
     world.enemyProjectiles.push({
       x: this.x + Math.cos(a) * (this.r + 8),
       y: this.y + Math.sin(a) * (this.r + 8),
@@ -77,6 +80,7 @@ export class Razorbat extends BaseEnemy {
     ctx.save();
     ctx.translate(this.x, this.y + Math.sin(this.swoop * 1.7) * 4);
     ctx.scale(this.flip, 1);
+    ctx.rotate(-(this.throwRelease / 0.18) * 0.16);
     ctx.fillStyle = "rgba(0,0,0,0.18)";
     ctx.beginPath();
     ctx.ellipse(0, this.r + 8, this.r * 1.1, this.r * 0.22, 0, 0, TAU);
@@ -151,5 +155,11 @@ export class Razorbat extends BaseEnemy {
     ctx.arc(0, -3 * z, (7 + Math.sin(this.anim * 0.8) * 1.2) * z, 0, TAU);
     ctx.stroke();
     ctx.restore();
+  }
+
+  getVisualState() {
+    if (this.throwWindup > 0) return { clip: "windup", progress: 1 - this.throwWindup / 0.28, facing: this.flip, heading: this.throwAngle };
+    if (this.throwRelease > 0) return { clip: "attack", progress: 1 - this.throwRelease / 0.18, facing: this.flip, heading: this.throwAngle };
+    return { clip: "move", progress: ((this.anim % TAU) + TAU) % TAU / TAU, facing: this.flip };
   }
 }

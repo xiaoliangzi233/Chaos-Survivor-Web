@@ -15,6 +15,7 @@ export class Wizard extends BaseEnemy {
     this.castAngle = 0;
     this.cooldown = 1.15 + Math.random() * 0.8;
     this.orbit = Math.random() * TAU;
+    this.castRelease = 0;
   }
 
   update(dt) {
@@ -25,6 +26,7 @@ export class Wizard extends BaseEnemy {
     this.anim += dt * 4.6;
     this.orbit += dt * 2.7;
     this.cooldown -= dt;
+    this.castRelease = Math.max(0, this.castRelease - dt);
     this.flash = Math.max(0, this.flash - dt * 8);
     this.hitTimer = Math.max(0, this.hitTimer - dt);
     this.flip = dx < 0 ? -1 : 1;
@@ -57,6 +59,7 @@ export class Wizard extends BaseEnemy {
   releaseSpell() {
     this.cooldown = this.elite ? 1.35 : 1.95;
     const count = this.elite ? 2 : 1;
+    this.castRelease = 0.22;
     for (let i = 0; i < count; i++) {
       const a = this.castAngle + (count === 1 ? 0 : (i - 0.5) * 0.16);
       world.enemyProjectiles.push({
@@ -80,8 +83,10 @@ export class Wizard extends BaseEnemy {
     const z = this.r / 15;
     const bob = Math.sin(this.anim * 1.35) * 4;
     const cast = this.castTime > 0;
+    const release = Math.min(1, this.castRelease / 0.22);
     ctx.save();
     ctx.translate(this.x, this.y + bob);
+    ctx.rotate(-release * 0.08 * (this.flip || 1));
     ctx.fillStyle = "rgba(0,0,0,0.24)";
     ctx.beginPath();
     ctx.ellipse(0, this.r + 8 - bob, this.r * 0.95, this.r * 0.24, 0, 0, TAU);
@@ -138,7 +143,7 @@ export class Wizard extends BaseEnemy {
     ctx.lineWidth = 2;
     ctx.beginPath();
     ctx.moveTo(12 * z, 10 * z);
-    ctx.lineTo(34 * z, 18 * z);
+    ctx.lineTo((34 - release * 8) * z, (18 + release * 5) * z);
     ctx.stroke();
     ctx.fillStyle = flash ? "#ffffff" : "#ffd166";
     ctx.beginPath();
@@ -186,6 +191,12 @@ export class Wizard extends BaseEnemy {
       ctx.restore();
     }
     ctx.restore();
+  }
+
+  getVisualState() {
+    if (this.castTime > 0) return { clip: "windup", progress: 1 - this.castTime / (this.elite ? 0.48 : 0.68), facing: this.flip, heading: this.castAngle };
+    if (this.castRelease > 0) return { clip: "attack", progress: 1 - this.castRelease / 0.22, facing: this.flip, heading: this.castAngle };
+    return { clip: "move", progress: ((this.anim % TAU) + TAU) % TAU / TAU, facing: this.flip };
   }
 }
 

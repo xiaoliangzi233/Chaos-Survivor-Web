@@ -30,7 +30,13 @@ export class MechWorm extends BaseEnemy {
     this.segmentGap = BASE_SEGMENT_GAP + this.difficultyRank * 0.75;
     this.segmentCount = BASE_SEGMENT_COUNT + Math.floor(this.difficultyRank / 2);
     this.coastTurnRate = 0.95 + this.difficultyRank * 0.42;
-    this.path = [];
+    this.headAngle = Math.atan2(state.player.y - y, state.player.x - x);
+    this.pathCapacity = 0;
+    this.pathX = null;
+    this.pathY = null;
+    this.pathHead = 0;
+    this.pathCount = 0;
+    this.pathSampleSpacing = 3;
     this.segments = [];
     for (let i = 0; i < this.segmentCount; i++) {
       this.segments.push({ x: x - (i + 1) * this.segmentGap, y, angle: 0, phase: Math.random() * TAU });
@@ -44,6 +50,8 @@ export class MechWorm extends BaseEnemy {
       this.knockbackResistance = Math.max(this.knockbackResistance, 0.7);
       this.extendSegments(4.4);
     }
+    this.ensurePathCapacity();
+    this.seedPath();
   }
 
   extendSegments(multiplier) {
@@ -58,6 +66,7 @@ export class MechWorm extends BaseEnemy {
         phase: Math.random() * TAU,
       });
     }
+    if (this.pathX) this.ensurePathCapacity();
   }
 
   update(dt) {
@@ -70,6 +79,10 @@ export class MechWorm extends BaseEnemy {
     this.hitTimer = Math.max(0, this.hitTimer - dt);
     this.cooldown = Math.max(0, this.cooldown - dt);
     this.flip = dx < 0 ? -1 : 1;
+    const desiredHeadAngle = this.state === "strike" || this.state === "coast"
+      ? this.strikeAngle
+      : Math.atan2(dy, dx);
+    this.headAngle += angleDiff(desiredHeadAngle, this.headAngle) * Math.min(1, dt * (this.state === "strike" ? 12 : 7));
 
     if (this.state === "charge") {
       this.updateCharge(dt, dx, dy, d);
@@ -145,32 +158,92 @@ export class MechWorm extends BaseEnemy {
   }
 
   recordPath() {
-    this.path.unshift({ x: this.x, y: this.y });
-    const rawMax = this.segmentCount * this.segmentGap + 24;
-    const max = Number.isFinite(rawMax) ? Math.max(1, Math.ceil(rawMax)) : 96;
-    if (this.path.length > max) this.path.length = max;
+    const lastIndex = (this.pathHead - 1 + this.pathCapacity) % this.pathCapacity;
+    if (this.pathCount > 0) {
+      const dx = this.x - this.pathX[lastIndex];
+      const dy = this.y - this.pathY[lastIndex];
+      if (dx * dx + dy * dy < this.pathSampleSpacing * this.pathSampleSpacing) return;
+    }
+    this.pathX[this.pathHead] = this.x;
+    this.pathY[this.pathHead] = this.y;
+    this.pathHead = (this.pathHead + 1) % this.pathCapacity;
+    this.pathCount = Math.min(this.pathCapacity, this.pathCount + 1);
   }
 
   updateSegments() {
-    let leadX = this.x;
-    let leadY = this.y;
-    let leadAngle = this.strikeAngle;
-    for (let i = 0; i < this.segments.length; i++) {
-      const seg = this.segments[i];
-      const dx = leadX - seg.x;
-      const dy = leadY - seg.y;
-      const distance = Math.max(1, Math.hypot(dx, dy));
-      const angle = distance > 2 ? Math.atan2(dy, dx) : leadAngle;
-      const targetX = leadX - Math.cos(angle) * this.segmentGap;
-      const targetY = leadY - Math.sin(angle) * this.segmentGap;
-      const follow = this.state === "strike" || this.state === "coast" ? 0.86 : 0.72;
-      seg.x += (targetX - seg.x) * follow;
-      seg.y += (targetY - seg.y) * follow;
-      seg.angle = angle;
-      leadX = seg.x;
-      leadY = seg.y;
-      leadAngle = angle;
+    if (!this.pathCount) return;
+    let newerX = this.x;
+    let newerY = this.y;
+    let accumulated = 0;
+    let targetDistance = this.segmentGap;
+    let segmentIndex = 0;
+    for (let step = 0; step < this.pathCount && segmentIndex < this.segments.length; step++) {
+      const index = (this.pathHead - 1 - step + this.pathCapacity) % this.pathCapacity;
+      const olderX = this.pathX[index];
+      const olderY = this.pathY[index];
+      const dx = olderX - newerX;
+      const dy = olderY - newerY;
+      const length = Math.max(0.001, Math.hypot(dx, dy));
+      while (segmentIndex < this.segments.length && accumulated + length >= targetDistance) {
+        const local = (targetDistance - accumulated) / length;
+        const baseX = newerX + dx * local;
+        const baseY = newerY + dy * local;
+        const tangent = Math.atan2(-dy, -dx);
+        const amplitude = this.r * (this.state === "strike" ? 0.12 : 0.34) * (1 - segmentIndex / Math.max(1, this.segments.length) * 0.38);
+        const wave = Math.sin(this.anim * 1.25 - segmentIndex * 0.82 + this.segments[segmentIndex].phase) * amplitude;
+        const targetX = baseX - Math.sin(tangent) * wave;
+        const targetY = baseY + Math.cos(tangent) * wave;
+        const seg = this.segments[segmentIndex];
+        seg.x += (targetX - seg.x) * 0.82;
+        seg.y += (targetY - seg.y) * 0.82;
+        seg.angle += angleDiff(tangent, seg.angle) * 0.72;
+        segmentIndex++;
+        targetDistance = (segmentIndex + 1) * this.segmentGap;
+      }
+      accumulated += length;
+      newerX = olderX;
+      newerY = olderY;
     }
+    while (segmentIndex < this.segments.length) {
+      const previous = segmentIndex ? this.segments[segmentIndex - 1] : { x: this.x, y: this.y, angle: this.headAngle };
+      const seg = this.segments[segmentIndex];
+      const targetX = previous.x - Math.cos(previous.angle) * this.segmentGap;
+      const targetY = previous.y - Math.sin(previous.angle) * this.segmentGap;
+      seg.x += (targetX - seg.x) * 0.72;
+      seg.y += (targetY - seg.y) * 0.72;
+      seg.angle += angleDiff(previous.angle, seg.angle) * 0.65;
+      segmentIndex++;
+    }
+  }
+
+  ensurePathCapacity() {
+    const desired = Math.max(64, Math.ceil((this.segmentCount * this.segmentGap + 120) / this.pathSampleSpacing) + 8);
+    if (desired <= this.pathCapacity) return;
+    this.pathCapacity = desired;
+    this.pathX = new Float32Array(desired);
+    this.pathY = new Float32Array(desired);
+    this.pathHead = 0;
+    this.pathCount = 0;
+  }
+
+  seedPath() {
+    const angle = this.headAngle;
+    const samples = Math.min(this.pathCapacity, Math.ceil((this.segmentCount * this.segmentGap + 36) / this.pathSampleSpacing));
+    for (let i = samples - 1; i >= 0; i--) {
+      this.pathX[this.pathHead] = this.x - Math.cos(angle) * i * this.pathSampleSpacing;
+      this.pathY[this.pathHead] = this.y - Math.sin(angle) * i * this.pathSampleSpacing;
+      this.pathHead = (this.pathHead + 1) % this.pathCapacity;
+      this.pathCount++;
+    }
+  }
+
+  getVisualState() {
+    return {
+      clip: this.state === "charge" ? "windup" : this.state === "strike" ? "attack" : this.state === "coast" ? "recover" : "move",
+      progress: ((this.anim % TAU) + TAU) % TAU / TAU,
+      facing: 1,
+      heading: this.headAngle,
+    };
   }
 
   damagePlayer() {
@@ -244,8 +317,7 @@ function drawSegment(ctx, e, seg, i, flash) {
 }
 
 function drawHead(ctx, e, flash) {
-  const p = state.player;
-  const angle = Math.atan2(p.y - e.y, p.x - e.x);
+  const angle = e.headAngle;
   const charge = e.state === "charge";
   const strike = e.state === "strike";
   ctx.save();

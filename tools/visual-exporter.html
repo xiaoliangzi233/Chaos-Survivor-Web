@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Survivor 可视化 PNG 导出器</title>
+  <link rel="stylesheet" href="./visual-exporter.css">
+</head>
+<body>
+  <main class="export-shell">
+    <header class="export-header">
+      <div>
+        <p class="eyebrow">SURVIVOR / VISUAL BAKE PIPELINE</p>
+        <h1>可视化 PNG 导出器</h1>
+        <p class="lede">调用游戏当前的 Canvas、Pixi 和 DOM 样式，将可视化内容按类别写入 <code>assets/exported/</code>。</p>
+      </div>
+      <div id="serverBadge" class="server-badge pending">正在连接本地写入服务</div>
+    </header>
+
+    <section class="control-panel">
+      <label class="mode-field">
+        <span>导出范围</span>
+        <select id="exportMode">
+          <option value="full">完整导出：全部对象与全部帧</option>
+          <option value="smoke">快速验证：每类少量样本</option>
+        </select>
+      </label>
+      <label class="resume-field">
+        <input id="resumeExisting" type="checkbox">
+        <span>续传模式：跳过已有同名 PNG</span>
+      </label>
+      <div class="action-row">
+        <button id="startExport" class="primary" type="button">开始导出全部 PNG</button>
+        <button id="cancelExport" type="button" disabled>停止</button>
+      </div>
+      <p class="hint">完整导出会生成大量序列帧。默认原子覆盖同名文件；中断后可勾选续传模式，只补齐缺失文件。</p>
+    </section>
+
+    <section class="progress-panel" aria-live="polite">
+      <div class="progress-copy">
+        <strong id="progressTitle">等待开始</strong>
+        <span id="progressCount">0 / 0</span>
+      </div>
+      <div class="progress-track"><div id="progressBar" class="progress-bar"></div></div>
+      <div id="categoryGrid" class="category-grid"></div>
+    </section>
+
+    <section class="workspace">
+      <div class="preview-panel">
+        <div class="panel-title">
+          <h2>当前预览</h2>
+          <code id="previewPath">尚未生成</code>
+        </div>
+        <div class="preview-stage">
+          <canvas id="previewCanvas" width="512" height="512"></canvas>
+        </div>
+      </div>
+      <div class="log-panel">
+        <div class="panel-title">
+          <h2>导出日志</h2>
+          <button id="clearLog" type="button">清空日志</button>
+        </div>
+        <pre id="exportLog"></pre>
+      </div>
+    </section>
+  </main>
+
+  <script type="module" src="./visual-exporter.js"></script>
+</body>
+</html>

@@ -5,6 +5,13 @@ import { clamp } from "../utils.js";
 import { playSfx } from "../audio.js";
 import { applyPlayerDamage } from "../systems/items.js";
 import { BaseEnemy, spawnConfigured } from "./BaseEnemy.js";
+import {
+  addBossHazard,
+  addBossProjectile,
+  bossHazardCount,
+  bossProjectileCount,
+  clearBossEffects,
+} from "../systems/bossEffectRegistry.js";
 
 export const DARK_ENTITY_THRESHOLDS = Object.freeze([2 / 3, 1 / 3]);
 export const DARK_ENTITY_LIMITS = Object.freeze({
@@ -625,8 +632,7 @@ export class DarkEnergyEntity extends BaseEnemy {
       bossOwner: this,
       ...options,
     };
-    world.hazards.push(field);
-    return field;
+    return addBossHazard(this, field, DARK_ENTITY_LIMITS.hazards);
   }
 
   pushProjectile(options) {
@@ -638,8 +644,7 @@ export class DarkEnergyEntity extends BaseEnemy {
       spin: Math.random() * TAU,
       ...options,
     };
-    world.enemyProjectiles.push(projectile);
-    return projectile;
+    return addBossProjectile(this, projectile, DARK_ENTITY_LIMITS.projectiles);
   }
 
   trackPlayerMotion(dt) {
@@ -742,12 +747,7 @@ export class DarkEnergyEntity extends BaseEnemy {
   }
 
   clearOwnedEffects() {
-    for (let index = world.enemyProjectiles.length - 1; index >= 0; index--) {
-      if (world.enemyProjectiles[index].bossOwner === this) world.enemyProjectiles.splice(index, 1);
-    }
-    for (let index = world.hazards.length - 1; index >= 0; index--) {
-      if (world.hazards[index].bossOwner === this) world.hazards.splice(index, 1);
-    }
+    clearBossEffects(this);
   }
 
   hasOwnedDanger() {
@@ -755,11 +755,11 @@ export class DarkEnergyEntity extends BaseEnemy {
   }
 
   ownedProjectileCount() {
-    return world.enemyProjectiles.reduce((count, projectile) => count + (projectile.bossOwner === this ? 1 : 0), 0);
+    return bossProjectileCount(this);
   }
 
   ownedHazardCount() {
-    return world.hazards.reduce((count, hazard) => count + (hazard.bossOwner === this ? 1 : 0), 0);
+    return bossHazardCount(this);
   }
 
   kill() {

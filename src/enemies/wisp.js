@@ -17,6 +17,9 @@ export class Wisp extends BaseEnemy {
     this.trailTimer = Math.random() * 0.12;
     this.lastX = x;
     this.lastY = y;
+    this.attackWindup = 0;
+    this.attackRelease = 0;
+    this.attackAngle = 0;
   }
 
   update(dt) {
@@ -35,6 +38,7 @@ export class Wisp extends BaseEnemy {
     this.anim += dt * 3.2;
     this.cooldown -= dt;
     this.shootCooldown -= dt;
+    this.attackRelease = Math.max(0, this.attackRelease - dt);
     this.flash = Math.max(0, this.flash - dt * 8);
     this.hitTimer = Math.max(0, this.hitTimer - dt);
     this.flip = dx < 0 ? -1 : 1;
@@ -55,9 +59,19 @@ export class Wisp extends BaseEnemy {
     this.x = clamp(this.x, -half + this.r, half - this.r);
     this.y = clamp(this.y, -half + this.r, half - this.r);
 
+    if (this.shootCooldown > 0 && this.shootCooldown <= 0.28 && d < 720) {
+      this.attackWindup = 1 - this.shootCooldown / 0.28;
+      this.attackAngle = Math.atan2(dy, dx);
+    } else if (this.shootCooldown > 0) {
+      this.attackWindup = 0;
+    }
+
     if (this.shootCooldown <= 0 && d < 720) {
       this.shootCooldown = this.elite ? 0.78 : 1.08;
-      this.fireSnowflake(Math.atan2(dy, dx), d);
+      this.attackWindup = 0;
+      this.attackRelease = 0.18;
+      this.attackAngle = Math.atan2(dy, dx);
+      this.fireSnowflake(this.attackAngle, d);
     }
 
     this.trailTimer -= dt;
@@ -101,8 +115,11 @@ export class Wisp extends BaseEnemy {
   }
 
   draw(ctx) {
-    const bob = Math.sin(this.anim * 2.2 + this.hoverPhase) * 4;
-    const sway = Math.sin(this.anim * 1.1 + this.hoverPhase) * 0.08;
+    const windup = this.attackWindup || 0;
+    const release = Math.min(1, (this.attackRelease || 0) / 0.18);
+    const bob = Math.sin(this.anim * 2.2 + this.hoverPhase) * (4 - windup * 2.2) + release * 2;
+    const sway = Math.sin(this.anim * 1.1 + this.hoverPhase) * 0.08
+      + Math.sin(this.attackAngle || 0) * (windup * 0.08 - release * 0.12);
     const flash = this.flash > 0;
 
     ctx.save();
@@ -114,10 +131,22 @@ export class Wisp extends BaseEnemy {
     drawOrbitShards(ctx, this, flash);
     ctx.restore();
   }
+
+  getVisualState() {
+    if (this.attackWindup > 0) {
+      return { clip: "windup", progress: this.attackWindup, facing: this.flip, heading: this.attackAngle };
+    }
+    if (this.attackRelease > 0) {
+      return { clip: "attack", progress: 1 - this.attackRelease / 0.18, facing: this.flip, heading: this.attackAngle };
+    }
+    return { clip: "move", progress: ((this.anim % TAU) + TAU) % TAU / TAU, facing: this.flip };
+  }
 }
 
 function drawWispAura(ctx, e, flash) {
-  const pulseSize = 1 + Math.sin(e.anim * 2.6) * 0.08;
+  const windup = e.attackWindup || 0;
+  const release = Math.min(1, (e.attackRelease || 0) / 0.18);
+  const pulseSize = 1 + Math.sin(e.anim * 2.6) * 0.08 + windup * 0.22 + release * 0.12;
   const glow = flash ? "#ffffff" : "#67e8ff";
   ctx.globalAlpha = flash ? 0.34 : 0.2;
   ctx.fillStyle = glow;
@@ -135,7 +164,9 @@ function drawWispBody(ctx, e, flash) {
   const body = flash ? "#ffffff" : "#baf8ff";
   const edge = flash ? "#ffffff" : "#58d9ff";
   const core = flash ? "#e9fdff" : "#55f0ff";
-  const ripple = Math.sin(e.anim * 4) * 2;
+  const windup = e.attackWindup || 0;
+  const release = Math.min(1, (e.attackRelease || 0) / 0.18);
+  const ripple = Math.sin(e.anim * 4) * 2 + windup * 3 - release * 4;
 
   ctx.fillStyle = "rgba(126,232,255,0.42)";
   ctx.beginPath();
@@ -150,7 +181,7 @@ function drawWispBody(ctx, e, flash) {
 
   ctx.fillStyle = body;
   ctx.beginPath();
-  ctx.ellipse(0, -5, 16, 18, 0, 0, TAU);
+  ctx.ellipse(-release * 2, -5, 16 + windup * 2, 18 - windup * 2 + release * 2, 0, 0, TAU);
   ctx.fill();
   ctx.strokeStyle = edge;
   ctx.lineWidth = 2;
@@ -180,9 +211,11 @@ function drawIceCrown(ctx, e, flash) {
   ctx.strokeStyle = edge;
   ctx.fillStyle = color;
   ctx.lineWidth = 1.4;
+  const windup = e.attackWindup || 0;
+  const release = Math.min(1, (e.attackRelease || 0) / 0.18);
   for (let i = -1; i <= 1; i++) {
-    const x = i * 8;
-    const h = i === 0 ? 14 : 9;
+    const x = i * (8 - windup * 2 + release * 3);
+    const h = (i === 0 ? 14 : 9) + windup * 5 - release * 2;
     ctx.beginPath();
     ctx.moveTo(x, -33 - h * 0.2);
     ctx.lineTo(x + 4, -21);
@@ -199,10 +232,13 @@ function drawOrbitShards(ctx, e, flash) {
   ctx.fillStyle = color;
   ctx.strokeStyle = "#e9feff";
   ctx.lineWidth = 1;
+  const windup = e.attackWindup || 0;
+  const release = Math.min(1, (e.attackRelease || 0) / 0.18);
   for (let i = 0; i < 3; i++) {
-    const a = e.anim * 1.35 + i * TAU / 3;
-    const x = Math.cos(a) * 24;
-    const y = Math.sin(a) * 9 - 2;
+    const a = e.anim * (1.35 + windup * 2.4) + i * TAU / 3;
+    const radius = 24 - windup * 13 + release * 18;
+    const x = Math.cos(a) * radius;
+    const y = Math.sin(a) * (9 - windup * 4 + release * 5) - 2;
     ctx.save();
     ctx.translate(x, y);
     ctx.rotate(a + Math.PI / 4);

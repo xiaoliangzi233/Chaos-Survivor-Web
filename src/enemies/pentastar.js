@@ -14,6 +14,7 @@ export class Pentastar extends BaseEnemy {
     this.windup = 0;
     this.spin = Math.random() * TAU;
     this.fireAngle = 0;
+    this.fireRelease = 0;
     this.knockbackResistance = Math.max(this.knockbackResistance, 0.4);
   }
 
@@ -25,6 +26,7 @@ export class Pentastar extends BaseEnemy {
     this.anim += dt * 5.2;
     this.spin += dt * (this.windup > 0 ? -8.5 : 1.7);
     this.cooldown -= dt;
+    this.fireRelease = Math.max(0, this.fireRelease - dt);
     this.flash = Math.max(0, this.flash - dt * 8);
     this.hitTimer = Math.max(0, this.hitTimer - dt);
     this.flip = dx < 0 ? -1 : 1;
@@ -52,6 +54,7 @@ export class Pentastar extends BaseEnemy {
 
   firePentagram() {
     this.cooldown = 2.25;
+    this.fireRelease = 0.24;
     for (let i = 0; i < 5; i++) {
       const a = this.fireAngle + i * TAU / 5;
       world.enemyProjectiles.push({
@@ -73,9 +76,10 @@ export class Pentastar extends BaseEnemy {
   draw(ctx) {
     const flash = this.flash > 0;
     const z = this.r / 15;
-    const hot = this.windup > 0 ? 1 + Math.sin(this.anim * 8) * 0.14 : 1;
+    const release = Math.min(1, this.fireRelease / 0.24);
+    const hot = this.windup > 0 ? 1 + Math.sin(this.anim * 8) * 0.14 : 1 + release * 0.1;
     ctx.save();
-    ctx.translate(this.x, this.y);
+    ctx.translate(this.x - Math.cos(this.fireAngle) * release * 5, this.y - Math.sin(this.fireAngle) * release * 5);
     ctx.fillStyle = "rgba(0,0,0,0.25)";
     ctx.beginPath();
     ctx.ellipse(0, this.r + 8, this.r * 1.05, this.r * 0.22, 0, 0, TAU);
@@ -145,5 +149,11 @@ export class Pentastar extends BaseEnemy {
       ctx.stroke();
     }
     ctx.restore();
+  }
+
+  getVisualState() {
+    if (this.windup > 0) return { clip: "windup", progress: 1 - this.windup / 0.55, facing: this.flip, heading: this.fireAngle };
+    if (this.fireRelease > 0) return { clip: "attack", progress: 1 - this.fireRelease / 0.24, facing: this.flip, heading: this.fireAngle };
+    return { clip: "move", progress: ((this.anim % TAU) + TAU) % TAU / TAU, facing: this.flip };
   }
 }

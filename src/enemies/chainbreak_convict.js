@@ -5,6 +5,15 @@ import { clamp } from "../utils.js";
 import { playSfx } from "../audio.js";
 import { applyPlayerDamage } from "../systems/items.js";
 import { BaseEnemy } from "./BaseEnemy.js";
+import {
+  addBossHazard,
+  addBossProjectile,
+  bossHazardCount,
+  bossProjectileCount,
+  clearBossEffects,
+  findBossHazard,
+  forEachBossProjectile,
+} from "../systems/bossEffectRegistry.js";
 
 export const CHAINBREAK_PHASE_THRESHOLDS = [0.7, 0.35];
 export const CHAINBREAK_SAFE_CORRIDORS = { prison: 150, collapse: 150 };
@@ -548,12 +557,13 @@ export class ChainbreakConvict extends BaseEnemy {
   updateGarroteVolley(dt) {
     this.garroteVolleyTimer = Math.max(0, (this.garroteVolleyTimer || 0) - dt);
     if (this.garroteVolleyTimer > 0) return;
-    const arc = world.hazards.find((hazard) => hazard.convictOwner === this && hazard.kind === "convict_chain_arc" && hazard.style === "garrote");
+    const arc = findBossHazard(this, (hazard) => hazard.kind === "convict_chain_arc" && hazard.style === "garrote");
     if (!arc || (arc.armTime || 0) > 0) return;
     this.garroteVolleyTimer = this.phaseLevel >= 3 ? 0.38 : 0.48;
-    const sources = world.enemyProjectiles
-      .filter((projectile) => projectile.convictOwner === this && projectile.shape === "convictBall" && !projectile.hidden)
-      .slice(0, this.phaseLevel);
+    const sources = [];
+    forEachBossProjectile(this, (projectile) => {
+      if (sources.length < this.phaseLevel && projectile.shape === "convictBall" && !projectile.hidden) sources.push(projectile);
+    });
     const fallback = sources.length ? sources : [{ x: arc.ballX, y: arc.ballY, agentRole: "hunter" }];
     fallback.forEach((source, index) => {
       const angle = Math.atan2(state.player.y - source.y, state.player.x - source.x) + (index - (fallback.length - 1) / 2) * 0.16;
@@ -562,10 +572,10 @@ export class ChainbreakConvict extends BaseEnemy {
   }
 
   spawnSeekerBullet(x, y, angle, role = "hunter") {
-    const owned = world.enemyProjectiles.filter((projectile) => projectile.convictOwner === this && projectile.shape === "convictSeeker").length;
+    const owned = bossProjectileCount(this, (projectile) => projectile.shape === "convictSeeker");
     if (owned >= 18) return false;
     const speed = role === "warden" ? 205 : role === "breaker" ? 230 : 218;
-    world.enemyProjectiles.push({
+    return Boolean(addBossProjectile(this, {
       x,
       y,
       vx: Math.cos(angle) * speed,
@@ -583,8 +593,7 @@ export class ChainbreakConvict extends BaseEnemy {
       expireWithLife: true,
       convictOwner: this,
       agentRole: role,
-    });
-    return true;
+    }));
   }
 
   startPrisonLockdown() {
@@ -1052,8 +1061,7 @@ export class ChainbreakConvict extends BaseEnemy {
     };
     hazard.ballX = hazard.centerX + Math.cos(startAngle) * radius;
     hazard.ballY = hazard.centerY + Math.sin(startAngle) * radius;
-    world.hazards.push(hazard);
-    return hazard;
+    return addBossHazard(this, hazard);
   }
 
   createSlamHazard(x, y, radius, armTime, activeTime, damage, style) {
@@ -1077,8 +1085,7 @@ export class ChainbreakConvict extends BaseEnemy {
     };
     hazard.ballX = x;
     hazard.ballY = y;
-    world.hazards.push(hazard);
-    return hazard;
+    return addBossHazard(this, hazard);
   }
 
   createLineHazard(x1, y1, x2, y2, armTime, activeTime, width, damage, style, scene = false, noDamage = false) {
@@ -1112,8 +1119,7 @@ export class ChainbreakConvict extends BaseEnemy {
     };
     hazard.ballX = x1;
     hazard.ballY = y1;
-    world.hazards.push(hazard);
-    return hazard;
+    return addBossHazard(this, hazard);
   }
 
   createMultiLineHazard(lines, armTime, activeTime, width, damage, style, scene = false) {
@@ -1139,8 +1145,7 @@ export class ChainbreakConvict extends BaseEnemy {
       coreColor: this.coreColor(),
       convictOwner: this,
     };
-    world.hazards.push(hazard);
-    return hazard;
+    return addBossHazard(this, hazard);
   }
 
   createPathHazard(points, armTime, activeTime, width, damage, style) {
@@ -1167,15 +1172,14 @@ export class ChainbreakConvict extends BaseEnemy {
     };
     hazard.ballX = points[0].x;
     hazard.ballY = points[0].y;
-    world.hazards.push(hazard);
-    return hazard;
+    return addBossHazard(this, hazard);
   }
 
   spawnLinkedBall(hazard, radius, options = {}) {
     this.syncChainBallAgents();
     const agent = this.chainBallAgents[clamp(options.agentIndex || 0, 0, this.chainBallAgents.length - 1)];
     if (agent) agent.detached = true;
-    world.enemyProjectiles.push({
+    addBossProjectile(this, {
       x: hazard.ballX ?? hazard.x,
       y: hazard.ballY ?? hazard.y,
       vx: 0,
@@ -1204,7 +1208,7 @@ export class ChainbreakConvict extends BaseEnemy {
     this.syncChainBallAgents();
     const agent = this.chainBallAgents[this.chainBallAgents.length - 1];
     if (agent) agent.detached = true;
-    world.enemyProjectiles.push({
+    addBossProjectile(this, {
       x: hazards[0]?.x || this.x,
       y: hazards[0]?.y || this.y,
       vx: 0,
@@ -1255,7 +1259,7 @@ export class ChainbreakConvict extends BaseEnemy {
     if (ownedShrapnel >= CHAINBREAK_SCREEN_PRESSURE.peakShrapnel) return false;
     const speed = (options.speed || 260) * SMALL_PROJECTILE_SPEED_MULTIPLIER;
     const delay = Math.max(0, options.delay || 0);
-    world.enemyProjectiles.push({
+    const spawned = addBossProjectile(this, {
       x,
       y,
       vx: delay > 0 ? 0 : Math.cos(angle) * speed,
@@ -1277,16 +1281,13 @@ export class ChainbreakConvict extends BaseEnemy {
       expireWithLife: true,
       convictOwner: this,
     });
+    if (!spawned) return false;
     if (budget) budget.count++;
     return true;
   }
 
   ownedShrapnelCount() {
-    let count = 0;
-    for (const projectile of world.enemyProjectiles) {
-      if (projectile.convictOwner === this && projectile.shape === "convictShrapnel") count++;
-    }
-    return count;
+    return bossProjectileCount(this, (projectile) => projectile.shape === "convictShrapnel");
   }
 
   syncChainBallAgents() {
@@ -1314,11 +1315,11 @@ export class ChainbreakConvict extends BaseEnemy {
   updateChainBallAgents(dt) {
     this.syncChainBallAgents();
     for (const agent of this.chainBallAgents) agent.detached = false;
-    for (const projectile of world.enemyProjectiles) {
-      if (projectile.convictOwner !== this || projectile.shape !== "convictBall" || !projectile.chainAgentId) continue;
+    forEachBossProjectile(this, (projectile) => {
+      if (projectile.convictOwner !== this || projectile.shape !== "convictBall" || !projectile.chainAgentId) return;
       const agent = this.chainBallAgents.find((candidate) => candidate.id === projectile.chainAgentId);
       if (agent) agent.detached = true;
-    }
+    });
     for (const agent of this.chainBallAgents) {
       agent.orbitAngle = wrapAngle(agent.orbitAngle + agent.orbitSpeed * dt);
       agent.decisionClock -= dt;
@@ -1436,15 +1437,11 @@ export class ChainbreakConvict extends BaseEnemy {
   }
 
   hasOwnedDanger() {
-    return world.hazards.some((hazard) => hazard.convictOwner === this && hazard.damage > 0);
+    return bossHazardCount(this, (hazard) => hazard.damage > 0) > 0;
   }
 
   latestOwnedHazard(kind) {
-    for (let i = world.hazards.length - 1; i >= 0; i--) {
-      const hazard = world.hazards[i];
-      if (hazard.convictOwner === this && hazard.kind === kind) return hazard;
-    }
-    return null;
+    return findBossHazard(this, (hazard) => hazard.kind === kind);
   }
 
   takeDamage(amount, x, y, options = {}) {
@@ -1482,12 +1479,7 @@ export class ChainbreakConvict extends BaseEnemy {
   }
 
   clearOwnedEffects() {
-    for (let i = world.enemyProjectiles.length - 1; i >= 0; i--) {
-      if (world.enemyProjectiles[i].convictOwner === this) world.enemyProjectiles.splice(i, 1);
-    }
-    for (let i = world.hazards.length - 1; i >= 0; i--) {
-      if (world.hazards[i].convictOwner === this) world.hazards.splice(i, 1);
-    }
+    clearBossEffects(this);
   }
 
   kill() {

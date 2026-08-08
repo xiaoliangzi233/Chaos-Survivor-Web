@@ -707,10 +707,10 @@ export function hideRunSetup() {
   ui.quickActions?.classList.remove("blocked");
 }
 
-export function showChoices({ eyebrow, title, items, onPick, refresh = null }) {
+export function showChoices({ eyebrow, title, items, onPick, refresh = null, confirm = null }) {
   clearPreview();
   ui.quickActions?.classList.add("blocked");
-  const isLevelUp = eyebrow === "LEVEL UP";
+  const isLevelUp = eyebrow === "LEVEL UP" || eyebrow.startsWith("WAVE COMPLETE");
   ui.levelEyebrow.textContent = eyebrow;
   ui.levelTitle.textContent = title;
   ui.choiceList.innerHTML = "";
@@ -739,23 +739,34 @@ export function showChoices({ eyebrow, title, items, onPick, refresh = null }) {
     }, { once: true });
     ui.choiceList.appendChild(button);
   }
-  if (isLevelUp && refresh) {
+  if (isLevelUp && (refresh || confirm)) {
     const actions = document.createElement("div");
     actions.className = "level-choice-actions";
-    const refreshButton = document.createElement("button");
-    refreshButton.type = "button";
-    refreshButton.className = "level-refresh-button";
-    refreshButton.textContent = refresh.label;
-    refreshButton.disabled = Boolean(refresh.disabled);
-    refreshButton.addEventListener("click", () => {
-      const refreshed = refresh.onRefresh?.();
-      if (refreshed === false) {
-        refreshButton.classList.remove("denied");
-        void refreshButton.offsetWidth;
-        refreshButton.classList.add("denied");
-      }
-    });
-    actions.append(refreshButton);
+    if (refresh) {
+      const refreshButton = document.createElement("button");
+      refreshButton.type = "button";
+      refreshButton.className = "level-refresh-button";
+      refreshButton.textContent = refresh.label;
+      refreshButton.disabled = Boolean(refresh.disabled);
+      refreshButton.addEventListener("click", () => {
+        const refreshed = refresh.onRefresh?.();
+        if (refreshed === false) {
+          refreshButton.classList.remove("denied");
+          void refreshButton.offsetWidth;
+          refreshButton.classList.add("denied");
+        }
+      });
+      actions.append(refreshButton);
+    }
+    if (confirm) {
+      const confirmButton = document.createElement("button");
+      confirmButton.type = "button";
+      confirmButton.className = "primary level-confirm-button";
+      confirmButton.textContent = confirm.label || "确认并就绪";
+      confirmButton.disabled = Boolean(confirm.disabled);
+      confirmButton.addEventListener("click", () => confirm.onConfirm?.());
+      actions.append(confirmButton);
+    }
     ui.levelOverlay.querySelector(".choices")?.appendChild(actions);
   }
   ui.levelOverlay.classList.add("active");

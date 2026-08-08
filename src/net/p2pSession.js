@@ -1,15 +1,13 @@
 import {
-  MESSAGE_TYPES,
   netRuntime,
   networkStatus,
   resetNetworkRuntime,
   setNetworkConnected,
   setNetworkRole,
   setNetworkStatus,
-  syncStateMultiplayer,
-  updateRemoteInput,
 } from "./netState.js";
-import { applyHostSnapshot, createHostSnapshot } from "./snapshot.js";
+import { createHostSnapshot } from "./snapshot.js";
+import { handleNetworkMessage } from "./networkMessages.js";
 import { multiplayerConfig } from "../config/multiplayer-config.js";
 import {
   cancelLanRoom as revokeLanRoom,
@@ -23,6 +21,7 @@ import {
 
 const CHANNEL_NAME = "survivor-p2p-v1";
 const ICE_TIMEOUT_MS = 1800;
+const SNAPSHOT_BUFFER_LIMIT = 384 * 1024;
 let peer = null;
 let channel = null;
 let lanSession = null;
@@ -123,6 +122,7 @@ export function sendLocalInput(inputFrame) {
 
 export function sendHostSnapshot() {
   if (!isChannelOpen()) return false;
+  if ((Number(channel.bufferedAmount) || 0) > SNAPSHOT_BUFFER_LIMIT) return false;
   return sendMessage({ type: "snapshot", payload: createHostSnapshot() });
 }
 
@@ -248,44 +248,11 @@ function stopLanSignaling({ revoke = false } = {}) {
 }
 
 function receiveMessage(raw) {
-  let message = null;
-  try {
-    message = JSON.parse(String(raw));
-  } catch {
-    return;
-  }
-  if (!MESSAGE_TYPES.has(message?.type)) return;
-  switch (message.type) {
-    case "hello":
-      setNetworkConnected(true, message.payload?.name || netRuntime.peerName);
-      break;
-    case "input":
-      updateRemoteInput(message.payload);
-      break;
-    case "snapshot":
-      netRuntime.onSnapshot ? netRuntime.onSnapshot(message.payload) : applyHostSnapshot(message.payload);
-      break;
-    case "startRun":
-      netRuntime.onStartRun?.(message.payload);
-      break;
-    case "lobbyAction":
-      netRuntime.onLobbyAction?.(message.payload);
-      break;
-    case "shopAction":
-      netRuntime.onShopAction?.(message.payload);
-      break;
-    case "ping":
-      sendMessage({ type: "pong", payload: { sentAt: message.payload?.sentAt || now() } });
-      break;
-    case "pong":
-      netRuntime.latencyMs = Math.max(0, Math.round(now() - Number(message.payload?.sentAt || now())));
-      syncStateMultiplayer();
-      netRuntime.onStatus?.(networkStatus());
-      break;
-    case "disconnect":
-      closeSession({ keepRole: false, notify: true });
-      break;
-  }
+  handleNetworkMessage(String(raw), {
+    send: sendMessage,
+    disconnect: () => closeSession({ keepRole: false, notify: true }),
+    now,
+  });
 }
 
 function sendMessage(message) {

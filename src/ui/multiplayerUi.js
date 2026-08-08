@@ -8,7 +8,8 @@ import {
   createLanHostRoom,
   disconnectPeer,
   joinLanRoom,
-} from "../net/p2pSession.js";
+  isRelayConfigured,
+} from "../net/multiplayerSession.js";
 
 const dom = {};
 let onModalChange = null;
@@ -156,22 +157,27 @@ function setBusy(busy) {
 }
 
 function applySignalModeCopy() {
+  const relay = isRelayConfigured();
   const online = isRemoteSignalConfigured();
   const sections = dom.overlay?.querySelectorAll(".multiplayer-lan-grid section") || [];
   const hostTitle = sections[0]?.querySelector("h3");
   const hostDescription = sections[0]?.querySelector("p");
   const guestTitle = sections[1]?.querySelector("h3");
-  if (hostTitle) hostTitle.textContent = online ? "P1 主机 · 创建在线房间" : "P1 主机 · 创建局域网房间";
+  if (hostTitle) hostTitle.textContent = relay ? "P1 主机 · 创建 WebSocket 房间" : online ? "P1 主机 · 创建在线房间" : "P1 主机 · 创建局域网房间";
   if (hostDescription) {
-    hostDescription.textContent = online
+    hostDescription.textContent = relay
+      ? "通过专用联机后端转发输入和战斗快照，WebRTC 仍可作为备用连接。"
+      : online
       ? "创建后复制邀请链接。伙伴从任意浏览器打开游戏页面即可加入。"
       : "使用 start.cmd -Lan 启动后，创建一个仅在 Radmin 网络中有效的临时房间。";
   }
-  if (guestTitle) guestTitle.textContent = online ? "P2 客机 · 加入在线房间" : "P2 客机 · 加入局域网房间";
-  if (dom.createRoomButton) dom.createRoomButton.textContent = online ? "创建在线房间" : "创建局域网房间";
-  if (dom.joinRoomButton) dom.joinRoomButton.textContent = online ? "加入在线房间" : "加入局域网房间";
+  if (guestTitle) guestTitle.textContent = relay ? "P2 客机 · 加入 WebSocket 房间" : online ? "P2 客机 · 加入在线房间" : "P2 客机 · 加入局域网房间";
+  if (dom.createRoomButton) dom.createRoomButton.textContent = relay ? "创建后端房间" : online ? "创建在线房间" : "创建局域网房间";
+  if (dom.joinRoomButton) dom.joinRoomButton.textContent = relay ? "加入后端房间" : online ? "加入在线房间" : "加入局域网房间";
   if (dom.joinHint) {
-    dom.joinHint.textContent = online
+    dom.joinHint.textContent = relay
+      ? "打开主机发来的邀请链接后直接加入；联机数据将通过 WebSocket 后端传输。"
+      : online
       ? "打开主机发来的邀请链接后点击加入；也可以输入 6 位房间号。"
       : "打开主机发来的邀请链接后，输入 6 位房间号即可加入。";
   }

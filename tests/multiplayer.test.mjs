@@ -5,9 +5,10 @@ import { resetRun, state, world } from "../src/state.js";
 import { updateRemotePlayer } from "../src/systems/entities.js";
 import { allLobbyInteractions, enterLobby, interactWithLobby, updateLobbyPeer } from "../src/systems/lobby.js";
 import { applyPlayerDamage } from "../src/systems/items.js";
-import { createHostSnapshot, applyHostSnapshot } from "../src/net/snapshot.js";
+import { createHostSnapshot, applyHostSnapshot, updateGuestInterpolation } from "../src/net/snapshot.js";
 import { setNetworkConnected, setNetworkRole } from "../src/net/netState.js";
 import { withPlayerProfile } from "../src/systems/playerProfiles.js";
+import { multiplayerEnemyMultipliers } from "../src/systems/multiplayerBalance.js";
 
 function resetMultiplayerRun() {
   resetRun(null);
@@ -95,6 +96,51 @@ test("host snapshot is JSON-safe and applies to guest mirror state", () => {
   assert.equal(typeof world.enemies[0].draw, "function");
   assert.equal(world.hazards.length, 1);
   assert.ok(state.players.p2.inventory);
+});
+
+test("wave-end upgrade readiness and P2 choices survive snapshot transport", () => {
+  resetMultiplayerRun();
+  state.mode = "leveling";
+  state.upgradePhase = {
+    active: true,
+    p1: { required: true, remaining: 0, ready: true, choices: [], choiceItems: [] },
+    p2: {
+      required: true,
+      remaining: 1,
+      ready: false,
+      choices: ["vital_core"],
+      choiceItems: [{ id: "vital_core", icon: "H", name: "生命核心", stat: "生存", amount: "+10", desc: "提升生命" }],
+    },
+  };
+  const snapshot = createHostSnapshot();
+  assert.equal(snapshot.ui.upgradePhase.p1.ready, true);
+  assert.equal(snapshot.ui.upgradePhase.p2.remaining, 1);
+  assert.equal(snapshot.ui.upgradePhase.p2.choices[0].name, "生命核心");
+  setNetworkRole("guest");
+  assert.equal(applyHostSnapshot(snapshot), true);
+  assert.equal(state.upgradePhase.p2.ready, false);
+});
+
+test("guest interpolation advances network targets without teleporting", () => {
+  resetMultiplayerRun();
+  setNetworkRole("guest");
+  state.player.x = 0;
+  state.player.y = 0;
+  state.player.netTargetX = 100;
+  state.player.netTargetY = 40;
+  updateGuestInterpolation(1 / 60);
+  assert.ok(state.player.x > 0 && state.player.x < 100);
+  assert.ok(state.player.y > 0 && state.player.y < 40);
+});
+
+test("connected multiplayer enables bounded enemy pressure multipliers", () => {
+  resetMultiplayerRun();
+  const coop = multiplayerEnemyMultipliers();
+  assert.equal(coop.hp, 1.42);
+  assert.equal(coop.bossHp, 1.32);
+  assert.ok(coop.spawnRate > 1 && coop.enemyLimit > 1);
+  setNetworkConnected(false);
+  assert.deepEqual(multiplayerEnemyMultipliers(), { hp: 1, bossHp: 1, damage: 1, speed: 1, attackSpeed: 1, spawnRate: 1, enemyLimit: 1 });
 });
 
 test("host simulates P2 in the lobby and guest maps lobby snapshots to its local avatar", () => {

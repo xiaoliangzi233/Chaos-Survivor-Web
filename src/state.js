@@ -37,6 +37,7 @@ export const state = {
   initialWeaponId: null,
   shop: null,
   waveReady: { p1: false, p2: false },
+  upgradePhase: null,
   easterEggs: null,
   waveScenario: null,
   waveScenarioRuntime: null,
@@ -387,6 +388,7 @@ export function resetRun(map) {
   state.initialWeaponId = null;
   state.shop = null;
   state.waveReady = { p1: false, p2: false };
+  state.upgradePhase = null;
   state.easterEggs = createEasterEggState();
   state.waveScenario = null;
   state.waveScenarioRuntime = null;

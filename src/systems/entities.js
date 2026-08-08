@@ -22,6 +22,7 @@ import {
 } from "./statusEffects.js";
 import { coinAmountForEnemy, dropCoin, dropGem } from "./rewards.js";
 import { framePerformance } from "./performanceMonitor.js";
+import { multiplayerEnemyMultipliers } from "./multiplayerBalance.js";
 import { releaseBossEffect } from "./bossEffectRegistry.js";
 import {
   addMinionHazard,
@@ -184,13 +185,15 @@ export function updateSpawning(dt) {
   if (state.debug?.enabled && state.debug.freezeWave) return;
   spawnWaveBoss();
   if (isBossWave(state.wave)) return;
+  const coop = multiplayerEnemyMultipliers();
   state.spawnBudget += dt * spawnBudgetGainPerSecond({
     wave: state.wave,
     difficultyId: state.difficultyId,
     difficultySpawnRate: difficultyMultiplier("spawnRate"),
     itemSpawnMultiplier: waveSpawnMultiplier(),
-  });
-  const enemyLimit = isRandomMode() ? randomEnemyLimitForWave(state.wave) : (currentDifficulty().enemyLimit || ENEMY_LIMIT);
+  }) * coop.spawnRate;
+  const baseEnemyLimit = isRandomMode() ? randomEnemyLimitForWave(state.wave) : (currentDifficulty().enemyLimit || ENEMY_LIMIT);
+  const enemyLimit = Math.floor(baseEnemyLimit * coop.enemyLimit);
   while (state.spawnBudget >= 1 && world.enemies.length < enemyLimit) {
     state.spawnBudget--;
     spawnEnemyById(randomEnemyForWave(state.wave));

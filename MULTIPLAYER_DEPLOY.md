@@ -44,3 +44,24 @@ For a separately started local backend, run:
 It exposes only `http://26.x.x.x:5001/api/p2p/`. A locally served game can select it with `?signal=http://26.x.x.x:5001`; the backend is also useful when the local front-end is served by another development server.
 
 Do not point an HTTPS GitHub Pages game at this HTTP address: browsers block that mixed-content request. In that case, use the deployed HTTPS Worker, or put the local backend behind an HTTPS reverse proxy/tunnel and use its HTTPS URL in `?signal=`.
+# WebSocket 联机后端（推荐）
+
+在安装了 Radmin VPN 的 P1 电脑运行：
+
+```powershell
+.\start-multiplayer.cmd
+```
+
+脚本会同时启动无缓存前端和 WebSocket 房间中继，并打开带有 `relay` 参数的游戏地址。P1 创建房间后直接把邀请链接发给 P2。若无法自动识别 Radmin 地址：
+
+```powershell
+.\start-multiplayer.cmd -AdvertiseHost 26.x.x.x
+```
+
+默认前端端口为 `5000`，WebSocket 端口为 `5001`。两者都需要允许通过防火墙。WebSocket 后端负责房间、输入、快照、强化和商店消息的双向转发；战斗判定仍由 P1 浏览器负责。
+
+GitHub Pages 是 HTTPS 页面，浏览器只允许连接 `wss://` 后端。公网部署时需要把本脚本的 WebSocket 服务放到支持 TLS 的反向代理后方，然后通过以下参数打开游戏：
+
+```text
+https://example.github.io/survivor/?transport=relay&relay=wss%3A%2F%2Frelay.example.com%2Fws
+```

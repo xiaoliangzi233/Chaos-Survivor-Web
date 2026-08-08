@@ -1,4 +1,11 @@
 import { state } from "../state.js";
+import {
+  bootstrapBackendPlayer,
+  configureBackendProgress,
+  fetchBackendProgress,
+  saveBackendProgress,
+  submitBackendRun,
+} from "../services/backendProgressService.js";
 
 const STORAGE_KEY = "pixel-survivor-player-progress-v1:local-dev";
 const LEGACY_STORAGE_KEYS = [
@@ -13,12 +20,17 @@ let difficultyIds = [];
 let progress = emptyProgress();
 
 export function configurePlayerProgress() {
-  // Progress is intentionally browser-local; no identity or backend is required.
+  configureBackendProgress();
 }
 
 export async function loadPlayerProgress({ difficultyIds: nextDifficultyIds = [] } = {}) {
   difficultyIds = uniqueStrings(nextDifficultyIds);
-  progress = normalizeProgress(readCachedProgress());
+  let cached = normalizeProgress(readCachedProgress());
+  if (await bootstrapBackendPlayer()) {
+    const remote = await fetchBackendProgress();
+    if (remote) cached = mergeProgress(cached, remote);
+  }
+  progress = normalizeProgress(cached);
   discardLegacyProgress();
   persistCurrentProgress();
   return getPlayerProgressSnapshot();
@@ -137,6 +149,7 @@ export function recordAdventureResult(summary = {}) {
   current.history.unshift(record);
   current.history.length = Math.min(current.history.length, ADVENTURE_HISTORY_LIMIT);
   persistCurrentProgress();
+  submitBackendRun(record);
   return cloneValue(record);
 }
 
@@ -157,7 +170,8 @@ export function recordBestRandomEndlessWave(wave) {
 }
 
 export function flushPlayerProgress() {
-  return Promise.resolve(getPlayerProgressSnapshot());
+  const snapshot = getPlayerProgressSnapshot();
+  return saveBackendProgress(snapshot, progress.adventureStats.revision).then(() => snapshot);
 }
 
 function emptyProgress() {
@@ -348,6 +362,7 @@ function persistCurrentProgress() {
   } catch {
     // In-memory progress still works when storage is unavailable.
   }
+  saveBackendProgress(getPlayerProgressSnapshot(), progress.adventureStats.revision);
 }
 
 function discardLegacyProgress() {

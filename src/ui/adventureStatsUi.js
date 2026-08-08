@@ -1,9 +1,11 @@
 import { getAdventureStats } from "../systems/playerProgress.js";
+import { backendStatus, fetchLeaderboards } from "../services/backendProgressService.js";
 
 const dom = {};
 let options = {};
 let activeTab = "overview";
 let historyPage = 0;
+let leaderboardRequestId = 0;
 const HISTORY_PAGE_SIZE = 10;
 
 export function initAdventureStatsUi(nextOptions = {}) {
@@ -79,8 +81,11 @@ function renderAdventureStats() {
   dom.content.replaceChildren();
   if (activeTab === "difficulty") renderDifficulty(stats);
   else if (activeTab === "history") renderHistory(stats);
+  else if (activeTab === "leaderboard") renderLeaderboard();
   else renderOverview(stats);
-  dom.status.textContent = `LOCAL ARCHIVE // ${stats.totals.runs} RUNS // REV.${stats.revision}`;
+  const backend = backendStatus();
+  const syncText = backend.enabled ? (backend.available ? "SYNC ONLINE" : "SYNC OFFLINE") : "LOCAL ONLY";
+  dom.status.textContent = `${syncText} // ${stats.totals.runs} RUNS // REV.${stats.revision}`;
 }
 
 function renderOverview(stats) {
@@ -189,6 +194,85 @@ function renderHistory(stats) {
   dom.content.appendChild(section);
 }
 
+function renderLeaderboard() {
+  const requestId = ++leaderboardRequestId;
+  const difficulties = options.getDifficulties?.() || [];
+  const section = node("section", "adventure-leaderboard-section");
+  section.appendChild(sectionTitle("同服排行榜", "SAME SERVER"));
+
+  const controls = node("div", "adventure-stats-filters adventure-leaderboard-filters");
+  const modeSelect = select([
+    ["all", "全部模式"],
+    ["standard", "剧情模式"],
+    ["random_twenty_waves", "随机 · 20 波"],
+    ["random_endless", "随机 · 无限"],
+  ]);
+  const difficultySelect = select([
+    ["all", "全部难度"],
+    ...difficulties.map((entry) => [entry.id, entry.name || entry.id]),
+  ]);
+  const metricSelect = select([
+    ["kills", "击杀"],
+    ["wave", "波次"],
+    ["time", "生存时间"],
+    ["gold", "金币"],
+    ["victory_speed", "通关速度"],
+  ]);
+  controls.append(
+    labeledControl("模式", modeSelect),
+    labeledControl("难度", difficultySelect),
+    labeledControl("排序", metricSelect),
+  );
+  section.appendChild(controls);
+
+  const results = node("div", "adventure-table adventure-leaderboard-table");
+  results.appendChild(tableRow(["#", "玩家", "难度", "模式", "波次", "击杀", "时间", "武器", "结果"], true));
+  section.appendChild(results);
+  dom.content.appendChild(section);
+
+  const load = async () => {
+    results.replaceChildren(tableRow(["#", "玩家", "难度", "模式", "波次", "击杀", "时间", "武器", "结果"], true));
+    results.appendChild(tableRow(["...", "正在连接排行榜", "", "", "", "", "", "", ""], false));
+    const response = await fetchLeaderboards({
+      mode: modeSelect.value,
+      difficulty: difficultySelect.value,
+      metric: metricSelect.value,
+      limit: 25,
+    });
+    if (requestId !== leaderboardRequestId || activeTab !== "leaderboard") return;
+    results.replaceChildren(tableRow(["#", "玩家", "难度", "模式", "波次", "击杀", "时间", "武器", "结果"], true));
+    if (!response.enabled) {
+      results.appendChild(tableRow(["--", "未配置后端，使用 ?api=http://127.0.0.1:5010 启用", "", "", "", "", "", "", ""], false));
+      return;
+    }
+    if (response.error) {
+      results.appendChild(tableRow(["--", `排行榜不可用：${response.error}`, "", "", "", "", "", "", ""], false));
+      return;
+    }
+    if (!response.entries.length) {
+      results.appendChild(tableRow(["--", "暂无公开战报", "", "", "", "", "", "", ""], false));
+      return;
+    }
+    response.entries.forEach((run, index) => {
+      results.appendChild(tableRow([
+        index + 1,
+        run.nickname || "Anonymous",
+        run.difficultyName || run.difficultyId,
+        modeLabel(run.modeKey),
+        run.wave,
+        formatNumber(run.kills),
+        formatDuration(run.seconds),
+        run.weaponName || run.weaponId || "--",
+        outcomeLabel(run.outcome),
+      ], false, run.outcome === "victory" ? "cleared" : ""));
+    });
+  };
+  modeSelect.addEventListener("change", load);
+  difficultySelect.addEventListener("change", load);
+  metricSelect.addEventListener("change", load);
+  load();
+}
+
 function historyCard(run) {
   const article = node("article", `adventure-history-card ${run.outcome}`);
   const header = node("header");
@@ -249,6 +333,22 @@ function button(label, onClick) {
   return element;
 }
 
+function select(options) {
+  const element = node("select");
+  for (const [value, label] of options) {
+    const option = textNode("option", label);
+    option.value = value;
+    element.appendChild(option);
+  }
+  return element;
+}
+
+function labeledControl(label, control) {
+  const element = node("label");
+  element.append(textNode("span", label), control);
+  return element;
+}
+
 function node(tag, className = "") {
   const element = document.createElement(tag);
   if (className) element.className = className;
@@ -267,6 +367,14 @@ function emptyBucket() {
 
 function outcomeLabel(outcome) {
   return { victory: "胜利返航", defeat: "战斗终止", abandoned: "中途返航" }[outcome] || outcome;
+}
+
+function modeLabel(modeKey) {
+  return {
+    standard: "剧情",
+    random_twenty_waves: "随机 20",
+    random_endless: "随机无限",
+  }[modeKey] || modeKey || "--";
 }
 
 function formatDuration(seconds) {

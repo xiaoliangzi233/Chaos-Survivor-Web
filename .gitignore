@@ -17,7 +17,10 @@ tests/
 !/tests/lanRoomService.test.mjs
 !/tests/lanSignalServer.test.py
 !/tests/p2pSignalBackend.test.py
+!/tests/test_backend_api.py
 !/tests/p2pSession.test.mjs
+!/tests/wsSession.test.mjs
+!/tests/test_multiplayer_relay.py
 
 # Local notes
 AGENTS.md
@@ -29,6 +32,9 @@ AGENTS.md
 *.log
 *.tmp
 *.bak
+backend/*.sqlite3
+backend/*.sqlite3-*
+backend/.env
 
 # Python cache
 __pycache__/

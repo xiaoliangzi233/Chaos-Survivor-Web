@@ -13,7 +13,7 @@ import {
   weaponSellPrice,
 } from "../economy/shop.js";
 import { isGuestMirror } from "../net/netState.js";
-import { sendShopAction } from "../net/p2pSession.js";
+import { sendShopAction } from "../net/multiplayerSession.js";
 import { withPlayerProfile } from "../systems/playerProfiles.js";
 
 const dom = {};

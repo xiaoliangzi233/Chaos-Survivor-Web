@@ -1,5 +1,5 @@
 import { TOTAL_WAVES, waveDurationFor } from "../constants.js";
-import { state, world, resetRun, xpNeedForLevel } from "../state.js";
+import { input, state, world, resetRun, xpNeedForLevel } from "../state.js";
 import {
   ui,
   updateHud,
@@ -101,8 +101,9 @@ import {
 } from "../ui/adventureStatsUi.js";
 import { hasPendingJoinInvite, initMultiplayerUi, openMultiplayerPanel, updateMultiplayerUi } from "../ui/multiplayerUi.js";
 import { netRuntime, nextLocalInputFrame, isHostAuthority, isGuestMirror } from "../net/netState.js";
-import { sendHostSnapshot, sendLocalInput, sendStartRun, sendLobbyAction } from "../net/p2pSession.js";
-import { applyHostSnapshot, createStartRunPayload } from "../net/snapshot.js";
+import { sendHostSnapshot, sendLocalInput, sendStartRun, sendLobbyAction } from "../net/multiplayerSession.js";
+import { applyHostSnapshot, createStartRunPayload, updateGuestInterpolation } from "../net/snapshot.js";
+import { currentPlayerId } from "../services/backendProgressService.js";
 
 const LEVEL_CHOICE_REFRESH_COST = 10;
 
@@ -278,7 +279,7 @@ export async function bootGame() {
     });
     const storyPromise = playDifficultyStoryIfNeeded({
       difficultyId: difficulty.id,
-      playerId: "local-dev",
+      playerId: currentPlayerId(),
       alwaysPlay: Boolean(runtimeGameConfig.storyAlwaysPlay),
     }).finally(() => {
       storyDone = true;
@@ -297,6 +298,142 @@ export async function bootGame() {
     showWaveEventNotice({ wave: state.wave, scenario, boss: isBossWave(state.wave) });
     playSfx("start");
     startMusic();
+    return true;
+  }
+
+  function beginDeferredUpgradePhase() {
+    const peerRequired = Boolean(state.multiplayer?.connected && state.players?.p2);
+    state.upgradePhase = {
+      active: true,
+      p1: createDeferredUpgradeTrack(state.player),
+      p2: peerRequired ? createDeferredUpgradeTrack(state.players.p2) : { required: false, remaining: 0, choices: [], ready: true },
+    };
+    state.mode = "leveling";
+    renderDeferredUpgradePanel();
+  }
+
+  function createDeferredUpgradeTrack(player) {
+    let remaining = 0;
+    while (player && player.xp >= player.xpNeed) {
+      player.xp -= player.xpNeed;
+      player.level++;
+      player.xpNeed = xpNeedForLevel(player.level);
+      remaining++;
+    }
+    const track = { required: true, remaining, choices: [], choiceItems: [], ready: false };
+    if (remaining > 0) assignDeferredUpgradeChoices(track);
+    return track;
+  }
+
+  function assignDeferredUpgradeChoices(track) {
+    const items = pickThree(UPGRADE_DEFS);
+    track.choices = items.map((item) => item.id);
+    track.choiceItems = items.map(({ id, icon, name, stat, amount, desc }) => ({ id, icon, name, stat, amount, desc }));
+  }
+
+  function deferredUpgradeTrack(playerId) {
+    return state.upgradePhase?.active ? state.upgradePhase[playerId] : null;
+  }
+
+  function deferredUpgradeItems(track) {
+    return (track?.choices || []).map((id) => UPGRADE_DEFS.find((item) => item.id === id)).filter(Boolean);
+  }
+
+  function renderDeferredUpgradePanel() {
+    if (isGuestMirror()) return;
+    const track = deferredUpgradeTrack("p1");
+    if (!track) return;
+    const items = deferredUpgradeItems(track);
+    const waitingPeer = deferredUpgradeTrack("p2")?.required && !deferredUpgradeTrack("p2")?.ready;
+    const title = track.remaining > 0
+      ? `选择本波强化（剩余 ${track.remaining} 次）`
+      : track.ready
+        ? (waitingPeer ? "已就绪，等待 P2 完成强化" : "双方强化已完成")
+        : "本波强化完成，确认后进入商店";
+    showChoices({
+      eyebrow: "WAVE COMPLETE // P1",
+      title,
+      items,
+      refresh: track.remaining > 0 ? {
+        label: `刷新选项 - ${LEVEL_CHOICE_REFRESH_COST} 金币`,
+        disabled: state.gold < LEVEL_CHOICE_REFRESH_COST,
+        onRefresh: () => refreshDeferredUpgrade("p1"),
+      } : null,
+      confirm: track.remaining === 0 ? {
+        label: track.ready ? "已就绪" : "确认强化并就绪",
+        disabled: track.ready,
+        onConfirm: () => markDeferredUpgradeReady("p1"),
+      } : null,
+      onPick: (item) => applyDeferredUpgrade("p1", item.id),
+    });
+    state.ai ||= {};
+    state.ai.levelPanel = track.remaining > 0 ? {
+      owner: "p1",
+      items,
+      refreshCost: LEVEL_CHOICE_REFRESH_COST,
+      refresh: () => refreshDeferredUpgrade("p1"),
+      pick: (id) => applyDeferredUpgrade("p1", id),
+    } : null;
+  }
+
+  function applyDeferredUpgrade(playerId, upgradeId) {
+    const track = deferredUpgradeTrack(playerId);
+    if (!track || track.ready || track.remaining <= 0 || !track.choices.includes(upgradeId)) return false;
+    const item = UPGRADE_DEFS.find((entry) => entry.id === upgradeId);
+    const player = playerId === "p2" ? state.players?.p2 : state.player;
+    if (!item || !player) return false;
+    item.apply(player);
+    track.remaining--;
+    track.choices = [];
+    track.choiceItems = [];
+    if (track.remaining > 0) assignDeferredUpgradeChoices(track);
+    state.flash = 0.18;
+    playSfx("level");
+    if (playerId === "p1") {
+      if (track.remaining === 0 && state.ai?.runtime?.enabled) markDeferredUpgradeReady("p1");
+      else renderDeferredUpgradePanel();
+    }
+    return true;
+  }
+
+  function refreshDeferredUpgrade(playerId) {
+    const track = deferredUpgradeTrack(playerId);
+    if (!track || track.ready || track.remaining <= 0) return false;
+    const player = playerId === "p2" ? state.players?.p2 : state.player;
+    const gold = playerId === "p2" ? Number(player?.gold) || 0 : state.gold;
+    if (gold < LEVEL_CHOICE_REFRESH_COST) {
+      playSfx("deny");
+      return false;
+    }
+    if (playerId === "p2") player.gold = gold - LEVEL_CHOICE_REFRESH_COST;
+    else state.gold -= LEVEL_CHOICE_REFRESH_COST;
+    assignDeferredUpgradeChoices(track);
+    playSfx("select");
+    if (playerId === "p1") renderDeferredUpgradePanel();
+    return true;
+  }
+
+  function markDeferredUpgradeReady(playerId) {
+    const track = deferredUpgradeTrack(playerId);
+    if (!track || track.remaining > 0) return false;
+    track.ready = true;
+    if (deferredUpgradePhaseComplete()) finishDeferredUpgradePhase();
+    else renderDeferredUpgradePanel();
+    return true;
+  }
+
+  function deferredUpgradePhaseComplete() {
+    const phase = state.upgradePhase;
+    if (!phase?.active || !phase.p1.ready) return false;
+    return !state.multiplayer?.connected || !phase.p2.required || phase.p2.ready;
+  }
+
+  function finishDeferredUpgradePhase() {
+    if (!state.upgradePhase?.active) return false;
+    state.upgradePhase.active = false;
+    state.ai.levelPanel = null;
+    hideChoices();
+    openShopAfterWave();
     return true;
   }
 
@@ -394,7 +531,7 @@ export async function bootGame() {
     collectAllExperience();
     clearEnemies();
     collectAllCoins();
-    if (!checkLevelUps("p1") && !checkLevelUps("p2")) openShopAfterWave();
+    beginDeferredUpgradePhase();
   }
 
   function finishPostLevelFlow() {
@@ -671,20 +808,39 @@ export async function bootGame() {
       closeShop();
     }
 
-    const choices = snapshot.ui?.levelChoices || [];
-    const levelOwner = snapshot.ui?.levelOwner || "p1";
-    const levelSignature = `${levelOwner}:${choices.map((item) => item.id).join(",")}`;
+    const phase = snapshot.ui?.upgradePhase;
+    const guestTrack = phase?.p2;
+    const choices = guestTrack?.choices || snapshot.ui?.levelChoices || [];
+    const levelOwner = phase ? "p2" : snapshot.ui?.levelOwner || "p1";
+    const levelSignature = phase
+      ? `p2:${guestTrack?.remaining || 0}:${Boolean(guestTrack?.ready)}:${choices.map((item) => item.id).join(",")}`
+      : `${levelOwner}:${choices.map((item) => item.id).join(",")}`;
     if (mode === "leveling" && levelSignature) {
       if (guestOverlaySignature !== `level:${levelSignature}`) {
         showChoices({
-          eyebrow: levelOwner === "p2" ? "P2 LEVEL UP" : "P1 LEVEL UP",
-          title: "主机正在选择强化",
+          eyebrow: phase ? "WAVE COMPLETE // P2" : levelOwner === "p2" ? "P2 LEVEL UP" : "P1 LEVEL UP",
+          title: phase
+            ? guestTrack?.remaining > 0
+              ? `选择本波强化（剩余 ${guestTrack.remaining} 次）`
+              : guestTrack?.ready ? "已就绪，等待 P1" : "本波强化完成，确认后进入商店"
+            : "主机正在选择强化",
           items: choices,
+          refresh: phase && guestTrack?.remaining > 0 ? {
+            label: `刷新选项 - ${LEVEL_CHOICE_REFRESH_COST} 金币`,
+            disabled: (state.players?.p2?.gold || 0) < LEVEL_CHOICE_REFRESH_COST,
+            onRefresh: () => sendShopAction({ action: "upgradeRefresh" }),
+          } : null,
+          confirm: phase && guestTrack?.remaining === 0 ? {
+            label: guestTrack.ready ? "已就绪" : "确认强化并就绪",
+            disabled: guestTrack.ready,
+            onConfirm: () => sendShopAction({ action: "upgradeReady" }),
+          } : null,
           onPick: (item) => {
-            if (levelOwner === "p2") sendShopAction({ action: "upgrade", id: item.id });
+            if (phase) sendShopAction({ action: "upgradeChoose", id: item.id });
+            else if (levelOwner === "p2") sendShopAction({ action: "upgrade", id: item.id });
           },
         });
-        if (levelOwner !== "p2") for (const button of ui.choiceList?.querySelectorAll("button") || []) button.disabled = true;
+        if (!phase && levelOwner !== "p2") for (const button of ui.choiceList?.querySelectorAll("button") || []) button.disabled = true;
         guestOverlaySignature = `level:${levelSignature}`;
       }
     } else {
@@ -849,6 +1005,8 @@ export async function bootGame() {
         return;
       }
       if (state.mode !== "menu") {
+        if (state.mode === "playing") updateRemotePlayer(dt, input);
+        updateGuestInterpolation(dt);
         sendLocalInput(nextLocalInputFrame(input));
         return;
       }
@@ -863,10 +1021,12 @@ export async function bootGame() {
     }
     if (state.mode === "shop") {
       state.time += dt;
+      if (!state.multiplayer?.connected && state.waveReady?.p1) finishWaveTransition();
       publishHostSnapshot();
       return;
     }
     if (state.mode !== "playing") {
+      if (state.mode === "leveling" && deferredUpgradePhaseComplete()) finishDeferredUpgradePhase();
       publishHostSnapshot();
       return;
     }
@@ -893,7 +1053,6 @@ export async function bootGame() {
     effects.updateEffects(dt);
     monitorRuntimeBudgets();
     updateCamera(dt);
-    if (!checkLevelUps("p1")) checkLevelUps("p2");
     if (!anyCombatPlayerAlive()) endGame(false);
     if (!debugFreeze && state.mode === "playing" && bossWave && !world.boss && state.spawnedBossWaves?.has(state.wave)) completeWave();
     if (!debugFreeze && state.mode === "playing" && !bossWave && state.waveTimeLeft <= 0) completeWave();
@@ -1005,15 +1164,9 @@ export async function bootGame() {
   netRuntime.onShopAction = (payload = {}) => {
     if (!isHostAuthority() || !payload?.action) return;
     if (payload.action === "ready") return markWaveReady("p2");
-    if (payload.action === "upgrade" && state.mode === "leveling" && state.ai?.levelPanel?.owner === "p2") {
-      const item = state.ai.levelPanel.items.find((entry) => entry.id === payload.id);
-      if (!item) return;
-      item.apply(state.players.p2);
-      state.ai.levelPanel = null;
-      state.flash = 0.18;
-      if (!checkLevelUps("p2") && !checkLevelUps("p1")) finishPostLevelFlow();
-      return;
-    }
+    if (payload.action === "upgradeChoose" && state.mode === "leveling") return applyDeferredUpgrade("p2", payload.id);
+    if (payload.action === "upgradeRefresh" && state.mode === "leveling") return refreshDeferredUpgrade("p2");
+    if (payload.action === "upgradeReady" && state.mode === "leveling") return markDeferredUpgradeReady("p2");
     if (state.mode !== "shop") return;
     withPlayerProfile("p2", () => {
       if (payload.action === "refresh") refreshShopOffers();

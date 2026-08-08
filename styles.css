@@ -2039,6 +2039,21 @@ h2 {
   top: clamp(18px, 3vw, 28px);
   right: clamp(18px, 3vw, 28px);
   z-index: 4;
+  display: flex;
+  gap: 10px;
+}
+
+.level-confirm-button {
+  min-width: 156px;
+  min-height: 38px;
+  border-radius: 5px;
+  padding: 0 16px;
+  letter-spacing: 0;
+}
+
+.level-confirm-button:disabled {
+  opacity: 0.56;
+  cursor: not-allowed;
 }
 
 .level-refresh-button {

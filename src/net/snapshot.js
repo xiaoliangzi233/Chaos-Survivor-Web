@@ -12,6 +12,8 @@ const SNAPSHOT_LIMITS = {
   weaponFx: 160,
   itemObjects: 160,
 };
+const networkIds = new WeakMap();
+let nextNetworkId = 1;
 
 export function createHostSnapshot() {
   return {
@@ -37,14 +39,11 @@ export function createHostSnapshot() {
     initialWeaponId: state.initialWeaponId,
     bossWaveActive: Boolean(state.bossWaveActive),
     lobby: serializeLobby(),
-    economy: {
-      shop: clonePlain(state.shop),
-      inventory: clonePlain(state.inventory),
-      p2: serializePeerEconomy(state.players?.p2),
-    },
+    economy: serializeEconomy(),
     ui: {
       levelChoices: serializeLevelChoices(state.ai?.levelPanel?.items),
       levelOwner: state.ai?.levelPanel?.owner || "",
+      upgradePhase: serializeUpgradePhase(state.upgradePhase),
     },
     players: {
       p1: serializePlayer(state.players?.p1 || state.player),
@@ -84,31 +83,31 @@ export function applyHostSnapshot(snapshot) {
   state.victory = Boolean(snapshot.victory);
   state.shake = number(snapshot.shake, state.shake);
   state.flash = number(snapshot.flash, state.flash);
-  state.cameraX = number(snapshot.cameraX, state.cameraX);
-  state.cameraY = number(snapshot.cameraY, state.cameraY);
+  applySnapshotCamera(snapshot.cameraX, snapshot.cameraY);
   state.difficultyId = snapshot.difficultyId || state.difficultyId;
   state.initialWeaponId = snapshot.initialWeaponId || state.initialWeaponId;
   state.bossWaveActive = Boolean(snapshot.bossWaveActive);
+  state.upgradePhase = clonePlain(snapshot.ui?.upgradePhase || null);
   applyLobbySnapshot(snapshot.lobby);
   if (snapshot.economy?.shop) state.shop = clonePlain(snapshot.economy.shop);
   if (snapshot.economy?.inventory) state.inventory = clonePlain(snapshot.economy.inventory);
   state.players ||= {};
   if (snapshot.players?.p1) {
-    Object.assign(state.player, snapshot.players.p1);
+    applySnapshotPosition(state.player, snapshot.players.p1);
     state.players.p1 = state.player;
   }
   if (snapshot.players?.p2) {
     state.players.p2 ||= {};
-    Object.assign(state.players.p2, snapshot.players.p2);
+    applySnapshotPosition(state.players.p2, snapshot.players.p2);
   }
   if (snapshot.economy?.p2 && state.players?.p2) applyPeerEconomy(state.players.p2, snapshot.economy.p2);
   const incoming = snapshot.world || {};
-  replaceList(world.enemies, incoming.enemies, reviveEnemy);
-  replaceList(world.projectiles, incoming.projectiles, revivePlainObject);
-  replaceList(world.enemyProjectiles, incoming.enemyProjectiles, revivePlainObject);
-  replaceList(world.hazards, incoming.hazards, revivePlainObject);
-  replaceList(world.gems, incoming.gems, revivePlainObject);
-  replaceList(world.coins, incoming.coins, revivePlainObject);
+  reconcileList(world.enemies, incoming.enemies, reviveEnemy);
+  reconcileList(world.projectiles, incoming.projectiles, revivePlainObject);
+  reconcileList(world.enemyProjectiles, incoming.enemyProjectiles, revivePlainObject);
+  reconcileList(world.hazards, incoming.hazards, revivePlainObject);
+  reconcileList(world.gems, incoming.gems, revivePlainObject);
+  reconcileList(world.coins, incoming.coins, revivePlainObject);
   replaceList(world.particles, incoming.particles, revivePlainObject);
   replaceList(world.weaponFx, incoming.weaponFx, revivePlainObject);
   replaceList(world.itemObjects, incoming.itemObjects, revivePlainObject);
@@ -122,15 +121,41 @@ export function applyHostSnapshot(snapshot) {
   return true;
 }
 
-function serializePeerEconomy(peer) {
-  if (!peer) return null;
+export function updateGuestInterpolation(dt) {
+  if (netRuntime.role !== "guest") return;
+  const blend = 1 - Math.exp(-Math.max(0, Number(dt) || 0) * 18);
+  interpolateObject(state.player, blend);
+  interpolateObject(state.players?.p2, blend);
+  if (Number.isFinite(state.netCameraTargetX) && Number.isFinite(state.netCameraTargetY)) {
+    state.cameraX += (state.netCameraTargetX - state.cameraX) * blend;
+    state.cameraY += (state.netCameraTargetY - state.cameraY) * blend;
+  }
+  for (const list of [world.enemies, world.projectiles, world.enemyProjectiles, world.hazards, world.gems, world.coins]) {
+    for (const entry of list) interpolateObject(entry, blend);
+  }
+}
+
+function serializeEconomy() {
+  const detailed = ["lobby", "shop", "leveling", "paused", "ended"].includes(state.mode);
   return {
+    shop: detailed ? clonePlain(state.shop) : null,
+    inventory: detailed ? clonePlain(state.inventory) : null,
+    p2: serializePeerEconomy(state.players?.p2, { detailed }),
+  };
+}
+
+function serializePeerEconomy(peer, { detailed = true } = {}) {
+  if (!peer) return null;
+  const economy = {
     gold: number(peer.gold, 0),
     initialWeaponId: peer.initialWeaponId || "",
-    inventory: clonePlain(peer.inventory),
-    weapons: clonePlain(peer.weapons),
-    shop: clonePlain(peer.shop),
   };
+  if (detailed) {
+    economy.inventory = clonePlain(peer.inventory);
+    economy.weapons = clonePlain(peer.weapons);
+    economy.shop = clonePlain(peer.shop);
+  }
+  return economy;
 }
 
 function applyPeerEconomy(peer, economy) {
@@ -203,6 +228,24 @@ function serializeLevelChoices(items) {
   }));
 }
 
+function serializeUpgradePhase(phase) {
+  if (!phase?.active) return null;
+  return {
+    active: true,
+    p1: serializeUpgradeTrack(phase.p1),
+    p2: serializeUpgradeTrack(phase.p2),
+  };
+}
+
+function serializeUpgradeTrack(track) {
+  return {
+    required: Boolean(track?.required),
+    remaining: Math.max(0, Math.floor(Number(track?.remaining) || 0)),
+    ready: Boolean(track?.ready),
+    choices: serializeLevelChoices(track?.choiceItems || []),
+  };
+}
+
 export function createStartRunPayload({ config, map }) {
   return {
     config: {
@@ -237,6 +280,7 @@ function serializeEnemy(enemy) {
     "x", "y", "r", "hp", "maxHp", "speed", "damage", "xp", "flash", "hitTimer", "anim", "phase",
     "cooldown", "angle", "spin", "knockbackX", "knockbackY",
   ], {
+    netId: networkIdFor(enemy),
     type: enemy.type || enemy.id || "enemy",
     id: enemy.id || enemy.type || "enemy",
     name: enemy.name || enemy.type || "敌人",
@@ -255,6 +299,7 @@ function serializeProjectile(projectile) {
     "x", "y", "px", "py", "vx", "vy", "r", "damage", "life", "maxLife", "angle", "spin", "speed",
     "targetX", "targetY", "targetRadius", "qualityRank",
   ], {
+    netId: networkIdFor(projectile),
     shape: projectile.shape || projectile.visualId || "defaultEnemyBullet",
     visualId: projectile.visualId || projectile.shape || "",
     ownerId: projectile.ownerId || "p1",
@@ -269,6 +314,7 @@ function serializeHazard(hazard) {
     "x", "y", "r", "damage", "life", "maxLife", "armTime", "armDuration", "angle", "length", "width",
     "triggerRadius", "pulse", "spin",
   ], {
+    netId: networkIdFor(hazard),
     kind: hazard.kind || "hazard",
     color: hazard.color || "#ff4d6d",
     warningColor: hazard.warningColor || "",
@@ -279,6 +325,7 @@ function serializeHazard(hazard) {
 
 function serializePickup(entry) {
   return pickNumberFields(entry, ["x", "y", "value", "phase", "life", "maxLife", "r"], {
+    netId: networkIdFor(entry),
     kind: entry.kind || "",
     color: entry.color || "",
   });
@@ -339,6 +386,73 @@ function replaceList(target, source, reviver) {
   target.length = 0;
   if (!Array.isArray(source)) return;
   for (const entry of source) target.push(reviver(entry));
+}
+
+function reconcileList(target, source, reviver) {
+  if (!Array.isArray(source)) {
+    target.length = 0;
+    return;
+  }
+  const existing = new Map(target.filter((entry) => entry?.netId).map((entry) => [entry.netId, entry]));
+  const next = source.map((entry) => {
+    const revived = reviver(entry);
+    const previous = existing.get(entry?.netId);
+    if (!previous || !Number.isFinite(Number(entry?.x)) || !Number.isFinite(Number(entry?.y))) return revived;
+    const distance = Math.hypot(Number(entry.x) - Number(previous.x || 0), Number(entry.y) - Number(previous.y || 0));
+    if (distance > 360) return revived;
+    revived.netTargetX = Number(entry.x);
+    revived.netTargetY = Number(entry.y);
+    revived.x = Number(previous.x) || 0;
+    revived.y = Number(previous.y) || 0;
+    return revived;
+  });
+  target.splice(0, target.length, ...next);
+}
+
+function applySnapshotPosition(target, source) {
+  if (!target || !source) return;
+  const oldX = Number(target.x) || 0;
+  const oldY = Number(target.y) || 0;
+  Object.assign(target, source);
+  if (netRuntime.role !== "guest" || !Number.isFinite(Number(source.x)) || !Number.isFinite(Number(source.y))) return;
+  const distance = Math.hypot(Number(source.x) - oldX, Number(source.y) - oldY);
+  if (distance > 360) return;
+  target.netTargetX = Number(source.x);
+  target.netTargetY = Number(source.y);
+  target.x = oldX;
+  target.y = oldY;
+}
+
+function applySnapshotCamera(x, y) {
+  const nextX = number(x, state.cameraX);
+  const nextY = number(y, state.cameraY);
+  if (netRuntime.role !== "guest") {
+    state.cameraX = nextX;
+    state.cameraY = nextY;
+    return;
+  }
+  state.netCameraTargetX = nextX;
+  state.netCameraTargetY = nextY;
+  if (Math.hypot(nextX - state.cameraX, nextY - state.cameraY) > 520) {
+    state.cameraX = nextX;
+    state.cameraY = nextY;
+  }
+}
+
+function interpolateObject(entry, blend) {
+  if (!entry || !Number.isFinite(entry.netTargetX) || !Number.isFinite(entry.netTargetY)) return;
+  entry.x += (entry.netTargetX - entry.x) * blend;
+  entry.y += (entry.netTargetY - entry.y) * blend;
+}
+
+function networkIdFor(entry) {
+  if (!entry || typeof entry !== "object") return 0;
+  let id = networkIds.get(entry);
+  if (!id) {
+    id = nextNetworkId++;
+    networkIds.set(entry, id);
+  }
+  return id;
 }
 
 function revivePlainObject(entry) {

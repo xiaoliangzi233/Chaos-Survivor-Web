@@ -15,7 +15,7 @@ const SNAPSHOT_LIMITS = {
 
 export function createHostSnapshot() {
   return {
-    mode: state.mode,
+    mode: state.mode === "inventory" ? "paused" : state.mode,
     time: round(state.time),
     wave: state.wave,
     waveDuration: round(state.waveDuration),
@@ -35,6 +35,14 @@ export function createHostSnapshot() {
     difficultyId: state.difficultyId,
     initialWeaponId: state.initialWeaponId,
     bossWaveActive: Boolean(state.bossWaveActive),
+    lobby: serializeLobby(),
+    economy: {
+      shop: clonePlain(state.shop),
+      inventory: clonePlain(state.inventory),
+    },
+    ui: {
+      levelChoices: serializeLevelChoices(state.ai?.levelPanel?.items),
+    },
     players: {
       p1: serializePlayer(state.players?.p1 || state.player),
       p2: serializePlayer(state.players?.p2),
@@ -77,6 +85,9 @@ export function applyHostSnapshot(snapshot) {
   state.difficultyId = snapshot.difficultyId || state.difficultyId;
   state.initialWeaponId = snapshot.initialWeaponId || state.initialWeaponId;
   state.bossWaveActive = Boolean(snapshot.bossWaveActive);
+  applyLobbySnapshot(snapshot.lobby);
+  if (snapshot.economy?.shop) state.shop = clonePlain(snapshot.economy.shop);
+  if (snapshot.economy?.inventory) state.inventory = clonePlain(snapshot.economy.inventory);
   state.players ||= {};
   if (snapshot.players?.p1) {
     Object.assign(state.player, snapshot.players.p1);
@@ -104,6 +115,66 @@ export function applyHostSnapshot(snapshot) {
   setNetworkConnected(true, netRuntime.peerName || "P1 主机");
   syncStateMultiplayer();
   return true;
+}
+
+function serializeLobby() {
+  const lobby = state.lobby;
+  if (!lobby?.active) return { active: false };
+  return {
+    active: true,
+    time: round(lobby.time),
+    shipTime: round(lobby.shipTime),
+    p1: serializeLobbyPlayer(lobby.player),
+    p2: serializeLobbyPlayer(lobby.peer),
+    selectedWeaponId: lobby.selectedWeaponId || "",
+    selectedDifficultyId: lobby.selectedDifficultyId || "",
+    randomGoal: lobby.randomGoal || "twenty_waves",
+    weaponPage: Number(lobby.weaponPage) || 0,
+    pendingLaunch: clonePlain(lobby.pendingLaunch),
+  };
+}
+
+function applyLobbySnapshot(lobbySnapshot) {
+  if (!lobbySnapshot || typeof lobbySnapshot !== "object") return;
+  state.lobby ||= {};
+  state.lobby.active = Boolean(lobbySnapshot.active);
+  if (!lobbySnapshot.active) return;
+  state.lobby.time = number(lobbySnapshot.time, state.lobby.time);
+  state.lobby.shipTime = number(lobbySnapshot.shipTime, state.lobby.shipTime);
+  state.lobby.selectedWeaponId = lobbySnapshot.selectedWeaponId || state.lobby.selectedWeaponId;
+  state.lobby.selectedDifficultyId = lobbySnapshot.selectedDifficultyId || state.lobby.selectedDifficultyId;
+  state.lobby.randomGoal = lobbySnapshot.randomGoal || state.lobby.randomGoal;
+  state.lobby.weaponPage = number(lobbySnapshot.weaponPage, state.lobby.weaponPage);
+  state.lobby.pendingLaunch = clonePlain(lobbySnapshot.pendingLaunch);
+  state.lobby.peer ||= {};
+  if (netRuntime.role === "guest") {
+    if (lobbySnapshot.p2) Object.assign(state.lobby.player, lobbySnapshot.p2);
+    if (lobbySnapshot.p1) Object.assign(state.lobby.peer, lobbySnapshot.p1);
+  } else {
+    if (lobbySnapshot.p1) Object.assign(state.lobby.player, lobbySnapshot.p1);
+    if (lobbySnapshot.p2) Object.assign(state.lobby.peer, lobbySnapshot.p2);
+  }
+}
+
+function serializeLobbyPlayer(player) {
+  return pickNumberFields(player, ["x", "y", "r", "speed", "vx", "vy", "dirX", "dirY", "tilt", "stride"], {
+    id: player?.id || "",
+    name: player?.name || "",
+    color: player?.color || "",
+    moving: Boolean(player?.moving),
+  });
+}
+
+function serializeLevelChoices(items) {
+  if (!Array.isArray(items)) return [];
+  return items.map((item) => ({
+    id: item?.id || "",
+    icon: item?.icon || "*",
+    name: item?.name || "强化",
+    stat: item?.stat || "强化",
+    amount: item?.amount || "",
+    desc: item?.desc || "由主机选择",
+  }));
 }
 
 export function createStartRunPayload({ config, map }) {

@@ -377,13 +377,13 @@ export function updateLobby(dt) {
   return updatePendingLaunch(dt);
 }
 
-export function interactWithLobby(targetId = null) {
+export function interactWithLobby(targetId = null, { player = state.lobby.player, allowLaunch = true } = {}) {
   if (state.mode !== "lobby" || state.lobby.modalOpen || state.lobby.pendingLaunch) return null;
-  const available = allLobbyInteractions(state.lobby.player);
+  const available = allLobbyInteractions(player);
   const explicit = targetId ? available.find((entry) => entry.id === targetId) : null;
-  const interaction = explicit && distSq(explicit.x, explicit.y, state.lobby.player.x, state.lobby.player.y) <= INTERACTION_RADIUS * INTERACTION_RADIUS
+  const interaction = explicit && distSq(explicit.x, explicit.y, player.x, player.y) <= INTERACTION_RADIUS * INTERACTION_RADIUS
     ? explicit
-    : targetId ? null : findNearestLobbyInteraction(state.lobby.player);
+    : targetId ? null : findNearestLobbyInteraction(player);
   if (!interaction) return null;
 
   if (interaction.action === "weapon-page") {
@@ -410,6 +410,7 @@ export function interactWithLobby(targetId = null) {
     return { ...interaction, randomGoal: state.lobby.randomGoal };
   }
   if (interaction.action === "story" || interaction.action === "random") {
+    if (!allowLaunch) return { ...interaction, denied: "host_only" };
     return beginLobbyLaunch(interaction.action, interaction);
   }
   if (interaction.action === "npc-talk") {
@@ -635,6 +636,12 @@ export function setLobbyModalOpen(open) {
     clearLobbyInput();
     cancelLobbyPlayerMove();
   }
+}
+
+export function updateLobbyPeer(dt, inputFrame = {}) {
+  const peer = state.lobby.peer;
+  if (!peer || state.lobby.modalOpen) return;
+  updateLobbyActorWithInput(peer, inputFrame, dt);
 }
 
 export function setLobbyToast(text, color = "#42e8ff", life = 2.8) {
@@ -948,6 +955,35 @@ function updateLobbyPlayer(dt) {
       break;
     }
   }
+  if (length > 0.001) {
+    ax /= length;
+    ay /= length;
+    player.dirX = ax;
+    player.dirY = ay;
+  } else {
+    ax = 0;
+    ay = 0;
+  }
+  const targetVx = ax * player.speed;
+  const targetVy = ay * player.speed;
+  const acceleration = length > 0.001 ? 1060 : 1280;
+  player.vx = approach(player.vx, targetVx, acceleration * dt);
+  player.vy = approach(player.vy, targetVy, acceleration * dt);
+  player.moving = Math.hypot(player.vx, player.vy) > 12;
+  player.stride += Math.hypot(player.vx, player.vy) * dt * 0.045;
+  player.tilt += ((player.vx / player.speed) * 0.16 - player.tilt) * Math.min(1, dt * 9);
+  const nextX = resolveLobbyPosition(player.x + player.vx * dt, player.y, player.r);
+  if (Math.abs(nextX.x - (player.x + player.vx * dt)) > 0.5) player.vx *= 0.15;
+  player.x = nextX.x;
+  const nextY = resolveLobbyPosition(player.x, player.y + player.vy * dt, player.r);
+  if (Math.abs(nextY.y - (player.y + player.vy * dt)) > 0.5) player.vy *= 0.15;
+  player.y = nextY.y;
+}
+
+function updateLobbyActorWithInput(player, inputFrame, dt) {
+  let ax = (inputFrame.right ? 1 : 0) - (inputFrame.left ? 1 : 0) + (Number(inputFrame.vx) || 0);
+  let ay = (inputFrame.down ? 1 : 0) - (inputFrame.up ? 1 : 0) + (Number(inputFrame.vy) || 0);
+  const length = Math.hypot(ax, ay);
   if (length > 0.001) {
     ax /= length;
     ay /= length;
@@ -1720,6 +1756,8 @@ function pushCircleOutOfCircle(point, radius, circle) {
 
 function entitiesNearDoor(door, radius) {
   if (distSq(state.lobby.player.x, state.lobby.player.y, door.x, door.y) <= radius * radius) return true;
+  const peer = state.lobby.peer;
+  if (peer && distSq(peer.x, peer.y, door.x, door.y) <= radius * radius) return true;
   if (Object.values(state.lobby.npcs).some((npc) => distSq(npc.x, npc.y, door.x, door.y) <= radius * radius)) return true;
   const pet = state.lobby.pet;
   return Boolean(pet && distSq(pet.x, pet.y, door.x, door.y) <= radius * radius);

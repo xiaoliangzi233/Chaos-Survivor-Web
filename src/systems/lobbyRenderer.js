@@ -97,7 +97,10 @@ export function renderLobby(ctx, viewport) {
   for (const door of LOBBY_DOORS) {
     if (pointNearCamera(door.x, door.y, 1300, 950)) actors.push({ y: door.y + 4, draw: () => drawDoor(ctx, door, lobby.time) });
   }
-  actors.push({ y: lobby.player.y, draw: () => drawLobbyPlayer(ctx, lobby.player, lobby.time) });
+  actors.push({ y: lobby.player.y, draw: () => drawLobbyPlayer(ctx, lobby.player, lobby.time, "P1") });
+  if (state.multiplayer?.connected && lobby.peer && pointNearCamera(lobby.peer.x, lobby.peer.y)) {
+    actors.push({ y: lobby.peer.y, draw: () => drawLobbyPlayer(ctx, lobby.peer, lobby.time, "P2") });
+  }
   actors.sort((a, b) => a.y - b.y);
   for (const actor of actors) actor.draw();
   drawRoomRoofs(ctx, lobby.time);
@@ -2006,7 +2009,7 @@ function drawNpcLabelAndBubble(ctx, npc, runtime, y) {
   ctx.restore();
 }
 
-function drawLobbyPlayer(ctx, player, time) {
+function drawLobbyPlayer(ctx, player, time, label = "") {
   const speedRatio = Math.min(1, Math.hypot(player.vx, player.vy) / player.speed);
   const bob = Math.sin(time * (player.moving ? 7 : 3.2) + player.stride * 0.2) * (1.1 + speedRatio * 2);
   const y = player.y * LOBBY_Y_SCALE;
@@ -2031,6 +2034,13 @@ function drawLobbyPlayer(ctx, player, time) {
   ctx.rotate(player.tilt);
   const mood = player.moving ? "happy" : ["blink", "smile", "curious", "happy"][Math.floor(time * 1.15) % 4];
   drawPlayerAvatar(ctx, player, { time, moving: player.moving, mood });
+  if (label) {
+    ctx.rotate(-player.tilt);
+    ctx.textAlign = "center";
+    ctx.font = `bold 10px ${FONT}`;
+    ctx.fillStyle = player.color || "#eefaff";
+    ctx.fillText(label, 0, -34);
+  }
   ctx.restore();
 }
 

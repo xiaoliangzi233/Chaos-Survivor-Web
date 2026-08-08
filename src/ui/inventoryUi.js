@@ -16,6 +16,7 @@ import {
   weaponSellPrice,
 } from "../economy/shop.js";
 import { ITEM_DEFS, equipActiveItem } from "../systems/items.js";
+import { isGuestMirror } from "../net/netState.js";
 
 let initialized = false;
 let previousMode = "playing";
@@ -150,6 +151,7 @@ function handleKeyDown(event) {
 }
 
 function canOpenInventory() {
+  if (isGuestMirror()) return false;
   if (!state.player || !state.inventory) return false;
   return state.mode === "playing" || state.mode === "paused";
 }

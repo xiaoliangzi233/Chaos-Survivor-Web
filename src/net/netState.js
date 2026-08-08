@@ -6,6 +6,7 @@ export const MESSAGE_TYPES = new Set([
   "snapshot",
   "startRun",
   "shopAction",
+  "lobbyAction",
   "ping",
   "pong",
   "disconnect",
@@ -25,6 +26,7 @@ export const netRuntime = {
   session: null,
   onStartRun: null,
   onSnapshot: null,
+  onLobbyAction: null,
   onStatus: null,
 };
 

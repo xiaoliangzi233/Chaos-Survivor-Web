@@ -22,7 +22,7 @@ import { generateMap } from "../systems/map.js";
 import { bindInput } from "../systems/input.js";
 import { closeInventory, initInventoryUi, isInventoryOpen } from "../ui/inventoryUi.js";
 import { closeCodex, initCodexUi, openCodex } from "../ui/codexUi.js";
-import { closeShop, initShopUi, openShop } from "../ui/shopUi.js";
+import { closeShop, initShopUi, openShop, renderShop } from "../ui/shopUi.js";
 import { isBossWave, setupEnemyRegistry } from "../systems/enemyRegistry.js";
 import { updatePlayer, updateRemotePlayer, updateSpawning, updateEnemies, rebuildGrid, updateGems, updateCoins, collectAllExperience, collectAllCoins, clearEnemies, anyCombatPlayerAlive, updatePeerAssistWeapon } from "../systems/entities.js";
 import { updateWeapons, STARTER_WEAPONS, UPGRADE_DEFS, activateWeapon, refreshStarterWeapons } from "../systems/weapons.js";
@@ -82,6 +82,7 @@ import {
   setLobbyModalOpen,
   setLobbyPlayerMoveTarget,
   updateLobby,
+  updateLobbyPeer,
 } from "../systems/lobby.js";
 import { lobbyScreenToWorld } from "../systems/lobbyRenderer.js";
 import {
@@ -98,7 +99,7 @@ import {
 } from "../ui/adventureStatsUi.js";
 import { hasPendingJoinInvite, initMultiplayerUi, openMultiplayerPanel, updateMultiplayerUi } from "../ui/multiplayerUi.js";
 import { netRuntime, nextLocalInputFrame, isHostAuthority, isGuestMirror } from "../net/netState.js";
-import { sendHostSnapshot, sendLocalInput, sendStartRun } from "../net/p2pSession.js";
+import { sendHostSnapshot, sendLocalInput, sendStartRun, sendLobbyAction } from "../net/p2pSession.js";
 import { applyHostSnapshot, createStartRunPayload } from "../net/snapshot.js";
 
 const LEVEL_CHOICE_REFRESH_COST = 10;
@@ -180,6 +181,7 @@ export async function bootGame() {
   let nextStatsPublishAt = 0;
   let nextSnapshotAt = 0;
   let debugUi = null;
+  let guestOverlaySignature = "";
 
   function start() {
     if (isHelpOpen()) return;
@@ -291,6 +293,7 @@ export async function bootGame() {
   }
 
   function showLevelChoices() {
+    if (isGuestMirror()) return;
     state.mode = "leveling";
     renderLevelChoices(pickThree(UPGRADE_DEFS));
   }
@@ -446,6 +449,7 @@ export async function bootGame() {
   }
 
   function pauseGame() {
+    if (isGuestMirror()) return;
     if (isInventoryOpen()) closeInventory();
     if (state.mode !== "playing") return;
     state.mode = "paused";
@@ -455,6 +459,7 @@ export async function bootGame() {
   }
 
   function resumeGame() {
+    if (isGuestMirror()) return;
     if (state.mode !== "paused") return;
     state.mode = "playing";
     ui.pauseButton.textContent = "II";
@@ -463,6 +468,7 @@ export async function bootGame() {
   }
 
   function togglePause() {
+    if (isGuestMirror()) return;
     if (isInventoryOpen()) {
       closeInventory();
       return;
@@ -472,6 +478,7 @@ export async function bootGame() {
   }
 
   function returnToLobby() {
+    if (isGuestMirror()) return false;
     if (["playing", "paused", "shop", "leveling"].includes(state.mode)) recordCurrentAdventure("abandoned");
     cancelStoryPlayback();
     closeCodex();
@@ -612,6 +619,50 @@ export async function bootGame() {
     return true;
   }
 
+  function syncGuestMirrorUi(snapshot = {}) {
+    if (!isGuestMirror()) return;
+    const mode = state.mode;
+    if (mode === "shop") {
+      renderShop();
+      ui.shopOverlay?.classList.add("active");
+    } else {
+      closeShop();
+    }
+
+    const choices = snapshot.ui?.levelChoices || [];
+    const levelSignature = choices.map((item) => item.id).join(",");
+    if (mode === "leveling" && levelSignature) {
+      if (guestOverlaySignature !== `level:${levelSignature}`) {
+        showChoices({
+          eyebrow: "P1 LEVEL UP",
+          title: "主机正在选择强化",
+          items: choices,
+          onPick: () => {},
+        });
+        for (const button of ui.choiceList?.querySelectorAll("button") || []) button.disabled = true;
+        guestOverlaySignature = `level:${levelSignature}`;
+      }
+    } else {
+      hideChoices();
+      if (guestOverlaySignature.startsWith("level:")) guestOverlaySignature = "";
+    }
+
+    if (mode === "paused") showPauseMenu();
+    else hidePauseMenu();
+
+    if (mode === "ended" && guestOverlaySignature !== `end:${state.victory}`) {
+      showEnd(state.victory);
+      ui.restartButton.disabled = true;
+      ui.endLobbyButton.disabled = true;
+      guestOverlaySignature = `end:${state.victory}`;
+    } else if (mode !== "ended" && guestOverlaySignature.startsWith("end:")) {
+      ui.endOverlay?.classList.remove("active");
+      ui.restartButton.disabled = false;
+      ui.endLobbyButton.disabled = false;
+      guestOverlaySignature = "";
+    }
+  }
+
   function taintRunForDebug() {
     state.debug.runTainted = true;
   }
@@ -639,6 +690,11 @@ export async function bootGame() {
   }
 
   function handleLobbyInteraction(targetId = null) {
+    if (isGuestMirror()) {
+      const actionId = targetId || state.lobby.nearbyInteractionId;
+      if (actionId) sendLobbyAction({ targetId: actionId });
+      return Boolean(actionId);
+    }
     const interaction = interactWithLobby(targetId);
     if (!interaction) return false;
     if (["weapon-page", "weapon-select", "difficulty", "random-goal", "launch-charge", "pet"].includes(interaction.action)) {
@@ -741,13 +797,22 @@ export async function bootGame() {
   }
 
   function update(dt) {
-    if (isGuestMirror() && !state.lobby.active && state.mode !== "menu") {
-      sendLocalInput(nextLocalInputFrame(input));
-      return;
+    if (isGuestMirror()) {
+      if (state.lobby.active) {
+        updateLobby(dt);
+        sendLocalInput(nextLocalInputFrame(input));
+        return;
+      }
+      if (state.mode !== "menu") {
+        sendLocalInput(nextLocalInputFrame(input));
+        return;
+      }
     }
     updateAi(dt);
     if (state.lobby.active) {
       const lobbyEvent = updateLobby(dt);
+      if (isHostAuthority()) updateLobbyPeer(dt, netRuntime.remoteInput);
+      publishHostSnapshot();
       if (lobbyEvent?.type === "launch") startWithLoadout(lobbyEvent.config);
       return;
     }
@@ -839,7 +904,7 @@ export async function bootGame() {
     openDebugShop,
     interactLobby: handleLobbyInteraction,
     interactLobbyPointer: (event) => lobbyPointerInteraction(event, true),
-    useActiveItem,
+    useActiveItem: () => !isGuestMirror() && useActiveItem(),
     hoverLobbyPointer: (event) => lobbyPointerInteraction(event, false),
     cancelLobbyAction: cancelLobbyLaunch,
   });
@@ -882,7 +947,16 @@ export async function bootGame() {
     },
   });
   netRuntime.onStartRun = startGuestMirrorRun;
-  netRuntime.onSnapshot = applyHostSnapshot;
+  netRuntime.onSnapshot = (snapshot) => {
+    if (!applyHostSnapshot(snapshot)) return;
+    syncGuestMirrorUi(snapshot);
+  };
+  netRuntime.onLobbyAction = (payload = {}) => {
+    if (!isHostAuthority() || !state.lobby.active || !payload.targetId) return;
+    const interaction = interactWithLobby(payload.targetId, { player: state.lobby.peer, allowLaunch: false });
+    if (interaction?.denied) playSfx("deny");
+    else if (interaction) playSfx("select");
+  };
   if (stressScenarioRequested()) {
     await startDebugRun({ difficultyId: "void_crown", weaponId: "arc", wave: 20 });
     populateDeterministicStressScenario();

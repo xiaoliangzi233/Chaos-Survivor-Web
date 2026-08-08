@@ -12,6 +12,7 @@ import {
   weaponSellDisabledReason,
   weaponSellPrice,
 } from "../economy/shop.js";
+import { isGuestMirror } from "../net/netState.js";
 
 const dom = {};
 let continueHandler = null;
@@ -50,10 +51,12 @@ export function initShopUi({ continueToNextWave }) {
   dom.hint = document.getElementById("shopHint");
 
   dom.refresh?.addEventListener("click", () => {
+    if (isGuestMirror()) return;
     if (refreshShopOffers()) renderShop();
     else renderShop(text.noGoldRefresh);
   });
   dom.continue?.addEventListener("click", () => {
+    if (isGuestMirror()) return;
     if (state.shop?.manualDebugOpen) {
       state.shop.manualDebugOpen = false;
       closeShop();
@@ -88,7 +91,8 @@ export function renderShop(message = "") {
   const cost = refreshCost();
   const canRefresh = state.gold >= cost;
   dom.refresh.textContent = canRefresh ? `${text.refresh} - ${cost} ${text.coin}` : `${text.refreshNoGold} - ${cost} ${text.coin}`;
-  dom.refresh.disabled = !canRefresh;
+  dom.refresh.disabled = !canRefresh || isGuestMirror();
+  if (dom.continue) dom.continue.disabled = isGuestMirror();
   dom.refresh.classList.toggle("no-gold-refresh", !canRefresh);
   dom.list.innerHTML = "";
   for (const offer of state.shop.offers) dom.list.appendChild(renderOffer(offer));
@@ -116,8 +120,9 @@ function renderOffer(offer) {
   lock.type = "button";
   lock.className = `shop-lock${offer.locked ? " active" : ""}`;
   lock.textContent = offer.locked ? text.locked : text.lock;
-  lock.disabled = soldOut;
+  lock.disabled = soldOut || isGuestMirror();
   lock.addEventListener("click", () => {
+    if (isGuestMirror()) return;
     toggleOfferLock(offer.uid);
     renderShop();
   });
@@ -126,9 +131,10 @@ function renderOffer(offer) {
   buy.type = "button";
   buy.className = "primary shop-buy";
   buy.textContent = soldOut ? text.sold : `${text.buy} ${offer.price}`;
-  buy.disabled = Boolean(reason);
+  buy.disabled = Boolean(reason) || isGuestMirror();
   buy.title = reason;
   buy.addEventListener("click", () => {
+    if (isGuestMirror()) return;
     const result = purchaseOffer(offer.uid);
     renderShop(result.ok ? (fuseTarget ? text.fuseSuccess : text.bought) : result.reason);
   });
@@ -200,7 +206,9 @@ function renderShopWeaponSlots(container, weaponSlots) {
       fuse.className = "shop-slot-fuse";
       fuse.textContent = text.fuseNow;
       fuse.title = text.fuseHint;
+      fuse.disabled = isGuestMirror();
       fuse.addEventListener("click", () => {
+        if (isGuestMirror()) return;
         const currentMaterial = findFuseCandidate(slot);
         const result = currentMaterial && fuseWeaponSlots(slot.uid, currentMaterial.uid);
         renderShop(result ? text.fuseSuccess : text.fuseHint);
@@ -213,9 +221,10 @@ function renderShopWeaponSlots(container, weaponSlots) {
     sell.type = "button";
     sell.className = "shop-slot-sell";
     sell.textContent = sellDisabledReason || `${text.sell} +${sellPrice}`;
-    sell.disabled = Boolean(sellDisabledReason);
+    sell.disabled = Boolean(sellDisabledReason) || isGuestMirror();
     sell.title = sellDisabledReason || `${text.sell} ${info.name}${text.gained} ${sellPrice} ${text.coin}`;
     sell.addEventListener("click", () => {
+      if (isGuestMirror()) return;
       const current = state.inventory?.weaponSlots.find((entry) => entry.uid === slot.uid);
       if (!current) {
         renderShop(text.unknownWeapon);

@@ -236,12 +236,16 @@ export function createDebugState(previous = {}) {
 }
 
 export function createLobbyState(previous = {}) {
+  const peer = previous.peer || {};
   return {
     initialized: Boolean(previous.initialized),
     active: Boolean(previous.active),
     time: Number(previous.time) || 0,
     shipTime: Number(previous.shipTime) || 0,
     player: {
+      id: "p1",
+      name: "P1 主机",
+      color: "#42e8ff",
       x: Number(previous.player?.x) || 120,
       y: Number(previous.player?.y) || 150,
       r: 15,
@@ -258,6 +262,22 @@ export function createLobbyState(previous = {}) {
       moveTargetY: 0,
       movePath: [],
       movePathIndex: 0,
+    },
+    peer: {
+      id: "p2",
+      name: "P2 客机",
+      color: "#ff8bd8",
+      x: Number(peer.x) || 164,
+      y: Number(peer.y) || 150,
+      r: 15,
+      speed: 245,
+      vx: Number(peer.vx) || 0,
+      vy: Number(peer.vy) || 0,
+      dirX: Number(peer.dirX) || 0,
+      dirY: Number(peer.dirY) || -1,
+      tilt: Number(peer.tilt) || 0,
+      stride: Number(peer.stride) || 0,
+      moving: Boolean(peer.moving),
     },
     cameraX: Number(previous.cameraX) || 80,
     cameraY: Number(previous.cameraY) || 105,

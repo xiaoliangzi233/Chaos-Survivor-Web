@@ -135,6 +135,10 @@ export function sendShopAction(payload) {
   return sendMessage({ type: "shopAction", payload });
 }
 
+export function sendLobbyAction(payload) {
+  return sendMessage({ type: "lobbyAction", payload });
+}
+
 export function disconnectPeer() {
   sendMessage({ type: "disconnect", payload: { reason: "local-disconnect" } });
   closeSession({ keepRole: false, notify: true });
@@ -263,6 +267,9 @@ function receiveMessage(raw) {
       break;
     case "startRun":
       netRuntime.onStartRun?.(message.payload);
+      break;
+    case "lobbyAction":
+      netRuntime.onLobbyAction?.(message.payload);
       break;
     case "ping":
       sendMessage({ type: "pong", payload: { sentAt: message.payload?.sentAt || now() } });

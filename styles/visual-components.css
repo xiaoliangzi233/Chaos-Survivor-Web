@@ -1,0 +1,242 @@
+.ui-shell.ui-shell {
+  --ui-accent: var(--ui-cyan);
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--ui-accent) 42%, rgba(180, 216, 230, 0.28));
+  border-radius: 0;
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--ui-accent) 7%, transparent), transparent 32%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.025), transparent 32%),
+    var(--ui-shell);
+  box-shadow: var(--ui-inner), var(--ui-shadow), 0 0 40px color-mix(in srgb, var(--ui-accent) 9%, transparent);
+  clip-path: polygon(var(--ui-cut-lg) 0, 100% 0, 100% calc(100% - var(--ui-cut-lg)), calc(100% - var(--ui-cut-lg)) 100%, 0 100%, 0 var(--ui-cut-lg));
+  animation: uiPanelBoot var(--ui-normal) ease-out both;
+}
+
+.ui-shell.ui-shell::before,
+.ui-shell.ui-shell::after {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  pointer-events: none;
+}
+
+.ui-shell.ui-shell::before {
+  inset: 0;
+  background:
+    linear-gradient(90deg, color-mix(in srgb, var(--ui-accent) 12%, transparent) 1px, transparent 1px),
+    linear-gradient(0deg, rgba(255, 255, 255, 0.025) 1px, transparent 1px);
+  background-size: var(--ui-grid) var(--ui-grid);
+  opacity: calc(0.38 * var(--visual-detail-opacity));
+  mask-image: linear-gradient(180deg, #000, transparent 72%);
+  animation: uiGridDrift 14s linear infinite;
+}
+
+.ui-shell.ui-shell::after {
+  top: 0;
+  left: 0;
+  width: 42%;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--ui-accent), #fff, transparent);
+  box-shadow: 0 0 18px color-mix(in srgb, var(--ui-accent) 62%, transparent);
+  animation: uiSignalSweep 5.8s ease-in-out infinite;
+}
+
+.ui-shell--link { --ui-accent: var(--ui-violet); }
+.ui-shell--dialogue { --ui-accent: var(--ui-cyan); }
+.ui-shell--ledger { --ui-accent: var(--ui-gold); }
+.ui-shell--manual { --ui-accent: var(--ui-green); }
+.ui-shell--archive { --ui-accent: var(--ui-violet); }
+.ui-shell--upgrade { --ui-accent: var(--ui-green); }
+.ui-shell--loading { --ui-accent: var(--ui-cyan); }
+.ui-shell--story { --ui-accent: var(--ui-violet); }
+.ui-shell--shop { --ui-accent: var(--ui-gold); }
+.ui-shell--pause { --ui-accent: var(--ui-gold); }
+.ui-shell--inventory { --ui-accent: var(--ui-cyan); }
+.ui-shell--end { --ui-accent: var(--ui-green); }
+
+.ui-shell > * {
+  position: relative;
+  z-index: 1;
+}
+
+.ui-shell header,
+.ui-shell > .shop-head,
+.ui-shell > .inventory-head {
+  border-bottom: 1px solid color-mix(in srgb, var(--ui-accent) 22%, transparent);
+  background:
+    linear-gradient(90deg, color-mix(in srgb, var(--ui-accent) 9%, transparent), transparent 62%),
+    rgba(3, 9, 17, 0.38);
+}
+
+.ui-shell footer,
+.ui-shell > .shop-actions {
+  border-top: 1px solid color-mix(in srgb, var(--ui-accent) 20%, transparent);
+  background: rgba(2, 7, 14, 0.62);
+}
+
+.ui-shell h2,
+.ui-shell h3,
+.ui-shell p {
+  text-wrap: pretty;
+}
+
+.ui-shell h2 {
+  color: var(--ui-ink);
+  text-shadow: 0 0 20px color-mix(in srgb, var(--ui-accent) 22%, transparent), 2px 2px 0 rgba(0, 0, 0, 0.72);
+}
+
+.ui-shell .eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  color: var(--ui-accent);
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+}
+
+.ui-shell .eyebrow::before {
+  content: "";
+  width: 18px;
+  height: 4px;
+  background: var(--ui-accent);
+  box-shadow: 0 0 12px color-mix(in srgb, var(--ui-accent) 62%, transparent);
+}
+
+.ui-shell button,
+.overlay:not(.debug-auth-overlay):not(.debug-panel-overlay) button {
+  position: relative;
+  min-height: 40px;
+  overflow: hidden;
+  border: 1px solid var(--ui-edge);
+  border-radius: 0;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.055), transparent 50%),
+    rgba(12, 25, 38, 0.92);
+  color: var(--ui-ink);
+  box-shadow: inset 0 -3px rgba(0, 0, 0, 0.3), var(--ui-inner);
+  clip-path: polygon(var(--ui-cut-sm) 0, 100% 0, 100% calc(100% - var(--ui-cut-sm)), calc(100% - var(--ui-cut-sm)) 100%, 0 100%, 0 var(--ui-cut-sm));
+  transition: transform var(--ui-fast) ease, border-color var(--ui-fast) ease, color var(--ui-fast) ease, box-shadow var(--ui-fast) ease;
+}
+
+.ui-shell button::after,
+.overlay:not(.debug-auth-overlay):not(.debug-panel-overlay) button::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(105deg, transparent 20%, rgba(255, 255, 255, 0.16) 48%, transparent 72%);
+  transform: translateX(-140%);
+  transition: transform 360ms ease;
+}
+
+.ui-shell button:hover,
+.ui-shell button:focus-visible,
+.overlay:not(.debug-auth-overlay):not(.debug-panel-overlay) button:hover,
+.overlay:not(.debug-auth-overlay):not(.debug-panel-overlay) button:focus-visible {
+  outline: none;
+  border-color: color-mix(in srgb, var(--ui-accent) 72%, #fff 10%);
+  color: #fff;
+  box-shadow: inset 0 -3px rgba(0, 0, 0, 0.3), 0 0 0 2px color-mix(in srgb, var(--ui-accent) 14%, transparent), 0 0 24px color-mix(in srgb, var(--ui-accent) 18%, transparent);
+  transform: translateY(-1px);
+}
+
+.ui-shell button:hover::after,
+.ui-shell button:focus-visible::after,
+.overlay:not(.debug-auth-overlay):not(.debug-panel-overlay) button:hover::after,
+.overlay:not(.debug-auth-overlay):not(.debug-panel-overlay) button:focus-visible::after {
+  transform: translateX(140%);
+}
+
+.ui-shell button:active,
+.overlay:not(.debug-auth-overlay):not(.debug-panel-overlay) button:active {
+  transform: translateY(1px);
+}
+
+.ui-shell button.primary,
+.overlay:not(.debug-auth-overlay):not(.debug-panel-overlay) button.primary {
+  border-color: color-mix(in srgb, var(--ui-accent) 68%, #fff 8%);
+  background:
+    linear-gradient(110deg, color-mix(in srgb, var(--ui-accent) 86%, #fff 8%), color-mix(in srgb, var(--ui-accent) 54%, #07131d 46%));
+  color: #031018;
+  font-weight: 800;
+  text-shadow: 0 1px rgba(255, 255, 255, 0.26);
+}
+
+.ui-shell button:disabled,
+.overlay:not(.debug-auth-overlay):not(.debug-panel-overlay) button:disabled {
+  opacity: 0.34;
+  filter: saturate(0.25);
+  cursor: not-allowed;
+  transform: none;
+}
+
+.ui-shell input,
+.ui-shell textarea,
+.ui-shell select {
+  border: 1px solid var(--ui-edge);
+  border-radius: 0;
+  background: rgba(2, 8, 16, 0.86);
+  color: var(--ui-ink);
+  box-shadow: var(--ui-inner);
+  outline: none;
+  transition: border-color var(--ui-fast) ease, box-shadow var(--ui-fast) ease;
+}
+
+.ui-shell input:focus,
+.ui-shell textarea:focus,
+.ui-shell select:focus {
+  border-color: color-mix(in srgb, var(--ui-accent) 72%, #fff 8%);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--ui-accent) 12%, transparent), inset 0 0 18px color-mix(in srgb, var(--ui-accent) 5%, transparent);
+}
+
+.ui-shell :is(.shop-card, .weapon-slot, .item-card, .codex-card, .inventory-stats, .inventory-weapons, .inventory-items, .inventory-detail, .help-feature-card, .help-protocol-list article, .help-growth-card, .adventure-summary-card, .adventure-history-card, .multiplayer-lan-grid section) {
+  position: relative;
+  border: 1px solid color-mix(in srgb, var(--ui-accent) 18%, var(--ui-edge));
+  border-radius: 0;
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--ui-accent) 5%, transparent), transparent 42%),
+    var(--ui-surface-soft);
+  box-shadow: var(--ui-inner), inset 4px 0 color-mix(in srgb, var(--ui-accent) 18%, transparent);
+  clip-path: polygon(var(--ui-cut-sm) 0, 100% 0, 100% calc(100% - var(--ui-cut-sm)), calc(100% - var(--ui-cut-sm)) 100%, 0 100%, 0 var(--ui-cut-sm));
+}
+
+.ui-shell :is(.shop-card, .weapon-slot, .item-card, .codex-card, .adventure-summary-card, .adventure-history-card)::after {
+  content: "";
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 5px;
+  height: 5px;
+  border: 1px solid color-mix(in srgb, var(--ui-accent) 54%, transparent);
+  box-shadow: -8px 0 color-mix(in srgb, var(--ui-accent) 16%, transparent);
+  pointer-events: none;
+}
+
+.ui-shell ::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.ui-shell ::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.34);
+  border: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.ui-shell ::-webkit-scrollbar-thumb {
+  background: linear-gradient(var(--ui-accent), color-mix(in srgb, var(--ui-accent) 38%, #152b38));
+  border: 2px solid rgba(2, 8, 16, 0.82);
+}
+
+.empty-detail,
+.adventure-empty,
+.codex-empty,
+.shop-empty {
+  min-height: 150px;
+  display: grid;
+  place-items: center;
+  border: 1px dashed color-mix(in srgb, var(--ui-accent) 24%, transparent);
+  background: repeating-linear-gradient(-45deg, transparent 0 12px, color-mix(in srgb, var(--ui-accent) 3%, transparent) 12px 24px);
+  color: var(--ui-muted);
+}

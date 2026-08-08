@@ -13,7 +13,7 @@ import {
   weaponSellPrice,
 } from "../economy/shop.js";
 import { isGuestMirror } from "../net/netState.js";
-import { sendShopAction } from "../net/multiplayerSession.js";
+import { sendReadyState, sendShopAction } from "../net/multiplayerSession.js";
 import { withPlayerProfile } from "../systems/playerProfiles.js";
 
 const dom = {};
@@ -76,10 +76,12 @@ export function openShop({ beforeBossWave = false, manualDebugOpen = false } = {
   state.mode = "shop";
   renderShop();
   dom.overlay?.classList.add("active");
+  dom.overlay?.setAttribute("aria-hidden", "false");
 }
 
 export function closeShop() {
   dom.overlay?.classList.remove("active");
+  dom.overlay?.setAttribute("aria-hidden", "true");
 }
 
 export function isShopOpen() {
@@ -255,7 +257,8 @@ function renderShopWeaponSlots(container, weaponSlots) {
 }
 
 function requestGuestAction(payload) {
-  sendShopAction(payload);
+  if (payload?.action === "ready") sendReadyState(payload);
+  else sendShopAction(payload);
   renderShop("请求已发送给主机。");
   return true;
 }

@@ -17,24 +17,6 @@ function qualityColor(weapon, fallback = "#42e8ff") {
   return quality === "common" ? fallback : QUALITY_COLORS[quality] || fallback;
 }
 
-export function startWeaponPreview(canvas, getWeapon) {
-  const ctx = canvas.getContext("2d");
-  let raf = 0;
-  let stopped = false;
-
-  function frame(now) {
-    if (stopped) return;
-    drawWeaponPreview(ctx, canvas, getWeapon(), now / 1000);
-    raf = requestAnimationFrame(frame);
-  }
-
-  raf = requestAnimationFrame(frame);
-  return () => {
-    stopped = true;
-    cancelAnimationFrame(raf);
-  };
-}
-
 export function drawWeaponPreview(ctx, canvas, weapon, t) {
   const dpr = Math.min(window.devicePixelRatio || 1, 2);
   const w = Math.max(220, canvas.clientWidth || 360);

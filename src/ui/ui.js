@@ -1,7 +1,7 @@
 import { TOTAL_WAVES } from "../constants.js";
 import { state, world } from "../state.js";
 import { choice, formatTime } from "../utils.js";
-import { bestSummaryText, difficultyCards } from "../difficulty.js";
+import { bestSummaryText } from "../difficulty.js";
 import {
   findFuseCandidate,
   fuseWeaponSlots,
@@ -10,10 +10,8 @@ import {
   selectedWeaponSlot,
   WEAPON_INFO,
 } from "../economy/inventory.js";
-import { startWeaponPreview } from "./weaponPreview.js";
 import { activePlayerStatusEffects } from "../systems/statusEffects.js";
 
-let stopPreview = null;
 const hudLast = {
   hp: null,
   xp: null,
@@ -64,21 +62,6 @@ export const ui = {
   runLoadingText: document.getElementById("runLoadingText"),
   runLoadingBar: document.getElementById("runLoadingBar"),
   runLoadingPercent: document.getElementById("runLoadingPercent"),
-  loadoutOverlay: document.getElementById("loadoutOverlay"),
-  loadoutModeList: document.getElementById("loadoutModeList"),
-  loadoutRandomGoalList: document.getElementById("loadoutRandomGoalList"),
-  loadoutDifficultyList: document.getElementById("loadoutDifficultyList"),
-  loadoutWeaponPreview: document.getElementById("loadoutWeaponPreview"),
-  loadoutWeaponList: document.getElementById("loadoutWeaponList"),
-  loadoutConfirmButton: document.getElementById("loadoutConfirmButton"),
-  loadoutBackButton: document.getElementById("loadoutBackButton"),
-  loadoutRunModeName: document.getElementById("loadoutRunModeName"),
-  loadoutDifficultyName: document.getElementById("loadoutDifficultyName"),
-  loadoutRandomGoalName: document.getElementById("loadoutRandomGoalName"),
-  loadoutWeaponName: document.getElementById("loadoutWeaponName"),
-  loadoutSelectedWeaponName: document.getElementById("loadoutSelectedWeaponName"),
-  loadoutWeaponDesc: document.getElementById("loadoutWeaponDesc"),
-  loadoutWeaponTags: document.getElementById("loadoutWeaponTags"),
   shopOverlay: document.getElementById("shopOverlay"),
   pauseOverlay: document.getElementById("pauseOverlay"),
   inventoryOverlay: document.getElementById("inventoryOverlay"),
@@ -186,7 +169,10 @@ export function updateHud(fps, now = performance.now()) {
     const p2HpRatio = Math.max(0, Math.min(1, p2.hp / Math.max(1, p2.maxHp)));
     if (ui.p2HpBar) ui.p2HpBar.style.transform = `scaleX(${p2HpRatio})`;
     if (ui.p2HpText) ui.p2HpText.textContent = `${Math.max(0, Math.ceil(p2.hp))}/${Math.ceil(p2.maxHp)}`;
-    if (ui.p2ConnectionText) ui.p2ConnectionText.textContent = `P2 // ${state.multiplayer.latencyMs || 0}ms`;
+    if (ui.p2ConnectionText) {
+      const status = state.multiplayer?.statusLabel || (state.multiplayer?.connected ? "已连接" : "未连接");
+      ui.p2ConnectionText.textContent = `P2 // ${status} // ${state.multiplayer.latencyMs || 0}ms`;
+    }
   }
   const hp = Math.max(0, Math.ceil(p.hp));
   const xp = Math.max(0, Math.floor(p.xp));
@@ -341,374 +327,11 @@ function setFpsClass(fps) {
   hudLast.fpsClass = className;
 }
 
-function clampCarouselIndex(index, length) {
-  if (!length) return 0;
-  return Math.max(0, Math.min(length - 1, index));
-}
-
-function cycleCarouselIndex(index, direction, length) {
-  if (!length) return 0;
-  return (index + direction + length) % length;
-}
-
 export function updateBestText() {
   ui.bestText.textContent = bestSummaryText(formatTime);
 }
 
-export function showRunSetup({ weapons, onConfirm, onBack, fixedRunMode = null, fixedWeapon = null }) {
-  clearPreview();
-  state.ai ||= {};
-  ui.quickActions?.classList.add("blocked");
-  const difficulties = difficultyCards();
-  const runModes = [
-    { id: "standard", name: "标准模式", desc: "使用当前难度的固定 20 波战役。" },
-    { id: "random", name: "随机模式", desc: "每波从已解锁图鉴中抽取敌人、Boss 与事件。" },
-  ];
-  const randomGoals = [
-    { id: "twenty_waves", name: "20波通关", desc: "第 20 波结束后胜利结算。" },
-    { id: "endless", name: "无限模式", desc: "不会自动通关，死亡时记录最高到达波次。" },
-  ];
-  let difficultyIndex = Math.max(0, difficulties.findIndex((item) => item.currentHighest));
-  let weaponIndex = 0;
-  let selectedRunMode = runModes.find((item) => item.id === fixedRunMode) || runModes[0];
-  let selectedRandomGoal = randomGoals[0];
-  let selectedDifficulty = difficulties[difficultyIndex] || null;
-  let selectedWeapon = fixedWeapon || weapons[weaponIndex] || null;
-  weaponIndex = Math.max(0, weapons.findIndex((item) => item.id === selectedWeapon?.id));
-  let confirmed = false;
-
-  if (ui.loadoutModeList) ui.loadoutModeList.innerHTML = "";
-  if (ui.loadoutRandomGoalList) ui.loadoutRandomGoalList.innerHTML = "";
-  ui.loadoutDifficultyList.innerHTML = "";
-  ui.loadoutWeaponList.innerHTML = "";
-  const modeSection = ui.loadoutModeList?.closest(".loadout-mode-section");
-  const weaponSection = ui.loadoutWeaponList?.closest(".loadout-weapon-section");
-  if (modeSection) modeSection.hidden = Boolean(fixedRunMode && fixedRunMode !== "random");
-  if (ui.loadoutModeList) ui.loadoutModeList.hidden = Boolean(fixedRunMode);
-  if (weaponSection) weaponSection.hidden = Boolean(fixedWeapon);
-  const modeHeading = modeSection?.querySelector(".loadout-section-title h3");
-  const modeDescription = modeSection?.querySelector(".loadout-section-title p");
-  if (modeHeading) modeHeading.textContent = fixedRunMode === "random" ? "选择随机任务目标" : "选择运行模式";
-  if (modeDescription) {
-    modeDescription.textContent = fixedRunMode === "random"
-      ? "完成二十波后撤离，或在无限模式中挑战最高波次。"
-      : "标准战役使用固定波次；随机模式会从已解锁图鉴中生成每一波。";
-  }
-  const setupIntro = ui.loadoutOverlay?.querySelector(".loadout-head > p");
-  if (setupIntro) {
-    setupIntro.textContent = fixedRunMode
-      ? `${selectedRunMode.name}出击配置。确认难度与任务目标后，将使用大厅中选择的开场武器。`
-      : "同时选择作战难度与开场武器。确认后立即进入战场。";
-  }
-
-  function renderRunModeList() {
-    if (!ui.loadoutModeList) return;
-    ui.loadoutModeList.innerHTML = "";
-    runModes.forEach((item) => {
-      const button = document.createElement("button");
-      button.type = "button";
-      button.className = `loadout-mode-card terminal-card${selectedRunMode.id === item.id ? " selected" : ""}`;
-      button.innerHTML = `<strong>${item.name}</strong><p>${item.desc}</p>`;
-      button.addEventListener("click", () => {
-        if (fixedRunMode) return;
-        selectedRunMode = item;
-        renderRunModeList();
-        renderRandomGoalList();
-        updateSummary();
-      });
-      ui.loadoutModeList.appendChild(button);
-    });
-  }
-
-  function renderRandomGoalList() {
-    if (!ui.loadoutRandomGoalList) return;
-    ui.loadoutRandomGoalList.innerHTML = "";
-    ui.loadoutRandomGoalList.hidden = selectedRunMode.id !== "random";
-    if (selectedRunMode.id !== "random") return;
-    randomGoals.forEach((item) => {
-      const button = document.createElement("button");
-      button.type = "button";
-      button.className = `loadout-random-goal-card terminal-card${selectedRandomGoal.id === item.id ? " selected" : ""}`;
-      button.innerHTML = `<strong>${item.name}</strong><p>${item.desc}</p>`;
-      button.addEventListener("click", () => {
-        selectedRandomGoal = item;
-        renderRandomGoalList();
-        updateSummary();
-      });
-      ui.loadoutRandomGoalList.appendChild(button);
-    });
-  }
-
-  function renderDifficultyList() {
-    ui.loadoutDifficultyList.innerHTML = "";
-    difficulties.forEach((item, index) => {
-      const button = document.createElement("button");
-      button.type = "button";
-      button.className = `loadout-difficulty-card difficulty-card terminal-card${item.unlocked ? "" : " locked"}${item.completed ? " completed" : ""}${item.currentHighest ? " current" : ""}${selectedDifficulty?.id === item.id ? " selected" : ""}`;
-      button.disabled = !item.unlocked;
-      button.innerHTML = `
-        <span class="loadout-card-index">${String(item.index + 1).padStart(2, "0")}</span>
-        <strong>${item.name}</strong>
-        <p>${item.unlocked ? item.desc : "击败上一难度解锁。"}</p>
-        <div class="difficulty-meta">
-          <i>敌人 ${Math.round(item.enemyHp * 100)}%</i>
-          <i>伤害 ${Math.round(item.enemyDamage * 100)}%</i>
-          <i>怪潮 ${Math.round(item.spawnRate * 100)}%</i>
-        </div>
-        <em>${item.completed ? `已通关 · ${formatTime(item.bestTime)}` : item.unlocked ? "可挑战" : "未解锁"}</em>`;
-      button.addEventListener("click", () => {
-        difficultyIndex = index;
-        selectedDifficulty = item;
-        renderDifficultyList();
-        updateSummary();
-      });
-      ui.loadoutDifficultyList.appendChild(button);
-    });
-  }
-
-  function renderWeaponList() {
-    ui.loadoutWeaponList.innerHTML = "";
-    weapons.forEach((item, index) => {
-      const button = document.createElement("button");
-      button.type = "button";
-      button.className = `loadout-weapon-card terminal-card${selectedWeapon?.id === item.id ? " selected" : ""}`;
-      button.innerHTML = `
-        <i>${item.icon}</i>
-        <strong>${item.name}</strong>`;
-      button.addEventListener("click", () => {
-        if (fixedWeapon) return;
-        weaponIndex = index;
-        selectedWeapon = item;
-        renderWeaponList();
-        updateWeaponPreviewInfo();
-        updateSummary();
-      });
-      ui.loadoutWeaponList.appendChild(button);
-    });
-  }
-
-  function renderDifficultyCarousel() {
-    ui.loadoutDifficultyList.innerHTML = "";
-    if (!difficulties.length) return;
-    difficultyIndex = clampCarouselIndex(difficultyIndex, difficulties.length);
-    selectedDifficulty = difficulties[difficultyIndex];
-    const item = selectedDifficulty;
-    const wrap = document.createElement("div");
-    wrap.className = "loadout-carousel difficulty-carousel";
-    wrap.innerHTML = `
-      <button type="button" class="loadout-carousel-arrow" data-dir="-1" aria-label="上一个难度">‹</button>
-      <button type="button" class="loadout-difficulty-card difficulty-card carousel-card${item.unlocked ? "" : " locked"}${item.completed ? " completed" : ""}${item.currentHighest ? " current" : ""} selected" ${item.unlocked ? "" : "disabled"}>
-        <span>${String(item.index + 1).padStart(2, "0")}</span>
-        <strong>${item.name}</strong>
-        <p>${item.unlocked ? item.desc : "击败上一难度解锁。"}</p>
-        <div class="difficulty-meta">
-          <i>敌人 ${Math.round(item.enemyHp * 100)}%</i>
-          <i>伤害 ${Math.round(item.enemyDamage * 100)}%</i>
-          <i>怪潮 ${Math.round(item.spawnRate * 100)}%</i>
-        </div>
-        <em>${item.completed ? `已通关 · ${formatTime(item.bestTime)}` : item.unlocked ? "可挑战" : "未解锁"}</em>
-      </button>
-      <button type="button" class="loadout-carousel-arrow" data-dir="1" aria-label="下一个难度">›</button>
-      <div class="loadout-carousel-count">${difficultyIndex + 1} / ${difficulties.length}</div>`;
-    for (const arrow of wrap.querySelectorAll(".loadout-carousel-arrow")) {
-      arrow.addEventListener("click", () => {
-        difficultyIndex = cycleCarouselIndex(difficultyIndex, Number(arrow.dataset.dir), difficulties.length);
-        renderDifficultyCarousel();
-        updateSummary();
-      });
-    }
-    ui.loadoutDifficultyList.appendChild(wrap);
-  }
-
-  function renderWeaponCarousel() {
-    ui.loadoutWeaponList.innerHTML = "";
-    if (!weapons.length) return;
-    weaponIndex = clampCarouselIndex(weaponIndex, weapons.length);
-    selectedWeapon = weapons[weaponIndex];
-    const item = selectedWeapon;
-    const info = WEAPON_INFO[item.id] || item;
-    const wrap = document.createElement("div");
-    wrap.className = "loadout-carousel weapon-carousel weapon-carousel-controls";
-    wrap.innerHTML = `
-      <button type="button" class="loadout-carousel-arrow" data-dir="-1" aria-label="上一个武器">‹</button>
-      <button type="button" class="loadout-weapon-card carousel-card selected">
-        <i>${item.icon}</i>
-        <strong>${item.name}</strong>
-        <small>${(info.tags || []).slice(0, 3).join(" · ")}</small>
-      </button>
-      <button type="button" class="loadout-carousel-arrow" data-dir="1" aria-label="下一个武器">›</button>
-      <div class="loadout-carousel-count">${weaponIndex + 1} / ${weapons.length}</div>`;
-    for (const arrow of wrap.querySelectorAll(".loadout-carousel-arrow")) {
-      arrow.addEventListener("click", () => {
-        weaponIndex = cycleCarouselIndex(weaponIndex, Number(arrow.dataset.dir), weapons.length);
-        renderWeaponCarousel();
-        updateWeaponPreviewInfo();
-        updateSummary();
-      });
-    }
-    ui.loadoutWeaponList.appendChild(wrap);
-  }
-
-  function updateWeaponPreviewInfo() {
-    if (!selectedWeapon) return;
-    const info = WEAPON_INFO[selectedWeapon.id] || selectedWeapon;
-    ui.loadoutWeaponName.textContent = `${selectedWeapon.icon} ${selectedWeapon.name}`;
-    ui.loadoutWeaponDesc.textContent = selectedWeapon.desc;
-    ui.loadoutWeaponTags.innerHTML = "";
-    (info.tags || []).forEach((text) => {
-      const tag = document.createElement("span");
-      tag.textContent = text;
-      ui.loadoutWeaponTags.appendChild(tag);
-    });
-  }
-
-  function updateSummary() {
-    if (ui.loadoutRunModeName) ui.loadoutRunModeName.textContent = selectedRunMode?.name || "标准模式";
-    ui.loadoutDifficultyName.textContent = selectedDifficulty?.name || "未选择";
-    if (ui.loadoutRandomGoalName) ui.loadoutRandomGoalName.textContent = selectedRunMode?.id === "random" ? selectedRandomGoal.name : "固定战役";
-    ui.loadoutSelectedWeaponName.textContent = selectedWeapon?.name || "未选择";
-    ui.loadoutConfirmButton.disabled = !selectedDifficulty?.unlocked || !selectedWeapon;
-  }
-
-  function cycleDifficulty(direction) {
-    if (!difficulties.length) return;
-    let nextIndex = difficultyIndex;
-    for (let attempts = 0; attempts < difficulties.length; attempts++) {
-      nextIndex = cycleCarouselIndex(nextIndex, direction, difficulties.length);
-      if (difficulties[nextIndex]?.unlocked) break;
-    }
-    difficultyIndex = nextIndex;
-    selectedDifficulty = difficulties[difficultyIndex];
-    renderDifficultyList();
-    updateSummary();
-  }
-
-  function cycleWeapon(direction) {
-    if (!weapons.length || fixedWeapon) return;
-    weaponIndex = cycleCarouselIndex(weaponIndex, direction, weapons.length);
-    selectedWeapon = weapons[weaponIndex];
-    renderWeaponList();
-    updateWeaponPreviewInfo();
-    updateSummary();
-  }
-
-  ui.loadoutOverlay.onkeydown = (event) => {
-    if (event.key === "ArrowLeft") {
-      event.preventDefault();
-      cycleWeapon(-1);
-    } else if (event.key === "ArrowRight") {
-      event.preventDefault();
-      cycleWeapon(1);
-    } else if (event.key === "ArrowUp") {
-      event.preventDefault();
-      cycleDifficulty(-1);
-    } else if (event.key === "ArrowDown") {
-      event.preventDefault();
-      cycleDifficulty(1);
-    }
-  };
-
-  function confirmLoadout() {
-    if (confirmed || !selectedDifficulty?.unlocked || !selectedWeapon) return;
-    confirmed = true;
-    ui.loadoutConfirmButton.disabled = true;
-    onConfirm({ difficulty: selectedDifficulty, weapon: selectedWeapon, runMode: selectedRunMode.id, randomGoal: selectedRandomGoal.id });
-    return true;
-  }
-
-  ui.loadoutConfirmButton.onclick = confirmLoadout;
-  if (ui.loadoutBackButton) {
-    ui.loadoutBackButton.onclick = () => {
-      if (confirmed) return;
-      hideRunSetup();
-      onBack?.();
-    };
-  }
-  state.ai.loadoutPanel = {
-    difficulties,
-    weapons,
-    runModes,
-    randomGoals,
-    selectRunMode: (id) => {
-      const item = runModes.find((entry) => entry.id === id);
-      if (!item) return false;
-      selectedRunMode = item;
-      renderRunModeList();
-      renderRandomGoalList();
-      updateSummary();
-      return true;
-    },
-    selectRandomGoal: (id) => {
-      const item = randomGoals.find((entry) => entry.id === id);
-      if (!item) return false;
-      selectedRandomGoal = item;
-      renderRandomGoalList();
-      updateSummary();
-      return true;
-    },
-    selectDifficulty: (id) => {
-      const index = difficulties.findIndex((item) => item.id === id && item.unlocked);
-      if (index < 0) return false;
-      difficultyIndex = index;
-      selectedDifficulty = difficulties[difficultyIndex];
-      renderDifficultyList();
-      updateSummary();
-      return true;
-    },
-    selectWeapon: (id) => {
-      const index = weapons.findIndex((item) => item.id === id);
-      if (index < 0) return false;
-      weaponIndex = index;
-      selectedWeapon = weapons[weaponIndex];
-      renderWeaponList();
-      updateWeaponPreviewInfo();
-      updateSummary();
-      return true;
-    },
-    confirm: () => {
-      if (confirmed || !selectedDifficulty?.unlocked || !selectedWeapon) return false;
-      return Boolean(confirmLoadout());
-    },
-    getSelection: () => {
-      return {
-        difficulty: selectedDifficulty?.id || "",
-        weapon: selectedWeapon?.id || "",
-        runMode: selectedRunMode?.id || "standard",
-        randomGoal: selectedRandomGoal?.id || "twenty_waves",
-        confirmed,
-        canConfirm: Boolean(!confirmed && selectedDifficulty?.unlocked && selectedWeapon),
-      };
-    },
-  };
-
-  renderRunModeList();
-  renderRandomGoalList();
-  renderDifficultyList();
-  renderWeaponList();
-  updateWeaponPreviewInfo();
-  updateSummary();
-  if (!fixedWeapon) stopPreview = startWeaponPreview(ui.loadoutWeaponPreview, () => selectedWeapon);
-  ui.loadoutOverlay.classList.add("active");
-  ui.loadoutOverlay.setAttribute("aria-hidden", "false");
-  ui.loadoutOverlay.tabIndex = -1;
-  ui.loadoutOverlay.focus({ preventScroll: true });
-}
-
-export function hideRunSetup() {
-  clearPreview();
-  if (state.ai?.loadoutPanel) state.ai.loadoutPanel = null;
-  ui.loadoutOverlay?.classList.remove("active");
-  ui.loadoutOverlay?.setAttribute("aria-hidden", "true");
-  const modeSection = ui.loadoutModeList?.closest(".loadout-mode-section");
-  const weaponSection = ui.loadoutWeaponList?.closest(".loadout-weapon-section");
-  if (modeSection) modeSection.hidden = false;
-  if (ui.loadoutModeList) ui.loadoutModeList.hidden = false;
-  if (weaponSection) weaponSection.hidden = false;
-  ui.quickActions?.classList.remove("blocked");
-}
-
 export function showChoices({ eyebrow, title, items, onPick, refresh = null, confirm = null }) {
-  clearPreview();
   ui.quickActions?.classList.add("blocked");
   const isLevelUp = eyebrow === "LEVEL UP" || eyebrow.startsWith("WAVE COMPLETE");
   ui.levelEyebrow.textContent = eyebrow;
@@ -770,11 +393,12 @@ export function showChoices({ eyebrow, title, items, onPick, refresh = null, con
     ui.levelOverlay.querySelector(".choices")?.appendChild(actions);
   }
   ui.levelOverlay.classList.add("active");
+  ui.levelOverlay.setAttribute("aria-hidden", "false");
 }
 
 export function hideChoices() {
-  clearPreview();
   ui.levelOverlay.classList.remove("active");
+  ui.levelOverlay.setAttribute("aria-hidden", "true");
   ui.levelOverlay.classList.remove("level-up-overlay");
   ui.levelOverlay.querySelector(".level-up-fx")?.remove();
   hideRunLoading();
@@ -785,10 +409,12 @@ export function hideChoices() {
 export function showInventory() {
   renderInventory();
   ui.inventoryOverlay.classList.add("active");
+  ui.inventoryOverlay.setAttribute("aria-hidden", "false");
 }
 
 export function hideInventory() {
   ui.inventoryOverlay.classList.remove("active");
+  ui.inventoryOverlay.setAttribute("aria-hidden", "true");
 }
 
 export function renderInventory() {
@@ -800,25 +426,29 @@ export function renderInventory() {
 
 export function showPauseMenu() {
   ui.pauseOverlay.classList.add("active");
+  ui.pauseOverlay.setAttribute("aria-hidden", "false");
 }
 
 export function hidePauseMenu() {
   ui.pauseOverlay.classList.remove("active");
+  ui.pauseOverlay.setAttribute("aria-hidden", "true");
 }
 
 export function hideAllOverlays() {
-  clearPreview();
   ui.quickActions?.classList.remove("blocked");
   ui.startOverlay.classList.remove("active");
   ui.levelOverlay.classList.remove("active");
+  ui.levelOverlay.setAttribute("aria-hidden", "true");
   ui.levelOverlay.classList.remove("level-up-overlay");
   ui.levelOverlay.querySelector(".level-up-fx")?.remove();
-  ui.loadoutOverlay?.classList.remove("active");
-  ui.loadoutOverlay?.setAttribute("aria-hidden", "true");
   ui.shopOverlay?.classList.remove("active");
+  ui.shopOverlay?.setAttribute("aria-hidden", "true");
   ui.pauseOverlay.classList.remove("active");
+  ui.pauseOverlay.setAttribute("aria-hidden", "true");
   ui.inventoryOverlay.classList.remove("active");
+  ui.inventoryOverlay.setAttribute("aria-hidden", "true");
   ui.endOverlay.classList.remove("active");
+  ui.endOverlay.setAttribute("aria-hidden", "true");
 }
 
 export function pickThree(items) {
@@ -849,6 +479,7 @@ export function showEnd(victory) {
     ui.endStats.appendChild(item);
   });
   ui.endOverlay.classList.add("active");
+  ui.endOverlay.setAttribute("aria-hidden", "false");
   updateBestText();
 }
 
@@ -950,13 +581,6 @@ function renderItems() {
     const qty = item.qty;
     row.innerHTML = `<span>${item.icon} ${item.name}</span><strong>x${qty}</strong><small>${item.desc}</small>`;
     ui.itemList.appendChild(row);
-  }
-}
-
-function clearPreview() {
-  if (stopPreview) {
-    stopPreview();
-    stopPreview = null;
   }
 }
 

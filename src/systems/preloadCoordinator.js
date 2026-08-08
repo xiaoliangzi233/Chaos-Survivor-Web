@@ -1,6 +1,7 @@
 import { preloadMusicAssets } from "../audio.js";
 import { prepareMapCache, releaseMapCache } from "./map.js";
 import { framePerformance } from "./performanceMonitor.js";
+import { preloadEnvironmentAssets } from "../visual/environmentAssets.js";
 
 function report(onProgress, value, label) {
   onProgress?.(Math.max(0, Math.min(1, value)), label);
@@ -21,6 +22,7 @@ export class PreloadCoordinator {
     report(onProgress, 0.1, "初始化渲染资源");
     await Promise.resolve();
     report(onProgress, 0.55, "准备公共纹理");
+    await preloadEnvironmentAssets().catch((error) => console.warn("[preload] environment detail atlas failed", error));
     preloadMusicAssets().catch((error) => console.warn("[preload] background music preload failed", error));
     this.coreReady = true;
     report(onProgress, 1, "核心资源已就绪");

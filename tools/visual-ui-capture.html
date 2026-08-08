@@ -6,8 +6,8 @@
   <title>UI Capture</title>
   <style>
     html, body, iframe {
-      width: 1920px;
-      height: 1080px;
+      width: 100%;
+      height: 100%;
       margin: 0;
       overflow: hidden;
       border: 0;
@@ -21,18 +21,26 @@
 <body>
   <iframe id="source" src="../index.html?visual-export=ui"></iframe>
   <script>
-    const id = new URLSearchParams(location.search).get("id") || "startOverlay";
+    const params = new URLSearchParams(location.search);
+    const id = params.get("id") || "startOverlay";
+    const viewportWidth = Math.max(320, Math.min(2560, Number(params.get("w")) || 1920));
+    const viewportHeight = Math.max(420, Math.min(1440, Number(params.get("h")) || 1080));
     const frame = document.querySelector("#source");
+    document.documentElement.style.width = `${viewportWidth}px`;
+    document.documentElement.style.height = `${viewportHeight}px`;
+    document.body.style.width = `${viewportWidth}px`;
+    document.body.style.height = `${viewportHeight}px`;
 
     function isolateTarget() {
       const doc = frame.contentDocument;
       const root = doc?.querySelector("#gameRoot");
       const target = doc?.getElementById(id);
       if (!doc || !root || !target) return false;
-      doc.documentElement.style.cssText = "width:1920px;height:1080px;overflow:hidden;background:#02050b;";
+      seedTarget(doc, id);
+      doc.documentElement.style.cssText = `width:${viewportWidth}px;height:${viewportHeight}px;overflow:hidden;background:#02050b;`;
       doc.body.className = "";
-      doc.body.style.cssText = "width:1920px;height:1080px;margin:0;overflow:hidden;background:#02050b;";
-      root.style.cssText = "position:relative;width:1920px;height:1080px;overflow:hidden;background:#02050b;";
+      doc.body.style.cssText = `width:${viewportWidth}px;height:${viewportHeight}px;margin:0;overflow:hidden;background:#02050b;`;
+      root.style.cssText = `position:relative;width:${viewportWidth}px;height:${viewportHeight}px;overflow:hidden;background:#02050b;`;
       for (const child of root.children) {
         child.style.setProperty("display", "none", "important");
         child.style.setProperty("visibility", "hidden", "important");
@@ -44,11 +52,115 @@
       target.style.setProperty("visibility", "visible", "important");
       target.style.setProperty("opacity", "1", "important");
       target.style.setProperty("pointer-events", "none", "important");
-      target.style.setProperty("width", "1920px", "important");
-      target.style.setProperty("height", "1080px", "important");
+      target.style.setProperty("width", `${viewportWidth}px`, "important");
+      target.style.setProperty("height", `${viewportHeight}px`, "important");
       target.style.setProperty("inset", "0", "important");
       document.body.dataset.ready = id;
       return true;
+    }
+
+    function seedTarget(doc, targetId) {
+      setText(doc, "hpText", "86 / 110");
+      setText(doc, "levelText", "Lv.12");
+      setText(doc, "timerText", "00:42");
+      setText(doc, "waveText", "第 12/20 波");
+      setChip(doc, "killText", "347");
+      setChip(doc, "goldText", "128");
+      setChip(doc, "fpsText", "60");
+      setText(doc, "waveEventTitle", "磁轨风暴");
+      setText(doc, "waveEventDescription", "高压磁轨正在扫描战场，保持移动并避开红色锁定区。");
+      setText(doc, "runLoadingText", "构建霓虹废墟与环境光照缓存");
+      setText(doc, "runLoadingPercent", "64%");
+      doc.querySelector("#runLoadingBar")?.style.setProperty("width", "64%");
+      setText(doc, "lobbyDialogueSpeaker", "向导 · 伊芙");
+      setText(doc, "lobbyDialogueText", "中转舰已经完成本轮航线校准。舰桥、军械与异常档案区均已开放，你可以继续调查，也可以直接进入下一条时间线。");
+      setHtml(doc, "lobbyDialogueTopics", topicButtons(["询问中转舰", "查看作战建议", "谈论异常档案"]));
+      setText(doc, "multiplayerStatus", "P1 主机 // 已连接 P2 Guest // 38ms // 快照 50ms");
+      setText(doc, "storyText", "警报沿着废弃实验区逐层亮起。远处的反应堆仍在运转，但回应广播的只有不断逼近的金属摩擦声。");
+      setText(doc, "endTitle", "时间线稳定");
+      setHtml(doc, "endStats", metricCards([["生存时间", "18:42"], ["击败", "1,284"], ["获得金币", "672"]]));
+
+      if (targetId === "levelOverlay") {
+        setHtml(doc, "choiceList", choiceCards());
+      }
+      if (targetId === "shopOverlay") {
+        setText(doc, "shopGoldText", "428");
+        setHtml(doc, "shopOfferList", shopCards());
+        setHtml(doc, "shopInventoryPanel", inventorySummary());
+      }
+      if (targetId === "inventoryOverlay") {
+        setText(doc, "inventoryWeaponCount", "武器 4/6");
+        setText(doc, "inventoryGoldCount", "金币 428");
+        setHtml(doc, "inventoryStats", metricCards([["生命", "110"], ["伤害", "+48%"], ["移速", "+22%"], ["拾取", "180"]]));
+        setHtml(doc, "weaponSlotList", weaponSlots());
+        setHtml(doc, "itemList", itemCards());
+        setHtml(doc, "weaponDetail", detailCard());
+      }
+      if (targetId === "codexOverlay") {
+        setHtml(doc, "codexList", codexCards());
+        setHtml(doc, "codexDetail", codexDetail());
+      }
+    }
+
+    function setText(doc, id, value) {
+      const node = doc.getElementById(id);
+      if (node) node.textContent = value;
+    }
+
+    function setChip(doc, id, value) {
+      const node = doc.getElementById(id);
+      const strong = node?.querySelector("strong");
+      if (strong) strong.textContent = value;
+    }
+
+    function setHtml(doc, id, value) {
+      const node = doc.getElementById(id);
+      if (node && !node.children.length) node.innerHTML = value;
+    }
+
+    function topicButtons(labels) {
+      return labels.map((label, index) => `<button type="button" class="${index ? "" : "active"}">${label}</button>`).join("");
+    }
+
+    function choiceCards() {
+      return [["⚡", "过载线圈", "伤害 +18%，攻击速度 +8%"], ["◇", "回收协议", "拾取范围 +60，金币收益 +12%"], ["✚", "生命备份", "最大生命 +25，立即恢复 30"]]
+        .map((entry) => `<button type="button" class="choice-card"><i>${entry[0]}</i><strong>${entry[1]}</strong><p>${entry[2]}</p></button>`).join("");
+    }
+
+    function shopCards() {
+      return [["✦", "棱镜轨道炮", "史诗武器", 146], ["⌁", "相位针刺", "稀有武器", 108], ["⬡", "应急护盾", "战术模块", 92]]
+        .map((entry) => `<article class="shop-card"><div class="shop-card-top"><i>${entry[0]}</i><div><strong>${entry[1]}</strong><span>${entry[2]}</span></div></div><p>强化当前构筑并提供清晰的战斗反馈。</p><div class="shop-card-actions"><button type="button">锁定</button><button type="button" class="primary">${entry[3]} G</button></div></article>`).join("");
+    }
+
+    function inventorySummary() {
+      return `<h3>当前构筑</h3><div class="shop-stock-row"><span>武器槽</span><strong>4 / 6</strong></div><div class="shop-stock-row"><span>道具</span><strong>7</strong></div><div class="shop-stock-row"><span>综合伤害</span><strong>+48%</strong></div>`;
+    }
+
+    function weaponSlots() {
+      return [["✦", "棱镜轨道炮", "史诗"], ["⌁", "相位针刺", "稀有"], ["◉", "虚空奇点", "传说"], ["⚡", "电弧发生器", "精良"]]
+        .map((entry) => `<button type="button" class="weapon-slot"><i>${entry[0]}</i><strong>${entry[1]}</strong><small>${entry[2]}</small></button>`).join("");
+    }
+
+    function itemCards() {
+      return [["⬡", "应急护盾", 2], ["✚", "再生凝胶", 3], ["⌁", "磁轨校准器", 1]]
+        .map((entry) => `<button type="button" class="item-card"><i>${entry[0]}</i><strong>${entry[1]}</strong><small>×${entry[2]}</small></button>`).join("");
+    }
+
+    function detailCard() {
+      return `<div class="weapon-detail-title"><i>✦</i><div><strong>棱镜轨道炮</strong><span>史诗 · 贯穿</span></div></div><p>蓄力后发射高能棱镜束，贯穿敌群并在命中位置留下短暂光痕。</p><div class="weapon-tags detail-tags"><span>远程</span><span>蓄力</span><span>首领增伤</span></div>`;
+    }
+
+    function codexCards() {
+      return [["◈", "风暴暴君"], ["✦", "棱镜轨道炮"], ["⬡", "应急护盾"], ["⌁", "磁轨风暴"]]
+        .map((entry, index) => `<button type="button" class="codex-card ${index ? "" : "active"}"><i>${entry[0]}</i><strong>${entry[1]}</strong><small>档案已解锁</small></button>`).join("");
+    }
+
+    function codexDetail() {
+      return `<div class="codex-detail-title"><i>◈</i><div><strong>风暴暴君</strong><span>首领生命体</span></div></div><p>盘踞在磁轨废墟上空的高威胁单位，会通过雷网和重力节点压缩安全空间。</p><div class="codex-meta"><span>首次发现 第10波</span><span>弱点 相位破坏</span></div>`;
+    }
+
+    function metricCards(entries) {
+      return entries.map((entry) => `<span><b>${entry[0]}</b><strong>${entry[1]}</strong></span>`).join("");
     }
 
     frame.addEventListener("load", () => {

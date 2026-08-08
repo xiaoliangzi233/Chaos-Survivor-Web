@@ -5,6 +5,15 @@ import { drawWeaponHologram, weaponPreviewColor } from "../ui/weaponPreview.js";
 import { renderScreenLighting } from "./lighting.js";
 import { drawPlayerAvatar } from "./playerAvatar.js";
 import {
+  drawEmissiveStrip,
+  drawPanelSurface,
+  drawPixelDecal,
+  drawServiceDetails,
+  drawWearLayer,
+} from "../visual/canvasDetailKit.js";
+import { drawEnvironmentAtlasDecal } from "../visual/environmentAssets.js";
+import { roomVisualProfile, visualSeedFrom } from "../visual/environmentTheme.js";
+import {
   LOBBY_CORRIDORS,
   LOBBY_DEVICES,
   LOBBY_DOORS,
@@ -298,7 +307,37 @@ function drawRoomFloor(ctx, room) {
   ctx.lineWidth = 5;
   ctx.strokeRect(x, top, room.w, h);
   drawTechDeckPattern(ctx, room, x, top, h);
+  drawRoomIdentity(ctx, room, x, top, h);
   drawRoomBulkheads(ctx, room);
+}
+
+function drawRoomIdentity(ctx, room, left, top, height) {
+  const profile = roomVisualProfile(room.id, room.color);
+  const width = room.w;
+  ctx.save();
+  ctx.globalAlpha = 0.72;
+  ctx.strokeStyle = hexToRgba(profile.color, 0.24);
+  ctx.lineWidth = 3;
+  ctx.setLineDash([36, 14, 6, 14]);
+  ctx.strokeRect(left + 34, top + 32, width - 68, height - 64);
+  ctx.setLineDash([]);
+  drawEmissiveStrip(ctx, {
+    x: room.x,
+    y: top + height * 0.18,
+    width: Math.min(360, width * 0.42),
+    height: 4,
+    color: profile.warmColor || profile.color,
+    intensity: 0.42,
+    segments: 7,
+  });
+  if (!drawEnvironmentAtlasDecal(ctx, profile.decal, room.x, top + height * 0.52, 72, 0.18)) {
+    drawPixelDecal(ctx, { x: room.x, y: top + height * 0.52, size: 72, color: profile.color, kind: profile.decal, alpha: 0.2 });
+  }
+  ctx.font = `bold 11px ${FONT}`;
+  ctx.textAlign = "center";
+  ctx.fillStyle = hexToRgba(profile.warmColor || profile.color, 0.34);
+  ctx.fillText(`${profile.label} // ${String(room.id).toUpperCase()}`, room.x, top + height * 0.52 + 58);
+  ctx.restore();
 }
 
 function drawTechDeckPattern(ctx, room, left, top, height) {
@@ -485,6 +524,7 @@ function drawPortal(ctx, portal, time) {
   const y = portal.y * LOBBY_Y_SCALE;
   ctx.save();
   ctx.translate(portal.x, y);
+  drawUnifiedFixtureBackdrop(ctx, portal, { width: 250, height: 230, time, active: portal.kind !== "home" });
   drawInteractionRing(ctx, portal.id, portal.color, 118, 40);
   drawObjectShadow(ctx, 0, 42, 126, 35);
 
@@ -566,6 +606,7 @@ function drawPortal(ctx, portal, time) {
   }
 
   drawTechLabel(ctx, portal.label, portal.sublabel, portal.color, 0, 61, active);
+  drawUnifiedFixtureFinish(ctx, portal, { width: 214, height: 220, time, active });
   ctx.restore();
 }
 
@@ -592,6 +633,12 @@ function drawDevice(ctx, device, time) {
   const y = device.y * LOBBY_Y_SCALE;
   ctx.save();
   ctx.translate(device.x, y);
+  drawUnifiedFixtureBackdrop(ctx, device, {
+    width: device.kind === "missionTable" ? 270 : device.kind === "squadRelay" ? 225 : 188,
+    height: device.kind === "missionTable" ? 126 : 166,
+    time,
+    active: state.lobby.nearbyInteractionId === device.id || state.lobby.hoveredInteractionId === device.id,
+  });
   drawInteractionRing(ctx, device.id, device.color, device.kind === "missionTable" ? 132 : device.kind === "squadRelay" ? 118 : 96, 36);
   if (device.kind === "missionTable") drawMissionTable(ctx, device, time);
   else if (device.kind === "recorder" || device.kind === "codex") drawArchiveDevice(ctx, device, time);
@@ -601,6 +648,12 @@ function drawDevice(ctx, device, time) {
   else if (device.kind === "difficulty") drawDifficultySync(ctx, device, time);
   else if (device.kind === "randomProtocol") drawRandomProtocol(ctx, device, time);
   else if (device.kind === "squadRelay") drawSquadRelay(ctx, device, time);
+  drawUnifiedFixtureFinish(ctx, device, {
+    width: device.kind === "missionTable" ? 230 : 166,
+    height: device.kind === "missionTable" ? 118 : 150,
+    time,
+    active: state.lobby.nearbyInteractionId === device.id || state.lobby.hoveredInteractionId === device.id,
+  });
   ctx.restore();
 }
 
@@ -981,6 +1034,7 @@ function drawWeaponStation(ctx, station, time) {
   const y = station.y * LOBBY_Y_SCALE;
   ctx.save();
   ctx.translate(station.x, y);
+  drawUnifiedFixtureBackdrop(ctx, station, { width: 210, height: 144, time, active: selected });
   drawInteractionRing(ctx, station.id, color, 112, 39);
   drawObjectShadow(ctx, 0, 36, 104, 33);
   if (selected) {
@@ -1025,6 +1079,7 @@ function drawWeaponStation(ctx, station, time) {
     ctx.restore();
     drawWeaponStationLabel(ctx, weapon.name, color, 0, 82, selected);
   }
+  drawUnifiedFixtureFinish(ctx, { ...station, color }, { width: 176, height: 134, time, active: selected });
   ctx.restore();
 }
 
@@ -1032,6 +1087,7 @@ function drawScenery(ctx, scenery, time) {
   const y = scenery.y * LOBBY_Y_SCALE;
   ctx.save();
   ctx.translate(scenery.x, y);
+  drawUnifiedFixtureBackdrop(ctx, scenery, { width: 250, height: 180, time, active: true });
   if (scenery.kind === "starMap") drawStarMap(ctx, scenery, time);
   else if (scenery.kind === "medbay") drawMedbay(ctx, scenery, time);
   else if (scenery.kind === "lifeSupport") drawLifeSupport(ctx, scenery, time);
@@ -1039,6 +1095,7 @@ function drawScenery(ctx, scenery, time) {
   else if (scenery.kind === "reactor") drawReactor(ctx, scenery, time);
   else if (scenery.kind === "power") drawPowerGrid(ctx, scenery, time);
   else if (scenery.kind === "habitat") drawHabitat(ctx, scenery, time);
+  drawUnifiedFixtureFinish(ctx, scenery, { width: 220, height: 170, time, active: true });
   ctx.restore();
 }
 
@@ -1047,6 +1104,16 @@ function drawLobbyProp(ctx, prop, time) {
   const pulse = 0.65 + Math.sin(time * 2.2 + hashString(prop.id)) * 0.12;
   ctx.save();
   ctx.translate(prop.x, y);
+  const profile = roomVisualProfile(prop.roomId, prop.color);
+  drawServiceDetails(ctx, {
+    x: 0,
+    y: 22,
+    width: prop.kind === "bench" || prop.kind === "planter" ? 128 : 92,
+    height: prop.kind === "server" || prop.kind === "vendor" ? 104 : 64,
+    color: profile.color,
+    seed: prop.id,
+    density: prop.kind === "server" || prop.kind === "vendor" ? 1.25 : 0.65,
+  });
   drawObjectShadow(ctx, 0, 20, prop.kind === "bench" ? 76 : 54, 17);
   if (prop.kind === "bench") {
     ctx.fillStyle = "#111f2a";
@@ -1157,6 +1224,17 @@ function drawLobbyProp(ctx, prop, time) {
     ctx.stroke();
     ctx.fillStyle = hexToRgba(prop.color, 0.78 * pulse);
     ctx.fillRect(-11, -42, 22, 34);
+  }
+  drawWearLayer(ctx, {
+    x: 0,
+    y: 12,
+    width: prop.kind === "bench" || prop.kind === "planter" ? 130 : 94,
+    height: prop.kind === "server" || prop.kind === "vendor" ? 112 : 70,
+    seed: prop.id,
+    amount: profile.wear * 0.75,
+  });
+  if (!["planter", "bench"].includes(prop.kind)) {
+    drawPixelDecal(ctx, { x: 0, y: prop.kind === "server" || prop.kind === "vendor" ? -70 : -24, size: 13, color: profile.color, kind: profile.decal, alpha: 0.32 });
   }
   ctx.restore();
 }
@@ -2241,6 +2319,7 @@ function drawDoor(ctx, door, time) {
   ctx.translate(door.x, y);
   const vertical = door.orientation === "vertical";
   if (vertical) ctx.rotate(Math.PI / 2);
+  const profile = roomVisualProfile(door.roomId, door.color);
   drawObjectShadow(ctx, 0, 13, 112, 16);
   ctx.fillStyle = "#08131c";
   ctx.strokeStyle = "#395363";
@@ -2259,7 +2338,46 @@ function drawDoor(ctx, door, time) {
   const statusColor = runtime.state === "closed" ? "#ff7a8a" : door.color;
   ctx.fillStyle = hexToRgba(statusColor, 0.72 + Math.sin(time * 5) * 0.15);
   ctx.fillRect(-7, -24, 14, 7);
+  drawEmissiveStrip(ctx, { x: 0, y: 22, width: 188, height: 3, color: statusColor, intensity: runtime.state === "closed" ? 0.58 : 0.38, segments: 8 });
+  drawPixelDecal(ctx, { x: 0, y: 0, size: 13, color: profile.color, kind: profile.decal, alpha: 0.42 });
   ctx.restore();
+}
+
+function drawUnifiedFixtureBackdrop(ctx, entity, { width, height, time, active = false }) {
+  const profile = roomVisualProfile(entity.roomId, entity.color);
+  const seed = visualSeedFrom(entity.id);
+  const pulse = active ? 0.7 + Math.sin(time * 3.1 + seed * 0.0001) * 0.12 : 0.28;
+  drawServiceDetails(ctx, { x: 0, y: 28, width, height, color: profile.color, seed, density: active ? 1.35 : 0.9 });
+  drawPanelSurface(ctx, {
+    x: 0,
+    y: 22,
+    width: Math.min(width * 0.68, 168),
+    height: 22,
+    color: profile.warmColor || profile.color,
+    seed,
+    active,
+  });
+  drawEmissiveStrip(ctx, { x: 0, y: 35, width: Math.min(width * 0.72, 190), height: 3, color: profile.color, intensity: pulse, segments: 6 });
+}
+
+function drawUnifiedFixtureFinish(ctx, entity, { width, height, time, active = false }) {
+  const profile = roomVisualProfile(entity.roomId, entity.color);
+  const seed = visualSeedFrom(entity.id);
+  drawWearLayer(ctx, { x: 0, y: 10, width, height, seed, amount: profile.wear });
+  const decalY = -Math.max(26, height * 0.38);
+  if (!drawEnvironmentAtlasDecal(ctx, profile.decal, -width * 0.32, decalY, active ? 23 : 18, active ? 0.58 : 0.32)) {
+    drawPixelDecal(ctx, { x: -width * 0.32, y: decalY, size: active ? 23 : 18, color: profile.color, kind: profile.decal, alpha: active ? 0.58 : 0.32 });
+  }
+  if (active) {
+    ctx.save();
+    ctx.strokeStyle = hexToRgba(profile.color, 0.24 + Math.sin(time * 4) * 0.06);
+    ctx.lineWidth = 2;
+    ctx.setLineDash([8, 7]);
+    ctx.beginPath();
+    ctx.ellipse(0, 22, width * 0.52, 35, 0, 0, TAU);
+    ctx.stroke();
+    ctx.restore();
+  }
 }
 
 function drawRoomRoofs(ctx, time) {

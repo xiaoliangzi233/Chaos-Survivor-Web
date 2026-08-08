@@ -1,6 +1,6 @@
 import { state } from "../state.js";
 import { isRemoteSignalConfigured, roomIdFromSearch } from "../net/lanRoomService.js";
-import { netRuntime, networkStatus } from "../net/netState.js";
+import { netRuntime, networkStatus, networkStatusLabel } from "../net/netState.js";
 import {
   acceptGuestAnswer,
   acceptHostOffer,
@@ -96,7 +96,7 @@ async function createRoom() {
     if (dom.roomId) dom.roomId.textContent = room.roomId;
     if (dom.inviteLink) dom.inviteLink.value = room.inviteUrl;
     if (dom.roomCard) dom.roomCard.hidden = false;
-    renderStatus("房间 " + room.roomId + " 已创建，等待伙伴通过邀请链接加入。");
+    renderStatus(`房间 ${room.roomId} 已创建，等待伙伴通过邀请链接加入。`);
   });
 }
 
@@ -106,7 +106,7 @@ async function joinRoom() {
     const room = await joinLanRoom(roomId);
     pendingJoinRoomId = "";
     removeJoinQuery();
-    renderStatus("已加入房间 " + room.roomId + "，正在建立 P2P 通道。");
+    renderStatus(`已加入房间 ${room.roomId}，正在同步联机状态。`);
   });
 }
 
@@ -163,30 +163,30 @@ function applySignalModeCopy() {
   const hostTitle = sections[0]?.querySelector("h3");
   const hostDescription = sections[0]?.querySelector("p");
   const guestTitle = sections[1]?.querySelector("h3");
-  if (hostTitle) hostTitle.textContent = relay ? "P1 主机 · 创建 WebSocket 房间" : online ? "P1 主机 · 创建在线房间" : "P1 主机 · 创建局域网房间";
+  if (hostTitle) hostTitle.textContent = relay ? "P1 主机 · 创建后端房间" : online ? "P1 主机 · 创建在线房间" : "P1 主机 · 创建局域网房间";
   if (hostDescription) {
     hostDescription.textContent = relay
-      ? "通过专用联机后端转发输入和战斗快照，WebRTC 仍可作为备用连接。"
+      ? "通过专用 WebSocket 后端转发输入、快照和准备状态，主机仍负责战斗判定。"
       : online
-      ? "创建后复制邀请链接。伙伴从任意浏览器打开游戏页面即可加入。"
-      : "使用 start.cmd -Lan 启动后，创建一个仅在 Radmin 网络中有效的临时房间。";
+        ? "创建后复制邀请链接，伙伴从任意浏览器打开游戏页面即可加入。"
+        : "使用 start.cmd -Lan 启动后，创建一个仅在 Radmin 或局域网内有效的临时房间。";
   }
-  if (guestTitle) guestTitle.textContent = relay ? "P2 客机 · 加入 WebSocket 房间" : online ? "P2 客机 · 加入在线房间" : "P2 客机 · 加入局域网房间";
+  if (guestTitle) guestTitle.textContent = relay ? "P2 客机 · 加入后端房间" : online ? "P2 客机 · 加入在线房间" : "P2 客机 · 加入局域网房间";
   if (dom.createRoomButton) dom.createRoomButton.textContent = relay ? "创建后端房间" : online ? "创建在线房间" : "创建局域网房间";
   if (dom.joinRoomButton) dom.joinRoomButton.textContent = relay ? "加入后端房间" : online ? "加入在线房间" : "加入局域网房间";
   if (dom.joinHint) {
     dom.joinHint.textContent = relay
       ? "打开主机发来的邀请链接后直接加入；联机数据将通过 WebSocket 后端传输。"
       : online
-      ? "打开主机发来的邀请链接后点击加入；也可以输入 6 位房间号。"
-      : "打开主机发来的邀请链接后，输入 6 位房间号即可加入。";
+        ? "打开主机发来的邀请链接后点击加入；也可以输入 6 位房间号。"
+        : "打开主机发来的邀请链接后，输入 6 位房间号即可加入。";
   }
 }
 
 async function copyText(value, successMessage) {
   const text = String(value || "").trim();
   if (!text) {
-    renderStatus("请先创建局域网房间。", true);
+    renderStatus("请先创建联机房间。", true);
     return;
   }
   try {
@@ -208,7 +208,7 @@ async function copyText(value, successMessage) {
 
 function setJoinInvite(roomId) {
   if (dom.roomInput) dom.roomInput.value = roomId;
-  if (dom.joinHint) dom.joinHint.textContent = "邀请房间 " + roomId + " 已就绪，点击加入即可。";
+  if (dom.joinHint) dom.joinHint.textContent = `邀请房间 ${roomId} 已就绪，点击加入即可。`;
 }
 
 function clearRoomCard() {
@@ -226,17 +226,12 @@ function renderStatus(message = "", error = false) {
   if (!dom.status) return;
   const status = networkStatus();
   const role = status.role === "host" ? "P1 主机" : status.role === "guest" ? "P2 客机" : "未联机";
-  const labels = {
-    "creating-room": "创建房间中",
-    "waiting-guest": "等待伙伴加入",
-    "joining-room": "正在加入房间",
-    "waiting-host": "等待主机建立通道",
-    "channel-opening": "数据通道初始化中",
-    connected: "已连接",
-  };
+  const quality = status.connected
+    ? ` // ${status.latencyMs || 0}ms${status.snapshotIntervalMs ? ` // 快照 ${status.snapshotIntervalMs}ms` : ""}`
+    : "";
   const connection = status.connected
-    ? "已连接 " + (status.peerName || "对端") + (status.latencyMs ? " // " + status.latencyMs + "ms" : "")
-    : labels[status.status] || status.status || "待机";
-  dom.status.textContent = message || role + " // " + connection;
-  dom.status.classList.toggle("error", Boolean(error || status.lastError || status.status === "room-error"));
+    ? `已连接 ${status.peerName || "对端"}${quality}`
+    : networkStatusLabel(status.status);
+  dom.status.textContent = message || `${role} // ${connection}`;
+  dom.status.classList.toggle("error", Boolean(error || status.lastError || ["room-error", "relay-error", "failed", "error"].includes(status.status)));
 }

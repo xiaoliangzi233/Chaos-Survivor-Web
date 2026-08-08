@@ -164,9 +164,6 @@ async function chooseAndStartRun(runtime) {
     if (state.mode === "menu" && typeof actions.openLoadout === "function") {
       actions.openLoadout();
     }
-    if (state.mode === "choosingWeapon" && !state.ai?.loadoutPanel) {
-      aiLog(config, "loadout_panel_missing", { fallback: typeof actions.startWithLoadout === "function" }, "summary");
-    }
     if (skipReload) {
       aiLog(config, "config_reload_skipped", { reason: "pending_timeout_recovery" }, "summary");
     } else {

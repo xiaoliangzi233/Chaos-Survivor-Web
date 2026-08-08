@@ -5,8 +5,6 @@ import {
   updateHud,
   updateBestText,
   showChoices,
-  showRunSetup,
-  hideRunSetup,
   hideChoices,
   showPauseMenu,
   hidePauseMenu,
@@ -100,8 +98,8 @@ import {
   openAdventureStats,
 } from "../ui/adventureStatsUi.js";
 import { hasPendingJoinInvite, initMultiplayerUi, openMultiplayerPanel, updateMultiplayerUi } from "../ui/multiplayerUi.js";
-import { netRuntime, nextLocalInputFrame, isHostAuthority, isGuestMirror } from "../net/netState.js";
-import { sendHostSnapshot, sendLocalInput, sendStartRun, sendLobbyAction } from "../net/multiplayerSession.js";
+import { netRuntime, nextLocalInputFrame, isHostAuthority, isGuestMirror, setNetworkStatus } from "../net/netState.js";
+import { sendHostSnapshot, sendLocalInput, sendStartRun, sendLobbyAction, sendReadyState } from "../net/multiplayerSession.js";
 import { applyHostSnapshot, createStartRunPayload, updateGuestInterpolation } from "../net/snapshot.js";
 import { currentPlayerId } from "../services/backendProgressService.js";
 
@@ -183,6 +181,7 @@ export async function bootGame() {
   let fpsFrames = 0;
   let nextStatsPublishAt = 0;
   let nextSnapshotAt = 0;
+  let lastSnapshotMode = "";
   let debugUi = null;
   let guestOverlaySignature = "";
 
@@ -210,11 +209,6 @@ export async function bootGame() {
     leaveLobby();
     setMusicScene("battle", { autoplay: false });
     state.mode = "choosingWeapon";
-    showRunSetup({
-      weapons: STARTER_WEAPONS,
-      onConfirm: startWithLoadout,
-      onBack: returnToLobby,
-    });
     return true;
   }
 
@@ -231,7 +225,6 @@ export async function bootGame() {
     closeAdventureStats();
     clearWaveEventNotice();
     hideAllOverlays();
-    hideRunSetup();
     leaveLobby();
     setMusicScene("battle", { autoplay: false });
     selectDifficulty(difficulty.id);
@@ -259,6 +252,7 @@ export async function bootGame() {
         config: { difficulty, weapon, peerWeaponId: state.lobby.selectedPeerWeaponId || weapon.id, runMode, randomGoal },
         map: runMap,
       }));
+      publishHostSnapshot(true);
     }
     state.mode = "story";
     let prepareDone = false;
@@ -310,6 +304,7 @@ export async function bootGame() {
     };
     state.mode = "leveling";
     renderDeferredUpgradePanel();
+    publishHostSnapshot(true);
   }
 
   function createDeferredUpgradeTrack(player) {
@@ -393,6 +388,7 @@ export async function bootGame() {
       if (track.remaining === 0 && state.ai?.runtime?.enabled) markDeferredUpgradeReady("p1");
       else renderDeferredUpgradePanel();
     }
+    publishHostSnapshot(true);
     return true;
   }
 
@@ -410,6 +406,7 @@ export async function bootGame() {
     assignDeferredUpgradeChoices(track);
     playSfx("select");
     if (playerId === "p1") renderDeferredUpgradePanel();
+    publishHostSnapshot(true);
     return true;
   }
 
@@ -419,6 +416,7 @@ export async function bootGame() {
     track.ready = true;
     if (deferredUpgradePhaseComplete()) finishDeferredUpgradePhase();
     else renderDeferredUpgradePanel();
+    publishHostSnapshot(true);
     return true;
   }
 
@@ -434,6 +432,7 @@ export async function bootGame() {
     state.ai.levelPanel = null;
     hideChoices();
     openShopAfterWave();
+    publishHostSnapshot(true);
     return true;
   }
 
@@ -554,6 +553,7 @@ export async function bootGame() {
       });
     }
     openShop({ beforeBossWave });
+    publishHostSnapshot(true);
   }
 
   function openDebugShop() {
@@ -596,6 +596,7 @@ export async function bootGame() {
     } else {
       renderShop();
     }
+    publishHostSnapshot(true);
     return true;
   }
 
@@ -729,7 +730,6 @@ export async function bootGame() {
     closeAdventureStats();
     clearWaveEventNotice();
     hideAllOverlays();
-    hideRunSetup();
     leaveLobby();
     selectDifficulty(difficultyId);
     preloadCoordinator.releaseRun();
@@ -774,7 +774,6 @@ export async function bootGame() {
     closeAdventureStats();
     clearWaveEventNotice();
     hideAllOverlays();
-    hideRunSetup();
     leaveLobby();
     selectDifficulty(cfg.difficultyId);
     preloadCoordinator.releaseRun();
@@ -790,10 +789,12 @@ export async function bootGame() {
     const peer = ensurePeerProfile();
     peer.initialWeaponId = cfg.peerWeaponId || cfg.weaponId;
     withPlayerProfile("p2", () => activateWeapon(peer.initialWeaponId));
-    state.mode = "playing";
+    state.mode = "loadingRun";
     state.multiplayer.enabled = true;
     state.multiplayer.role = "guest";
     state.multiplayer.connected = true;
+    setNetworkStatus("syncing");
+    showRunLoading(0, "等待主机同步战场");
     setMusicScene("battle", { autoplay: false });
     return true;
   }
@@ -804,6 +805,7 @@ export async function bootGame() {
     if (mode === "shop") {
       renderShop();
       ui.shopOverlay?.classList.add("active");
+      ui.shopOverlay?.setAttribute("aria-hidden", "false");
     } else {
       closeShop();
     }
@@ -828,15 +830,15 @@ export async function bootGame() {
           refresh: phase && guestTrack?.remaining > 0 ? {
             label: `刷新选项 - ${LEVEL_CHOICE_REFRESH_COST} 金币`,
             disabled: (state.players?.p2?.gold || 0) < LEVEL_CHOICE_REFRESH_COST,
-            onRefresh: () => sendShopAction({ action: "upgradeRefresh" }),
+            onRefresh: () => sendReadyState({ action: "upgradeRefresh" }),
           } : null,
           confirm: phase && guestTrack?.remaining === 0 ? {
             label: guestTrack.ready ? "已就绪" : "确认强化并就绪",
             disabled: guestTrack.ready,
-            onConfirm: () => sendShopAction({ action: "upgradeReady" }),
+            onConfirm: () => sendReadyState({ action: "upgradeReady" }),
           } : null,
           onPick: (item) => {
-            if (phase) sendShopAction({ action: "upgradeChoose", id: item.id });
+            if (phase) sendReadyState({ action: "upgradeChoose", id: item.id });
             else if (levelOwner === "p2") sendShopAction({ action: "upgrade", id: item.id });
           },
         });
@@ -858,6 +860,7 @@ export async function bootGame() {
       guestOverlaySignature = `end:${state.victory}`;
     } else if (mode !== "ended" && guestOverlaySignature.startsWith("end:")) {
       ui.endOverlay?.classList.remove("active");
+      ui.endOverlay?.setAttribute("aria-hidden", "true");
       ui.restartButton.disabled = false;
       ui.endLobbyButton.disabled = false;
       guestOverlaySignature = "";
@@ -872,11 +875,21 @@ export async function bootGame() {
     return isRandomEndlessMode() ? state.wave + 1 : Math.min(TOTAL_WAVES, state.wave + 1);
   }
 
-  function publishHostSnapshot() {
-    if (!isHostAuthority() || performance.now() < nextSnapshotAt) return false;
+  function publishHostSnapshot(force = false) {
+    const now = performance.now();
+    const modeChanged = lastSnapshotMode !== state.mode;
+    if (!isHostAuthority() || (!force && !modeChanged && now < nextSnapshotAt)) return false;
     sendHostSnapshot();
-    nextSnapshotAt = performance.now() + 80;
+    lastSnapshotMode = state.mode;
+    nextSnapshotAt = now + snapshotIntervalForMode();
     return true;
+  }
+
+  function snapshotIntervalForMode() {
+    if (state.mode === "playing") return 50;
+    if (state.lobby.active || state.mode === "lobby") return 90;
+    if (state.mode === "shop" || state.mode === "leveling") return 120;
+    return 160;
   }
 
   function pauseForDebug() {
@@ -1153,6 +1166,10 @@ export async function bootGame() {
   netRuntime.onStartRun = startGuestMirrorRun;
   netRuntime.onSnapshot = (snapshot) => {
     if (!applyHostSnapshot(snapshot)) return;
+    if (netRuntime.role === "guest" && netRuntime.status === "syncing" && ["playing", "paused", "shop", "leveling", "ended"].includes(snapshot?.mode)) {
+      setNetworkStatus("connected");
+      hideRunLoading();
+    }
     syncGuestMirrorUi(snapshot);
   };
   netRuntime.onLobbyAction = (payload = {}) => {
@@ -1161,12 +1178,18 @@ export async function bootGame() {
     if (interaction?.denied) playSfx("deny");
     else if (interaction) playSfx("select");
   };
-  netRuntime.onShopAction = (payload = {}) => {
+  function handlePeerReadyState(payload = {}) {
     if (!isHostAuthority() || !payload?.action) return;
     if (payload.action === "ready") return markWaveReady("p2");
     if (payload.action === "upgradeChoose" && state.mode === "leveling") return applyDeferredUpgrade("p2", payload.id);
     if (payload.action === "upgradeRefresh" && state.mode === "leveling") return refreshDeferredUpgrade("p2");
     if (payload.action === "upgradeReady" && state.mode === "leveling") return markDeferredUpgradeReady("p2");
+    return false;
+  }
+  netRuntime.onReadyState = handlePeerReadyState;
+  netRuntime.onShopAction = (payload = {}) => {
+    if (handlePeerReadyState(payload)) return;
+    if (!isHostAuthority() || !payload?.action) return;
     if (state.mode !== "shop") return;
     withPlayerProfile("p2", () => {
       if (payload.action === "refresh") refreshShopOffers();

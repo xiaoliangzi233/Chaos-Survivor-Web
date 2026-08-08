@@ -165,7 +165,10 @@ export function createMultiplayerState(previous = {}) {
     connected: Boolean(previous.connected),
     peerName: previous.peerName || "",
     latencyMs: Math.max(0, Math.round(Number(previous.latencyMs) || 0)),
+    jitterMs: Math.max(0, Math.round(Number(previous.jitterMs) || 0)),
+    snapshotIntervalMs: Math.max(0, Math.round(Number(previous.snapshotIntervalMs) || 0)),
     status: previous.status || "idle",
+    statusLabel: previous.statusLabel || "",
   };
 }
 
@@ -253,6 +256,8 @@ export function createLobbyState(previous = {}) {
       id: "p1",
       name: "P1 主机",
       color: "#42e8ff",
+      name: "P1 主机",
+      name: "P1 Host",
       x: Number(previous.player?.x) || 120,
       y: Number(previous.player?.y) || 150,
       r: 15,
@@ -274,6 +279,8 @@ export function createLobbyState(previous = {}) {
       id: "p2",
       name: "P2 客机",
       color: "#ff8bd8",
+      name: "P2 客机",
+      name: "P2 Guest",
       x: Number(peer.x) || 164,
       y: Number(peer.y) || 150,
       r: 15,

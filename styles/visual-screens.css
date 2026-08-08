@@ -1,0 +1,328 @@
+/* Combat information layer */
+.hud {
+  top: max(14px, env(safe-area-inset-top));
+  left: 16px;
+  right: 16px;
+  grid-template-columns: 276px minmax(230px, 1fr) auto;
+  gap: 14px;
+}
+
+.hud-left,
+.hud-center,
+.hud-right {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid rgba(126, 202, 224, 0.28);
+  border-radius: 0;
+  background:
+    linear-gradient(135deg, rgba(66, 232, 255, 0.08), transparent 45%),
+    rgba(4, 11, 20, 0.88);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.025), 0 16px 42px rgba(0, 0, 0, 0.42);
+  backdrop-filter: blur(12px) saturate(1.2);
+  clip-path: polygon(9px 0, 100% 0, 100% calc(100% - 9px), calc(100% - 9px) 100%, 0 100%, 0 9px);
+}
+
+.hud-left {
+  width: 276px;
+  padding: 12px 14px;
+  border-left: 3px solid var(--ui-cyan);
+}
+
+.meter {
+  grid-template-columns: 44px minmax(108px, 1fr) 58px;
+}
+
+.bar.bar-track {
+  position: relative;
+  height: 15px;
+  border-color: rgba(180, 222, 236, 0.2);
+  background:
+    repeating-linear-gradient(90deg, transparent 0 12px, rgba(255, 255, 255, 0.09) 12px 13px),
+    rgba(0, 0, 0, 0.42);
+}
+
+.bar-fill {
+  box-shadow: 0 0 14px currentColor;
+}
+
+.hud-center {
+  justify-self: center;
+  width: min(430px, 100%);
+  min-height: 78px;
+  padding: 10px 34px 12px;
+  border-top: 2px solid rgba(66, 232, 255, 0.48);
+  text-align: center;
+}
+
+.hud-center::before,
+.hud-center::after {
+  content: "";
+  position: absolute;
+  top: 12px;
+  width: 42px;
+  height: 4px;
+  background: linear-gradient(90deg, transparent, rgba(66, 232, 255, 0.62));
+}
+
+.hud-center::before { left: 12px; }
+.hud-center::after { right: 12px; transform: scaleX(-1); }
+
+.hud-center > strong {
+  line-height: 1;
+  letter-spacing: 0.16em;
+  text-shadow: 0 0 20px rgba(66, 232, 255, 0.34);
+}
+
+.hud-right {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(74px, 1fr));
+  gap: 1px;
+  min-width: 276px;
+  padding: 0;
+  align-self: start;
+}
+
+.hud-chip {
+  min-height: 54px;
+  display: grid;
+  grid-template-columns: 18px 1fr;
+  grid-template-rows: auto auto;
+  gap: 2px 8px;
+  align-content: center;
+  padding: 8px 11px;
+  border-left: 1px solid rgba(126, 202, 224, 0.16);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.025), transparent);
+}
+
+.hud-chip i { grid-row: 1 / 3; align-self: center; color: var(--ui-accent); }
+.hud-chip b { color: var(--ui-muted); font-size: 9px; letter-spacing: 0.12em; }
+.hud-chip strong { color: var(--ui-ink); font-size: 14px; }
+.kill-chip { --ui-accent: var(--ui-red); }
+.gold-chip { --ui-accent: var(--ui-gold); }
+.fps-chip { --ui-accent: var(--ui-green); }
+
+.quick-actions {
+  right: max(16px, env(safe-area-inset-right));
+  bottom: max(18px, env(safe-area-inset-bottom));
+  gap: 8px;
+  padding: 7px;
+  border: 1px solid rgba(126, 202, 224, 0.2);
+  background: rgba(3, 9, 17, 0.78);
+  box-shadow: 0 16px 42px rgba(0, 0, 0, 0.42);
+  clip-path: polygon(8px 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%, 0 8px);
+}
+
+.quick-actions button {
+  width: 46px;
+  height: 46px;
+  border-radius: 0;
+  border-color: rgba(126, 202, 224, 0.26);
+  background: linear-gradient(145deg, rgba(23, 52, 66, 0.9), rgba(5, 14, 23, 0.96));
+  clip-path: polygon(6px 0, 100% 0, 100% calc(100% - 6px), calc(100% - 6px) 100%, 0 100%, 0 6px);
+}
+
+#inventoryButton { width: 86px; }
+
+.wave-event-frame {
+  border: 1px solid rgba(255, 77, 109, 0.56);
+  border-left: 5px solid var(--ui-red);
+  border-radius: 0;
+  background:
+    linear-gradient(100deg, rgba(255, 77, 109, 0.14), transparent 42%),
+    rgba(5, 8, 17, 0.94);
+  box-shadow: 0 22px 70px rgba(0, 0, 0, 0.58), 0 0 34px rgba(255, 77, 109, 0.12);
+  clip-path: polygon(12px 0, 100% 0, 100% calc(100% - 12px), calc(100% - 12px) 100%, 0 100%, 0 12px);
+}
+
+/* Compact system screens */
+.pause-menu.ui-shell,
+.end.ui-shell,
+.run-loading-panel.ui-shell {
+  width: min(620px, calc(100vw - 40px));
+  padding: 34px 38px;
+}
+
+.pause-menu.ui-shell,
+.end.ui-shell {
+  min-height: 350px;
+  display: grid;
+  align-content: center;
+}
+
+.pause-menu h2,
+.end h2 {
+  margin: 8px 0 26px;
+  font-size: clamp(34px, 5vw, 58px);
+  letter-spacing: 0.06em;
+}
+
+.pause-actions,
+.end-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.pause-actions .primary,
+.end-actions .primary {
+  grid-column: 1 / -1;
+  min-height: 54px;
+}
+
+.end-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0 0 24px;
+}
+
+.end-stats > * {
+  padding: 12px;
+  border: 1px solid rgba(119, 255, 138, 0.18);
+  background: rgba(119, 255, 138, 0.035);
+}
+
+.run-loading-panel.ui-shell {
+  min-height: 310px;
+  display: grid;
+  align-content: center;
+}
+
+.run-loading-track {
+  height: 16px;
+  padding: 3px;
+  border-color: rgba(66, 232, 255, 0.48);
+  background: repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.035) 0 16px, transparent 16px 19px), rgba(0, 0, 0, 0.54);
+}
+
+/* Level choices */
+.level-up-overlay .choices.ui-shell {
+  width: min(1120px, calc(100vw - 36px));
+  padding: 30px;
+}
+
+.choice-list,
+.choices-list {
+  gap: 12px;
+}
+
+.choice-card {
+  min-height: 148px;
+  border: 1px solid rgba(119, 255, 138, 0.24);
+  border-radius: 0;
+  background:
+    linear-gradient(135deg, rgba(119, 255, 138, 0.07), transparent 50%),
+    rgba(8, 20, 30, 0.9);
+  clip-path: polygon(8px 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%, 0 8px);
+}
+
+/* Large overlays */
+.shop-panel.ui-shell,
+.inventory-panel.ui-shell,
+.codex-panel.ui-shell,
+.help-panel.ui-shell,
+.adventure-stats-panel.ui-shell,
+.multiplayer-panel.ui-shell {
+  width: min(1580px, calc(100vw - 28px));
+  max-width: calc(100vw - 28px);
+  max-height: calc(100dvh - 28px);
+  border-radius: 0;
+}
+
+.shop-wallet,
+.inventory-summary,
+.codex-meta,
+.adventure-record-chip,
+.multiplayer-status {
+  border-radius: 0;
+  background: rgba(2, 8, 16, 0.72);
+  box-shadow: var(--ui-inner);
+}
+
+.shop-wallet {
+  border-color: rgba(255, 209, 102, 0.38);
+}
+
+.inventory-summary span,
+.codex-meta span,
+.adventure-record-chip {
+  border: 1px solid color-mix(in srgb, var(--ui-accent) 18%, transparent);
+}
+
+.inventory-head,
+.shop-head,
+.codex-head {
+  min-height: 94px;
+}
+
+.inventory-head h2,
+.shop-head h2,
+.codex-head h2 {
+  font-size: clamp(30px, 3vw, 44px);
+}
+
+.lobby-dialogue-panel.ui-shell {
+  border-radius: 0;
+}
+
+.lobby-dialogue-portrait {
+  border-radius: 0;
+  border: 1px solid rgba(66, 232, 255, 0.32);
+  background:
+    linear-gradient(135deg, rgba(66, 232, 255, 0.09), transparent 48%),
+    repeating-linear-gradient(0deg, transparent 0 5px, rgba(255, 255, 255, 0.02) 5px 6px),
+    rgba(2, 8, 16, 0.9);
+  clip-path: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px);
+}
+
+.lobby-dialogue-copy > p {
+  border-left: 3px solid rgba(66, 232, 255, 0.42);
+  padding: 14px 16px;
+  background: rgba(66, 232, 255, 0.035);
+}
+
+.story-panel.ui-shell {
+  border-color: rgba(180, 140, 255, 0.42);
+}
+
+.story-panel.ui-shell::before {
+  opacity: 0.32;
+}
+
+.multiplayer-status.error {
+  border-color: rgba(255, 77, 109, 0.62);
+  background: rgba(255, 77, 109, 0.08);
+  animation: uiAlertBreath 1.2s ease-in-out infinite;
+}
+
+/* Lobby prompts */
+.lobby-interaction-prompt,
+.lobby-launch-status,
+.lobby-toast {
+  border-radius: 0;
+  backdrop-filter: blur(12px) saturate(1.25);
+}
+
+.lobby-interaction-prompt {
+  border-left: 4px solid var(--ui-cyan);
+  background:
+    linear-gradient(90deg, rgba(66, 232, 255, 0.1), transparent 48%),
+    rgba(3, 9, 17, 0.94);
+}
+
+.lobby-interaction-prompt kbd {
+  clip-path: polygon(7px 0, 100% 0, 100% calc(100% - 7px), calc(100% - 7px) 100%, 0 100%, 0 7px);
+}
+
+.lobby-toast {
+  border-left: 4px solid var(--lobby-toast-color, var(--ui-cyan));
+}
+
+/* Overlay atmosphere shared by all player-facing screens */
+.overlay.active:not(#startOverlay):not(.story-overlay):not(.debug-auth-overlay):not(.debug-panel-overlay) {
+  background:
+    radial-gradient(circle at 50% 42%, rgba(66, 232, 255, 0.065), transparent 42%),
+    repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.012) 0 1px, transparent 1px 64px),
+    rgba(1, 4, 10, 0.74);
+  backdrop-filter: blur(8px) saturate(0.92);
+}

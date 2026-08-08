@@ -1,6 +1,15 @@
 import { WORLD_SIZE, TAU } from "../constants.js";
 import { state } from "../state.js";
 import { hexToRgba, mulberry32 } from "../utils.js";
+import {
+  drawEmissiveStrip,
+  drawPanelSurface,
+  drawPixelDecal,
+  drawServiceDetails,
+  drawWearLayer,
+} from "../visual/canvasDetailKit.js";
+import { drawEnvironmentAtlasDecal } from "../visual/environmentAssets.js";
+import { arenaVisualProfile, visualSeedFrom } from "../visual/environmentTheme.js";
 
 const STATIC_CACHE_SCALE = 0.5;
 const PROP_LAYER_FLOOR = "floor";
@@ -83,7 +92,34 @@ export function generateMap() {
   const map = { tileSize, palette: LAB_PALETTE, rooms, corridors, doors, tiles, props, energyLines, floorDecals, cableRuns, fogBanks };
   constrainMapGeometry(map, half);
   finalizeMapLayers(map);
+  applyMapVisualProfiles(map);
   return map;
+}
+
+function applyMapVisualProfiles(map) {
+  for (const room of map.rooms || []) {
+    room.visualProfile ||= room.zone || "service";
+    if (!Number.isInteger(room.detailSeed)) room.detailSeed = visualSeedFrom(`${room.id}:${room.detailSeed ?? "default"}`);
+  }
+  for (const prop of map.props || []) {
+    const room = (map.rooms || []).find((candidate) => (
+      prop.x >= candidate.x && prop.x <= candidate.x + candidate.w
+      && prop.y >= candidate.y && prop.y <= candidate.y + candidate.h
+    ));
+    prop.visualProfile ||= room?.visualProfile || inferPropVisualProfile(prop.kind);
+    if (!Number.isInteger(prop.detailSeed)) prop.detailSeed = visualSeedFrom(`${prop.kind}:${Math.round(prop.x)}:${Math.round(prop.y)}:${prop.detailSeed ?? "default"}`);
+    prop.wear ??= arenaVisualProfile(prop.visualProfile, prop.color).wear;
+    prop.lightProfile ||= prop.dynamicDecor ? "active" : "ambient";
+  }
+}
+
+function inferPropVisualProfile(kind) {
+  if (["specimenTank", "bioCanister", "labBench", "surgicalTray", "sampleTray"].includes(kind)) return "bio";
+  if (["cryoPod", "cryoArray", "coolantTank", "coolantValve"].includes(kind)) return "cryo";
+  if (["serverCabinet", "serverWall", "commandConsole", "terminal", "faultyScreenStrip"].includes(kind)) return "control";
+  if (["crateStack", "brokenRack", "cargoLift", "tornSealCrate"].includes(kind)) return "storage";
+  if (["reactorCore", "largeGenerator", "energyNodeBase"].includes(kind)) return "reactor";
+  return "service";
 }
 
 export function drawMap(ctx, map, camX, camY, viewW, viewH, time) {
@@ -1221,6 +1257,7 @@ function drawEnergyLines(ctx, map, camX, camY, viewW, viewH, time) {
 function drawRoomBorders(ctx, map, camX, camY, viewW, viewH) {
   for (const room of map.rooms || []) {
     if (!rectVisible(room.x, room.y, room.w, room.h, camX, camY, viewW, viewH, 80)) continue;
+    const profile = arenaVisualProfile(room.visualProfile || room.zone);
     const top = ctx.createLinearGradient(room.x, room.y, room.x, room.y + 48);
     top.addColorStop(0, "rgba(255,255,255,0.07)");
     top.addColorStop(1, "rgba(255,255,255,0)");
@@ -1231,7 +1268,7 @@ function drawRoomBorders(ctx, map, camX, camY, viewW, viewH) {
     bottom.addColorStop(1, "rgba(0,0,0,0.22)");
     ctx.fillStyle = bottom;
     ctx.fillRect(room.x, room.y + room.h - 56, room.w, 56);
-    ctx.strokeStyle = "rgba(255,255,255,0.075)";
+    ctx.strokeStyle = hexToRgba(profile.color, 0.18);
     ctx.lineWidth = 4;
     ctx.strokeRect(room.x, room.y, room.w, room.h);
     ctx.strokeStyle = "rgba(0,0,0,0.28)";
@@ -1240,6 +1277,20 @@ function drawRoomBorders(ctx, map, camX, camY, viewW, viewH) {
     ctx.strokeStyle = "rgba(255,255,255,0.035)";
     ctx.lineWidth = 1;
     ctx.strokeRect(room.x - 6, room.y - 6, room.w + 12, room.h + 12);
+    drawEmissiveStrip(ctx, {
+      x: room.x + room.w / 2,
+      y: room.y + 19,
+      width: Math.min(260, room.w * 0.48),
+      height: 3,
+      color: profile.color,
+      intensity: 0.3,
+      segments: 8,
+    });
+    const decalX = room.x + 54;
+    const decalY = room.y + 54;
+    if (!drawEnvironmentAtlasDecal(ctx, profile.decal, decalX, decalY, 38, 0.2)) {
+      drawPixelDecal(ctx, { x: decalX, y: decalY, size: 38, color: profile.color, kind: profile.decal, alpha: 0.2 });
+    }
   }
 }
 
@@ -1338,9 +1389,76 @@ function drawPropIfVisible(ctx, prop, camX, camY, viewW, viewH, time) {
   ctx.rotate(prop.rot);
   drawPropGroundShadow(ctx, prop);
   drawPropBaseExtrusion(ctx, prop);
+  drawUnifiedMapPropBackdrop(ctx, prop, time);
   drawPropBody(ctx, prop, time);
+  drawUnifiedMapPropFinish(ctx, prop, time);
   drawPropRimLight(ctx, prop);
   ctx.restore();
+}
+
+function drawUnifiedMapPropBackdrop(ctx, prop, time) {
+  if (prop.layer === PROP_LAYER_FLOOR || ["hangingCable", "brokenGlass", "steamLeak", "swingingCable", "ceilingFanShadow"].includes(prop.kind)) return;
+  const profile = arenaVisualProfile(prop.visualProfile, prop.color);
+  const dims = getPropFootprintSize(prop);
+  const height = prop.height ?? getPropHeight(prop);
+  drawServiceDetails(ctx, {
+    x: 0,
+    y: dims.h * 0.28,
+    width: dims.w,
+    height: Math.max(dims.h, height),
+    color: profile.color,
+    seed: prop.detailSeed ?? prop.phase,
+    density: RECTANGULAR_PROP_KINDS.has(prop.kind) ? 1.1 : 0.65,
+  });
+  if (RECTANGULAR_PROP_KINDS.has(prop.kind) && dims.w >= 42 && dims.h >= 24) {
+    drawPanelSurface(ctx, {
+      x: 0,
+      y: dims.h * 0.12,
+      width: dims.w * 0.72,
+      height: Math.max(12, dims.h * 0.24),
+      color: profile.color,
+      seed: prop.detailSeed,
+      active: prop.dynamicDecor,
+    });
+  }
+}
+
+function drawUnifiedMapPropFinish(ctx, prop, time) {
+  if (prop.layer === PROP_LAYER_FLOOR || ["hangingCable", "brokenGlass", "steamLeak", "swingingCable", "ceilingFanShadow"].includes(prop.kind)) return;
+  const profile = arenaVisualProfile(prop.visualProfile, prop.color);
+  const dims = getPropFootprintSize(prop);
+  const height = prop.height ?? getPropHeight(prop);
+  drawWearLayer(ctx, {
+    x: 0,
+    y: dims.h * 0.22,
+    width: dims.w,
+    height: Math.max(dims.h, height),
+    seed: prop.detailSeed,
+    amount: prop.wear ?? profile.wear,
+    color: profile.color,
+  });
+  if (dims.w >= 44 && dims.h >= 28) {
+    drawPixelDecal(ctx, {
+      x: -dims.w * 0.26,
+      y: -Math.max(12, height * 0.2),
+      size: Math.min(18, dims.w * 0.18),
+      color: profile.color,
+      kind: profile.decal,
+      alpha: 0.28,
+    });
+  }
+  if (prop.dynamicDecor || ["reactorCore", "largeGenerator", "commandConsole", "serverWall", "deconGate"].includes(prop.kind)) {
+    const pulse = 0.38 + Math.max(0, Math.sin(time * 2.2 + prop.phase)) * 0.18;
+    drawEmissiveStrip(ctx, {
+      x: 0,
+      y: dims.h * 0.31,
+      width: dims.w * 0.68,
+      height: Math.max(2, dims.h * 0.045),
+      color: profile.color,
+      intensity: pulse,
+      segments: Math.max(3, Math.min(7, Math.round(dims.w / 18))),
+    });
+  }
 }
 
 function drawPropBody(ctx, prop, time) {

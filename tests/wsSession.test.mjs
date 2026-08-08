@@ -56,8 +56,10 @@ globalThis.window = {
 };
 globalThis.WebSocket = FakeWebSocket;
 
-const { createRelayHostRoom, disconnectRelay, isRelayConfigured } = await import("../src/net/wsSession.js");
-const { netRuntime } = await import("../src/net/netState.js");
+const { createRelayHostRoom, disconnectRelay, isRelayConfigured, sendRelayInput } = await import("../src/net/wsSession.js");
+const { handleNetworkMessage } = await import("../src/net/networkMessages.js");
+const { netRuntime, setNetworkRole } = await import("../src/net/netState.js");
+const { state } = await import("../src/state.js");
 
 test("WebSocket relay creates an invite and becomes connected when P2 joins", async () => {
   assert.equal(isRelayConfigured(), true);
@@ -69,5 +71,29 @@ test("WebSocket relay creates an invite and becomes connected when P2 joins", as
   assert.equal(netRuntime.connected, false);
   FakeWebSocket.instances.at(-1).message({ type: "peerJoined" });
   assert.equal(netRuntime.connected, true);
+  const hello = FakeWebSocket.instances.at(-1).sent.at(-1);
+  assert.equal(hello.type, "hello");
+  assert.equal(hello.roomId, "123456");
+  assert.ok(hello.seq > 0);
   disconnectRelay();
+});
+
+test("WebSocket relay throttles unchanged input but sends direction changes", async () => {
+  await createRelayHostRoom();
+  FakeWebSocket.instances.at(-1).message({ type: "peerJoined" });
+  const ws = FakeWebSocket.instances.at(-1);
+  const before = ws.sent.length;
+  assert.equal(sendRelayInput({ right: true, vx: 1, seq: 1 }), true);
+  assert.equal(sendRelayInput({ right: true, vx: 1, seq: 2 }), false);
+  assert.equal(sendRelayInput({ left: true, vx: -1, seq: 3 }), true);
+  assert.equal(ws.sent.length, before + 2);
+  disconnectRelay();
+});
+
+test("snapshot messages with older sequence numbers do not roll back guest state", () => {
+  setNetworkRole("guest");
+  handleNetworkMessage({ type: "snapshot", seq: 10, sentAt: 1000, payload: { mode: "playing", wave: 4, players: {}, world: {} } });
+  assert.equal(state.wave, 4);
+  handleNetworkMessage({ type: "snapshot", seq: 9, sentAt: 900, payload: { mode: "playing", wave: 2, players: {}, world: {} } });
+  assert.equal(state.wave, 4);
 });

@@ -98,9 +98,11 @@ class VisualExportHandler(SimpleHTTPRequestHandler):
             element_id = self.headers.get("X-Ui-Element", "")
             if not SAFE_UI_ID.fullmatch(element_id):
                 raise ValueError("invalid UI element id")
+            width = max(320, min(2560, int(self.headers.get("X-Ui-Width", "1920"))))
+            height = max(420, min(1440, int(self.headers.get("X-Ui-Height", "1080"))))
             browser = self._find_headless_browser()
             host, port = self.server.server_address[:2]
-            capture_url = f"http://{host}:{port}/tools/visual-ui-capture.html?id={element_id}"
+            capture_url = f"http://{host}:{port}/tools/visual-ui-capture.html?id={element_id}&w={width}&h={height}"
             with tempfile.TemporaryDirectory(prefix="survivor-ui-export-") as temp_dir:
                 screenshot = Path(temp_dir) / "ui.png"
                 profile = Path(temp_dir) / "profile"
@@ -116,7 +118,7 @@ class VisualExportHandler(SimpleHTTPRequestHandler):
                     "--no-first-run",
                     "--disable-features=UseDawn,SkiaGraphite,msEdgeWelcomePage",
                     "--force-device-scale-factor=1",
-                    "--window-size=1920,1080",
+                    f"--window-size={width},{height}",
                     "--run-all-compositor-stages-before-draw",
                     "--virtual-time-budget=3500",
                     f"--user-data-dir={profile}",

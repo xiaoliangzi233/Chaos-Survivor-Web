@@ -105,12 +105,16 @@ export function isInventoryOpen() {
 export function openInventory() {
   if (!canOpenInventory()) return false;
   previousMode = state.mode;
-  if (previousMode === "paused") dom.pauseOverlay?.classList.remove("active");
+  if (previousMode === "paused") {
+    dom.pauseOverlay?.classList.remove("active");
+    dom.pauseOverlay?.setAttribute("aria-hidden", "true");
+  }
   state.mode = "inventory";
   fuseMaterialUid = normalizeFuseMaterial()?.uid ?? null;
   syncDetailSelection();
   renderInventory();
   dom.overlay?.classList.add("active");
+  dom.overlay?.setAttribute("aria-hidden", "false");
   return true;
 }
 
@@ -121,8 +125,12 @@ export function closeInventory() {
   fuseMessage = "";
   detailSelection = { type: "weapon", id: state.inventory?.selectedWeaponUid ?? null };
   dom.overlay?.classList.remove("active");
+  dom.overlay?.setAttribute("aria-hidden", "true");
   state.mode = previousMode === "paused" ? "paused" : "playing";
-  if (state.mode === "paused") dom.pauseOverlay?.classList.add("active");
+  if (state.mode === "paused") {
+    dom.pauseOverlay?.classList.add("active");
+    dom.pauseOverlay?.setAttribute("aria-hidden", "false");
+  }
   return true;
 }
 

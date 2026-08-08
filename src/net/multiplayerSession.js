@@ -10,9 +10,11 @@ import {
   relayServerUrl,
   sendRelayInput,
   sendRelayLobbyAction,
+  sendRelayReadyState,
   sendRelayShopAction,
   sendRelaySnapshot,
   sendRelayStartRun,
+  sendRelayStateSync,
 } from "./wsSession.js";
 
 export { isRelayConfigured, relayServerUrl };
@@ -37,6 +39,8 @@ export function sendHostSnapshot() { return isRelayActive() ? sendRelaySnapshot(
 export function sendStartRun(payload) { return isRelayActive() ? sendRelayStartRun(payload) : p2p.sendStartRun(payload); }
 export function sendShopAction(payload) { return isRelayActive() ? sendRelayShopAction(payload) : p2p.sendShopAction(payload); }
 export function sendLobbyAction(payload) { return isRelayActive() ? sendRelayLobbyAction(payload) : p2p.sendLobbyAction(payload); }
+export function sendReadyState(payload) { return isRelayActive() ? sendRelayReadyState(payload) : p2p.sendShopAction(payload); }
+export function sendStateSync(payload) { return isRelayActive() ? sendRelayStateSync(payload) : p2p.sendShopAction(payload); }
 
 export function disconnectPeer() {
   if (isRelayActive()) disconnectRelay();

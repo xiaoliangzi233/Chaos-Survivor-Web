@@ -1,0 +1,71 @@
+:root {
+  --ui-void: #02050b;
+  --ui-ink: #eefbff;
+  --ui-muted: #87a3b4;
+  --ui-cyan: #42e8ff;
+  --ui-green: #77ff8a;
+  --ui-gold: #ffd166;
+  --ui-red: #ff4d6d;
+  --ui-violet: #b48cff;
+  --ui-shell: rgba(5, 12, 22, 0.94);
+  --ui-shell-raised: rgba(11, 24, 38, 0.96);
+  --ui-surface: rgba(14, 29, 43, 0.76);
+  --ui-surface-soft: rgba(10, 22, 34, 0.58);
+  --ui-edge: rgba(126, 202, 224, 0.22);
+  --ui-edge-bright: rgba(180, 235, 248, 0.46);
+  --ui-shadow: 0 28px 90px rgba(0, 0, 0, 0.64);
+  --ui-inner: inset 0 0 0 1px rgba(255, 255, 255, 0.035);
+  --ui-cut-sm: 6px;
+  --ui-cut: 12px;
+  --ui-cut-lg: 20px;
+  --ui-grid: 24px;
+  --ui-fast: 120ms;
+  --ui-normal: 220ms;
+  --ui-slow: 520ms;
+  --ui-accent: var(--ui-cyan);
+  --ui-accent-rgb: 66, 232, 255;
+}
+
+body {
+  --visual-detail-opacity: 1;
+  --visual-motion-scale: 1;
+}
+
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 999;
+  pointer-events: none;
+  background:
+    repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.012) 0 1px, transparent 1px 4px),
+    radial-gradient(circle at 50% 45%, transparent 45%, rgba(0, 0, 0, 0.18) 100%);
+  mix-blend-mode: screen;
+  opacity: 0.42;
+}
+
+@keyframes uiSignalSweep {
+  0% { transform: translateX(-130%); opacity: 0; }
+  15% { opacity: 0.72; }
+  70%, 100% { transform: translateX(230%); opacity: 0; }
+}
+
+@keyframes uiPanelBoot {
+  from { opacity: 0; transform: translateY(12px) scale(0.985); filter: brightness(1.35); }
+  to { opacity: 1; transform: none; filter: none; }
+}
+
+@keyframes uiStatusPulse {
+  0%, 100% { opacity: 0.55; box-shadow: 0 0 8px rgba(var(--ui-accent-rgb), 0.2); }
+  50% { opacity: 1; box-shadow: 0 0 18px rgba(var(--ui-accent-rgb), 0.46); }
+}
+
+@keyframes uiGridDrift {
+  from { background-position: 0 0, 0 0; }
+  to { background-position: 0 var(--ui-grid), var(--ui-grid) 0; }
+}
+
+@keyframes uiAlertBreath {
+  0%, 100% { border-color: rgba(255, 77, 109, 0.42); }
+  50% { border-color: rgba(255, 77, 109, 0.82); }
+}

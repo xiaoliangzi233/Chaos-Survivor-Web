@@ -9,6 +9,10 @@
     <title>混乱幸存者</title>
     <link rel="icon" href="./assets/survivor-app-icon.png" type="image/png" />
     <link rel="stylesheet" href="./styles.css" />
+    <link rel="stylesheet" href="./styles/visual-tokens.css" />
+    <link rel="stylesheet" href="./styles/visual-components.css" />
+    <link rel="stylesheet" href="./styles/visual-screens.css" />
+    <link rel="stylesheet" href="./styles/visual-responsive.css" />
   </head>
   <body class="is-menu is-booting">
     <main id="gameRoot">
@@ -120,7 +124,7 @@
       </nav>
 
       <section id="multiplayerOverlay" class="overlay multiplayer-overlay" aria-hidden="true">
-        <div class="multiplayer-panel" role="dialog" aria-modal="true" aria-labelledby="multiplayerTitle">
+        <div class="multiplayer-panel ui-shell ui-shell--link" role="dialog" aria-modal="true" aria-labelledby="multiplayerTitle">
           <header>
             <div>
               <p class="eyebrow">P2P LINK // LOCAL TUNNEL</p>
@@ -176,7 +180,7 @@
       </section>
 
       <section id="lobbyDialogueOverlay" class="overlay lobby-dialogue-overlay" aria-hidden="true">
-        <div class="lobby-dialogue-panel" role="dialog" aria-modal="true" aria-labelledby="lobbyDialogueTitle">
+        <div class="lobby-dialogue-panel ui-shell ui-shell--dialogue" role="dialog" aria-modal="true" aria-labelledby="lobbyDialogueTitle">
           <header>
             <div>
               <p id="lobbyDialogueRole" class="eyebrow">TRANSIT HUB</p>
@@ -203,7 +207,7 @@
       </section>
 
       <section id="adventureStatsOverlay" class="overlay adventure-stats-overlay" aria-hidden="true">
-        <div class="adventure-stats-panel" role="dialog" aria-modal="true" aria-labelledby="adventureStatsTitle">
+        <div class="adventure-stats-panel ui-shell ui-shell--ledger" role="dialog" aria-modal="true" aria-labelledby="adventureStatsTitle">
           <header>
             <div>
               <p class="eyebrow">ADVENTURE LEDGER // ONLINE</p>
@@ -352,7 +356,7 @@
       </section>
 
       <section id="helpOverlay" class="overlay help-overlay" aria-hidden="true">
-        <div class="help-panel" role="dialog" aria-modal="true" aria-labelledby="helpTitle">
+        <div class="help-panel ui-shell ui-shell--manual" role="dialog" aria-modal="true" aria-labelledby="helpTitle">
           <header class="help-head">
             <div>
               <p class="eyebrow">SURVIVOR FIELD MANUAL</p>
@@ -381,7 +385,7 @@
               <div class="help-card-grid">
                 <article class="help-feature-card"><kbd>E</kbd><h3>背包</h3><p>随时查看属性、武器、道具并进行合成或出售。</p></article>
                 <article class="help-feature-card"><div><kbd>P</kbd><kbd>Esc</kbd></div><h3>暂停</h3><p>暂停战局或从背包返回战场。</p></article>
-                <article class="help-feature-card"><kbd>Space</kbd><h3>快速开始</h3><p>在主菜单直接进入作战配置。</p></article>
+                <article class="help-feature-card"><kbd>Space</kbd><h3>进入大厅</h3><p>从主菜单进入中转大厅，并通过大厅设备完成出击配置。</p></article>
               </div>
             </section>
 
@@ -413,7 +417,7 @@
       </section>
 
       <section id="codexOverlay" class="overlay codex-overlay" aria-hidden="true">
-        <div class="codex-panel" role="dialog" aria-modal="true" aria-labelledby="codexTitle">
+        <div class="codex-panel ui-shell ui-shell--archive" role="dialog" aria-modal="true" aria-labelledby="codexTitle">
           <header class="codex-head">
             <div>
               <p class="eyebrow">SURVIVOR ARCHIVE</p>
@@ -433,8 +437,8 @@
         </div>
       </section>
 
-      <section id="levelOverlay" class="overlay">
-        <div class="panel choices">
+      <section id="levelOverlay" class="overlay" aria-hidden="true">
+        <div class="panel choices ui-shell ui-shell--upgrade">
           <p class="eyebrow">LEVEL UP</p>
           <h2>选择一次强化</h2>
           <div id="choiceList" class="choice-list"></div>
@@ -442,80 +446,12 @@
       </section>
 
       <section id="runLoadingOverlay" class="overlay run-loading-overlay" aria-hidden="true">
-        <div class="panel run-loading-panel" role="status" aria-live="polite">
+        <div class="panel run-loading-panel ui-shell ui-shell--loading" role="status" aria-live="polite">
           <p class="eyebrow">MISSION PRELOAD</p>
           <h2>正在准备战场</h2>
           <p id="runLoadingText">生成地图与战斗纹理</p>
           <div class="run-loading-track"><i id="runLoadingBar"></i></div>
           <strong id="runLoadingPercent">0%</strong>
-        </div>
-      </section>
-
-      <section id="loadoutOverlay" class="overlay loadout-overlay" aria-hidden="true">
-        <div class="panel loadout-panel">
-          <div class="loadout-fx" aria-hidden="true">
-            <i></i><i></i><i></i><i></i><i></i><i></i>
-          </div>
-          <header class="loadout-head">
-            <div>
-              <p class="eyebrow">COMBAT SETUP</p>
-              <h2>作战配置</h2>
-            </div>
-            <p>同时选择作战难度与开局武器。确认后立即进入战场。</p>
-          </header>
-          <div class="loadout-body">
-            <section class="loadout-section loadout-mode-section">
-              <div class="loadout-section-title">
-                <span>00</span>
-                <div>
-                  <h3>选择运行模式</h3>
-                  <p>标准战役使用固定波次；随机模式会从已解锁图鉴中生成每一波。</p>
-                </div>
-              </div>
-              <div id="loadoutModeList" class="loadout-mode-list"></div>
-              <div id="loadoutRandomGoalList" class="loadout-random-goal-list"></div>
-            </section>
-            <section class="loadout-section loadout-difficulty-section">
-              <div class="loadout-section-title">
-                <span>01</span>
-                <div>
-                  <h3>选择作战难度</h3>
-                  <p>完成当前难度后，下一难度会自动解锁。</p>
-                </div>
-              </div>
-              <div id="loadoutDifficultyList" class="loadout-difficulty-list"></div>
-            </section>
-            <section class="loadout-section loadout-weapon-section">
-              <div class="loadout-section-title">
-                <span>02</span>
-                <div>
-                  <h3>选择开局武器</h3>
-                  <p>武器预览会实时播放，进入游戏后立即装备。</p>
-                </div>
-              </div>
-              <div class="loadout-weapon-preview-wrap">
-                <canvas id="loadoutWeaponPreview" class="loadout-weapon-preview" aria-label="开局武器预览"></canvas>
-                <div class="loadout-weapon-info">
-                  <strong id="loadoutWeaponName">未选择武器</strong>
-                  <p id="loadoutWeaponDesc">选择一把开局武器。</p>
-                  <div id="loadoutWeaponTags" class="weapon-tags"></div>
-                </div>
-              </div>
-              <div id="loadoutWeaponList" class="loadout-weapon-list"></div>
-            </section>
-          </div>
-          <footer class="loadout-footer">
-            <div class="loadout-summary">
-              <span>模式 <strong id="loadoutRunModeName">标准模式</strong></span>
-              <span>难度 <strong id="loadoutDifficultyName">未选择</strong></span>
-              <span>目标 <strong id="loadoutRandomGoalName">20波通关</strong></span>
-              <span>武器 <strong id="loadoutSelectedWeaponName">未选择</strong></span>
-            </div>
-            <div class="loadout-actions">
-              <button id="loadoutBackButton" type="button" class="secondary">返回大厅</button>
-              <button id="loadoutConfirmButton" type="button" class="primary" disabled>开始作战</button>
-            </div>
-          </footer>
         </div>
       </section>
 
@@ -547,7 +483,7 @@
             <span>跳过剧情</span>
           </button>
 
-          <article class="story-panel">
+          <article class="story-panel ui-shell ui-shell--story">
             <p id="storyArchive" class="story-archive">档案 01 / 再生舱</p>
             <h2 id="storyTitle">苏醒协议</h2>
             <div class="story-rule" aria-hidden="true"></div>
@@ -569,8 +505,8 @@
         </div>
       </section>
 
-      <section id="shopOverlay" class="overlay">
-        <div class="panel shop-panel">
+      <section id="shopOverlay" class="overlay" aria-hidden="true">
+        <div class="panel shop-panel ui-shell ui-shell--shop">
           <div class="shop-head">
             <div>
               <p class="eyebrow">WAVE SHOP</p>
@@ -598,8 +534,8 @@
         </div>
       </section>
 
-      <section id="pauseOverlay" class="overlay">
-        <div class="panel pause-menu">
+      <section id="pauseOverlay" class="overlay" aria-hidden="true">
+        <div class="panel pause-menu ui-shell ui-shell--pause">
           <p class="eyebrow">PAUSED</p>
           <h2>游戏已暂停</h2>
           <div class="pause-actions">
@@ -611,8 +547,8 @@
         </div>
       </section>
 
-      <section id="inventoryOverlay" class="overlay">
-        <div class="panel inventory-panel">
+      <section id="inventoryOverlay" class="overlay" aria-hidden="true">
+        <div class="panel inventory-panel ui-shell ui-shell--inventory">
           <div class="inventory-head">
             <div>
               <p class="eyebrow">INVENTORY</p>
@@ -647,8 +583,8 @@
           </div>
         </div>
       </section>
-      <section id="endOverlay" class="overlay">
-        <div class="panel end">
+      <section id="endOverlay" class="overlay" aria-hidden="true">
+        <div class="panel end ui-shell ui-shell--end">
           <p id="endEyebrow" class="eyebrow">RUN COMPLETE</p>
           <h2 id="endTitle">生存结束</h2>
           <div id="endStats" class="end-stats"></div>

@@ -1,67 +1,39 @@
-# Online P2P Deployment
+# Multiplayer Deployment
 
-GitHub Pages can host the game files, but it cannot execute the local Python room API. The included `worker/` directory supplies the missing signaling API; it stores only a WebRTC offer and answer long enough to establish a connection.
+The recommended multiplayer path is the WebSocket relay. The relay only forwards room messages, P2 input, host snapshots, ready states, and shop or lobby actions. Combat authority still stays in the P1 browser.
 
-## Architecture
+## Local or Radmin Play
 
-```text
-Game page (GitHub Pages / any HTTPS host)
-  -> Cloudflare Worker + Durable Object (short-lived signaling only)
-  -> WebRTC DataChannel (host-authoritative battle data, browser to browser)
-```
-
-The Worker never relays player input, snapshots, or combat state. `stun:stun.cloudflare.com:3478` helps browsers discover direct paths through NAT. Some restrictive networks still require a TURN relay; do not add a TURN credential directly to the static game because it would be public.
-
-## Publish the signaling service
-
-1. Run `npx wrangler deploy` in `worker/` after logging in to Cloudflare.
-2. Set the Worker variable `ALLOWED_ORIGINS` to the game origins, for example `https://owner.github.io,https://game.example.com`.
-3. Put the deployed Worker HTTPS address in `src/config/multiplayer-config.js`:
-
-```js
-export const multiplayerConfig = {
-  signalServerUrl: "https://survivor-p2p-signal.<account>.workers.dev",
-  iceServers: [{ urls: ["stun:stun.cloudflare.com:3478"] }],
-};
-```
-
-4. Publish the game files to GitHub Pages or another HTTPS static host.
-
-With this configuration, the host creates a six-digit room and shares the game-page invitation link. The guest opens that link from any network, joins the room, then plays over a direct WebRTC DataChannel whenever the two networks allow it.
-
-## Local Radmin fallback
-
-Leave `signalServerUrl` empty and start the game with `start.cmd -Lan` to use the existing host-local room API over Radmin VPN. This is useful for development or private LAN sessions, but it is not available from GitHub Pages.
-
-## Standalone local signaling backend
-
-For a separately started local backend, run:
-
-```powershell
-.\start-p2p-backend.cmd -AdvertiseHost 26.x.x.x -AllowedOrigin http://26.x.x.x:5000
-```
-
-It exposes only `http://26.x.x.x:5001/api/p2p/`. A locally served game can select it with `?signal=http://26.x.x.x:5001`; the backend is also useful when the local front-end is served by another development server.
-
-Do not point an HTTPS GitHub Pages game at this HTTP address: browsers block that mixed-content request. In that case, use the deployed HTTPS Worker, or put the local backend behind an HTTPS reverse proxy/tunnel and use its HTTPS URL in `?signal=`.
-# WebSocket 联机后端（推荐）
-
-在安装了 Radmin VPN 的 P1 电脑运行：
+Run this on the P1 computer:
 
 ```powershell
 .\start-multiplayer.cmd
 ```
 
-脚本会同时启动无缓存前端和 WebSocket 房间中继，并打开带有 `relay` 参数的游戏地址。P1 创建房间后直接把邀请链接发给 P2。若无法自动识别 Radmin 地址：
+The script starts the no-cache frontend on port `5000`, starts the WebSocket relay on port `5001`, and opens a game URL with `?transport=relay&relay=...`.
+
+If the Radmin address cannot be detected automatically, pass it explicitly:
 
 ```powershell
 .\start-multiplayer.cmd -AdvertiseHost 26.x.x.x
 ```
 
-默认前端端口为 `5000`，WebSocket 端口为 `5001`。两者都需要允许通过防火墙。WebSocket 后端负责房间、输入、快照、强化和商店消息的双向转发；战斗判定仍由 P1 浏览器负责。
+P1 creates a room at the communication tower and sends the invite link to P2. Both ports must be allowed through the firewall on the Radmin or LAN network.
 
-GitHub Pages 是 HTTPS 页面，浏览器只允许连接 `wss://` 后端。公网部署时需要把本脚本的 WebSocket 服务放到支持 TLS 的反向代理后方，然后通过以下参数打开游戏：
+## GitHub Pages or HTTPS Hosting
+
+GitHub Pages can host the static game, but it cannot run the Python relay. A game opened from HTTPS must connect to a `wss://` relay, not a plain `ws://` or `http://` local service.
+
+Example URL:
 
 ```text
 https://example.github.io/survivor/?transport=relay&relay=wss%3A%2F%2Frelay.example.com%2Fws
 ```
+
+Put the relay behind a TLS reverse proxy or deploy an equivalent WebSocket service. Do not place private credentials in the static game files.
+
+## WebRTC Fallback
+
+The older WebRTC DataChannel path is still available as an advanced fallback. It can use the online signaling Worker or the local `/api/p2p/` room API to exchange offer and answer data, then send gameplay directly through WebRTC.
+
+For that mode, configure `src/config/multiplayer-config.js` with a `signalServerUrl` and `iceServers`, or use the local LAN signaling service. Some restrictive networks still require TURN; do not embed shared TURN credentials in a public static site.

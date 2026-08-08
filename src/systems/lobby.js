@@ -522,8 +522,8 @@ export function allLobbyInteractions(player = state.lobby.player) {
       randomProtocol: `切换随机目标 · 当前 ${lobbyRandomGoalLabel()}`,
       missionTable: "查看霓虹中转舰运行状态",
       squadRelay: state.multiplayer?.connected
-        ? `已与 ${state.multiplayer.peerName || "对端"} 建立协同链路 · ${state.multiplayer.latencyMs || 0}ms`
-        : "建立双人 P2P 协同链路 · 支持 Radmin 虚拟局域网",
+        ? `已与 ${state.multiplayer.peerName || "对端"} 建立协同链路 · ${state.multiplayer.statusLabel || "已连接"} · ${state.multiplayer.latencyMs || 0}ms`
+        : "建立双人协同链路 · 支持 WebSocket 后端、在线信令和 Radmin 局域网",
       recorder: "查看正式冒险总览、难度档案与单局历史",
       codex: "查阅敌人、武器、道具与事件记录",
       gene: "局外强化模块尚未开放",

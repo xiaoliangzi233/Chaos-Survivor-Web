@@ -62,13 +62,17 @@ const UI_IDS = [
   "codexOverlay",
   "levelOverlay",
   "runLoadingOverlay",
-  "loadoutOverlay",
   "storyOverlay",
   "shopOverlay",
   "pauseOverlay",
   "inventoryOverlay",
   "endOverlay",
 ];
+const UI_VIEWPORTS = Object.freeze([
+  { id: "desktop-xl", width: 1920, height: 1080 },
+  { id: "desktop-compact", width: 1366, height: 768 },
+  { id: "mobile", width: 390, height: 844 },
+]);
 const GLYPH_EFFECTS = [
   "diamond",
   "diamondGlow",
@@ -580,13 +584,16 @@ function addHazardTasks(tasks, mode) {
 
 function addUiTasks(tasks, mode) {
   const ids = mode === "smoke" ? UI_IDS.slice(0, 1) : UI_IDS;
-  for (const id of ids) {
-    tasks.push(task(
-      "ui",
-      id,
-      `ui/${safeId(id)}.png`,
-      () => captureUiElement(id),
-    ));
+  const viewports = mode === "smoke" ? UI_VIEWPORTS.slice(0, 1) : UI_VIEWPORTS;
+  for (const viewportProfile of viewports) {
+    for (const id of ids) {
+      tasks.push(task(
+        "ui",
+        `${viewportProfile.id}-${id}`,
+        `ui/${viewportProfile.id}/${safeId(id)}.png`,
+        () => captureUiElement(id, viewportProfile),
+      ));
+    }
   }
 }
 
@@ -956,10 +963,14 @@ function makeHazard(kind, variant, progress) {
   };
 }
 
-async function captureUiElement(id) {
+async function captureUiElement(id, viewportProfile = UI_VIEWPORTS[0]) {
   const response = await fetch("/__visual_export/ui-render", {
     method: "POST",
-    headers: { "X-Ui-Element": id },
+    headers: {
+      "X-Ui-Element": id,
+      "X-Ui-Width": String(viewportProfile.width),
+      "X-Ui-Height": String(viewportProfile.height),
+    },
   });
   if (!response.ok) {
     const result = await response.json().catch(() => ({}));
@@ -969,7 +980,7 @@ async function captureUiElement(id) {
   const url = URL.createObjectURL(blob);
   try {
     const image = await loadImage(url);
-    const canvas = createCanvas(image.naturalWidth || 1920, image.naturalHeight || 1080);
+    const canvas = createCanvas(image.naturalWidth || viewportProfile.width, image.naturalHeight || viewportProfile.height);
     canvas.getContext("2d").drawImage(image, 0, 0);
     return canvas;
   } finally {

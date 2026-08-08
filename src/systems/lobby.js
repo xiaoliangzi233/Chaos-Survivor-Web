@@ -50,6 +50,7 @@ export const LOBBY_PORTALS = [
 
 export const LOBBY_DEVICES = [
   { id: "mission-table", kind: "missionTable", action: "ship-status", roomId: "core", x: 0, y: -90, color: "#42e8ff", label: "星舰任务全息桌", collider: { w: 250, h: 118 } },
+  { id: "squad-relay", kind: "squadRelay", action: "multiplayer", roomId: "core", x: -205, y: 270, color: "#ff8bd8", label: "协同通信塔", collider: { w: 202, h: 128 } },
   { id: "difficulty-sync", kind: "difficulty", action: "difficulty", roomId: "bridge", x: -480, y: -1180, color: "#ffd166", label: "难度同步器", collider: { w: 160, h: 100 } },
   { id: "adventure-recorder", kind: "recorder", action: "recorder", roomId: "data", x: -2130, y: -520, color: "#ffd166", label: "冒险记录仪", collider: { w: 170, h: 104 } },
   { id: "codex-terminal", kind: "codex", action: "codex", roomId: "data", x: -1640, y: -500, color: "#42e8ff", label: "记录者终端", collider: { w: 175, h: 100 } },
@@ -515,6 +516,9 @@ export function allLobbyInteractions(player = state.lobby.player) {
       difficulty: `切换已解锁难度 · 当前 ${selectedLobbyDifficulty()?.name || "未同步"}`,
       randomProtocol: `切换随机目标 · 当前 ${lobbyRandomGoalLabel()}`,
       missionTable: "查看霓虹中转舰运行状态",
+      squadRelay: state.multiplayer?.connected
+        ? `已与 ${state.multiplayer.peerName || "对端"} 建立协同链路 · ${state.multiplayer.latencyMs || 0}ms`
+        : "建立双人 P2P 协同链路 · 支持 Radmin 虚拟局域网",
       recorder: "查看正式冒险总览、难度档案与单局历史",
       codex: "查阅敌人、武器、道具与事件记录",
       gene: "局外强化模块尚未开放",

@@ -43,6 +43,10 @@ export const ui = {
   hpBar: document.getElementById("hpBar"),
   hpText: document.getElementById("hpText"),
   hpMeter: document.getElementById("hpMeter"),
+  coopVitals: document.getElementById("coopVitals"),
+  p2HpBar: document.getElementById("p2HpBar"),
+  p2HpText: document.getElementById("p2HpText"),
+  p2ConnectionText: document.getElementById("p2ConnectionText"),
   xpBar: document.getElementById("xpBar"),
   xpMeter: document.getElementById("xpMeter"),
   levelText: document.getElementById("levelText"),
@@ -167,6 +171,16 @@ export function updateHud(fps, now = performance.now()) {
   }
   const p = state.player;
   if (!p) return;
+  const p2 = state.players?.p2;
+  const coopActive = Boolean(state.multiplayer?.connected && p2 && ["playing", "paused", "shop", "leveling"].includes(state.mode));
+  ui.coopVitals?.classList.toggle("active", coopActive);
+  ui.coopVitals?.setAttribute("aria-hidden", coopActive ? "false" : "true");
+  if (coopActive && p2) {
+    const p2HpRatio = Math.max(0, Math.min(1, p2.hp / Math.max(1, p2.maxHp)));
+    if (ui.p2HpBar) ui.p2HpBar.style.transform = `scaleX(${p2HpRatio})`;
+    if (ui.p2HpText) ui.p2HpText.textContent = `${Math.max(0, Math.ceil(p2.hp))}/${Math.ceil(p2.maxHp)}`;
+    if (ui.p2ConnectionText) ui.p2ConnectionText.textContent = `P2 // ${state.multiplayer.latencyMs || 0}ms`;
+  }
   const hp = Math.max(0, Math.ceil(p.hp));
   const xp = Math.max(0, Math.floor(p.xp));
   const hpRatio = Math.max(0, Math.min(1, p.hp / p.maxHp));

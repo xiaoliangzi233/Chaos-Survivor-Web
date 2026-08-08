@@ -8,8 +8,10 @@ import {
 } from "../net/p2pSession.js";
 
 const dom = {};
+let onModalChange = null;
 
-export function initMultiplayerUi() {
+export function initMultiplayerUi({ onModalChange: modalChange } = {}) {
+  onModalChange = modalChange || null;
   dom.openButton = document.getElementById("multiplayerButton");
   dom.overlay = document.getElementById("multiplayerOverlay");
   dom.closeButton = document.getElementById("multiplayerCloseButton");
@@ -21,6 +23,8 @@ export function initMultiplayerUi() {
   dom.createHostButton = document.getElementById("multiplayerCreateHostButton");
   dom.createAnswerButton = document.getElementById("multiplayerCreateAnswerButton");
   dom.acceptAnswerButton = document.getElementById("multiplayerAcceptAnswerButton");
+  dom.copyHostButton = document.getElementById("multiplayerCopyHostButton");
+  dom.copyAnswerButton = document.getElementById("multiplayerCopyAnswerButton");
   dom.disconnectButton = document.getElementById("multiplayerDisconnectButton");
 
   dom.openButton?.addEventListener("click", openMultiplayerPanel);
@@ -31,6 +35,8 @@ export function initMultiplayerUi() {
   dom.createHostButton?.addEventListener("click", createHostCode);
   dom.createAnswerButton?.addEventListener("click", createAnswerCode);
   dom.acceptAnswerButton?.addEventListener("click", acceptAnswerCode);
+  dom.copyHostButton?.addEventListener("click", () => copyCode(dom.hostOffer, "主机码已复制。"));
+  dom.copyAnswerButton?.addEventListener("click", () => copyCode(dom.guestAnswer, "应答码已复制。"));
   dom.disconnectButton?.addEventListener("click", () => {
     disconnectPeer();
     renderStatus("已断开联机。");
@@ -50,15 +56,19 @@ export function updateMultiplayerUi() {
   renderStatus();
 }
 
-function openMultiplayerPanel() {
+export function openMultiplayerPanel() {
   dom.overlay?.classList.add("active");
   dom.overlay?.setAttribute("aria-hidden", "false");
+  dom.openButton?.setAttribute("aria-expanded", "true");
+  onModalChange?.(true);
   renderStatus();
 }
 
-function closeMultiplayerPanel() {
+export function closeMultiplayerPanel() {
   dom.overlay?.classList.remove("active");
   dom.overlay?.setAttribute("aria-hidden", "true");
+  dom.openButton?.setAttribute("aria-expanded", "false");
+  onModalChange?.(false);
 }
 
 async function createHostCode() {
@@ -98,6 +108,26 @@ async function runAction(action) {
 function setBusy(busy) {
   for (const button of [dom.createHostButton, dom.createAnswerButton, dom.acceptAnswerButton]) {
     if (button) button.disabled = Boolean(busy);
+  }
+}
+
+async function copyCode(textarea, successMessage) {
+  const text = textarea?.value?.trim();
+  if (!text) {
+    renderStatus("请先生成联机码。", true);
+    return;
+  }
+  try {
+    if (navigator.clipboard?.writeText) await navigator.clipboard.writeText(text);
+    else {
+      textarea.focus();
+      textarea.select();
+      if (!document.execCommand("copy")) throw new Error("copy failed");
+      textarea.setSelectionRange(0, 0);
+    }
+    renderStatus(successMessage);
+  } catch {
+    renderStatus("无法自动复制，请长按或手动复制联机码。", true);
   }
 }
 

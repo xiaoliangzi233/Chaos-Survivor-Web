@@ -96,7 +96,7 @@ import {
   initAdventureStatsUi,
   openAdventureStats,
 } from "../ui/adventureStatsUi.js";
-import { initMultiplayerUi, updateMultiplayerUi } from "../ui/multiplayerUi.js";
+import { initMultiplayerUi, openMultiplayerPanel, updateMultiplayerUi } from "../ui/multiplayerUi.js";
 import { netRuntime, nextLocalInputFrame, isHostAuthority, isGuestMirror } from "../net/netState.js";
 import { sendHostSnapshot, sendLocalInput, sendStartRun } from "../net/p2pSession.js";
 import { applyHostSnapshot, createStartRunPayload } from "../net/snapshot.js";
@@ -107,7 +107,11 @@ export async function bootGame() {
   setBootProgress(6, "正在启动霓虹废墟");
   initInventoryUi();
   initLobbyUi();
-  initMultiplayerUi();
+  initMultiplayerUi({
+    onModalChange: (open) => {
+      if (state.lobby.active) setLobbyModalOpen(open);
+    },
+  });
   initAdventureStatsUi({
     getDifficulties: difficultyCards,
     onModalChange: (open) => {
@@ -636,6 +640,12 @@ export async function bootGame() {
     const interaction = interactWithLobby(targetId);
     if (!interaction) return false;
     if (["weapon-page", "weapon-select", "difficulty", "random-goal", "launch-charge", "pet"].includes(interaction.action)) {
+      playSfx("select");
+      return true;
+    }
+    if (interaction.action === "multiplayer") {
+      setLobbyModalOpen(true);
+      openMultiplayerPanel();
       playSfx("select");
       return true;
     }

@@ -589,7 +589,7 @@ function drawDevice(ctx, device, time) {
   const y = device.y * LOBBY_Y_SCALE;
   ctx.save();
   ctx.translate(device.x, y);
-  drawInteractionRing(ctx, device.id, device.color, device.kind === "missionTable" ? 132 : 96, 36);
+  drawInteractionRing(ctx, device.id, device.color, device.kind === "missionTable" ? 132 : device.kind === "squadRelay" ? 118 : 96, 36);
   if (device.kind === "missionTable") drawMissionTable(ctx, device, time);
   else if (device.kind === "recorder" || device.kind === "codex") drawArchiveDevice(ctx, device, time);
   else if (device.kind === "gene") drawGeneModifier(ctx, device, time);
@@ -597,7 +597,104 @@ function drawDevice(ctx, device, time) {
   else if (device.kind === "lever") drawLever(ctx, device);
   else if (device.kind === "difficulty") drawDifficultySync(ctx, device, time);
   else if (device.kind === "randomProtocol") drawRandomProtocol(ctx, device, time);
+  else if (device.kind === "squadRelay") drawSquadRelay(ctx, device, time);
   ctx.restore();
+}
+
+function drawSquadRelay(ctx, device, time) {
+  const connected = Boolean(state.multiplayer?.connected);
+  const statusColor = connected ? "#77ff8a" : device.color;
+  const pulse = 0.72 + Math.sin(time * 4.4) * 0.16;
+  const active = connected ? 1 : 0.42 + Math.sin(time * 2.2) * 0.12;
+  drawObjectShadow(ctx, 0, 38, 126, 35);
+
+  ctx.fillStyle = "#07111c";
+  ctx.strokeStyle = "#3b5265";
+  ctx.lineWidth = 5;
+  ctx.beginPath();
+  ctx.moveTo(-104, 27);
+  ctx.lineTo(-75, -4);
+  ctx.lineTo(75, -4);
+  ctx.lineTo(104, 27);
+  ctx.lineTo(78, 47);
+  ctx.lineTo(-78, 47);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = hexToRgba(statusColor, 0.16 + active * 0.12);
+  ctx.fillRect(-70, 11, 140, 9);
+
+  for (const side of [-1, 1]) {
+    ctx.save();
+    ctx.translate(side * 66, 5);
+    ctx.fillStyle = "#0c1d2a";
+    ctx.strokeStyle = hexToRgba(statusColor, 0.62);
+    ctx.lineWidth = 3;
+    roundRect(ctx, -15, -94, 30, 100, 5);
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = hexToRgba(statusColor, 0.52);
+    for (let slot = 0; slot < 4; slot++) ctx.fillRect(-8, -78 + slot * 17, 16, 6);
+    ctx.restore();
+  }
+
+  ctx.save();
+  ctx.translate(0, -80);
+  const beam = ctx.createLinearGradient(0, -92, 0, 61);
+  beam.addColorStop(0, hexToRgba(statusColor, 0));
+  beam.addColorStop(0.45, hexToRgba(statusColor, 0.11 * active));
+  beam.addColorStop(1, hexToRgba(statusColor, 0));
+  ctx.fillStyle = beam;
+  ctx.beginPath();
+  ctx.moveTo(-52, 66);
+  ctx.lineTo(-18, -86);
+  ctx.lineTo(18, -86);
+  ctx.lineTo(52, 66);
+  ctx.closePath();
+  ctx.fill();
+  for (let ring = 0; ring < 3; ring++) {
+    ctx.save();
+    ctx.rotate(time * (ring % 2 ? -0.72 : 0.54) + ring * 0.66);
+    ctx.strokeStyle = hexToRgba(ring === 1 ? "#42e8ff" : statusColor, (0.58 - ring * 0.1) * active);
+    ctx.lineWidth = 3 - ring * 0.45;
+    ctx.beginPath();
+    ctx.ellipse(0, ring * 4, 56 - ring * 13, 19 - ring * 3, 0, 0, TAU);
+    ctx.stroke();
+    ctx.restore();
+  }
+  const coreGlow = ctx.createRadialGradient(0, 0, 2, 0, 0, 45);
+  coreGlow.addColorStop(0, "rgba(255,255,255,0.94)");
+  coreGlow.addColorStop(0.18, hexToRgba(statusColor, 0.82));
+  coreGlow.addColorStop(1, hexToRgba(statusColor, 0));
+  ctx.fillStyle = coreGlow;
+  ctx.beginPath();
+  ctx.arc(0, 0, 45 * pulse, 0, TAU);
+  ctx.fill();
+  ctx.fillStyle = "#f4fbff";
+  ctx.beginPath();
+  ctx.moveTo(0, -10);
+  ctx.lineTo(10, 0);
+  ctx.lineTo(0, 10);
+  ctx.lineTo(-10, 0);
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
+
+  ctx.fillStyle = "#07111c";
+  ctx.strokeStyle = hexToRgba(statusColor, 0.72);
+  ctx.lineWidth = 2;
+  roundRect(ctx, -93, 52, 186, 32, 5);
+  ctx.fill();
+  ctx.stroke();
+  ctx.font = `bold 10px ${FONT}`;
+  ctx.textAlign = "center";
+  ctx.fillStyle = statusColor;
+  ctx.fillText(connected ? "P2 LINK // ONLINE" : "P2 LINK // STANDBY", 0, 73);
+  if (connected) {
+    ctx.font = `8px ${FONT}`;
+    ctx.fillStyle = "#dfffe5";
+    ctx.fillText(`${state.multiplayer?.latencyMs || 0}ms`, 0, 94);
+  }
 }
 
 function drawMissionTable(ctx, device, time) {
@@ -2291,8 +2388,10 @@ function collectLobbyLights(viewport) {
   }
   for (const device of LOBBY_DEVICES) {
     if (!isLobbyRoomVisible(device.roomId)) continue;
-    const radius = device.kind === "missionTable" ? 195 : device.kind === "lever" ? 92 : 148;
-    add(device.x, device.y - 40 / LOBBY_Y_SCALE, radius, device.color, device.kind === "lever" ? 0.28 : 0.42, 0.18, 74);
+    const radius = device.kind === "missionTable" ? 195 : device.kind === "squadRelay" ? 210 : device.kind === "lever" ? 92 : 148;
+    const color = device.kind === "squadRelay" && state.multiplayer?.connected ? "#77ff8a" : device.color;
+    const strength = device.kind === "squadRelay" ? (state.multiplayer?.connected ? 0.6 : 0.34) : device.kind === "lever" ? 0.28 : 0.42;
+    add(device.x, device.y - 54 / LOBBY_Y_SCALE, radius, color, strength, 0.18, 74);
   }
   for (const station of LOBBY_WEAPON_STATIONS) {
     if (!isLobbyRoomVisible(station.roomId)) continue;

@@ -65,6 +65,7 @@
 
       <nav class="quick-actions" aria-label="游戏操作">
         <button id="inventoryButton" type="button" title="按 E 打开背包" aria-label="背包，快捷键 E"><span>背包</span><kbd>E</kbd></button>
+        <button id="activeItemButton" type="button" title="使用战术模块，快捷键 F" aria-label="使用战术模块，快捷键 F" hidden><span>模块</span><kbd>F</kbd></button>
         <button id="pauseButton" type="button" title="暂停/继续">II</button>
         <button id="muteButton" type="button" title="音效开关">♪</button>
       </nav>
@@ -128,10 +129,31 @@
             <button id="multiplayerCloseButton" type="button" aria-label="关闭联机面板">×</button>
           </header>
           <p id="multiplayerStatus" class="multiplayer-status">未联机</p>
-          <div class="multiplayer-grid">
+          <div class="multiplayer-lan-grid">
             <section>
-              <h3>P1 主机</h3>
-              <button id="multiplayerCreateHostButton" type="button" class="primary">创建主机码</button>
+              <h3>P1 主机 · 创建局域网房间</h3>
+              <p>使用 <code>start.cmd -Lan</code> 启动后，创建一个仅在 Radmin 网络中有效的临时房间。</p>
+              <button id="multiplayerCreateRoomButton" type="button" class="primary">创建局域网房间</button>
+              <div id="multiplayerRoomCard" class="multiplayer-room-card" hidden>
+                <span>ROOM CODE</span>
+                <strong id="multiplayerRoomId">------</strong>
+                <input id="multiplayerInviteLink" readonly aria-label="局域网邀请链接" />
+                <button id="multiplayerCopyInviteButton" type="button">复制邀请链接</button>
+              </div>
+            </section>
+            <section>
+              <h3>P2 客机 · 加入房间</h3>
+              <p id="multiplayerJoinHint">打开主机发来的邀请链接后，输入 6 位房间号即可加入。</p>
+              <input id="multiplayerRoomInput" class="multiplayer-room-input" inputmode="numeric" maxlength="6" autocomplete="one-time-code" placeholder="6 位房间号" aria-label="局域网房间号" />
+              <button id="multiplayerJoinRoomButton" type="button" class="primary">加入局域网房间</button>
+            </section>
+          </div>
+          <details class="multiplayer-manual-fallback">
+            <summary>高级备用连接：手动粘贴 WebRTC 联机码</summary>
+            <div class="multiplayer-grid">
+              <section>
+                <h3>P1 主机</h3>
+                <button id="multiplayerCreateHostButton" type="button">创建主机码</button>
               <textarea id="multiplayerHostOffer" readonly spellcheck="false" aria-label="主机码"></textarea>
               <button id="multiplayerCopyHostButton" type="button">复制主机码</button>
               <textarea id="multiplayerHostAnswer" spellcheck="false" aria-label="粘贴 P2 应答码" placeholder="粘贴 P2 返回的应答码"></textarea>
@@ -144,10 +166,11 @@
               <textarea id="multiplayerGuestAnswer" readonly spellcheck="false" aria-label="P2 应答码"></textarea>
               <button id="multiplayerCopyAnswerButton" type="button">复制应答码</button>
             </section>
-          </div>
+            </div>
+          </details>
           <footer>
-            <span>Radmin 等工具只需先让双方处在可互通网络中；本面板不连接任何服务器。</span>
-            <button id="multiplayerDisconnectButton" type="button">断开连接</button>
+            <span>临时房间只交换 P2P 配对信息，不保存战斗数据，也不连接外部服务器。</span>
+            <button id="multiplayerDisconnectButton" type="button">取消 / 断开</button>
           </footer>
         </div>
       </section>

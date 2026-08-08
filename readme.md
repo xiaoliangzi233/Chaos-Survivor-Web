@@ -34,6 +34,22 @@ Cache-Control: no-store, no-cache, must-revalidate, max-age=0
 python .\scripts\no_cache_server.py 5000 --bind 127.0.0.1
 ```
 
+### Radmin 局域网双人联机
+
+主机在 Radmin VPN 已连接的前提下运行：
+
+```powershell
+.\start.cmd -Lan
+```
+
+启动脚本会优先识别 Radmin IPv4，并以该地址打开游戏。进入大厅的“协同通信塔”后创建局域网房间，复制邀请链接发送给伙伴；伙伴打开链接、进入大厅后点击“加入局域网房间”即可。临时服务只在主机电脑内存中交换 WebRTC 配对信息，战斗数据仍通过 P2P DataChannel 传输。
+
+若未自动识别 Radmin 地址，明确指定它：
+
+```powershell
+.\start.cmd -Lan -AdvertiseHost 26.x.x.x
+```
+
 不建议日常开发直接使用 `python -m http.server`，因为它可能返回 `304 Not Modified`，导致浏览器继续使用旧资源。
 
 ## 主要玩法与系统

@@ -4,7 +4,7 @@ import { clamp, distSq } from "../utils.js";
 import { burst, pulse, spawnDamageText } from "../effects.js";
 import { playSfx } from "../audio.js";
 import { currentDifficulty } from "../difficulty.js";
-import { applyPlayerDamage } from "../systems/items.js";
+import { applyPlayerDamage, onItemEnemyKilled } from "../systems/items.js";
 import { maybeTriggerBossSignature } from "../systems/easterEggs.js";
 import { dropEnemyRewards } from "../systems/rewards.js";
 import { randomGrowthMultiplierForWave } from "../systems/randomMode.js";
@@ -209,6 +209,7 @@ export class BaseEnemy {
     burst(this.x, this.y, this.boss ? 48 : 12, this.color, this.boss ? 240 : 140);
     playSfx(this.boss ? "explode" : "hit");
     dropEnemyRewards(this);
+    onItemEnemyKilled(this);
     const i = world.enemies.indexOf(this);
     if (i >= 0) world.enemies.splice(i, 1);
     if (this.behavior === "split_large") splitInto("slime_medium", this.x, this.y, 2, this.r * 0.8);

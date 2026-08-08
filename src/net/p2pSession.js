@@ -9,11 +9,72 @@ import {
   updateRemoteInput,
 } from "./netState.js";
 import { applyHostSnapshot, createHostSnapshot } from "./snapshot.js";
+import { multiplayerConfig } from "../config/multiplayer-config.js";
+import {
+  cancelLanRoom as revokeLanRoom,
+  createInviteUrl,
+  createLanRoom,
+  fetchLanAnswer,
+  fetchLanOffer,
+  normalizeRoomId,
+  publishLanAnswer,
+} from "./lanRoomService.js";
 
 const CHANNEL_NAME = "survivor-p2p-v1";
 const ICE_TIMEOUT_MS = 1800;
 let peer = null;
 let channel = null;
+let lanSession = null;
+
+export async function createLanHostRoom() {
+  const offer = await createHostOffer();
+  setNetworkStatus("creating-room");
+  try {
+    const room = await createLanRoom(offer);
+    lanSession = {
+      role: "host",
+      roomId: room.roomId,
+      inviteUrl: createInviteUrl(room.roomId),
+      pollTimer: 0,
+      stopped: false,
+    };
+    setNetworkStatus("waiting-guest");
+    pollHostAnswer();
+    return { roomId: room.roomId, inviteUrl: lanSession.inviteUrl, expiresIn: room.expiresIn };
+  } catch (error) {
+    closeSession({ keepRole: false, notify: false });
+    setNetworkStatus("room-error", error instanceof Error ? error.message : String(error));
+    throw error;
+  }
+}
+
+export async function joinLanRoom(roomId) {
+  const normalizedRoomId = normalizeRoomId(roomId);
+  closeSession({ keepRole: false, notify: false });
+  setNetworkStatus("joining-room");
+  try {
+    const room = await fetchLanOffer(normalizedRoomId);
+    const answer = await acceptHostOffer(room.offer);
+    lanSession = { role: "guest", roomId: normalizedRoomId, pollTimer: 0, stopped: false };
+    await publishLanAnswer(normalizedRoomId, answer);
+    setNetworkStatus("waiting-host");
+    return { roomId: normalizedRoomId };
+  } catch (error) {
+    closeSession({ keepRole: false, notify: false });
+    setNetworkStatus("room-error", error instanceof Error ? error.message : String(error));
+    throw error;
+  }
+}
+
+export function currentLanRoom() {
+  if (!lanSession) return null;
+  return { roomId: lanSession.roomId, role: lanSession.role, inviteUrl: lanSession.inviteUrl || "" };
+}
+
+export function cancelLanSession() {
+  stopLanSignaling({ revoke: true });
+  closeSession({ keepRole: false, notify: true });
+}
 
 export async function createHostOffer() {
   closeSession({ keepRole: false, notify: false });
@@ -76,6 +137,7 @@ export function disconnectPeer() {
 }
 
 export function closeSession({ keepRole = false, notify = true } = {}) {
+  stopLanSignaling({ revoke: true });
   try {
     channel?.close?.();
   } catch {}
@@ -93,10 +155,11 @@ export function isChannelOpen() {
 }
 
 function createPeer() {
-  const rtc = new RTCPeerConnection({ iceServers: [] });
+  const rtc = new RTCPeerConnection({ iceServers: multiplayerConfig.iceServers || [] });
   rtc.addEventListener("connectionstatechange", () => {
     const state = rtc.connectionState;
     if (state === "connected") {
+      stopLanSignaling();
       setNetworkConnected(true, netRuntime.role === "host" ? "P2 客机" : "P1 主机");
       setNetworkStatus("connected");
       sendMessage({ type: "hello", payload: { name: netRuntime.role === "host" ? "P1 主机" : "P2 客机" } });
@@ -114,6 +177,7 @@ function createPeer() {
 function bindChannel(dc) {
   dc.binaryType = "arraybuffer";
   dc.addEventListener("open", () => {
+    stopLanSignaling();
     setNetworkConnected(true, netRuntime.role === "host" ? "P2 客机" : "P1 主机");
     setNetworkStatus("connected");
     sendMessage({ type: "hello", payload: { name: netRuntime.role === "host" ? "P1 主机" : "P2 客机" } });
@@ -127,6 +191,38 @@ function bindChannel(dc) {
     setNetworkStatus("error", "DataChannel 连接错误");
   });
   dc.addEventListener("message", (event) => receiveMessage(event.data));
+}
+
+async function pollHostAnswer() {
+  const session = lanSession;
+  if (!session || session.role !== "host" || session.stopped) return;
+  try {
+    const response = await fetchLanAnswer(session.roomId);
+    if (lanSession !== session || session.stopped) return;
+    if (response.state === "answer_ready" && response.answer) {
+      stopLanSignaling();
+      await acceptGuestAnswer(response.answer);
+      return;
+    }
+    scheduleHostPoll(session);
+  } catch (error) {
+    if (lanSession !== session || session.stopped) return;
+    stopLanSignaling();
+    setNetworkStatus("room-error", error instanceof Error ? error.message : String(error));
+  }
+}
+
+function scheduleHostPoll(session) {
+  session.pollTimer = window.setTimeout(() => pollHostAnswer(), 650);
+}
+
+function stopLanSignaling({ revoke = false } = {}) {
+  const session = lanSession;
+  if (!session) return;
+  session.stopped = true;
+  if (session.pollTimer) window.clearTimeout(session.pollTimer);
+  lanSession = null;
+  if (revoke && session.role === "host") revokeLanRoom(session.roomId).catch(() => {});
 }
 
 function receiveMessage(raw) {

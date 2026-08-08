@@ -66,6 +66,48 @@ export const ITEM_DATA_DEFS = [
   { id: "star_cloak", icon: "✦", name: "星星斗篷", basePrice: 36, singleQuality: true, fixedQuality: "rare", unique: true, desc: "只能购买 1 个。被攻击时召唤 8 颗星雨反击敌人。" },
   { id: "landmine", icon: "◈", name: "地雷", basePrice: 32, singleQuality: true, fixedQuality: "rare", desc: "每波随机生成 3 个地雷，可叠加。" },
   { id: "airburst", icon: "✹", name: "空爆弹", basePrice: 40, unique: true, desc: "不可叠加。每隔 30/25/20/15/10 秒清空玩家附近敌方投射物。" },
+  ...[
+    ["kinetic_capacitor", "⚡", "动能电容", "持续移动会充能，充满后释放环形电击。"],
+    ["afterimage_relay", "◇", "残影中继器", "高速转向时留下伤害残影。"],
+    ["hunter_protocol", "✕", "猎杀协议", "击杀精英或标记目标时释放处决冲击。"],
+    ["target_relay", "⌁", "锁定转发器", "连续命中同一目标会引发连锁伤害。"],
+    ["near_miss_coil", "◌", "近失线圈", "擦身避开弹幕会积攒反击电荷。"],
+    ["thermal_reactor", "☀", "热熔反应堆", "连续命中叠加热量，满层爆燃。"],
+    ["cryo_prism", "❄", "霜爆棱镜", "冻结敌人死亡时爆出冰晶。"],
+    ["corrosion_flask", "☣", "腐蚀试剂", "敌人死亡后留下腐蚀区域。"],
+    ["plague_beacon", "✣", "瘟疫信标", "死亡敌人把异常状态传播给附近敌人。"],
+    ["resonance_engine", "♫", "共振引擎", "多次命中同一目标会触发共振爆裂。"],
+    ["gravity_anchor", "◉", "引力锚点", "每波部署牵引敌群的引力锚点。"],
+    ["holo_decoy", "◈", "全息诱饵", "每波部署吸引敌人的诱饵，耗尽后爆炸。"],
+    ["sentry_array", "▣", "旋转哨戒塔", "每波部署一座旋转扫射的哨戒塔。"],
+    ["reclaimer_drone", "◍", "回收无人机", "自动牵引远处金币与经验。"],
+    ["phase_barricade", "▰", "相位路障", "周期投放减速敌人的相位墙。"],
+    ["mirror_array", "↗", "反射镜阵", "周期将附近敌方弹幕反射为反击电弧。"],
+    ["absorption_lattice", "⬡", "吸收晶格", "清除敌方弹幕时获得临时护盾。"],
+    ["static_barrier", "☇", "静电屏障", "近身敌人会被周期震退并受伤。"],
+    ["crisis_echo", "◒", "危机回响", "受伤后在身边生成防守脉冲。"],
+    ["reprisal_protocol", "⚔", "报复协议", "闪避或护盾格挡后召唤追击雷击。"],
+    ["bounty_scanner", "⌖", "赏金扫描器", "周期标记高价值敌人，击杀掉落额外金币。"],
+    ["challenge_beacon", "⚑", "挑战信标", "每波召唤强化精英，击败后获得奖励。"],
+    ["crisis_insurance", "✚", "危机保险", "本局首次濒死时保留 1 生命并获得无敌。", { unique: true }],
+    ["revival_bloom", "✿", "复苏花冠", "波次结束时按击杀数恢复生命。"],
+    ["emergency_transfer", "⇢", "应急转移器", "低生命时周期击退周围敌人。"],
+    ["final_protocol", "☠", "终局协议", "Boss 在场时提高伤害与金币收益，同时承受更多伤害。"],
+    ["ballistic_loom", "⌇", "弹道织机", "命中会在目标附近织出伤害丝线。"],
+    ["echo_magazine", "↺", "余响弹仓", "部分命中会延迟重演一次回响攻击。"],
+    ["orbit_deflector", "⟳", "轨道偏转器", "移动时周期释放环绕切割波。"],
+    ["tractor_warhead", "⊙", "牵引弹头", "命中会把敌人拉向牵引核心。"],
+    ["rift_prism", "◇", "裂隙棱镜", "命中时有几率留下短时裂隙伤害区。"],
+    ["polarity_inverter", "↹", "磁极反转器", "周期聚集掉落物，并在收束时震慑敌人。"],
+    ["xp_yeast", "✧", "经验酵母", "连续拾取经验后释放成长孢子。"],
+    ["supply_signal", "✹", "补给信号塔", "低生命时投放可拾取的医疗补给。"],
+    ["soul_vessel", "◐", "灵魂容器", "击杀积攒灵魂，波次末换成护盾与爆发。"],
+    ["pulse_drive", "✹", "脉冲驱动", "主动：击退附近敌人并清出近身空间。", { active: true, cooldown: 16 }],
+    ["stasis_field", "⌛", "静滞领域", "主动：短时间减速敌人与敌方弹幕。", { active: true, cooldown: 24 }],
+    ["warp_gate", "⇱", "折跃门", "主动：传送到朝向的安全位置。", { active: true, cooldown: 22 }],
+    ["medic_swarm", "✚", "医疗蜂群", "主动：治疗全队并净化异常。", { active: true, cooldown: 28 }],
+    ["overload_core", "⚡", "超载核心", "主动：短时间强化全队武器。", { active: true, cooldown: 32 }],
+  ].map(([id, icon, name, desc, extra = {}], index) => ({ id, icon, name, desc, basePrice: 28 + (index % 5) * 4, singleQuality: true, fixedQuality: index % 4 === 0 ? "epic" : index % 3 === 0 ? "rare" : "uncommon", ...extra })),
 ];
 
 const listeners = new Set();
@@ -80,6 +122,7 @@ export function applyEditableGameData({ weapons = {}, items = {} } = {}) {
   mergeMap(WEAPON_BASE_STATS, weapons.baseStats);
   mergeRarityWeights(ITEM_RARITY_WEIGHTS, items.rarityWeights);
   if (Array.isArray(items.definitions)) mergeArrayById(ITEM_DATA_DEFS, items.definitions);
+  if (Array.isArray(items.mechanicDefinitions)) mergeArrayById(ITEM_DATA_DEFS, items.mechanicDefinitions);
   for (const listener of listeners) listener();
 }
 

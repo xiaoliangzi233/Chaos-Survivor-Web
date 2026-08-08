@@ -15,6 +15,7 @@ import {
   weaponSellDisabledReason,
   weaponSellPrice,
 } from "../economy/shop.js";
+import { ITEM_DEFS, equipActiveItem } from "../systems/items.js";
 
 let initialized = false;
 let previousMode = "playing";
@@ -325,6 +326,9 @@ function renderItemDetail() {
 
   const quality = QUALITY_INFO[item.quality] || QUALITY_INFO.common;
   const price = itemSellPrice(item);
+  const definition = ITEM_DEFS.find((entry) => entry.id === item.itemId);
+  const activeModule = definition?.active;
+  const equipped = state.inventory.activeItemId === item.itemId;
   dom.detail.innerHTML = `
     <div class="weapon-detail-card item-detail-card">
       <div class="weapon-detail-title">
@@ -335,15 +339,16 @@ function renderItemDetail() {
         </div>
       </div>
       <p>${item.desc || ""}</p>
+      ${activeModule ? `<button class="inventory-sell-button item-equip-button" type="button">${equipped ? "已装备战术模块 // F" : "装备为战术模块"}</button>` : ""}
       <div class="item-detail-meta">
         <span><b>${text.quantity}</b><strong>x${item.qty}</strong></span>
         <span><b>${text.quality}</b><strong style="color:${quality.color}">${quality.name}</strong></span>
       </div>
-      <button class="inventory-sell-button" type="button">${text.sellItem} +${price} ${text.coin}</button>
+      <button class="inventory-sell-button item-sell-action" type="button">${text.sellItem} +${price} ${text.coin}</button>
       ${fuseMessage ? `<p class="fuse-message">${fuseMessage}</p>` : ""}
     </div>`;
 
-  dom.detail.querySelector(".inventory-sell-button")?.addEventListener("click", () => {
+  dom.detail.querySelector(".item-sell-action")?.addEventListener("click", () => {
     const current = state.inventory.items.find((entry) => entry.id === detailSelection.id);
     if (!current) return;
     const currentPrice = itemSellPrice(current);
@@ -352,6 +357,11 @@ function renderItemDetail() {
     const stillOwned = state.inventory.items.some((entry) => entry.id === current.id);
     if (!stillOwned) detailSelection = { type: "weapon", id: state.inventory.selectedWeaponUid };
     fuseMessage = result.ok ? `${text.sold} ${itemName}${text.gain} ${currentPrice} ${text.coin}\u3002` : result.reason;
+    renderInventory();
+  });
+  dom.detail.querySelector(".item-equip-button")?.addEventListener("click", () => {
+    equipActiveItem(item.itemId);
+    fuseMessage = `战术模块已装备：${item.name}（按 F 使用）`;
     renderInventory();
   });
 }

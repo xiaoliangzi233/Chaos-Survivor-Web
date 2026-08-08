@@ -6,7 +6,7 @@ import { playSfx } from "../audio.js";
 import { isBossWave, randomEnemyForWave, spawnEnemyById, spawnWaveBoss } from "./enemyRegistry.js";
 import { updateBlackhole } from "../blackhole.js";
 import { difficultyMultiplier, currentDifficulty } from "../difficulty.js";
-import { applyPlayerDamage, onWeaponHit, rollWeaponDamage, waveSpawnMultiplier } from "./items.js";
+import { applyPlayerDamage, onWeaponHit, onItemPickup, rollWeaponDamage, waveSpawnMultiplier } from "./items.js";
 import { spawnDamageText } from "../effects.js";
 import { waveScenarioSpawnRate } from "../config/wave-scenario-config.js";
 import { activeWaveEffect } from "./waveScenarios.js";
@@ -285,6 +285,7 @@ export function updateGems(dt) {
     }
     if (dist < p.r + 12) {
       p.xp += g.value;
+      onItemPickup("gem", g.value, p);
       pulse(g.x, g.y, g.value >= 15 ? 28 : g.value >= 8 ? 23 : 19, g.value >= 15 ? "#b48cff" : g.value >= 8 ? "#77ff8a" : "#42e8ff", 0.12);
       world.gems.splice(i, 1);
       playSfx("gem");
@@ -312,6 +313,7 @@ export function updateCoins(dt) {
     }
     if (dist < p.r + 12) {
       state.gold += c.value;
+      onItemPickup("coin", c.value, p);
       pulse(c.x, c.y, c.value >= 8 ? 27 : c.value >= 4 ? 22 : 18, c.value >= 8 ? "#ff8bd8" : "#ffd166", 0.12);
       world.coins.splice(i, 1);
       playSfx("coin");

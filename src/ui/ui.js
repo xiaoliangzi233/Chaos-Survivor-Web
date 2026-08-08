@@ -104,6 +104,7 @@ export const ui = {
   itemList: document.getElementById("itemList"),
   pauseButton: document.getElementById("pauseButton"),
   inventoryButton: document.getElementById("inventoryButton"),
+  activeItemButton: document.getElementById("activeItemButton"),
   muteButton: document.getElementById("muteButton"),
   bestText: document.getElementById("bestText"),
   endEyebrow: document.getElementById("endEyebrow"),
@@ -171,6 +172,12 @@ export function updateHud(fps, now = performance.now()) {
   }
   const p = state.player;
   if (!p) return;
+  const activeItem = state.inventory?.items?.find((item) => item.itemId === state.inventory?.activeItemId);
+  if (ui.activeItemButton) {
+    ui.activeItemButton.hidden = !activeItem;
+    ui.activeItemButton.querySelector("span").textContent = activeItem ? activeItem.icon || "模块" : "模块";
+    ui.activeItemButton.title = activeItem ? `${activeItem.name} // F` : "战术模块";
+  }
   const p2 = state.players?.p2;
   const coopActive = Boolean(state.multiplayer?.connected && p2 && ["playing", "paused", "shop", "leveling"].includes(state.mode));
   ui.coopVitals?.classList.toggle("active", coopActive);

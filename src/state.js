@@ -54,6 +54,7 @@ export const world = {
   enemyProjectiles: [],
   hazards: [],
   itemObjects: [],
+  itemZones: [],
   gems: [],
   coins: [],
   particles: [],
@@ -170,6 +171,8 @@ export function createInventory() {
     selectedWeaponUid: null,
     weaponSlots: [],
     items: [],
+    activeItemId: null,
+    itemRuntime: {},
     nextUid: 1,
   };
 }
@@ -313,6 +316,7 @@ export function resetRun(map) {
   world.enemyProjectiles.length = 0;
   world.hazards.length = 0;
   world.itemObjects.length = 0;
+  world.itemZones.length = 0;
   world.gems.length = 0;
   world.coins.length = 0;
   world.particles.length = 0;

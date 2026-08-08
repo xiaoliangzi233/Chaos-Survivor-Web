@@ -7499,6 +7499,114 @@ option,
   gap: 16px;
 }
 
+.multiplayer-lan-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.multiplayer-lan-grid section {
+  display: grid;
+  align-content: start;
+  gap: 12px;
+  min-height: 226px;
+  border: 1px solid rgba(255, 139, 216, 0.38);
+  background:
+    linear-gradient(135deg, rgba(255, 139, 216, 0.08), transparent 42%),
+    rgba(4, 10, 18, 0.72);
+  padding: 16px;
+}
+
+.multiplayer-lan-grid section:last-child {
+  border-color: rgba(119, 255, 138, 0.38);
+  background:
+    linear-gradient(135deg, rgba(119, 255, 138, 0.09), transparent 42%),
+    rgba(4, 10, 18, 0.72);
+}
+
+.multiplayer-lan-grid p {
+  min-height: 42px;
+  color: #9fb5c7;
+  font-size: 11px;
+  line-height: 1.6;
+}
+
+.multiplayer-lan-grid code {
+  color: #d9f8ff;
+}
+
+.multiplayer-room-card {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid rgba(255, 139, 216, 0.46);
+  background: rgba(3, 8, 16, 0.72);
+}
+
+.multiplayer-room-card[hidden] {
+  display: none;
+}
+
+.multiplayer-room-card span {
+  color: #ffb6e6;
+  font-size: 9px;
+}
+
+.multiplayer-room-card strong {
+  color: #fff0fa;
+  font-size: 22px;
+  letter-spacing: 0.12em;
+  text-align: right;
+  text-shadow: 0 0 14px rgba(255, 139, 216, 0.7);
+}
+
+.multiplayer-room-card input,
+.multiplayer-room-input {
+  width: 100%;
+  min-height: 38px;
+  border: 1px solid rgba(125, 211, 252, 0.45);
+  border-radius: 4px;
+  background: rgba(1, 6, 12, 0.82);
+  color: #dff9ff;
+  font: 11px/1.35 "Zpix", "Fusion Pixel 12px Monospaced SC", monospace;
+  padding: 8px 10px;
+}
+
+.multiplayer-room-card input {
+  grid-column: 1 / -1;
+}
+
+.multiplayer-room-card button {
+  grid-column: 1 / -1;
+}
+
+.multiplayer-room-input {
+  border-color: rgba(119, 255, 138, 0.52);
+  font-size: 17px;
+  letter-spacing: 0.22em;
+  text-align: center;
+}
+
+.multiplayer-manual-fallback {
+  margin-top: 16px;
+  border: 1px solid rgba(125, 211, 252, 0.24);
+  background: rgba(3, 8, 16, 0.42);
+  padding: 0 14px 14px;
+}
+
+.multiplayer-manual-fallback summary {
+  padding: 13px 0;
+  color: #9fb5c7;
+  cursor: pointer;
+  font-size: 11px;
+}
+
+.multiplayer-manual-fallback[open] summary {
+  color: #dff9ff;
+}
+
 .multiplayer-grid section {
   display: grid;
   gap: 10px;
@@ -7562,6 +7670,10 @@ option,
   }
 
   .multiplayer-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .multiplayer-lan-grid {
     grid-template-columns: 1fr;
   }
 

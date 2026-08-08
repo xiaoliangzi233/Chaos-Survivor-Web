@@ -2737,6 +2737,7 @@ function drawConvictBallProjectile(ctx, b) {
 }
 
 function drawItemObjects(ctx) {
+  for (const zone of world.itemZones) drawMechanicZone(ctx, zone);
   for (const obj of world.itemObjects) {
     if (!inView(obj.x, obj.y, 120)) continue;
     if (obj.kind === "turret") drawAllyTurret(ctx, obj);
@@ -2744,8 +2745,31 @@ function drawItemObjects(ctx) {
     else if (obj.kind === "fallingStar") drawFallingStar(ctx, obj);
     else if (obj.kind === "tesla_node") drawTeslaNode(ctx, obj);
     else if (obj.kind === "storm_portal") drawStormPortal(ctx, obj);
+    else if (["gravity_anchor", "holo_decoy", "sentry_array", "phase_barricade"].includes(obj.kind)) drawMechanicItem(ctx, obj);
     else if (obj.kind === "easter_signature" || obj.kind === "easter_terminal") drawEasterEggObject(ctx, obj);
   }
+}
+
+function drawMechanicZone(ctx, zone) {
+  const alpha = Math.max(0, zone.life / zone.maxLife);
+  ctx.save();
+  ctx.globalAlpha = alpha * 0.32;
+  ctx.strokeStyle = zone.color;
+  ctx.lineWidth = 3;
+  ctx.setLineDash([8, 6]);
+  ctx.beginPath(); ctx.arc(zone.x, zone.y, zone.radius, 0, TAU); ctx.stroke();
+  ctx.setLineDash([]); ctx.globalAlpha = alpha * 0.08; ctx.fillStyle = zone.color; ctx.fill();
+  ctx.restore();
+}
+
+function drawMechanicItem(ctx, obj) {
+  const t = state.time + (obj.t || 0);
+  ctx.save(); ctx.translate(obj.x, obj.y); ctx.rotate(t * 0.8);
+  glow(ctx, 0, 0, obj.radius * 0.7, 0.24, obj.color);
+  ctx.strokeStyle = obj.color; ctx.lineWidth = 3; ctx.fillStyle = "#10202d";
+  if (obj.kind === "phase_barricade") { ctx.fillRect(-obj.radius, -10, obj.radius * 2, 20); ctx.strokeRect(-obj.radius, -10, obj.radius * 2, 20); }
+  else { ctx.beginPath(); for (let i = 0; i < 6; i++) { const a = i * TAU / 6; const r = i % 2 ? 18 : 30; const x = Math.cos(a) * r; const y = Math.sin(a) * r; if (!i) ctx.moveTo(x, y); else ctx.lineTo(x, y); } ctx.closePath(); ctx.fill(); ctx.stroke(); ctx.beginPath(); ctx.arc(0, 0, 9 + Math.sin(t * 4) * 2, 0, TAU); ctx.fillStyle = obj.color; ctx.fill(); }
+  ctx.restore();
 }
 
 function drawSpecialEnemyProjectile(ctx, b) {

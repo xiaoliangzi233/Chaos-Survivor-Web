@@ -26,7 +26,7 @@ import { closeShop, initShopUi, openShop } from "../ui/shopUi.js";
 import { isBossWave, setupEnemyRegistry } from "../systems/enemyRegistry.js";
 import { updatePlayer, updateRemotePlayer, updateSpawning, updateEnemies, rebuildGrid, updateGems, updateCoins, collectAllExperience, collectAllCoins, clearEnemies, anyCombatPlayerAlive, updatePeerAssistWeapon } from "../systems/entities.js";
 import { updateWeapons, STARTER_WEAPONS, UPGRADE_DEFS, activateWeapon, refreshStarterWeapons } from "../systems/weapons.js";
-import { consumeNextWaveSpawnBonus, startWaveItems, updateItems } from "../systems/items.js";
+import { completeWaveItems, consumeNextWaveSpawnBonus, startWaveItems, updateItems, useActiveItem } from "../systems/items.js";
 import { updateEasterEggs } from "../systems/easterEggs.js";
 import { applyWaveStartScenario, resetWaveScenarioState, updateWaveScenario } from "../systems/waveScenarios.js";
 import { createShopState } from "../economy/shop.js";
@@ -96,7 +96,7 @@ import {
   initAdventureStatsUi,
   openAdventureStats,
 } from "../ui/adventureStatsUi.js";
-import { initMultiplayerUi, openMultiplayerPanel, updateMultiplayerUi } from "../ui/multiplayerUi.js";
+import { hasPendingJoinInvite, initMultiplayerUi, openMultiplayerPanel, updateMultiplayerUi } from "../ui/multiplayerUi.js";
 import { netRuntime, nextLocalInputFrame, isHostAuthority, isGuestMirror } from "../net/netState.js";
 import { sendHostSnapshot, sendLocalInput, sendStartRun } from "../net/p2pSession.js";
 import { applyHostSnapshot, createStartRunPayload } from "../net/snapshot.js";
@@ -190,6 +190,7 @@ export async function bootGame() {
     clearWaveEventNotice();
     hideAllOverlays();
     enterLobby({ resetPosition: true });
+    if (hasPendingJoinInvite()) openMultiplayerPanel();
     setMusicScene("lobby");
     playSfx("select");
   }
@@ -362,6 +363,7 @@ export async function bootGame() {
   }
 
   function completeWave() {
+    completeWaveItems();
     clearWaveEventNotice();
     resetWaveScenarioState();
     if (isBossWave(state.wave)) state.bossKills++;
@@ -837,6 +839,7 @@ export async function bootGame() {
     openDebugShop,
     interactLobby: handleLobbyInteraction,
     interactLobbyPointer: (event) => lobbyPointerInteraction(event, true),
+    useActiveItem,
     hoverLobbyPointer: (event) => lobbyPointerInteraction(event, false),
     cancelLobbyAction: cancelLobbyLaunch,
   });

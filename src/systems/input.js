@@ -14,6 +14,7 @@ export function bindInput({
   interactLobbyPointer,
   hoverLobbyPointer,
   cancelLobbyAction,
+  useActiveItem,
 }) {
   const keys = new Map([
     ["KeyW", "up"], ["ArrowUp", "up"],
@@ -57,6 +58,11 @@ export function bindInput({
       event.__survivorHandled = true;
       event.preventDefault();
       interactLobby?.();
+      return;
+    }
+    if (event.code === "KeyF" && state.mode === "playing" && !event.repeat && useActiveItem?.()) {
+      event.__survivorHandled = true;
+      event.preventDefault();
       return;
     }
     if (event.code === "Space" && state.mode === "menu") {
@@ -104,6 +110,7 @@ export function bindInput({
   ui.canvas.addEventListener("contextmenu", (event) => event.preventDefault());
 
   ui.startButton.addEventListener("click", start);
+  ui.activeItemButton?.addEventListener("click", () => useActiveItem?.());
   ui.restartButton.addEventListener("click", restart);
   ui.endLobbyButton?.addEventListener("click", returnToMenu);
   ui.pauseRestartButton.addEventListener("click", restart);

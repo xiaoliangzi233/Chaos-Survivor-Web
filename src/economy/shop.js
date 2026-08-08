@@ -1,6 +1,6 @@
 import { state } from "../state.js";
 import { addWeaponToInventory, canFuseWeapons, QUALITY_INFO, QUALITY_ORDER, recomputeAllWeapons, WEAPON_INFO } from "./inventory.js";
-import { applyItemPurchase, canPurchaseItem, hasPurchasedUniqueItem, ITEM_DEFS, itemDescription, itemSellPriceById, offerQualityForItem, weightedQuality } from "../systems/items.js";
+import { applyItemPurchase, canPurchaseItem, hasPurchasedUniqueItem, ITEM_DEFS, itemDescription, itemSellPriceById, offerQualityForItem, onItemSold, weightedQuality } from "../systems/items.js";
 import { ITEM_RARITY_WEIGHTS } from "../config/editableGameData.js";
 import { playSfx } from "../audio.js";
 
@@ -127,6 +127,7 @@ export function sellInventoryItem(id) {
   item.qty--;
   state.gold += itemSellPrice(item);
   if (item.qty <= 0) inv.items.splice(inv.items.indexOf(item), 1);
+  onItemSold(item);
   playSfx("coin");
   return { ok: true };
 }

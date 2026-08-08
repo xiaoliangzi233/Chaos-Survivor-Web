@@ -17,6 +17,7 @@ tests/
 !/tests/lanRoomService.test.mjs
 !/tests/lanSignalServer.test.py
 !/tests/p2pSignalBackend.test.py
+!/tests/p2pSession.test.mjs
 
 # Local notes
 AGENTS.md

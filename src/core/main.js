@@ -243,7 +243,7 @@ export async function bootGame() {
     state.shop = createShopState();
     state.initialWeaponId = weapon.id;
     activateWeapon(weapon.id);
-    if (isHostAuthority()) {
+    if (netRuntime.role === "host") {
       sendStartRun(createStartRunPayload({
         config: { difficulty, weapon, runMode, randomGoal },
         map: runMap,

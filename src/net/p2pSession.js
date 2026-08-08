@@ -6,6 +6,7 @@ import {
   setNetworkConnected,
   setNetworkRole,
   setNetworkStatus,
+  syncStateMultiplayer,
   updateRemoteInput,
 } from "./netState.js";
 import { applyHostSnapshot, createHostSnapshot } from "./snapshot.js";
@@ -25,6 +26,8 @@ const ICE_TIMEOUT_MS = 1800;
 let peer = null;
 let channel = null;
 let lanSession = null;
+let pendingStartRun = null;
+let pingTimer = 0;
 
 export async function createLanHostRoom() {
   const offer = await createHostOffer();
@@ -124,7 +127,8 @@ export function sendHostSnapshot() {
 }
 
 export function sendStartRun(payload) {
-  return sendMessage({ type: "startRun", payload });
+  pendingStartRun = payload;
+  return flushPendingStartRun();
 }
 
 export function sendShopAction(payload) {
@@ -138,6 +142,7 @@ export function disconnectPeer() {
 
 export function closeSession({ keepRole = false, notify = true } = {}) {
   stopLanSignaling({ revoke: true });
+  clearPingTimer();
   try {
     channel?.close?.();
   } catch {}
@@ -146,6 +151,7 @@ export function closeSession({ keepRole = false, notify = true } = {}) {
   } catch {}
   channel = null;
   peer = null;
+  pendingStartRun = null;
   resetNetworkRuntime({ keepRole });
   if (notify) setNetworkStatus("idle");
 }
@@ -160,10 +166,8 @@ function createPeer() {
     const state = rtc.connectionState;
     if (state === "connected") {
       stopLanSignaling();
-      setNetworkConnected(true, netRuntime.role === "host" ? "P2 客机" : "P1 主机");
-      setNetworkStatus("connected");
-      sendMessage({ type: "hello", payload: { name: netRuntime.role === "host" ? "P1 主机" : "P2 客机" } });
-      schedulePing();
+      if (isChannelOpen()) markChannelReady();
+      else setNetworkStatus("channel-opening");
     } else if (state === "failed" || state === "disconnected" || state === "closed") {
       setNetworkConnected(false);
       setNetworkStatus(state);
@@ -178,12 +182,10 @@ function bindChannel(dc) {
   dc.binaryType = "arraybuffer";
   dc.addEventListener("open", () => {
     stopLanSignaling();
-    setNetworkConnected(true, netRuntime.role === "host" ? "P2 客机" : "P1 主机");
-    setNetworkStatus("connected");
-    sendMessage({ type: "hello", payload: { name: netRuntime.role === "host" ? "P1 主机" : "P2 客机" } });
-    schedulePing();
+    markChannelReady();
   });
   dc.addEventListener("close", () => {
+    clearPingTimer();
     setNetworkConnected(false);
     setNetworkStatus("closed");
   });
@@ -191,6 +193,22 @@ function bindChannel(dc) {
     setNetworkStatus("error", "DataChannel 连接错误");
   });
   dc.addEventListener("message", (event) => receiveMessage(event.data));
+}
+
+function markChannelReady() {
+  if (!isChannelOpen()) return;
+  setNetworkConnected(true, netRuntime.role === "host" ? "P2 客机" : "P1 主机");
+  setNetworkStatus("connected");
+  sendMessage({ type: "hello", payload: { name: netRuntime.role === "host" ? "P1 主机" : "P2 客机" } });
+  flushPendingStartRun();
+  schedulePing();
+}
+
+function flushPendingStartRun() {
+  if (netRuntime.role !== "host" || !pendingStartRun || !isChannelOpen()) return false;
+  const payload = pendingStartRun;
+  pendingStartRun = null;
+  return sendMessage({ type: "startRun", payload });
 }
 
 async function pollHostAnswer() {
@@ -251,6 +269,8 @@ function receiveMessage(raw) {
       break;
     case "pong":
       netRuntime.latencyMs = Math.max(0, Math.round(now() - Number(message.payload?.sentAt || now())));
+      syncStateMultiplayer();
+      netRuntime.onStatus?.(networkStatus());
       break;
     case "disconnect":
       closeSession({ keepRole: false, notify: true });
@@ -270,11 +290,19 @@ function sendMessage(message) {
 }
 
 function schedulePing() {
-  window.setTimeout(() => {
+  if (pingTimer) return;
+  pingTimer = window.setTimeout(() => {
+    pingTimer = 0;
     if (!isChannelOpen()) return;
     sendMessage({ type: "ping", payload: { sentAt: now(), status: networkStatus() } });
     schedulePing();
   }, 1000);
+}
+
+function clearPingTimer() {
+  if (!pingTimer) return;
+  window.clearTimeout(pingTimer);
+  pingTimer = 0;
 }
 
 function encodeSignal(description) {

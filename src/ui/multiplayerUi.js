@@ -225,6 +225,7 @@ function renderStatus(message = "", error = false) {
     "waiting-guest": "等待伙伴加入",
     "joining-room": "正在加入房间",
     "waiting-host": "等待主机建立通道",
+    "channel-opening": "数据通道初始化中",
     connected: "已连接",
   };
   const connection = status.connected

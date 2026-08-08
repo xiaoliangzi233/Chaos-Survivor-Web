@@ -289,6 +289,9 @@ export function configureLobbyWeapons(weapons = []) {
   if (!lobby.selectedWeaponId || !lobbyWeapons.some((weapon) => weapon.id === lobby.selectedWeaponId)) {
     lobby.selectedWeaponId = lobbyWeapons[0]?.id || "";
   }
+  if (!lobby.selectedPeerWeaponId || !lobbyWeapons.some((weapon) => weapon.id === lobby.selectedPeerWeaponId)) {
+    lobby.selectedPeerWeaponId = lobbyWeapons[0]?.id || "";
+  }
   lobby.weaponPage = clampLobbyWeaponPage(lobby.weaponPage);
   lobby.initialized = true;
   return lobby.selectedWeaponId;
@@ -394,7 +397,8 @@ export function interactWithLobby(targetId = null, { player = state.lobby.player
   if (interaction.action === "weapon-select") {
     const weapon = weaponForStation(interaction.slot);
     if (!weapon) return null;
-    state.lobby.selectedWeaponId = weapon.id;
+    if (player?.id === "p2") state.lobby.selectedPeerWeaponId = weapon.id;
+    else state.lobby.selectedWeaponId = weapon.id;
     state.lobby.selectionPulse = 0.55;
     setLobbyToast(`开场武器已设为：${weapon.name}`, weaponColor(weapon.id));
     return { ...interaction, weapon };

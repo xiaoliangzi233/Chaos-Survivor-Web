@@ -1,5 +1,6 @@
 import { ENEMY_LIMIT, TAU, WORLD_SIZE } from "../constants.js";
 import { state, world, input } from "../state.js";
+import { addGoldForPlayer } from "./playerProfiles.js";
 import { clamp, distSq, circleHit } from "../utils.js";
 import { burst, dust, pulse } from "../effects.js";
 import { playSfx } from "../audio.js";
@@ -312,7 +313,7 @@ export function updateCoins(dt) {
       dist = Math.hypot(p.x - c.x, p.y - c.y);
     }
     if (dist < p.r + 12) {
-      state.gold += c.value;
+      addGoldForPlayer(p, c.value);
       onItemPickup("coin", c.value, p);
       pulse(c.x, c.y, c.value >= 8 ? 27 : c.value >= 4 ? 22 : 18, c.value >= 8 ? "#ff8bd8" : "#ffd166", 0.12);
       world.coins.splice(i, 1);
@@ -374,19 +375,22 @@ export function nearestEnemy(x, y, range = 900) {
 }
 
 export function collectAllExperience() {
-  const p = state.player;
-  for (const g of world.gems) {
-    p.xp += g.value;
+  const players = activeCombatPlayers();
+  const fallback = players[0] || state.player;
+  for (let i = 0; i < world.gems.length; i++) {
+    (players[i % players.length] || fallback).xp += world.gems[i].value;
   }
   world.gems.length = 0;
-  for (const e of world.enemies) {
-    p.xp += Math.max(1, Math.round(e.xp || 1));
+  for (let i = 0; i < world.enemies.length; i++) {
+    (players[i % players.length] || fallback).xp += Math.max(1, Math.round(world.enemies[i].xp || 1));
   }
 }
 
 export function collectAllCoins() {
-  const total = world.coins.reduce((sum, c) => sum + Math.max(1, Math.round(c.value || 1)), 0);
-  if (total > 0) state.gold += Math.max(1, Math.floor(total * 0.5));
+  const players = activeCombatPlayers();
+  for (let i = 0; i < world.coins.length; i++) {
+    addGoldForPlayer(players[i % players.length] || state.player, Math.max(1, Math.round(world.coins[i].value || 1)));
+  }
   world.coins.length = 0;
 }
 

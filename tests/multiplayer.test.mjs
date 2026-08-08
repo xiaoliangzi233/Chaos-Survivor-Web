@@ -7,6 +7,7 @@ import { allLobbyInteractions, enterLobby, interactWithLobby, updateLobbyPeer } 
 import { applyPlayerDamage } from "../src/systems/items.js";
 import { createHostSnapshot, applyHostSnapshot } from "../src/net/snapshot.js";
 import { setNetworkConnected, setNetworkRole } from "../src/net/netState.js";
+import { withPlayerProfile } from "../src/systems/playerProfiles.js";
 
 function resetMultiplayerRun() {
   resetRun(null);
@@ -22,6 +23,24 @@ test("resetRun initializes and clears P2 multiplayer state", () => {
   state.players.p2.hp = 12;
   resetRun(null);
   assert.equal(state.players.p2.hp, 110);
+  assert.notEqual(state.players.p2.inventory, state.inventory);
+  assert.notEqual(state.players.p2.weapons, state.weapons);
+});
+
+test("P2 profile keeps currency, inventory, and weapon data separate from P1", () => {
+  resetMultiplayerRun();
+  state.gold = 17;
+  state.inventory.items.push({ id: "p1-only", qty: 1 });
+  withPlayerProfile("p2", () => {
+    state.gold = 33;
+    state.inventory.items.push({ id: "p2-only", qty: 1 });
+    state.weapons.arc.level = 4;
+  });
+  assert.equal(state.gold, 17);
+  assert.equal(state.inventory.items.some((item) => item.id === "p2-only"), false);
+  assert.equal(state.players.p2.gold, 33);
+  assert.equal(state.players.p2.inventory.items.some((item) => item.id === "p1-only"), false);
+  assert.equal(state.players.p2.weapons.arc.level, 4);
 });
 
 test("host applies remote P2 input with the same movement bounds", () => {
@@ -65,6 +84,7 @@ test("host snapshot is JSON-safe and applies to guest mirror state", () => {
   });
   const snapshot = createHostSnapshot();
   assert.doesNotThrow(() => JSON.stringify(snapshot));
+  assert.ok(snapshot.economy.p2);
 
   setNetworkRole("guest");
   setNetworkConnected(true, "P1 主机");
@@ -74,6 +94,7 @@ test("host snapshot is JSON-safe and applies to guest mirror state", () => {
   assert.equal(world.enemies.length, 1);
   assert.equal(typeof world.enemies[0].draw, "function");
   assert.equal(world.hazards.length, 1);
+  assert.ok(state.players.p2.inventory);
 });
 
 test("host simulates P2 in the lobby and guest maps lobby snapshots to its local avatar", () => {

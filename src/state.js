@@ -36,6 +36,7 @@ export const state = {
   inventory: null,
   initialWeaponId: null,
   shop: null,
+  waveReady: { p1: false, p2: false },
   easterEggs: null,
   waveScenario: null,
   waveScenarioRuntime: null,
@@ -148,6 +149,11 @@ export function createPeerPlayer() {
     dirX: -1,
     dirY: 0,
   });
+  player.gold = 0;
+  player.weapons = createWeapons();
+  player.inventory = createInventory();
+  player.shop = null;
+  player.initialWeaponId = null;
   return player;
 }
 
@@ -282,6 +288,7 @@ export function createLobbyState(previous = {}) {
     cameraX: Number(previous.cameraX) || 80,
     cameraY: Number(previous.cameraY) || 105,
     selectedWeaponId: previous.selectedWeaponId || "",
+    selectedPeerWeaponId: previous.selectedPeerWeaponId || previous.selectedWeaponId || "",
     selectedDifficultyId: previous.selectedDifficultyId || "",
     randomGoal: previous.randomGoal === "endless" ? "endless" : "twenty_waves",
     weaponPage: Math.max(0, Math.min(2, Math.floor(Number(previous.weaponPage) || 0))),
@@ -379,6 +386,7 @@ export function resetRun(map) {
   state.inventory = createInventory();
   state.initialWeaponId = null;
   state.shop = null;
+  state.waveReady = { p1: false, p2: false };
   state.easterEggs = createEasterEggState();
   state.waveScenario = null;
   state.waveScenarioRuntime = null;

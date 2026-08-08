@@ -544,7 +544,10 @@ function updateMechanicObject(obj, dt) {
 }
 
 function hasItem(id) { return hasInventoryItem(id); }
-function activePlayers() { return state.multiplayer?.connected ? [state.player, state.players?.p2].filter(Boolean) : [state.player].filter(Boolean); }
+function activePlayers() {
+  if (!state.multiplayer?.connected) return [state.player].filter(Boolean);
+  return [state.players?.p1 || state.player, state.players?.p2].filter(Boolean);
+}
 function triggerPulse(x, y, radius, color, damage = 0, knockback = false) {
   pulse(x, y, radius, color, 0.32);
   burst(x, y, 14, color, 180);

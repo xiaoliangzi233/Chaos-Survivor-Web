@@ -8,6 +8,7 @@ import { addWeaponToInventory, QUALITY_INFO, QUALITY_ORDER, WEAPON_INFO } from "
 import { attackSpeedMultiplier, weaponProjectileBonus, weaponRangeBonus, weaponRangeScale } from "./items.js";
 import { isPlayerProjectileBlocked } from "./minionMechanics.js";
 import { restorePlayerHealth } from "./statusEffects.js";
+import { withPlayerProfile } from "./playerProfiles.js";
 
 const STARTER_WEAPON_IDS = ["arc", "ice", "missile", "boomerang", "drone", "prism_railgun", "void_singularity", "tesla_mine_chain", "starfall_scepter", "phase_needler", "echo_tuning_fork", "rift_loom"];
 
@@ -26,9 +27,9 @@ export const UPGRADE_DEFS = [
     stat: "生存",
     amount: "+10 最大生命 / +40 治疗",
     desc: "最大生命提高，并立即恢复一段生命。",
-    apply: () => {
-      state.player.maxHp += 10;
-      restorePlayerHealth(state.player, 40);
+    apply: (player = state.player) => {
+      player.maxHp += 10;
+      restorePlayerHealth(player, 40);
     },
   },
   {
@@ -38,8 +39,8 @@ export const UPGRADE_DEFS = [
     stat: "恢复",
     amount: "+1/s 回血",
     desc: "获得稳定生命回复，适合长波次消耗战。",
-    apply: () => {
-      state.player.regen += 1;
+    apply: (player = state.player) => {
+      player.regen += 1;
     },
   },
   {
@@ -49,9 +50,9 @@ export const UPGRADE_DEFS = [
     stat: "机动",
     amount: "+10 移速 / +10 拾取",
     desc: "移动速度提高，拾取半径小幅扩大。",
-    apply: () => {
-      state.player.speed += 10;
-      state.player.magnet += 10;
+    apply: (player = state.player) => {
+      player.speed += 10;
+      player.magnet += 10;
     },
   },
   {
@@ -61,8 +62,8 @@ export const UPGRADE_DEFS = [
     stat: "拾取",
     amount: "+20 拾取半径",
     desc: "显著扩大经验和金币的吸附范围。",
-    apply: () => {
-      state.player.magnet += 20;
+    apply: (player = state.player) => {
+      player.magnet += 20;
     },
   },
   {
@@ -72,8 +73,8 @@ export const UPGRADE_DEFS = [
     stat: "伤害",
     amount: "+6% 伤害",
     desc: "所有武器基础伤害提高。",
-    apply: () => {
-      state.player.damageScale += 0.06;
+    apply: (player = state.player) => {
+      player.damageScale += 0.06;
     },
   },
   {
@@ -83,8 +84,8 @@ export const UPGRADE_DEFS = [
     stat: "攻速",
     amount: "+5% 攻击速度",
     desc: "缩短所有武器冷却，让火力更密集。",
-    apply: () => {
-      state.player.attackSpeedBonus += 0.05;
+    apply: (player = state.player) => {
+      player.attackSpeedBonus += 0.05;
     },
   },
   {
@@ -94,8 +95,8 @@ export const UPGRADE_DEFS = [
     stat: "射程",
     amount: "+24 攻击范围",
     desc: "提升自动索敌和武器攻击范围。",
-    apply: () => {
-      state.player.attackRangeBonus += 24;
+    apply: (player = state.player) => {
+      player.attackRangeBonus += 24;
     },
   },
   {
@@ -105,8 +106,8 @@ export const UPGRADE_DEFS = [
     stat: "暴击",
     amount: "+2% 暴击率",
     desc: "提高所有武器造成暴击的概率。",
-    apply: () => {
-      state.player.critChance = clamp(state.player.critChance + 0.02, 0, 0.7);
+    apply: (player = state.player) => {
+      player.critChance = clamp(player.critChance + 0.02, 0, 0.7);
     },
   },
   {
@@ -116,8 +117,8 @@ export const UPGRADE_DEFS = [
     stat: "防御",
     amount: "+2 防御",
     desc: "降低受到的直接伤害。",
-    apply: () => {
-      state.player.defense += 2;
+    apply: (player = state.player) => {
+      player.defense += 2;
     },
   },
   {
@@ -127,8 +128,8 @@ export const UPGRADE_DEFS = [
     stat: "闪避",
     amount: "+2% 闪避率",
     desc: "提高完全躲开一次伤害的概率。",
-    apply: () => {
-      state.player.dodge = clamp(state.player.dodge + 0.02, 0, 0.7);
+    apply: (player = state.player) => {
+      player.dodge = clamp(player.dodge + 0.02, 0, 0.7);
     },
   },
   {
@@ -138,8 +139,8 @@ export const UPGRADE_DEFS = [
     stat: "幸运",
     amount: "+4 幸运",
     desc: "提高商店高品质商品出现概率。",
-    apply: () => {
-      state.player.luck += 4;
+    apply: (player = state.player) => {
+      player.luck += 4;
     },
   },
 ];
@@ -149,6 +150,15 @@ export function activateWeapon(id) {
 }
 
 export function updateWeapons(dt) {
+  updateWeaponSet(dt);
+  if (state.multiplayer?.connected && state.players?.p2?.hp > 0) {
+    withPlayerProfile("p2", () => updateWeaponSet(dt));
+  }
+  updateProjectiles(dt);
+  updateWeaponFx(dt);
+}
+
+function updateWeaponSet(dt) {
   updateArcWeapon(dt);
   updateIceWeapon(dt);
   updateMissileWeapon(dt);
@@ -162,8 +172,6 @@ export function updateWeapons(dt) {
   updatePhaseNeedlerWeapon(dt);
   updateEchoTuningForkWeapon(dt);
   updateRiftLoomWeapon(dt);
-  updateProjectiles(dt);
-  updateWeaponFx(dt);
 }
 
 function qualityRank(w) {
@@ -1672,6 +1680,7 @@ function fireProjectile(angle, w, opt) {
     returnBounceLeft: opt.returnBounceLeft || 0,
     chainHitsLeft: opt.chainHitsLeft || 0,
     sourceWeaponId: opt.sourceWeaponId || null,
+    ownerId: origin.id || "p1",
     hitIds: new Set(),
     spin: Math.random() * TAU,
     trailTimer: 0,
@@ -1754,12 +1763,13 @@ function updateProjectiles(dt) {
       }
     }
 
-    if (b.shape === "boomerang" && b.returnBounceLeft > 0 && b.returnTimer > b.returnAfter && distSq(b.x, b.y, state.player.x, state.player.y) < 34 * 34) {
+    const owner = b.ownerId === "p2" ? state.players?.p2 : state.player;
+    if (b.shape === "boomerang" && owner && b.returnBounceLeft > 0 && b.returnTimer > b.returnAfter && distSq(b.x, b.y, owner.x, owner.y) < 34 * 34) {
       b.returnBounceLeft--;
       b.returnTimer = 0;
       b.recallFxDone = false;
       b.farBurstDone = false;
-      const a = Math.atan2(state.player.dirY, state.player.dirX) + 0.7;
+      const a = Math.atan2(owner.dirY, owner.dirX) + 0.7;
       b.vx = Math.cos(a) * b.speed;
       b.vy = Math.sin(a) * b.speed;
       b.life = Math.max(b.life, 1.25);
@@ -2048,7 +2058,8 @@ function steer(b, dt) {
   }
   if (b.returning) {
     b.returnTimer += dt;
-    if (b.returnTimer >= b.returnAfter) turnToward(b, Math.atan2(state.player.y - b.y, state.player.x - b.x), dt, b.returnSpeed * 4.2, b.speed * b.returnSpeed);
+    const owner = b.ownerId === "p2" ? state.players?.p2 : state.player;
+    if (owner && b.returnTimer >= b.returnAfter) turnToward(b, Math.atan2(owner.y - b.y, owner.x - b.x), dt, b.returnSpeed * 4.2, b.speed * b.returnSpeed);
   }
   b.angle = Math.atan2(b.vy, b.vx);
 }

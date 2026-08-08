@@ -24,12 +24,14 @@ import { closeInventory, initInventoryUi, isInventoryOpen } from "../ui/inventor
 import { closeCodex, initCodexUi, openCodex } from "../ui/codexUi.js";
 import { closeShop, initShopUi, openShop, renderShop } from "../ui/shopUi.js";
 import { isBossWave, setupEnemyRegistry } from "../systems/enemyRegistry.js";
-import { updatePlayer, updateRemotePlayer, updateSpawning, updateEnemies, rebuildGrid, updateGems, updateCoins, collectAllExperience, collectAllCoins, clearEnemies, anyCombatPlayerAlive, updatePeerAssistWeapon } from "../systems/entities.js";
+import { updatePlayer, updateRemotePlayer, updateSpawning, updateEnemies, rebuildGrid, updateGems, updateCoins, collectAllExperience, collectAllCoins, clearEnemies, anyCombatPlayerAlive } from "../systems/entities.js";
 import { updateWeapons, STARTER_WEAPONS, UPGRADE_DEFS, activateWeapon, refreshStarterWeapons } from "../systems/weapons.js";
+import { ensurePeerProfile, withPlayerProfile } from "../systems/playerProfiles.js";
 import { completeWaveItems, consumeNextWaveSpawnBonus, startWaveItems, updateItems, useActiveItem } from "../systems/items.js";
 import { updateEasterEggs } from "../systems/easterEggs.js";
 import { applyWaveStartScenario, resetWaveScenarioState, updateWaveScenario } from "../systems/waveScenarios.js";
-import { createShopState } from "../economy/shop.js";
+import { createShopState, prepareShopOffers, purchaseOffer, refreshShopOffers, sellWeaponSlot, toggleOfferLock } from "../economy/shop.js";
+import { fuseWeaponSlots } from "../economy/inventory.js";
 import * as effects from "../effects.js";
 import { updateCamera, viewport } from "../systems/renderer.js";
 import { createRenderBackend } from "../systems/renderBackend.js";
@@ -127,7 +129,7 @@ export async function bootGame() {
       if (state.lobby.active) setLobbyModalOpen(false);
     },
   });
-  initShopUi({ continueToNextWave: finishWaveTransition });
+  initShopUi({ continueToNextWave: () => markWaveReady("p1") });
   initStoryUi();
   initWaveEventUi();
   initHelpUi({
@@ -245,9 +247,15 @@ export async function bootGame() {
     state.shop = createShopState();
     state.initialWeaponId = weapon.id;
     activateWeapon(weapon.id);
+    if (state.multiplayer?.connected) {
+      const peer = ensurePeerProfile();
+      const peerWeaponId = state.lobby.selectedPeerWeaponId || weapon.id;
+      peer.initialWeaponId = peerWeaponId;
+      withPlayerProfile("p2", () => activateWeapon(peerWeaponId));
+    }
     if (netRuntime.role === "host") {
       sendStartRun(createStartRunPayload({
-        config: { difficulty, weapon, runMode, randomGoal },
+        config: { difficulty, weapon, peerWeaponId: state.lobby.selectedPeerWeaponId || weapon.id, runMode, randomGoal },
         map: runMap,
       }));
     }
@@ -292,9 +300,15 @@ export async function bootGame() {
     return true;
   }
 
-  function showLevelChoices() {
+  function showLevelChoices(playerId = "p1") {
     if (isGuestMirror()) return;
     state.mode = "leveling";
+    if (playerId === "p2") {
+      state.ai ||= {};
+      state.ai.levelPanel = { owner: "p2", items: pickThree(UPGRADE_DEFS), refreshCost: LEVEL_CHOICE_REFRESH_COST };
+      hideChoices();
+      return;
+    }
     renderLevelChoices(pickThree(UPGRADE_DEFS));
   }
 
@@ -323,12 +337,13 @@ export async function bootGame() {
         if (state.ai?.levelPanel) state.ai.levelPanel = null;
         hideChoices();
         state.flash = 0.18;
-        if (!checkLevelUps()) {
+        if (!checkLevelUps("p1") && !checkLevelUps("p2")) {
           finishPostLevelFlow();
         }
       },
     });
     state.ai.levelPanel = {
+      owner: "p1",
       items,
       refreshCost: LEVEL_CHOICE_REFRESH_COST,
       refresh: () => {
@@ -348,25 +363,27 @@ export async function bootGame() {
         state.ai.levelPanel = null;
         hideChoices();
         state.flash = 0.18;
-        if (!checkLevelUps()) finishPostLevelFlow();
+        if (!checkLevelUps("p1") && !checkLevelUps("p2")) finishPostLevelFlow();
         return true;
       },
     };
   }
 
-  function checkLevelUps() {
-    const p = state.player;
+  function checkLevelUps(playerId = "p1") {
+    const p = playerId === "p2" ? state.players?.p2 : state.player;
+    if (!p) return false;
     if (p.xp < p.xpNeed) return false;
     p.xp -= p.xpNeed;
     p.level++;
     p.xpNeed = xpNeedForLevel(p.level);
     playSfx("level");
-    showLevelChoices();
+    showLevelChoices(playerId);
     return true;
   }
 
   function completeWave() {
     completeWaveItems();
+    if (state.multiplayer?.connected) withPlayerProfile("p2", () => completeWaveItems());
     clearWaveEventNotice();
     resetWaveScenarioState();
     if (isBossWave(state.wave)) state.bossKills++;
@@ -377,7 +394,7 @@ export async function bootGame() {
     collectAllExperience();
     clearEnemies();
     collectAllCoins();
-    if (!checkLevelUps()) openShopAfterWave();
+    if (!checkLevelUps("p1") && !checkLevelUps("p2")) openShopAfterWave();
   }
 
   function finishPostLevelFlow() {
@@ -391,7 +408,15 @@ export async function bootGame() {
       state.mode = "playing";
       return;
     }
-    openShop({ beforeBossWave: isBossWave(nextWaveNumber()) });
+    state.waveReady = { p1: false, p2: false };
+    const beforeBossWave = isBossWave(nextWaveNumber());
+    if (state.multiplayer?.connected) {
+      withPlayerProfile("p2", () => {
+        state.shop = createShopState();
+        prepareShopOffers({ preserveLocked: false, beforeBossWave });
+      });
+    }
+    openShop({ beforeBossWave });
   }
 
   function openDebugShop() {
@@ -417,10 +442,24 @@ export async function bootGame() {
     state.spawnBudget = 0;
     consumeNextWaveSpawnBonus();
     startWaveItems();
+    if (state.multiplayer?.connected) withPlayerProfile("p2", () => startWaveItems());
     state.mode = "playing";
     const scenario = applyWaveStartScenario();
     showWaveEventNotice({ wave: state.wave, scenario, boss: isBossWave(state.wave) });
     playSfx("wave");
+  }
+
+  function markWaveReady(playerId) {
+    if (!state.pendingNextWave) return false;
+    state.waveReady ||= { p1: false, p2: false };
+    state.waveReady[playerId] = true;
+    if (!state.multiplayer?.connected || (state.waveReady.p1 && state.waveReady.p2)) {
+      closeShop();
+      finishWaveTransition();
+    } else {
+      renderShop();
+    }
+    return true;
   }
 
   function endGame(victory) {
@@ -611,6 +650,9 @@ export async function bootGame() {
     state.shop = createShopState();
     state.initialWeaponId = cfg.weaponId;
     activateWeapon(cfg.weaponId);
+    const peer = ensurePeerProfile();
+    peer.initialWeaponId = cfg.peerWeaponId || cfg.weaponId;
+    withPlayerProfile("p2", () => activateWeapon(peer.initialWeaponId));
     state.mode = "playing";
     state.multiplayer.enabled = true;
     state.multiplayer.role = "guest";
@@ -630,16 +672,19 @@ export async function bootGame() {
     }
 
     const choices = snapshot.ui?.levelChoices || [];
-    const levelSignature = choices.map((item) => item.id).join(",");
+    const levelOwner = snapshot.ui?.levelOwner || "p1";
+    const levelSignature = `${levelOwner}:${choices.map((item) => item.id).join(",")}`;
     if (mode === "leveling" && levelSignature) {
       if (guestOverlaySignature !== `level:${levelSignature}`) {
         showChoices({
-          eyebrow: "P1 LEVEL UP",
+          eyebrow: levelOwner === "p2" ? "P2 LEVEL UP" : "P1 LEVEL UP",
           title: "主机正在选择强化",
           items: choices,
-          onPick: () => {},
+          onPick: (item) => {
+            if (levelOwner === "p2") sendShopAction({ action: "upgrade", id: item.id });
+          },
         });
-        for (const button of ui.choiceList?.querySelectorAll("button") || []) button.disabled = true;
+        if (levelOwner !== "p2") for (const button of ui.choiceList?.querySelectorAll("button") || []) button.disabled = true;
         guestOverlaySignature = `level:${levelSignature}`;
       }
     } else {
@@ -833,6 +878,7 @@ export async function bootGame() {
     state.shake = Math.max(0, state.shake - dt * 20);
     state.flash = Math.max(0, state.flash - dt * 3);
     updateItems(dt);
+    if (state.multiplayer?.connected) withPlayerProfile("p2", () => updateItems(dt));
     updatePlayer(dt);
     updateWaveScenario(dt);
     updateEasterEggs(dt);
@@ -840,7 +886,6 @@ export async function bootGame() {
     if (isHostAuthority()) updateRemotePlayer(dt, netRuntime.remoteInput);
     updateEnemies(dt);
     rebuildGrid();
-    updatePeerAssistWeapon(dt);
     updateWeapons(dt);
     updateGems(dt);
     updateCoins(dt);
@@ -848,7 +893,7 @@ export async function bootGame() {
     effects.updateEffects(dt);
     monitorRuntimeBudgets();
     updateCamera(dt);
-    checkLevelUps();
+    if (!checkLevelUps("p1")) checkLevelUps("p2");
     if (!anyCombatPlayerAlive()) endGame(false);
     if (!debugFreeze && state.mode === "playing" && bossWave && !world.boss && state.spawnedBossWaves?.has(state.wave)) completeWave();
     if (!debugFreeze && state.mode === "playing" && !bossWave && state.waveTimeLeft <= 0) completeWave();
@@ -956,6 +1001,28 @@ export async function bootGame() {
     const interaction = interactWithLobby(payload.targetId, { player: state.lobby.peer, allowLaunch: false });
     if (interaction?.denied) playSfx("deny");
     else if (interaction) playSfx("select");
+  };
+  netRuntime.onShopAction = (payload = {}) => {
+    if (!isHostAuthority() || !payload?.action) return;
+    if (payload.action === "ready") return markWaveReady("p2");
+    if (payload.action === "upgrade" && state.mode === "leveling" && state.ai?.levelPanel?.owner === "p2") {
+      const item = state.ai.levelPanel.items.find((entry) => entry.id === payload.id);
+      if (!item) return;
+      item.apply(state.players.p2);
+      state.ai.levelPanel = null;
+      state.flash = 0.18;
+      if (!checkLevelUps("p2") && !checkLevelUps("p1")) finishPostLevelFlow();
+      return;
+    }
+    if (state.mode !== "shop") return;
+    withPlayerProfile("p2", () => {
+      if (payload.action === "refresh") refreshShopOffers();
+      else if (payload.action === "lock") toggleOfferLock(payload.uid);
+      else if (payload.action === "purchase") purchaseOffer(payload.uid);
+      else if (payload.action === "fuse") fuseWeaponSlots(payload.uid, payload.materialUid);
+      else if (payload.action === "sellWeapon") sellWeaponSlot(payload.uid);
+    });
+    renderShop();
   };
   if (stressScenarioRequested()) {
     await startDebugRun({ difficultyId: "void_crown", weaponId: "arc", wave: 20 });

@@ -27,6 +27,7 @@ export const netRuntime = {
   onStartRun: null,
   onSnapshot: null,
   onLobbyAction: null,
+  onShopAction: null,
   onStatus: null,
 };
 

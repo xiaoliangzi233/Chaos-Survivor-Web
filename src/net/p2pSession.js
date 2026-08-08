@@ -271,6 +271,9 @@ function receiveMessage(raw) {
     case "lobbyAction":
       netRuntime.onLobbyAction?.(message.payload);
       break;
+    case "shopAction":
+      netRuntime.onShopAction?.(message.payload);
+      break;
     case "ping":
       sendMessage({ type: "pong", payload: { sentAt: message.payload?.sentAt || now() } });
       break;

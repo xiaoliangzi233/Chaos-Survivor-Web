@@ -22,6 +22,7 @@ export function createHostSnapshot() {
     waveTimeLeft: round(state.waveTimeLeft),
     pendingNextWave: Boolean(state.pendingNextWave),
     pendingVictory: Boolean(state.pendingVictory),
+    waveReady: clonePlain(state.waveReady || { p1: false, p2: false }),
     runMode: state.runMode,
     randomGoal: state.randomGoal,
     kills: state.kills,
@@ -39,9 +40,11 @@ export function createHostSnapshot() {
     economy: {
       shop: clonePlain(state.shop),
       inventory: clonePlain(state.inventory),
+      p2: serializePeerEconomy(state.players?.p2),
     },
     ui: {
       levelChoices: serializeLevelChoices(state.ai?.levelPanel?.items),
+      levelOwner: state.ai?.levelPanel?.owner || "",
     },
     players: {
       p1: serializePlayer(state.players?.p1 || state.player),
@@ -72,6 +75,7 @@ export function applyHostSnapshot(snapshot) {
   state.waveTimeLeft = number(snapshot.waveTimeLeft, state.waveTimeLeft);
   state.pendingNextWave = Boolean(snapshot.pendingNextWave);
   state.pendingVictory = Boolean(snapshot.pendingVictory);
+  state.waveReady = clonePlain(snapshot.waveReady || { p1: false, p2: false });
   state.runMode = snapshot.runMode || state.runMode;
   state.randomGoal = snapshot.randomGoal || state.randomGoal;
   state.kills = number(snapshot.kills, state.kills);
@@ -97,6 +101,7 @@ export function applyHostSnapshot(snapshot) {
     state.players.p2 ||= {};
     Object.assign(state.players.p2, snapshot.players.p2);
   }
+  if (snapshot.economy?.p2 && state.players?.p2) applyPeerEconomy(state.players.p2, snapshot.economy.p2);
   const incoming = snapshot.world || {};
   replaceList(world.enemies, incoming.enemies, reviveEnemy);
   replaceList(world.projectiles, incoming.projectiles, revivePlainObject);
@@ -117,6 +122,25 @@ export function applyHostSnapshot(snapshot) {
   return true;
 }
 
+function serializePeerEconomy(peer) {
+  if (!peer) return null;
+  return {
+    gold: number(peer.gold, 0),
+    initialWeaponId: peer.initialWeaponId || "",
+    inventory: clonePlain(peer.inventory),
+    weapons: clonePlain(peer.weapons),
+    shop: clonePlain(peer.shop),
+  };
+}
+
+function applyPeerEconomy(peer, economy) {
+  peer.gold = number(economy.gold, peer.gold);
+  peer.initialWeaponId = economy.initialWeaponId || peer.initialWeaponId || null;
+  if (economy.inventory) peer.inventory = clonePlain(economy.inventory);
+  if (economy.weapons) peer.weapons = clonePlain(economy.weapons);
+  if (economy.shop) peer.shop = clonePlain(economy.shop);
+}
+
 function serializeLobby() {
   const lobby = state.lobby;
   if (!lobby?.active) return { active: false };
@@ -127,6 +151,7 @@ function serializeLobby() {
     p1: serializeLobbyPlayer(lobby.player),
     p2: serializeLobbyPlayer(lobby.peer),
     selectedWeaponId: lobby.selectedWeaponId || "",
+    selectedPeerWeaponId: lobby.selectedPeerWeaponId || "",
     selectedDifficultyId: lobby.selectedDifficultyId || "",
     randomGoal: lobby.randomGoal || "twenty_waves",
     weaponPage: Number(lobby.weaponPage) || 0,
@@ -142,6 +167,7 @@ function applyLobbySnapshot(lobbySnapshot) {
   state.lobby.time = number(lobbySnapshot.time, state.lobby.time);
   state.lobby.shipTime = number(lobbySnapshot.shipTime, state.lobby.shipTime);
   state.lobby.selectedWeaponId = lobbySnapshot.selectedWeaponId || state.lobby.selectedWeaponId;
+  state.lobby.selectedPeerWeaponId = lobbySnapshot.selectedPeerWeaponId || state.lobby.selectedPeerWeaponId;
   state.lobby.selectedDifficultyId = lobbySnapshot.selectedDifficultyId || state.lobby.selectedDifficultyId;
   state.lobby.randomGoal = lobbySnapshot.randomGoal || state.lobby.randomGoal;
   state.lobby.weaponPage = number(lobbySnapshot.weaponPage, state.lobby.weaponPage);
@@ -182,6 +208,7 @@ export function createStartRunPayload({ config, map }) {
     config: {
       difficultyId: config?.difficulty?.id || config?.difficultyId || "",
       weaponId: config?.weapon?.id || config?.weaponId || "",
+      peerWeaponId: config?.peerWeaponId || "",
       runMode: config?.runMode || "standard",
       randomGoal: config?.randomGoal || "twenty_waves",
     },
@@ -230,6 +257,7 @@ function serializeProjectile(projectile) {
   ], {
     shape: projectile.shape || projectile.visualId || "defaultEnemyBullet",
     visualId: projectile.visualId || projectile.shape || "",
+    ownerId: projectile.ownerId || "p1",
     color: projectile.color || "#42e8ff",
     bossProjectile: Boolean(projectile.bossProjectile),
     hidden: Boolean(projectile.hidden),

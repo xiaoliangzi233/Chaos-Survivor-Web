@@ -109,10 +109,45 @@
         <button id="helpButton" type="button" class="menu-help-button" aria-label="打开游戏帮助" aria-controls="helpOverlay" aria-expanded="false">
           <span>帮助</span>
         </button>
+        <button id="multiplayerButton" type="button" class="menu-multiplayer-button" aria-label="打开联机面板" aria-controls="multiplayerOverlay" aria-expanded="false">
+          <span>联机</span>
+        </button>
         <button id="debugMenuButton" type="button" class="menu-debug-button" aria-label="进入密码保护的调试模式" aria-controls="debugAuthOverlay" aria-expanded="false">
           <span>调试</span>
         </button>
       </nav>
+
+      <section id="multiplayerOverlay" class="overlay multiplayer-overlay" aria-hidden="true">
+        <div class="multiplayer-panel" role="dialog" aria-modal="true" aria-labelledby="multiplayerTitle">
+          <header>
+            <div>
+              <p class="eyebrow">P2P LINK // LOCAL TUNNEL</p>
+              <h2 id="multiplayerTitle">双人联机</h2>
+            </div>
+            <button id="multiplayerCloseButton" type="button" aria-label="关闭联机面板">×</button>
+          </header>
+          <p id="multiplayerStatus" class="multiplayer-status">未联机</p>
+          <div class="multiplayer-grid">
+            <section>
+              <h3>P1 主机</h3>
+              <button id="multiplayerCreateHostButton" type="button" class="primary">创建主机码</button>
+              <textarea id="multiplayerHostOffer" readonly spellcheck="false" aria-label="主机码"></textarea>
+              <textarea id="multiplayerHostAnswer" spellcheck="false" aria-label="粘贴 P2 应答码" placeholder="粘贴 P2 返回的应答码"></textarea>
+              <button id="multiplayerAcceptAnswerButton" type="button">确认应答码</button>
+            </section>
+            <section>
+              <h3>P2 客机</h3>
+              <textarea id="multiplayerGuestOffer" spellcheck="false" aria-label="粘贴 P1 主机码" placeholder="粘贴 P1 发来的主机码"></textarea>
+              <button id="multiplayerCreateAnswerButton" type="button" class="primary">生成应答码</button>
+              <textarea id="multiplayerGuestAnswer" readonly spellcheck="false" aria-label="P2 应答码"></textarea>
+            </section>
+          </div>
+          <footer>
+            <span>Radmin 等工具只需先让双方处在可互通网络中；本面板不连接任何服务器。</span>
+            <button id="multiplayerDisconnectButton" type="button">断开连接</button>
+          </footer>
+        </div>
+      </section>
 
       <section id="lobbyDialogueOverlay" class="overlay lobby-dialogue-overlay" aria-hidden="true">
         <div class="lobby-dialogue-panel" role="dialog" aria-modal="true" aria-labelledby="lobbyDialogueTitle">

@@ -7,6 +7,13 @@ tests/
 !/tests/apocalypseScenarioEvents.test.mjs
 !/tests/lobby.test.mjs
 !/tests/renderInfrastructure.test.mjs
+!/tests/compactWorld.test.mjs
+!/tests/emberStormTyrantBoss.test.mjs
+!/tests/pixiVisualProfiles.test.mjs
+!/tests/apocalypseRiftbladeBoss.test.mjs
+!/tests/voidCrownScenarioEvents.test.mjs
+!/tests/minionMechanics.test.mjs
+!/tests/multiplayer.test.mjs
 
 # Local notes
 AGENTS.md

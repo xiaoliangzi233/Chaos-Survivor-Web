@@ -125,9 +125,9 @@ test("random events filter conflicting stacks", () => {
 });
 
 test("random mode caps enemies independently and slows endless scaling after wave thirty", () => {
-  assert.equal(randomEnemyLimitForWave(1), 360);
-  state.difficulty.enemyLimit = 180;
-  assert.equal(randomEnemyLimitForWave(1), 180);
+  assert.equal(randomEnemyLimitForWave(1), 120);
+  state.difficulty.enemyLimit = 80;
+  assert.equal(randomEnemyLimitForWave(1), 80);
 
   configureRandomModeRun({ runMode: RUN_MODE_RANDOM, randomGoal: RANDOM_GOAL_ENDLESS, seed: 11 });
   assert.equal(randomEffectiveWave(30), 30);

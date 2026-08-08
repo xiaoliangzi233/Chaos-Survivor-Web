@@ -187,7 +187,8 @@ export function render(ctx, options = {}) {
     }
   }
   drawDrones(ctx);
-  drawPlayer(ctx);
+  drawPlayer(ctx, state.player, { label: "P1", moving: input.up || input.down || input.left || input.right || Math.abs(input.vx) > 0.05 || Math.abs(input.vy) > 0.05 });
+  if (state.multiplayer?.enabled && state.multiplayer?.connected && state.players?.p2) drawPlayer(ctx, state.players.p2, { label: "P2", secondary: true });
   if (!options.skipEnemyProjectiles) drawEnemyProjectiles(ctx, options.batchEnemyProjectile);
   framePerformance.begin("hazardRender");
   drawHazards(ctx, options.batchHazard);
@@ -381,14 +382,23 @@ function drawBounds(ctx) {
   ctx.strokeRect(-half, -half, WORLD_SIZE, WORLD_SIZE);
 }
 
-function drawPlayer(ctx) {
-  const p = state.player;
-  const moving = input.up || input.down || input.left || input.right || Math.abs(input.vx) > 0.05 || Math.abs(input.vy) > 0.05;
+function drawPlayer(ctx, p = state.player, options = {}) {
+  if (!p) return;
+  const moving = options.moving ?? Math.hypot(p.slideVx || 0, p.slideVy || 0) > 12;
   const hurt = p.invuln > 0;
   const low = p.hp / p.maxHp < 0.35;
   const mood = hurt ? "hurt" : low ? "worried" : moving ? "happy" : ["blink", "smile", "curious", "happy"][Math.floor(state.time * 1.15) % 4];
   const bob = Math.sin(state.time * 7) * (moving ? 2.2 : 1.1);
   ctx.save();
+  if (options.secondary) {
+    ctx.globalCompositeOperation = "lighter";
+    ctx.strokeStyle = p.color || "#ff8bd8";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y - 4, 31 + Math.sin(state.time * 5) * 2, 0, TAU);
+    ctx.stroke();
+    ctx.globalCompositeOperation = "source-over";
+  }
   ctx.translate(p.x, p.y + bob);
   ctx.fillStyle = "rgba(0,0,0,0.28)";
   ctx.beginPath(); ctx.ellipse(0, 21, 22, 7, 0, 0, TAU); ctx.fill();
@@ -404,6 +414,17 @@ function drawPlayer(ctx) {
     ctx.ellipse(0, 0, 22, 27, 0, 0, TAU);
     ctx.stroke();
     ctx.setLineDash([]);
+  }
+  if (options.label) {
+    ctx.font = "700 10px 'Zpix', 'Fusion Pixel 12px Monospaced SC', monospace";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillStyle = "rgba(3,7,13,0.72)";
+    ctx.fillRect(-15, -47, 30, 14);
+    ctx.strokeStyle = p.color || (options.secondary ? "#ff8bd8" : "#42e8ff");
+    ctx.strokeRect(-15.5, -47.5, 31, 15);
+    ctx.fillStyle = p.color || "#f3f7ff";
+    ctx.fillText(options.label, 0, -40);
   }
   ctx.restore();
 }

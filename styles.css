@@ -7364,3 +7364,159 @@ option,
     font-size: 14px;
   }
 }
+/* Multiplayer panel */
+.menu-multiplayer-button.connected span {
+  color: #77ff8a;
+  text-shadow: 0 0 12px rgba(119, 255, 138, 0.8);
+}
+
+.multiplayer-overlay {
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.multiplayer-overlay.active {
+  display: flex;
+}
+
+.multiplayer-panel {
+  width: min(980px, 100%);
+  max-height: min(760px, calc(100vh - 48px));
+  overflow: auto;
+  border: 2px solid rgba(66, 232, 255, 0.72);
+  border-radius: 8px;
+  background: linear-gradient(180deg, rgba(5, 13, 23, 0.97), rgba(9, 18, 30, 0.95));
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.08), 0 22px 80px rgba(0, 0, 0, 0.62), inset 0 0 44px rgba(66, 232, 255, 0.08);
+  color: #dff9ff;
+  padding: 22px;
+}
+
+.multiplayer-panel header,
+.multiplayer-panel footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.multiplayer-panel h2,
+.multiplayer-panel h3,
+.multiplayer-panel p {
+  margin: 0;
+}
+
+.multiplayer-panel h2 {
+  color: #f3f7ff;
+  font-size: 28px;
+}
+
+.multiplayer-panel h3 {
+  color: #ffd166;
+  font-size: 15px;
+  letter-spacing: 0;
+}
+
+.multiplayer-panel header button {
+  width: 36px;
+  height: 36px;
+  border: 1px solid rgba(255, 122, 138, 0.75);
+  border-radius: 6px;
+  background: rgba(255, 77, 109, 0.14);
+  color: #ffd7de;
+  font-size: 24px;
+}
+
+.multiplayer-status {
+  margin: 16px 0;
+  border: 1px solid rgba(119, 255, 138, 0.38);
+  background: rgba(119, 255, 138, 0.08);
+  color: #9fffb0;
+  padding: 10px 12px;
+  font-size: 13px;
+}
+
+.multiplayer-status.error {
+  border-color: rgba(255, 122, 138, 0.7);
+  background: rgba(255, 77, 109, 0.12);
+  color: #ffd7de;
+}
+
+.multiplayer-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.multiplayer-grid section {
+  display: grid;
+  gap: 10px;
+  border: 1px solid rgba(66, 232, 255, 0.28);
+  background: rgba(4, 10, 18, 0.62);
+  padding: 14px;
+}
+
+.multiplayer-panel textarea {
+  width: 100%;
+  min-height: 90px;
+  resize: vertical;
+  border: 1px solid rgba(125, 211, 252, 0.45);
+  border-radius: 6px;
+  background: rgba(1, 6, 12, 0.82);
+  color: #dff9ff;
+  font: 12px/1.45 "Zpix", "Fusion Pixel 12px Monospaced SC", monospace;
+  padding: 10px;
+  outline: none;
+}
+
+.multiplayer-panel textarea:focus {
+  border-color: #42e8ff;
+  box-shadow: 0 0 0 2px rgba(66, 232, 255, 0.18);
+}
+
+.multiplayer-panel button {
+  min-height: 38px;
+  border: 1px solid rgba(66, 232, 255, 0.55);
+  border-radius: 6px;
+  background: rgba(66, 232, 255, 0.12);
+  color: #dff9ff;
+  font: inherit;
+  cursor: pointer;
+}
+
+.multiplayer-panel button.primary {
+  border-color: rgba(119, 255, 138, 0.72);
+  background: rgba(119, 255, 138, 0.16);
+  color: #eaffef;
+}
+
+.multiplayer-panel button:disabled {
+  cursor: wait;
+  opacity: 0.58;
+}
+
+.multiplayer-panel footer {
+  margin-top: 16px;
+  color: #9fb5c7;
+  font-size: 12px;
+}
+
+@media (max-width: 760px) {
+  .multiplayer-overlay {
+    padding: 12px;
+  }
+
+  .multiplayer-panel {
+    padding: 16px;
+  }
+
+  .multiplayer-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .multiplayer-panel header,
+  .multiplayer-panel footer {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}

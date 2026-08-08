@@ -91,8 +91,8 @@ export function startWaveItems() {
   for (let i = 0; i < (p.landminePacks || 0) * 3; i++) spawnLandmine();
 }
 
-export function applyPlayerDamage(amount, source = {}) {
-  const p = state.player;
+export function applyPlayerDamage(amount, source = {}, player = null) {
+  const p = player || damageTargetFromSource(source) || state.player;
   if (!p || amount <= 0) return { damaged: false, amount: 0 };
   if (state.debug?.enabled && state.debug.invincible) return { damaged: false, debugInvincible: true, amount: 0 };
   if (amount < 1) {
@@ -137,6 +137,23 @@ export function weaponRangeBonus() {
   const bonus = state.player?.attackRangeBonus || 0;
   const statusScale = playerStatusModifiers(state.player).weaponRangeScale;
   return (state.waveScenario?.effect === "blind" ? bonus * 0.25 : bonus) * statusScale;
+}
+
+function damageTargetFromSource(source = {}) {
+  if (!state.multiplayer?.enabled || !state.multiplayer?.connected || !state.players?.p2) return state.player;
+  if (!Number.isFinite(Number(source.x)) || !Number.isFinite(Number(source.y))) return state.player;
+  const players = [state.player, state.players.p2].filter((p) => p && p.hp > 0);
+  let best = state.player;
+  let bestD = Infinity;
+  for (const p of players) {
+    const d = distSq(source.x, source.y, p.x, p.y);
+    const reach = (Number(source.r) || 28) + (p.r || 14) + 12;
+    if (d <= reach * reach && d < bestD) {
+      best = p;
+      bestD = d;
+    }
+  }
+  return best;
 }
 
 export function weaponRangeScale() {

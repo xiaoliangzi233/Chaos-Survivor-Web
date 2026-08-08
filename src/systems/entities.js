@@ -37,7 +37,20 @@ export { coinAmountForEnemy, dropCoin, dropGem } from "./rewards.js";
 const AI_PRIORITY_MINION_TYPES = new Set(["doctor", "shield_caster", "prism_medic", "brood_seeder", "slime_angel"]);
 
 export function updatePlayer(dt) {
-  const p = state.player;
+  updatePlayerWithInput(state.player, input, dt);
+}
+
+export function updateRemotePlayer(dt, inputFrame) {
+  if (!state.players?.p2) return;
+  updatePlayerWithInput(state.players.p2, inputFrame, dt, { remote: true });
+}
+
+export function updatePlayerWithInput(p, inputFrame, dt, { remote = false } = {}) {
+  if (!p) return;
+  if (p.hp <= 0) {
+    p.invuln = Math.max(0, (p.invuln || 0) - dt);
+    return;
+  }
   updatePlayerStatusEffects(dt, p);
   updateLegacyPlayerEffects(dt, p);
   if (p.frozenTimer > 0) {
@@ -45,8 +58,8 @@ export function updatePlayer(dt) {
     p.invuln = Math.max(0, p.invuln - dt);
     return;
   }
-  let vx = (input.right ? 1 : 0) - (input.left ? 1 : 0) + input.vx;
-  let vy = (input.down ? 1 : 0) - (input.up ? 1 : 0) + input.vy;
+  let vx = (inputFrame.right ? 1 : 0) - (inputFrame.left ? 1 : 0) + (Number(inputFrame.vx) || 0);
+  let vy = (inputFrame.down ? 1 : 0) - (inputFrame.up ? 1 : 0) + (Number(inputFrame.vy) || 0);
   const len = Math.hypot(vx, vy);
   if (len > 0.001) {
     vx /= len;
@@ -90,7 +103,7 @@ export function updatePlayer(dt) {
     p.trailTimer -= dt;
     if (p.trailTimer <= 0) {
       p.trailTimer = 0.055;
-      dust(p.x - trailVx / trailLen * 12, p.y - trailVy / trailLen * 12, -trailVx / trailLen, -trailVy / trailLen);
+      if (!remote || Math.random() < 0.55) dust(p.x - trailVx / trailLen * 12, p.y - trailVy / trailLen * 12, -trailVx / trailLen, -trailVy / trailLen);
     }
   }
   const half = WORLD_SIZE / 2 - 60;
@@ -119,6 +132,51 @@ function updateLegacyPlayerEffects(dt, p) {
     p.frostMarkTimer = Math.max(0, p.frostMarkTimer - dt);
     if (p.frostMarkTimer <= 0) p.frostMarks = 0;
   }
+}
+
+export function activeCombatPlayers() {
+  const players = [];
+  if (state.player) players.push(state.player);
+  const p2 = state.players?.p2;
+  if (state.multiplayer?.enabled && state.multiplayer?.connected && p2 && p2 !== state.player) players.push(p2);
+  return players.filter((player) => player && player.hp > 0);
+}
+
+export function anyCombatPlayerAlive() {
+  return activeCombatPlayers().length > 0;
+}
+
+export function updatePeerAssistWeapon(dt) {
+  const p2 = state.players?.p2;
+  if (!state.multiplayer?.enabled || !state.multiplayer?.connected || !p2 || p2.hp <= 0) return;
+  p2.assistCooldown = Math.max(0, (p2.assistCooldown || 0) - dt);
+  if (p2.assistCooldown > 0) return;
+  const target = nearestEnemy(p2.x, p2.y, 560);
+  if (!target) return;
+  p2.assistCooldown = 0.62;
+  const damage = 6.5 + (state.player?.level || 1) * 0.42;
+  damageEnemy(target, damage, target.x, target.y);
+  world.weaponFx.push({
+    kind: "arc",
+    segments: [{ x1: p2.x, y1: p2.y, x2: target.x, y2: target.y, seed: Math.random() * 999, index: 0, power: 0.5 }],
+    life: 0.16,
+    maxLife: 0.16,
+    color: p2.color || "#ff8bd8",
+  });
+  pulse(p2.x, p2.y, 24, p2.color || "#ff8bd8", 0.12);
+}
+
+function nearestCombatPlayer(x, y) {
+  let best = state.player;
+  let bestD = Infinity;
+  for (const player of activeCombatPlayers()) {
+    const d = distSq(x, y, player.x, player.y);
+    if (d < bestD) {
+      best = player;
+      bestD = d;
+    }
+  }
+  return best;
 }
 
 export function updateSpawning(dt) {
@@ -211,10 +269,12 @@ export function applyKnockback(e, dx, dy, force) {
 }
 
 export function updateGems(dt) {
-  const p = state.player;
-  const magnetRadius = p.magnet * playerStatusModifiers(p).magnetScale;
+  const players = activeCombatPlayers();
+  if (!players.length) return;
   for (let i = world.gems.length - 1; i >= 0; i--) {
     const g = world.gems[i];
+    const p = nearestMagnetPlayer(g, players, false);
+    const magnetRadius = p.magnet * playerStatusModifiers(p).magnetScale;
     const dx = p.x - g.x;
     const dy = p.y - g.y;
     const dist = Math.max(1, Math.hypot(dx, dy));
@@ -233,10 +293,12 @@ export function updateGems(dt) {
 }
 
 export function updateCoins(dt) {
-  const p = state.player;
-  const magnetScale = playerStatusModifiers(p).magnetScale;
+  const players = activeCombatPlayers();
+  if (!players.length) return;
   for (let i = world.coins.length - 1; i >= 0; i--) {
     const c = world.coins[i];
+    const p = nearestMagnetPlayer(c, players, true);
+    const magnetScale = playerStatusModifiers(p).magnetScale;
     const dx = p.x - c.x;
     const dy = p.y - c.y;
     let dist = Math.max(1, Math.hypot(dx, dy));
@@ -351,7 +413,6 @@ export function clearEnemies({ dropRewards = true } = {}) {
 }
 
 function updateEnemyProjectiles(dt) {
-  const p = state.player;
   let removed = 0;
   for (let i = world.enemyProjectiles.length - 1; i >= 0; i--) {
     const b = world.enemyProjectiles[i];
@@ -376,33 +437,9 @@ function updateEnemyProjectiles(dt) {
     }
     if (b.landTrapAtY != null && b.y >= b.landTrapAtY) b.life = 0;
     const projectileActive = !b.nonColliding && (!b.activeWhenArmed || (b.linkedHazard?.armTime || 0) <= 0);
-    if (projectileActive && circleHit(b.x, b.y, b.r, p.x, p.y, p.r) && p.invuln <= 0) {
-      const result = applyPlayerDamage(b.damage, b);
-      p.invuln = 0.5;
-      if (result.damaged && b.burnDuration > 0) {
-        p.burnTimer = Math.max(p.burnTimer || 0, b.burnDuration);
-        p.burnDps = Math.max(p.burnDps || 0, b.burnDps || 0);
-      }
-      if (result.damaged && b.poisonDuration > 0) {
-        p.burnTimer = Math.max(p.burnTimer || 0, b.poisonDuration);
-        p.burnDps = Math.max(p.burnDps || 0, b.poisonDps || 0);
-      }
-      if (result.damaged && b.frostDuration > 0) {
-        if (b.frostMarks) applyFrostMark(p, { duration: b.frostDuration, slow: b.frostSlow || 0.18, freezeDuration: b.freezeDuration || 5 });
-        else {
-          p.frostTimer = Math.max(p.frostTimer || 0, b.frostDuration);
-          p.frostSlow = Math.max(p.frostSlow || 0, b.frostSlow || 0.18);
-        }
-      }
-      if (result.damaged && b.statusId) {
-        applyPlayerStatus(p, b.statusId, {
-          duration: b.statusDuration,
-          stacks: b.statusStacks || 1,
-          source: b.owner || b,
-        });
-      }
-      burst(p.x, p.y, 8, b.color, 100);
-      playSfx("hurt");
+    const hitPlayer = projectileActive ? activeCombatPlayers().find((p) => p.invuln <= 0 && circleHit(b.x, b.y, b.r, p.x, p.y, p.r)) : null;
+    if (hitPlayer) {
+      applyEnemyProjectileDamage(b, hitPlayer);
       if (b.landTrapOnHit) placeGearProjectileTrap(b);
       expireMinionProjectile(b);
       releaseBossEffect(b);
@@ -418,6 +455,36 @@ function updateEnemyProjectiles(dt) {
     }
   }
   if (removed) compactRemoved(world.enemyProjectiles);
+}
+
+function applyEnemyProjectileDamage(projectile, player) {
+  const result = applyPlayerDamage(projectile.damage, projectile, player);
+  player.invuln = 0.5;
+  if (result.damaged && projectile.burnDuration > 0) {
+    player.burnTimer = Math.max(player.burnTimer || 0, projectile.burnDuration);
+    player.burnDps = Math.max(player.burnDps || 0, projectile.burnDps || 0);
+  }
+  if (result.damaged && projectile.poisonDuration > 0) {
+    player.burnTimer = Math.max(player.burnTimer || 0, projectile.poisonDuration);
+    player.burnDps = Math.max(player.burnDps || 0, projectile.poisonDps || 0);
+  }
+  if (result.damaged && projectile.frostDuration > 0) {
+    if (projectile.frostMarks) applyFrostMark(player, { duration: projectile.frostDuration, slow: projectile.frostSlow || 0.18, freezeDuration: projectile.freezeDuration || 5 });
+    else {
+      player.frostTimer = Math.max(player.frostTimer || 0, projectile.frostDuration);
+      player.frostSlow = Math.max(player.frostSlow || 0, projectile.frostSlow || 0.18);
+    }
+  }
+  if (result.damaged && projectile.statusId) {
+    applyPlayerStatus(player, projectile.statusId, {
+      duration: projectile.statusDuration,
+      stacks: projectile.statusStacks || 1,
+      source: projectile.owner || projectile,
+    });
+  }
+  burst(player.x, player.y, 8, projectile.color, 100);
+  playSfx("hurt");
+  return result;
 }
 
 function isEnemyProjectileOutsideMap(b) {
@@ -494,7 +561,6 @@ function splitEnemyProjectile(b) {
 }
 
 function updateHazards(dt) {
-  const p = state.player;
   let removed = 0;
   for (let i = world.hazards.length - 1; i >= 0; i--) {
     const h = world.hazards[i];
@@ -527,7 +593,8 @@ function updateHazards(dt) {
       case "ice_spike":
       case "ice_seal": updateIceHazard(h, dt); break;
     }
-    if (distSq(h.x, h.y, p.x, p.y) < ((h.triggerRadius || h.r) + p.r) ** 2 && h.kind === "ember_mine") h.triggered = true;
+    const players = activeCombatPlayers();
+    if (h.kind === "ember_mine" && players.some((p) => distSq(h.x, h.y, p.x, p.y) < ((h.triggerRadius || h.r) + p.r) ** 2)) h.triggered = true;
     const canDamage =
       !h.kind ||
       (h.kind === "ember_mine" && h.triggered) ||
@@ -554,46 +621,19 @@ function updateHazards(dt) {
     const stormTyrantHazard = Boolean(h.stormTyrantOwner);
     const polarHazard = Boolean(h.polarOwner);
     const riftbladeBladeCorridor = h.kind === "riftblade_bladefall" && Array.isArray(h.lines);
-    const hit = darkEntityHazard
-      ? darkEntityHazardHit(h, p)
-      : riftbladeBladeCorridor
-      ? h.lines.some((line) => pointSegmentDistance(p.x, p.y, line.x1, line.y1, line.x2, line.y2) < p.r + (h.width || 31))
-      : scientistHazard
-      ? scientistHazardHit(h, p)
-      : convictHazard
-      ? convictHazardHit(h, p)
-      : h.kind === "storm_laser_net"
-        ? stormLineHazardHit(h, p)
-      : h.kind === "polar_ice_lane" || h.kind === "riftblade_slash"
-        ? pointLineDistance(p.x, p.y, h.x, h.y, h.angle || 0, h.length || 1200) < p.r + (h.width || 18)
-        : distSq(h.x, h.y, p.x, p.y) < (h.r + p.r) ** 2;
-    if (h.minionSkill) applyMinionHazardStatus(h, p);
-    if (hit && p.invuln <= 0 && canDamage && !h.playerHit) {
-      const damage = darkEntityHazard ? darkEntityHazardDamage(h) : convictHazard ? convictHazardDamage(h, p) : h.damage;
-      const result = applyPlayerDamage(damage, h);
-      if (darkEntityHazard || convictHazard || scientistHazard || riftbladeBladeCorridor || stormStrike || stormTyrantHazard || polarHazard) h.playerHit = true;
-      p.invuln = 0.35;
-      if (result.damaged && h.frostDuration > 0) {
-        if (h.frostMarks) applyFrostMark(p, { duration: h.frostDuration, slow: h.frostSlow || 0.18, freezeDuration: h.freezeDuration || 5 });
-        else {
-          p.frostTimer = Math.max(p.frostTimer || 0, h.frostDuration);
-          p.frostSlow = Math.max(p.frostSlow || 0, h.frostSlow || 0.18);
-        }
+    for (const p of players) {
+      const hit = hazardHitsPlayer(h, p, { darkEntityHazard, riftbladeBladeCorridor, scientistHazard, convictHazard });
+      if (h.minionSkill && hit) applyMinionHazardStatus(h, p);
+      if (hit && p.invuln <= 0 && canDamage && !hazardAlreadyHitPlayer(h, p)) {
+        const damage = darkEntityHazard ? darkEntityHazardDamage(h) : convictHazard ? convictHazardDamage(h, p) : h.damage;
+        const result = applyPlayerDamage(damage, h, p);
+        if (darkEntityHazard || convictHazard || scientistHazard || riftbladeBladeCorridor || stormStrike || stormTyrantHazard || polarHazard) markHazardHitPlayer(h, p);
+        p.invuln = 0.35;
+        applyHazardStatusEffects(h, p, result);
+        playSfx("hurt");
+        if (h.kind === "ember_mine") h.life = 0;
+        if (h.kind === "artillery_blast") h.life = Math.min(h.life, 0.12);
       }
-      if ((result.damaged || h.kind === "toxic_residue") && h.poisonDuration > 0) {
-        p.burnTimer = Math.max(p.burnTimer || 0, h.poisonDuration);
-        p.burnDps = Math.max(p.burnDps || 0, h.poisonDps || 0);
-      }
-      if (result.damaged && h.statusId) {
-        applyPlayerStatus(p, h.statusId, {
-          duration: h.statusDuration,
-          stacks: h.statusStacks || 1,
-          source: h.minionOwner || h,
-        });
-      }
-      playSfx("hurt");
-      if (h.kind === "ember_mine") h.life = 0;
-      if (h.kind === "artillery_blast") h.life = Math.min(h.life, 0.12);
     }
     if (h.life <= 0) {
       releaseBossEffect(h);
@@ -602,6 +642,53 @@ function updateHazards(dt) {
     }
   }
   if (removed) compactRemoved(world.hazards);
+}
+
+function hazardHitsPlayer(h, p, { darkEntityHazard, riftbladeBladeCorridor, scientistHazard, convictHazard }) {
+  return darkEntityHazard
+    ? darkEntityHazardHit(h, p)
+    : riftbladeBladeCorridor
+    ? h.lines.some((line) => pointSegmentDistance(p.x, p.y, line.x1, line.y1, line.x2, line.y2) < p.r + (h.width || 31))
+    : scientistHazard
+    ? scientistHazardHit(h, p)
+    : convictHazard
+    ? convictHazardHit(h, p)
+    : h.kind === "storm_laser_net"
+      ? stormLineHazardHit(h, p)
+    : h.kind === "polar_ice_lane" || h.kind === "riftblade_slash"
+      ? pointLineDistance(p.x, p.y, h.x, h.y, h.angle || 0, h.length || 1200) < p.r + (h.width || 18)
+      : distSq(h.x, h.y, p.x, p.y) < (h.r + p.r) ** 2;
+}
+
+function applyHazardStatusEffects(h, p, result) {
+  if (result.damaged && h.frostDuration > 0) {
+    if (h.frostMarks) applyFrostMark(p, { duration: h.frostDuration, slow: h.frostSlow || 0.18, freezeDuration: h.freezeDuration || 5 });
+    else {
+      p.frostTimer = Math.max(p.frostTimer || 0, h.frostDuration);
+      p.frostSlow = Math.max(p.frostSlow || 0, h.frostSlow || 0.18);
+    }
+  }
+  if ((result.damaged || h.kind === "toxic_residue") && h.poisonDuration > 0) {
+    p.burnTimer = Math.max(p.burnTimer || 0, h.poisonDuration);
+    p.burnDps = Math.max(p.burnDps || 0, h.poisonDps || 0);
+  }
+  if (result.damaged && h.statusId) {
+    applyPlayerStatus(p, h.statusId, {
+      duration: h.statusDuration,
+      stacks: h.statusStacks || 1,
+      source: h.minionOwner || h,
+    });
+  }
+}
+
+function hazardAlreadyHitPlayer(h, p) {
+  return Boolean(h.playerHits?.[p.id || "p1"] || (!h.playerHits && h.playerHit));
+}
+
+function markHazardHitPlayer(h, p) {
+  h.playerHits ||= {};
+  h.playerHits[p.id || "p1"] = true;
+  h.playerHit = true;
 }
 
 function compactRemoved(array) {
@@ -938,6 +1025,21 @@ function pointLineDistance(px, py, x, y, angle, length) {
   const half = length / 2;
   if (forward < -half || forward > half) return Infinity;
   return Math.abs(dx * -vy + dy * vx);
+}
+
+function nearestMagnetPlayer(pickup, players, coin) {
+  let best = players[0];
+  let bestScore = Infinity;
+  for (const player of players) {
+    const radius = player.magnet * (coin ? 1.12 : 1) * playerStatusModifiers(player).magnetScale;
+    const d = distSq(pickup.x, pickup.y, player.x, player.y);
+    const score = d <= radius * radius ? d / Math.max(1, radius * radius) : d;
+    if (score < bestScore) {
+      best = player;
+      bestScore = score;
+    }
+  }
+  return best;
 }
 
 export function stormLineHazardHit(hazard, body) {
@@ -1342,6 +1444,7 @@ function setDarkEntityDamageEpoch(h, epoch) {
   if (h.damageEpoch === epoch) return;
   h.damageEpoch = epoch;
   h.playerHit = false;
+  h.playerHits = {};
 }
 
 function writeDarkPolygonVertices(target, x, y, radius, sides, rotation) {
@@ -1416,14 +1519,15 @@ function splitDarkLineForGate(start, end, gap, width) {
 
 function applyScientistPull(h, dt) {
   if (!(h.pullStrength > 0) || !(h.pullRadius > 0)) return;
-  const p = state.player;
-  const dx = h.x - p.x;
-  const dy = h.y - p.y;
-  const distance = Math.max(1, Math.hypot(dx, dy));
-  if (distance >= h.pullRadius) return;
-  const force = h.pullStrength * (1 - distance / h.pullRadius);
-  p.x = clamp(p.x + dx / distance * force * dt, -WORLD_SIZE / 2 + p.r, WORLD_SIZE / 2 - p.r);
-  p.y = clamp(p.y + dy / distance * force * dt, -WORLD_SIZE / 2 + p.r, WORLD_SIZE / 2 - p.r);
+  for (const p of activeCombatPlayers()) {
+    const dx = h.x - p.x;
+    const dy = h.y - p.y;
+    const distance = Math.max(1, Math.hypot(dx, dy));
+    if (distance >= h.pullRadius) continue;
+    const force = h.pullStrength * (1 - distance / h.pullRadius);
+    p.x = clamp(p.x + dx / distance * force * dt, -WORLD_SIZE / 2 + p.r, WORLD_SIZE / 2 - p.r);
+    p.y = clamp(p.y + dy / distance * force * dt, -WORLD_SIZE / 2 + p.r, WORLD_SIZE / 2 - p.r);
+  }
 }
 
 function pointAlongPath(points, progress) {
@@ -1483,14 +1587,15 @@ function updatePolarIceLane(h, dt) {
 
 function updatePhaseTear(h, dt) {
   h.spin = (h.spin || 0) + dt * 4.8;
-  const p = state.player;
-  const dx = p.x - h.x;
-  const dy = p.y - h.y;
-  const d = Math.max(1, Math.hypot(dx, dy));
-  if (d > h.r || (h.armTime || 0) > 0) return;
-  const force = (1 - d / h.r) * 125;
-  p.x += -dy / d * force * dt;
-  p.y += dx / d * force * dt;
+  for (const p of activeCombatPlayers()) {
+    const dx = p.x - h.x;
+    const dy = p.y - h.y;
+    const d = Math.max(1, Math.hypot(dx, dy));
+    if (d > h.r || (h.armTime || 0) > 0) continue;
+    const force = (1 - d / h.r) * 125;
+    p.x += -dy / d * force * dt;
+    p.y += dx / d * force * dt;
+  }
 }
 
 function updateInfernoBeacon(h, dt) {
@@ -1569,9 +1674,12 @@ function updateArtilleryBlast(h, dt) {
     h.exploding = true;
     h.life = Math.min(h.life, 0.34);
     h.maxLife = Math.max(h.maxLife, 1.28);
-    if (!wasArmed && h.impactDamage > 0 && distSq(h.x, h.y, state.player.x, state.player.y) <= ((h.impactRadius || h.r * 0.45) + state.player.r) ** 2) {
-      applyPlayerDamage(h.impactDamage, h);
-      state.player.invuln = Math.min(state.player.invuln || 0, 0.08);
+    if (!wasArmed && h.impactDamage > 0) {
+      for (const p of activeCombatPlayers()) {
+        if (distSq(h.x, h.y, p.x, p.y) > ((h.impactRadius || h.r * 0.45) + p.r) ** 2) continue;
+        applyPlayerDamage(h.impactDamage, h, p);
+        p.invuln = Math.min(p.invuln || 0, 0.08);
+      }
     }
     burst(h.x, h.y, 18, h.color, 190);
     state.shake = Math.max(state.shake, 5);

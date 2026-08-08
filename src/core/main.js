@@ -24,7 +24,7 @@ import { closeInventory, initInventoryUi, isInventoryOpen } from "../ui/inventor
 import { closeCodex, initCodexUi, openCodex } from "../ui/codexUi.js";
 import { closeShop, initShopUi, openShop } from "../ui/shopUi.js";
 import { isBossWave, setupEnemyRegistry } from "../systems/enemyRegistry.js";
-import { updatePlayer, updateSpawning, updateEnemies, rebuildGrid, updateGems, updateCoins, collectAllExperience, collectAllCoins, clearEnemies } from "../systems/entities.js";
+import { updatePlayer, updateRemotePlayer, updateSpawning, updateEnemies, rebuildGrid, updateGems, updateCoins, collectAllExperience, collectAllCoins, clearEnemies, anyCombatPlayerAlive, updatePeerAssistWeapon } from "../systems/entities.js";
 import { updateWeapons, STARTER_WEAPONS, UPGRADE_DEFS, activateWeapon, refreshStarterWeapons } from "../systems/weapons.js";
 import { consumeNextWaveSpawnBonus, startWaveItems, updateItems } from "../systems/items.js";
 import { updateEasterEggs } from "../systems/easterEggs.js";
@@ -96,6 +96,10 @@ import {
   initAdventureStatsUi,
   openAdventureStats,
 } from "../ui/adventureStatsUi.js";
+import { initMultiplayerUi, updateMultiplayerUi } from "../ui/multiplayerUi.js";
+import { netRuntime, nextLocalInputFrame, isHostAuthority, isGuestMirror } from "../net/netState.js";
+import { sendHostSnapshot, sendLocalInput, sendStartRun } from "../net/p2pSession.js";
+import { applyHostSnapshot, createStartRunPayload } from "../net/snapshot.js";
 
 const LEVEL_CHOICE_REFRESH_COST = 10;
 
@@ -103,6 +107,7 @@ export async function bootGame() {
   setBootProgress(6, "正在启动霓虹废墟");
   initInventoryUi();
   initLobbyUi();
+  initMultiplayerUi();
   initAdventureStatsUi({
     getDifficulties: difficultyCards,
     onModalChange: (open) => {
@@ -169,6 +174,7 @@ export async function bootGame() {
   let fpsAcc = 0;
   let fpsFrames = 0;
   let nextStatsPublishAt = 0;
+  let nextSnapshotAt = 0;
   let debugUi = null;
 
   function start() {
@@ -232,6 +238,12 @@ export async function bootGame() {
     state.shop = createShopState();
     state.initialWeaponId = weapon.id;
     activateWeapon(weapon.id);
+    if (isHostAuthority()) {
+      sendStartRun(createStartRunPayload({
+        config: { difficulty, weapon, runMode, randomGoal },
+        map: runMap,
+      }));
+    }
     state.mode = "story";
     let prepareDone = false;
     let storyDone = false;
@@ -564,12 +576,49 @@ export async function bootGame() {
     return true;
   }
 
+  async function startGuestMirrorRun(payload = {}) {
+    const cfg = payload.config || {};
+    if (!cfg.difficultyId || !cfg.weaponId) return false;
+    cancelStoryPlayback();
+    closeCodex();
+    closeHelp();
+    closeAdventureStats();
+    clearWaveEventNotice();
+    hideAllOverlays();
+    hideRunSetup();
+    leaveLobby();
+    selectDifficulty(cfg.difficultyId);
+    preloadCoordinator.releaseRun();
+    resetRun(payload.map || generateMap());
+    selectDifficulty(cfg.difficultyId);
+    configureRandomModeRun({
+      runMode: cfg.runMode === RUN_MODE_RANDOM ? RUN_MODE_RANDOM : "standard",
+      randomGoal: cfg.randomGoal === RANDOM_GOAL_ENDLESS ? RANDOM_GOAL_ENDLESS : RANDOM_GOAL_TWENTY_WAVES,
+    });
+    state.shop = createShopState();
+    state.initialWeaponId = cfg.weaponId;
+    activateWeapon(cfg.weaponId);
+    state.mode = "playing";
+    state.multiplayer.enabled = true;
+    state.multiplayer.role = "guest";
+    state.multiplayer.connected = true;
+    setMusicScene("battle", { autoplay: false });
+    return true;
+  }
+
   function taintRunForDebug() {
     state.debug.runTainted = true;
   }
 
   function nextWaveNumber() {
     return isRandomEndlessMode() ? state.wave + 1 : Math.min(TOTAL_WAVES, state.wave + 1);
+  }
+
+  function publishHostSnapshot() {
+    if (!isHostAuthority() || performance.now() < nextSnapshotAt) return false;
+    sendHostSnapshot();
+    nextSnapshotAt = performance.now() + 80;
+    return true;
   }
 
   function pauseForDebug() {
@@ -680,6 +729,10 @@ export async function bootGame() {
   }
 
   function update(dt) {
+    if (isGuestMirror() && !state.lobby.active && state.mode !== "menu") {
+      sendLocalInput(nextLocalInputFrame(input));
+      return;
+    }
     updateAi(dt);
     if (state.lobby.active) {
       const lobbyEvent = updateLobby(dt);
@@ -688,9 +741,13 @@ export async function bootGame() {
     }
     if (state.mode === "shop") {
       state.time += dt;
+      publishHostSnapshot();
       return;
     }
-    if (state.mode !== "playing") return;
+    if (state.mode !== "playing") {
+      publishHostSnapshot();
+      return;
+    }
     const bossWave = isBossWave(state.wave);
     const debugFreeze = Boolean(state.debug?.enabled);
     state.bossWaveActive = bossWave || Boolean(world.boss);
@@ -703,8 +760,10 @@ export async function bootGame() {
     updateWaveScenario(dt);
     updateEasterEggs(dt);
     if (bossWave || state.waveTimeLeft > 0 || debugFreeze) updateSpawning(dt);
+    if (isHostAuthority()) updateRemotePlayer(dt, netRuntime.remoteInput);
     updateEnemies(dt);
     rebuildGrid();
+    updatePeerAssistWeapon(dt);
     updateWeapons(dt);
     updateGems(dt);
     updateCoins(dt);
@@ -713,9 +772,10 @@ export async function bootGame() {
     monitorRuntimeBudgets();
     updateCamera(dt);
     checkLevelUps();
-    if (state.player.hp <= 0) endGame(false);
+    if (!anyCombatPlayerAlive()) endGame(false);
     if (!debugFreeze && state.mode === "playing" && bossWave && !world.boss && state.spawnedBossWaves?.has(state.wave)) completeWave();
     if (!debugFreeze && state.mode === "playing" && !bossWave && state.waveTimeLeft <= 0) completeWave();
+    publishHostSnapshot();
   }
 
   function loop(now) {
@@ -742,6 +802,7 @@ export async function bootGame() {
     framePerformance.begin("hud");
     updateHud(fps);
     updateLobbyUi();
+    updateMultiplayerUi();
     updateDebugModeUi();
     framePerformance.end("hud");
     framePerformance.end("frame");
@@ -807,6 +868,8 @@ export async function bootGame() {
       }),
     },
   });
+  netRuntime.onStartRun = startGuestMirrorRun;
+  netRuntime.onSnapshot = applyHostSnapshot;
   if (stressScenarioRequested()) {
     await startDebugRun({ difficultyId: "void_crown", weaponId: "arc", wave: 20 });
     populateDeterministicStressScenario();

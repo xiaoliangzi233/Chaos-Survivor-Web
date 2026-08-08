@@ -74,8 +74,9 @@ export function updateBlackhole(dt) {
 
   const difficultySpeed = BLACKHOLE_SPEED_BY_DIFFICULTY[state.difficultyId || state.difficulty?.id] || 1;
   const speed = Math.max(20, 76 - h.level * 9 - h.r * 0.08) * difficultySpeed;
-  const dx = state.player.x - h.x;
-  const dy = state.player.y - h.y;
+  const target = nearestBlackholeTarget(h) || state.player;
+  const dx = target.x - h.x;
+  const dy = target.y - h.y;
   const d = Math.max(1, Math.hypot(dx, dy));
   h.vx = h.vx * 0.94 + (dx / d) * 0.06;
   h.vy = h.vy * 0.94 + (dy / d) * 0.06;
@@ -85,9 +86,11 @@ export function updateBlackhole(dt) {
   h.x = clamp(h.x, -half + h.r, half - h.r);
   h.y = clamp(h.y, -half + h.r, half - h.r);
 
-  pullBody(state.player, h, dt, 1.0, 1.46);
-  state.player.x = clamp(state.player.x, -half + state.player.r, half - state.player.r);
-  state.player.y = clamp(state.player.y, -half + state.player.r, half - state.player.r);
+  for (const player of blackholePlayers()) {
+    pullBody(player, h, dt, 1.0, 1.46);
+    player.x = clamp(player.x, -half + player.r, half - player.r);
+    player.y = clamp(player.y, -half + player.r, half - player.r);
+  }
 
   h.damageTick -= dt;
   if (h.damageTick <= 0) {
@@ -129,16 +132,38 @@ function playerEscapeResistance(toHoleX, toHoleY, distance) {
 }
 
 function damagePlayerInBlackhole(h) {
-  const p = state.player;
-  const d2 = distSq(h.x, h.y, p.x, p.y);
-  if (d2 > (h.r + p.r) * (h.r + p.r)) return;
-  const d = Math.sqrt(d2);
-  const inner = d < h.r * 0.48;
-  const damage = h.damage * (inner ? 0.46 : 0.26);
-  applyPlayerDamage(damage, h);
-  state.flash = Math.max(state.flash, inner ? 0.2 : 0.12);
-  state.shake = Math.max(state.shake, inner ? 8 : 4);
-  playSfx("hurt");
+  for (const p of blackholePlayers()) {
+    const d2 = distSq(h.x, h.y, p.x, p.y);
+    if (d2 > (h.r + p.r) * (h.r + p.r)) continue;
+    const d = Math.sqrt(d2);
+    const inner = d < h.r * 0.48;
+    const damage = h.damage * (inner ? 0.46 : 0.26);
+    applyPlayerDamage(damage, h, p);
+    state.flash = Math.max(state.flash, inner ? 0.2 : 0.12);
+    state.shake = Math.max(state.shake, inner ? 8 : 4);
+    playSfx("hurt");
+  }
+}
+
+function blackholePlayers() {
+  const players = [];
+  if (state.player?.hp > 0) players.push(state.player);
+  const p2 = state.players?.p2;
+  if (state.multiplayer?.enabled && p2?.hp > 0) players.push(p2);
+  return players;
+}
+
+function nearestBlackholeTarget(h) {
+  let best = null;
+  let bestD = Infinity;
+  for (const player of blackholePlayers()) {
+    const d = distSq(h.x, h.y, player.x, player.y);
+    if (d < bestD) {
+      best = player;
+      bestD = d;
+    }
+  }
+  return best;
 }
 
 function spawnAccretionParticle(h) {

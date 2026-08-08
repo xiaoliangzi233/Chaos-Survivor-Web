@@ -30,6 +30,8 @@ export const state = {
   cameraY: 0,
   map: null,
   player: null,
+  players: null,
+  multiplayer: createMultiplayerState(),
   weapons: null,
   inventory: null,
   initialWeaponId: null,
@@ -78,6 +80,9 @@ export function addCameraShake(amount, cap = 18) {
 
 export function createPlayer() {
   return {
+    id: "p1",
+    name: "P1",
+    color: "#42e8ff",
     x: 0,
     y: 0,
     r: 14,
@@ -128,6 +133,31 @@ export function createPlayer() {
     trailTimer: 0,
     slideVx: 0,
     slideVy: 0,
+  };
+}
+
+export function createPeerPlayer() {
+  const player = createPlayer();
+  Object.assign(player, {
+    id: "p2",
+    name: "P2",
+    color: "#ff8bd8",
+    x: 58,
+    y: 0,
+    dirX: -1,
+    dirY: 0,
+  });
+  return player;
+}
+
+export function createMultiplayerState(previous = {}) {
+  return {
+    enabled: Boolean(previous.enabled),
+    role: previous.role === "host" || previous.role === "guest" ? previous.role : "solo",
+    connected: Boolean(previous.connected),
+    peerName: previous.peerName || "",
+    latencyMs: Math.max(0, Math.round(Number(previous.latencyMs) || 0)),
+    status: previous.status || "idle",
   };
 }
 
@@ -277,6 +307,7 @@ export function createRandomRunState() {
 export function resetRun(map) {
   const previousAi = state.ai;
   const previousDebug = state.debug;
+  const previousMultiplayer = state.multiplayer;
   world.enemies.length = 0;
   world.projectiles.length = 0;
   world.enemyProjectiles.length = 0;
@@ -317,6 +348,9 @@ export function resetRun(map) {
   state.cameraY = 0;
   state.map = map;
   state.player = createPlayer();
+  state.players = { p1: state.player, p2: createPeerPlayer() };
+  state.players.p1.x = -34;
+  state.players.p2.x = 34;
   state.weapons = createWeapons();
   state.inventory = createInventory();
   state.initialWeaponId = null;
@@ -328,4 +362,5 @@ export function resetRun(map) {
   state.difficultyId = state.difficultyId || "ember";
   state.ai = createAiState(previousAi || {});
   state.debug = createDebugState(previousDebug || {});
+  state.multiplayer = createMultiplayerState(previousMultiplayer || {});
 }

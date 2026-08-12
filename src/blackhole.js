@@ -146,11 +146,7 @@ function damagePlayerInBlackhole(h) {
 }
 
 function blackholePlayers() {
-  const players = [];
-  if (state.player?.hp > 0) players.push(state.player);
-  const p2 = state.players?.p2;
-  if (state.multiplayer?.enabled && p2?.hp > 0) players.push(p2);
-  return players;
+  return state.player?.hp > 0 ? [state.player] : [];
 }
 
 function nearestBlackholeTarget(h) {

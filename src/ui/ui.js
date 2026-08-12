@@ -41,10 +41,6 @@ export const ui = {
   hpBar: document.getElementById("hpBar"),
   hpText: document.getElementById("hpText"),
   hpMeter: document.getElementById("hpMeter"),
-  coopVitals: document.getElementById("coopVitals"),
-  p2HpBar: document.getElementById("p2HpBar"),
-  p2HpText: document.getElementById("p2HpText"),
-  p2ConnectionText: document.getElementById("p2ConnectionText"),
   xpBar: document.getElementById("xpBar"),
   xpMeter: document.getElementById("xpMeter"),
   levelText: document.getElementById("levelText"),
@@ -160,19 +156,6 @@ export function updateHud(fps, now = performance.now()) {
     ui.activeItemButton.hidden = !activeItem;
     ui.activeItemButton.querySelector("span").textContent = activeItem ? activeItem.icon || "模块" : "模块";
     ui.activeItemButton.title = activeItem ? `${activeItem.name} // F` : "战术模块";
-  }
-  const p2 = state.players?.p2;
-  const coopActive = Boolean(state.multiplayer?.connected && p2 && ["playing", "paused", "shop", "leveling"].includes(state.mode));
-  ui.coopVitals?.classList.toggle("active", coopActive);
-  ui.coopVitals?.setAttribute("aria-hidden", coopActive ? "false" : "true");
-  if (coopActive && p2) {
-    const p2HpRatio = Math.max(0, Math.min(1, p2.hp / Math.max(1, p2.maxHp)));
-    if (ui.p2HpBar) ui.p2HpBar.style.transform = `scaleX(${p2HpRatio})`;
-    if (ui.p2HpText) ui.p2HpText.textContent = `${Math.max(0, Math.ceil(p2.hp))}/${Math.ceil(p2.maxHp)}`;
-    if (ui.p2ConnectionText) {
-      const status = state.multiplayer?.statusLabel || (state.multiplayer?.connected ? "已连接" : "未连接");
-      ui.p2ConnectionText.textContent = `P2 // ${status} // ${state.multiplayer.latencyMs || 0}ms`;
-    }
   }
   const hp = Math.max(0, Math.ceil(p.hp));
   const xp = Math.max(0, Math.floor(p.xp));
@@ -396,6 +379,31 @@ export function showChoices({ eyebrow, title, items, onPick, refresh = null, con
   ui.levelOverlay.setAttribute("aria-hidden", "false");
 }
 
+export function playLevelGoldRain({ count = 96, duration = 1850 } = {}) {
+  const layer = ensureLevelGoldRainLayer();
+  layer.classList.remove("ending");
+  const amount = Math.max(36, Math.min(180, Math.floor(count)));
+  for (let i = 0; i < amount; i++) {
+    const coin = document.createElement("span");
+    coin.className = i % 5 === 0 ? "big" : i % 3 === 0 ? "spark" : "";
+    coin.style.setProperty("--x", `${Math.random() * 100}vw`);
+    coin.style.setProperty("--drift", `${(Math.random() - 0.5) * 220}px`);
+    coin.style.setProperty("--delay", `${Math.random() * 820}ms`);
+    coin.style.setProperty("--fall", `${860 + Math.random() * 620}ms`);
+    coin.style.setProperty("--spin", `${Math.random() * 720 - 360}deg`);
+    coin.textContent = i % 7 === 0 ? "$" : "G";
+    layer.appendChild(coin);
+    window.setTimeout(() => coin.remove(), duration + 700);
+  }
+  window.clearTimeout(layer._goldRainTimer);
+  layer._goldRainTimer = window.setTimeout(() => {
+    layer.classList.add("ending");
+    window.setTimeout(() => {
+      if (!layer.children.length) layer.remove();
+    }, 260);
+  }, duration);
+}
+
 export function hideChoices() {
   ui.levelOverlay.classList.remove("active");
   ui.levelOverlay.setAttribute("aria-hidden", "true");
@@ -609,4 +617,14 @@ function playUpgradePickFx(item) {
     <i></i><i></i><i></i><i></i>`;
   document.body.appendChild(fx);
   window.setTimeout(() => fx.remove(), 760);
+}
+
+function ensureLevelGoldRainLayer() {
+  let layer = document.querySelector(".level-gold-rain");
+  if (layer) return layer;
+  layer = document.createElement("div");
+  layer.className = "level-gold-rain";
+  layer.setAttribute("aria-hidden", "true");
+  document.body.appendChild(layer);
+  return layer;
 }

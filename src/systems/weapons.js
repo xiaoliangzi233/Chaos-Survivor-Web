@@ -8,7 +8,6 @@ import { addWeaponToInventory, QUALITY_INFO, QUALITY_ORDER, WEAPON_INFO } from "
 import { attackSpeedMultiplier, weaponProjectileBonus, weaponRangeBonus, weaponRangeScale } from "./items.js";
 import { isPlayerProjectileBlocked } from "./minionMechanics.js";
 import { restorePlayerHealth } from "./statusEffects.js";
-import { withPlayerProfile } from "./playerProfiles.js";
 
 const STARTER_WEAPON_IDS = ["arc", "ice", "missile", "boomerang", "drone", "prism_railgun", "void_singularity", "tesla_mine_chain", "starfall_scepter", "phase_needler", "echo_tuning_fork", "rift_loom"];
 
@@ -151,9 +150,6 @@ export function activateWeapon(id) {
 
 export function updateWeapons(dt) {
   updateWeaponSet(dt);
-  if (state.multiplayer?.connected && state.players?.p2?.hp > 0) {
-    withPlayerProfile("p2", () => updateWeaponSet(dt));
-  }
   updateProjectiles(dt);
   updateWeaponFx(dt);
 }
@@ -1763,7 +1759,7 @@ function updateProjectiles(dt) {
       }
     }
 
-    const owner = b.ownerId === "p2" ? state.players?.p2 : state.player;
+    const owner = state.player;
     if (b.shape === "boomerang" && owner && b.returnBounceLeft > 0 && b.returnTimer > b.returnAfter && distSq(b.x, b.y, owner.x, owner.y) < 34 * 34) {
       b.returnBounceLeft--;
       b.returnTimer = 0;
@@ -2058,7 +2054,7 @@ function steer(b, dt) {
   }
   if (b.returning) {
     b.returnTimer += dt;
-    const owner = b.ownerId === "p2" ? state.players?.p2 : state.player;
+    const owner = state.player;
     if (owner && b.returnTimer >= b.returnAfter) turnToward(b, Math.atan2(owner.y - b.y, owner.x - b.x), dt, b.returnSpeed * 4.2, b.speed * b.returnSpeed);
   }
   b.angle = Math.atan2(b.vy, b.vx);

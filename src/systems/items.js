@@ -156,20 +156,7 @@ export function weaponRangeBonus() {
 }
 
 function damageTargetFromSource(source = {}) {
-  if (!state.multiplayer?.enabled || !state.multiplayer?.connected || !state.players?.p2) return state.player;
-  if (!Number.isFinite(Number(source.x)) || !Number.isFinite(Number(source.y))) return state.player;
-  const players = [state.player, state.players.p2].filter((p) => p && p.hp > 0);
-  let best = state.player;
-  let bestD = Infinity;
-  for (const p of players) {
-    const d = distSq(source.x, source.y, p.x, p.y);
-    const reach = (Number(source.r) || 28) + (p.r || 14) + 12;
-    if (d <= reach * reach && d < bestD) {
-      best = p;
-      bestD = d;
-    }
-  }
-  return best;
+  return state.player;
 }
 
 export function weaponRangeScale() {
@@ -545,8 +532,7 @@ function updateMechanicObject(obj, dt) {
 
 function hasItem(id) { return hasInventoryItem(id); }
 function activePlayers() {
-  if (!state.multiplayer?.connected) return [state.player].filter(Boolean);
-  return [state.players?.p1 || state.player, state.players?.p2].filter(Boolean);
+  return [state.player].filter(Boolean);
 }
 function triggerPulse(x, y, radius, color, damage = 0, knockback = false) {
   pulse(x, y, radius, color, 0.32);

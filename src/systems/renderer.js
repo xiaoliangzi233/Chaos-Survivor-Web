@@ -187,8 +187,7 @@ export function render(ctx, options = {}) {
     }
   }
   drawDrones(ctx);
-  drawPlayer(ctx, state.player, { label: "P1", moving: input.up || input.down || input.left || input.right || Math.abs(input.vx) > 0.05 || Math.abs(input.vy) > 0.05 });
-  if (state.multiplayer?.enabled && state.multiplayer?.connected && state.players?.p2) drawPlayer(ctx, state.players.p2, { label: "P2", secondary: true });
+  drawPlayer(ctx, state.player, { label: "", moving: input.up || input.down || input.left || input.right || Math.abs(input.vx) > 0.05 || Math.abs(input.vy) > 0.05 });
   if (!options.skipEnemyProjectiles) drawEnemyProjectiles(ctx, options.batchEnemyProjectile);
   framePerformance.begin("hazardRender");
   drawHazards(ctx, options.batchHazard);
@@ -5189,6 +5188,7 @@ function drawBossBar(ctx) {
   if (!b || b.dead) return;
   const layout = bossHudLayout(viewport, b);
   const { x, y, w } = layout.bar;
+  drawBossTitle(ctx, layout.title.text, layout.title.x, layout.title.y, layout.title.w);
   if (b.shared?.members) {
     drawTwinBossBar(ctx, b, x, y, w);
     return;
@@ -5509,19 +5509,13 @@ function drawTwinBossBar(ctx, b, x, y, w) {
 }
 function drawBossTitle(ctx, text, x, y, w) {
   ctx.save();
-  const labelWidth = Math.max(220, Math.min(w - 24, 560));
-  const labelX = (viewport.width - labelWidth) / 2;
-  ctx.fillStyle = "rgba(6,9,18,0.82)";
-  ctx.fillRect(labelX, y - 18, labelWidth, 26);
-  ctx.strokeStyle = "rgba(255,209,102,0.36)";
-  ctx.lineWidth = 1;
-  ctx.strokeRect(labelX, y - 18, labelWidth, 26);
   ctx.fillStyle = "#f3f7ff";
   ctx.font = `18px ${CANVAS_PIXEL_FONT}`;
   ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
   ctx.shadowColor = "rgba(255,77,109,0.65)";
   ctx.shadowBlur = 10;
-  ctx.fillText(text, viewport.width / 2, y + 2);
+  ctx.fillText(text, x + w / 2, y);
   ctx.restore();
 }
 

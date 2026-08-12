@@ -1,6 +1,7 @@
 import { input, state } from "../state.js";
 import { clamp, distSq } from "../utils.js";
 import { peekLobbyFirstClearReaction } from "./playerProgress.js";
+import { isCurrentUserAdmin } from "../services/backendProgressService.js";
 
 export const LOBBY_WIDTH = 5600;
 export const LOBBY_HEIGHT = 3600;
@@ -50,7 +51,6 @@ export const LOBBY_PORTALS = [
 
 export const LOBBY_DEVICES = [
   { id: "mission-table", kind: "missionTable", action: "ship-status", roomId: "core", x: 0, y: -90, color: "#42e8ff", label: "星舰任务全息桌", collider: { w: 250, h: 118 } },
-  { id: "squad-relay", kind: "squadRelay", action: "multiplayer", roomId: "core", x: -205, y: 270, color: "#ff8bd8", label: "协同通信塔", collider: { w: 202, h: 128 } },
   { id: "difficulty-sync", kind: "difficulty", action: "difficulty", roomId: "bridge", x: -480, y: -1180, color: "#ffd166", label: "难度同步器", collider: { w: 160, h: 100 } },
   { id: "adventure-recorder", kind: "recorder", action: "recorder", roomId: "data", x: -2130, y: -520, color: "#ffd166", label: "冒险记录仪", collider: { w: 170, h: 104 } },
   { id: "codex-terminal", kind: "codex", action: "codex", roomId: "data", x: -1640, y: -500, color: "#42e8ff", label: "记录者终端", collider: { w: 175, h: 100 } },
@@ -289,9 +289,6 @@ export function configureLobbyWeapons(weapons = []) {
   if (!lobby.selectedWeaponId || !lobbyWeapons.some((weapon) => weapon.id === lobby.selectedWeaponId)) {
     lobby.selectedWeaponId = lobbyWeapons[0]?.id || "";
   }
-  if (!lobby.selectedPeerWeaponId || !lobbyWeapons.some((weapon) => weapon.id === lobby.selectedPeerWeaponId)) {
-    lobby.selectedPeerWeaponId = lobbyWeapons[0]?.id || "";
-  }
   lobby.weaponPage = clampLobbyWeaponPage(lobby.weaponPage);
   lobby.initialized = true;
   return lobby.selectedWeaponId;
@@ -397,8 +394,7 @@ export function interactWithLobby(targetId = null, { player = state.lobby.player
   if (interaction.action === "weapon-select") {
     const weapon = weaponForStation(interaction.slot);
     if (!weapon) return null;
-    if (player?.id === "p2") state.lobby.selectedPeerWeaponId = weapon.id;
-    else state.lobby.selectedWeaponId = weapon.id;
+    state.lobby.selectedWeaponId = weapon.id;
     state.lobby.selectionPulse = 0.55;
     setLobbyToast(`开场武器已设为：${weapon.name}`, weaponColor(weapon.id));
     return { ...interaction, weapon };
@@ -500,6 +496,7 @@ export function findNearestLobbyInteraction(player, radius = INTERACTION_RADIUS)
 export function allLobbyInteractions(player = state.lobby.player) {
   const interactions = [];
   for (const portal of LOBBY_PORTALS) {
+    const trialLocked = portal.kind === "trial" && !isCurrentUserAdmin();
     interactions.push({
       id: portal.id,
       action: portal.kind,
@@ -512,8 +509,9 @@ export function allLobbyInteractions(player = state.lobby.player) {
         : portal.kind === "random"
           ? `充能进入异常时间线 · ${lobbyRandomGoalLabel()}`
           : portal.kind === "trial"
-            ? "打开受保护的战斗调试终端"
+            ? trialLocked ? "仅管理员可打开试炼场终端" : "打开受保护的战斗调试终端"
             : "空间坐标尚未开放",
+      disabled: trialLocked,
     });
   }
   for (const device of LOBBY_DEVICES) {
@@ -521,9 +519,6 @@ export function allLobbyInteractions(player = state.lobby.player) {
       difficulty: `切换已解锁难度 · 当前 ${selectedLobbyDifficulty()?.name || "未同步"}`,
       randomProtocol: `切换随机目标 · 当前 ${lobbyRandomGoalLabel()}`,
       missionTable: "查看霓虹中转舰运行状态",
-      squadRelay: state.multiplayer?.connected
-        ? `已与 ${state.multiplayer.peerName || "对端"} 建立协同链路 · ${state.multiplayer.statusLabel || "已连接"} · ${state.multiplayer.latencyMs || 0}ms`
-        : "建立双人协同链路 · 支持 WebSocket 后端、在线信令和 Radmin 局域网",
       recorder: "查看正式冒险总览、难度档案与单局历史",
       codex: "查阅敌人、武器、道具与事件记录",
       gene: "局外强化模块尚未开放",
@@ -640,12 +635,6 @@ export function setLobbyModalOpen(open) {
     clearLobbyInput();
     cancelLobbyPlayerMove();
   }
-}
-
-export function updateLobbyPeer(dt, inputFrame = {}) {
-  const peer = state.lobby.peer;
-  if (!peer || state.lobby.modalOpen) return;
-  updateLobbyActorWithInput(peer, inputFrame, dt);
 }
 
 export function setLobbyToast(text, color = "#42e8ff", life = 2.8) {
@@ -1789,8 +1778,6 @@ function pushCircleOutOfCircle(point, radius, circle) {
 
 function entitiesNearDoor(door, radius) {
   if (distSq(state.lobby.player.x, state.lobby.player.y, door.x, door.y) <= radius * radius) return true;
-  const peer = state.lobby.peer;
-  if (peer && distSq(peer.x, peer.y, door.x, door.y) <= radius * radius) return true;
   if (Object.values(state.lobby.npcs).some((npc) => distSq(npc.x, npc.y, door.x, door.y) <= radius * radius)) return true;
   const pet = state.lobby.pet;
   return Boolean(pet && distSq(pet.x, pet.y, door.x, door.y) <= radius * radius);

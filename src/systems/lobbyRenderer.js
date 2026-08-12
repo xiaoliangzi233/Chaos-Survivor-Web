@@ -13,6 +13,7 @@ import {
 } from "../visual/canvasDetailKit.js";
 import { drawEnvironmentAtlasDecal } from "../visual/environmentAssets.js";
 import { roomVisualProfile, visualSeedFrom } from "../visual/environmentTheme.js";
+import { isCurrentUserAdmin } from "../services/backendProgressService.js";
 import {
   LOBBY_CORRIDORS,
   LOBBY_DEVICES,
@@ -106,10 +107,7 @@ export function renderLobby(ctx, viewport) {
   for (const door of LOBBY_DOORS) {
     if (pointNearCamera(door.x, door.y, 1300, 950)) actors.push({ y: door.y + 4, draw: () => drawDoor(ctx, door, lobby.time) });
   }
-  actors.push({ y: lobby.player.y, draw: () => drawLobbyPlayer(ctx, lobby.player, lobby.time, "P1") });
-  if (state.multiplayer?.connected && lobby.peer && pointNearCamera(lobby.peer.x, lobby.peer.y)) {
-    actors.push({ y: lobby.peer.y, draw: () => drawLobbyPlayer(ctx, lobby.peer, lobby.time, "P2") });
-  }
+  actors.push({ y: lobby.player.y, draw: () => drawLobbyPlayer(ctx, lobby.player, lobby.time, "") });
   actors.sort((a, b) => a.y - b.y);
   for (const actor of actors) actor.draw();
   drawRoomRoofs(ctx, lobby.time);
@@ -518,13 +516,13 @@ function drawStaticLightFixtures(ctx) {
 }
 
 function drawPortal(ctx, portal, time) {
-  const active = portal.kind !== "home";
+  const active = portal.kind !== "home" && (portal.kind !== "trial" || isCurrentUserAdmin());
   const pulse = 0.75 + Math.sin(time * 2.8 + portal.x * 0.01) * 0.13;
   const charging = state.lobby.pendingLaunch?.portalId === portal.id;
   const y = portal.y * LOBBY_Y_SCALE;
   ctx.save();
   ctx.translate(portal.x, y);
-  drawUnifiedFixtureBackdrop(ctx, portal, { width: 250, height: 230, time, active: portal.kind !== "home" });
+  drawUnifiedFixtureBackdrop(ctx, portal, { width: 250, height: 230, time, active });
   drawInteractionRing(ctx, portal.id, portal.color, 118, 40);
   drawObjectShadow(ctx, 0, 42, 126, 35);
 
@@ -639,7 +637,7 @@ function drawDevice(ctx, device, time) {
     time,
     active: state.lobby.nearbyInteractionId === device.id || state.lobby.hoveredInteractionId === device.id,
   });
-  drawInteractionRing(ctx, device.id, device.color, device.kind === "missionTable" ? 132 : device.kind === "squadRelay" ? 118 : 96, 36);
+  drawInteractionRing(ctx, device.id, device.color, device.kind === "missionTable" ? 132 : 96, 36);
   if (device.kind === "missionTable") drawMissionTable(ctx, device, time);
   else if (device.kind === "recorder" || device.kind === "codex") drawArchiveDevice(ctx, device, time);
   else if (device.kind === "gene") drawGeneModifier(ctx, device, time);
@@ -647,7 +645,6 @@ function drawDevice(ctx, device, time) {
   else if (device.kind === "lever") drawLever(ctx, device);
   else if (device.kind === "difficulty") drawDifficultySync(ctx, device, time);
   else if (device.kind === "randomProtocol") drawRandomProtocol(ctx, device, time);
-  else if (device.kind === "squadRelay") drawSquadRelay(ctx, device, time);
   drawUnifiedFixtureFinish(ctx, device, {
     width: device.kind === "missionTable" ? 230 : 166,
     height: device.kind === "missionTable" ? 118 : 150,
@@ -655,102 +652,6 @@ function drawDevice(ctx, device, time) {
     active: state.lobby.nearbyInteractionId === device.id || state.lobby.hoveredInteractionId === device.id,
   });
   ctx.restore();
-}
-
-function drawSquadRelay(ctx, device, time) {
-  const connected = Boolean(state.multiplayer?.connected);
-  const statusColor = connected ? "#77ff8a" : device.color;
-  const pulse = 0.72 + Math.sin(time * 4.4) * 0.16;
-  const active = connected ? 1 : 0.42 + Math.sin(time * 2.2) * 0.12;
-  drawObjectShadow(ctx, 0, 38, 126, 35);
-
-  ctx.fillStyle = "#07111c";
-  ctx.strokeStyle = "#3b5265";
-  ctx.lineWidth = 5;
-  ctx.beginPath();
-  ctx.moveTo(-104, 27);
-  ctx.lineTo(-75, -4);
-  ctx.lineTo(75, -4);
-  ctx.lineTo(104, 27);
-  ctx.lineTo(78, 47);
-  ctx.lineTo(-78, 47);
-  ctx.closePath();
-  ctx.fill();
-  ctx.stroke();
-  ctx.fillStyle = hexToRgba(statusColor, 0.16 + active * 0.12);
-  ctx.fillRect(-70, 11, 140, 9);
-
-  for (const side of [-1, 1]) {
-    ctx.save();
-    ctx.translate(side * 66, 5);
-    ctx.fillStyle = "#0c1d2a";
-    ctx.strokeStyle = hexToRgba(statusColor, 0.62);
-    ctx.lineWidth = 3;
-    roundRect(ctx, -15, -94, 30, 100, 5);
-    ctx.fill();
-    ctx.stroke();
-    ctx.fillStyle = hexToRgba(statusColor, 0.52);
-    for (let slot = 0; slot < 4; slot++) ctx.fillRect(-8, -78 + slot * 17, 16, 6);
-    ctx.restore();
-  }
-
-  ctx.save();
-  ctx.translate(0, -80);
-  const beam = ctx.createLinearGradient(0, -92, 0, 61);
-  beam.addColorStop(0, hexToRgba(statusColor, 0));
-  beam.addColorStop(0.45, hexToRgba(statusColor, 0.11 * active));
-  beam.addColorStop(1, hexToRgba(statusColor, 0));
-  ctx.fillStyle = beam;
-  ctx.beginPath();
-  ctx.moveTo(-52, 66);
-  ctx.lineTo(-18, -86);
-  ctx.lineTo(18, -86);
-  ctx.lineTo(52, 66);
-  ctx.closePath();
-  ctx.fill();
-  for (let ring = 0; ring < 3; ring++) {
-    ctx.save();
-    ctx.rotate(time * (ring % 2 ? -0.72 : 0.54) + ring * 0.66);
-    ctx.strokeStyle = hexToRgba(ring === 1 ? "#42e8ff" : statusColor, (0.58 - ring * 0.1) * active);
-    ctx.lineWidth = 3 - ring * 0.45;
-    ctx.beginPath();
-    ctx.ellipse(0, ring * 4, 56 - ring * 13, 19 - ring * 3, 0, 0, TAU);
-    ctx.stroke();
-    ctx.restore();
-  }
-  const coreGlow = ctx.createRadialGradient(0, 0, 2, 0, 0, 45);
-  coreGlow.addColorStop(0, "rgba(255,255,255,0.94)");
-  coreGlow.addColorStop(0.18, hexToRgba(statusColor, 0.82));
-  coreGlow.addColorStop(1, hexToRgba(statusColor, 0));
-  ctx.fillStyle = coreGlow;
-  ctx.beginPath();
-  ctx.arc(0, 0, 45 * pulse, 0, TAU);
-  ctx.fill();
-  ctx.fillStyle = "#f4fbff";
-  ctx.beginPath();
-  ctx.moveTo(0, -10);
-  ctx.lineTo(10, 0);
-  ctx.lineTo(0, 10);
-  ctx.lineTo(-10, 0);
-  ctx.closePath();
-  ctx.fill();
-  ctx.restore();
-
-  ctx.fillStyle = "#07111c";
-  ctx.strokeStyle = hexToRgba(statusColor, 0.72);
-  ctx.lineWidth = 2;
-  roundRect(ctx, -93, 52, 186, 32, 5);
-  ctx.fill();
-  ctx.stroke();
-  ctx.font = `bold 10px ${FONT}`;
-  ctx.textAlign = "center";
-  ctx.fillStyle = statusColor;
-  ctx.fillText(connected ? "P2 LINK // ONLINE" : "P2 LINK // STANDBY", 0, 73);
-  if (connected) {
-    ctx.font = `8px ${FONT}`;
-    ctx.fillStyle = "#dfffe5";
-    ctx.fillText(`${state.multiplayer?.latencyMs || 0}ms`, 0, 94);
-  }
 }
 
 function drawMissionTable(ctx, device, time) {
@@ -2501,7 +2402,8 @@ function collectLobbyLights(viewport) {
   };
   add(state.lobby.player.x, state.lobby.player.y - 26 / LOBBY_Y_SCALE, 205, "#ffd6a8", 0.72, 0.32, 100);
   for (const portal of LOBBY_PORTALS) {
-    if (portal.kind !== "home" && isLobbyRoomVisible(portal.roomId)) {
+    const active = portal.kind !== "home" && (portal.kind !== "trial" || isCurrentUserAdmin());
+    if (active && isLobbyRoomVisible(portal.roomId)) {
       add(portal.x, portal.y - 105 / LOBBY_Y_SCALE, state.lobby.pendingLaunch?.portalId === portal.id ? 285 : 230, portal.color, state.lobby.pendingLaunch?.portalId === portal.id ? 0.82 : 0.58, 0.22, 88);
     }
   }
@@ -2516,9 +2418,9 @@ function collectLobbyLights(viewport) {
   }
   for (const device of LOBBY_DEVICES) {
     if (!isLobbyRoomVisible(device.roomId)) continue;
-    const radius = device.kind === "missionTable" ? 195 : device.kind === "squadRelay" ? 210 : device.kind === "lever" ? 92 : 148;
-    const color = device.kind === "squadRelay" && state.multiplayer?.connected ? "#77ff8a" : device.color;
-    const strength = device.kind === "squadRelay" ? (state.multiplayer?.connected ? 0.6 : 0.34) : device.kind === "lever" ? 0.28 : 0.42;
+    const radius = device.kind === "missionTable" ? 195 : device.kind === "lever" ? 92 : 148;
+    const color = device.color;
+    const strength = device.kind === "lever" ? 0.28 : 0.42;
     add(device.x, device.y - 54 / LOBBY_Y_SCALE, radius, color, strength, 0.18, 74);
   }
   for (const station of LOBBY_WEAPON_STATIONS) {

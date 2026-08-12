@@ -9,7 +9,6 @@ import { maybeTriggerBossSignature } from "../systems/easterEggs.js";
 import { dropEnemyRewards } from "../systems/rewards.js";
 import { randomGrowthMultiplierForWave } from "../systems/randomMode.js";
 import { notifyMinionDamaged, notifyMinionKilled } from "../systems/minionMechanics.js";
-import { multiplayerEnemyMultipliers } from "../systems/multiplayerBalance.js";
 
 export class BaseEnemy {
   constructor(config, x, y) {
@@ -23,7 +22,6 @@ export class BaseEnemy {
     const hpMul = this.boss ? difficulty.bossHp : difficulty.enemyHp;
     const damageMul = this.boss ? difficulty.bossDamage : difficulty.enemyDamage;
     const speedMul = this.boss ? Math.min(1.12, difficulty.enemySpeed || 1) : difficulty.enemySpeed;
-    const coop = multiplayerEnemyMultipliers();
     this.type = config.id;
     this.x = x;
     this.y = y;
@@ -37,10 +35,7 @@ export class BaseEnemy {
     this.maxHp = this.hp;
     this.speed *= randomGrowth.speed;
     this.damage *= randomGrowth.damage;
-    this.hp *= this.boss ? coop.bossHp : coop.hp;
     this.maxHp = this.hp;
-    this.speed *= coop.speed;
-    this.damage *= coop.damage;
     this.defense = this.boss ? config.defense || 0 : (config.defense || 0) + defenseScale;
     this.xp = config.xp;
     this.color = config.color;

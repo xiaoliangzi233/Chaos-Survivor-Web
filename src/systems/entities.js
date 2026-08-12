@@ -22,7 +22,6 @@ import {
 } from "./statusEffects.js";
 import { coinAmountForEnemy, dropCoin, dropGem } from "./rewards.js";
 import { framePerformance } from "./performanceMonitor.js";
-import { multiplayerEnemyMultipliers } from "./multiplayerBalance.js";
 import { releaseBossEffect } from "./bossEffectRegistry.js";
 import {
   addMinionHazard,
@@ -40,11 +39,6 @@ const AI_PRIORITY_MINION_TYPES = new Set(["doctor", "shield_caster", "prism_medi
 
 export function updatePlayer(dt) {
   updatePlayerWithInput(state.player, input, dt);
-}
-
-export function updateRemotePlayer(dt, inputFrame) {
-  if (!state.players?.p2) return;
-  updatePlayerWithInput(state.players.p2, inputFrame, dt, { remote: true });
 }
 
 export function updatePlayerWithInput(p, inputFrame, dt, { remote = false } = {}) {
@@ -137,11 +131,7 @@ function updateLegacyPlayerEffects(dt, p) {
 }
 
 export function activeCombatPlayers() {
-  const players = [];
-  if (state.player) players.push(state.player);
-  const p2 = state.players?.p2;
-  if (state.multiplayer?.enabled && state.multiplayer?.connected && p2 && p2 !== state.player) players.push(p2);
-  return players.filter((player) => player && player.hp > 0);
+  return [state.player].filter((player) => player && player.hp > 0);
 }
 
 export function anyCombatPlayerAlive() {
@@ -149,23 +139,7 @@ export function anyCombatPlayerAlive() {
 }
 
 export function updatePeerAssistWeapon(dt) {
-  const p2 = state.players?.p2;
-  if (!state.multiplayer?.enabled || !state.multiplayer?.connected || !p2 || p2.hp <= 0) return;
-  p2.assistCooldown = Math.max(0, (p2.assistCooldown || 0) - dt);
-  if (p2.assistCooldown > 0) return;
-  const target = nearestEnemy(p2.x, p2.y, 560);
-  if (!target) return;
-  p2.assistCooldown = 0.62;
-  const damage = 6.5 + (state.player?.level || 1) * 0.42;
-  damageEnemy(target, damage, target.x, target.y);
-  world.weaponFx.push({
-    kind: "arc",
-    segments: [{ x1: p2.x, y1: p2.y, x2: target.x, y2: target.y, seed: Math.random() * 999, index: 0, power: 0.5 }],
-    life: 0.16,
-    maxLife: 0.16,
-    color: p2.color || "#ff8bd8",
-  });
-  pulse(p2.x, p2.y, 24, p2.color || "#ff8bd8", 0.12);
+  return;
 }
 
 function nearestCombatPlayer(x, y) {
@@ -185,15 +159,14 @@ export function updateSpawning(dt) {
   if (state.debug?.enabled && state.debug.freezeWave) return;
   spawnWaveBoss();
   if (isBossWave(state.wave)) return;
-  const coop = multiplayerEnemyMultipliers();
   state.spawnBudget += dt * spawnBudgetGainPerSecond({
     wave: state.wave,
     difficultyId: state.difficultyId,
     difficultySpawnRate: difficultyMultiplier("spawnRate"),
     itemSpawnMultiplier: waveSpawnMultiplier(),
-  }) * coop.spawnRate;
+  });
   const baseEnemyLimit = isRandomMode() ? randomEnemyLimitForWave(state.wave) : (currentDifficulty().enemyLimit || ENEMY_LIMIT);
-  const enemyLimit = Math.floor(baseEnemyLimit * coop.enemyLimit);
+  const enemyLimit = Math.floor(baseEnemyLimit);
   while (state.spawnBudget >= 1 && world.enemies.length < enemyLimit) {
     state.spawnBudget--;
     spawnEnemyById(randomEnemyForWave(state.wave));

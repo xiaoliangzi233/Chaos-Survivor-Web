@@ -12,9 +12,6 @@ import {
   weaponSellDisabledReason,
   weaponSellPrice,
 } from "../economy/shop.js";
-import { isGuestMirror } from "../net/netState.js";
-import { sendReadyState, sendShopAction } from "../net/multiplayerSession.js";
-import { withPlayerProfile } from "../systems/playerProfiles.js";
 
 const dom = {};
 let continueHandler = null;
@@ -53,12 +50,10 @@ export function initShopUi({ continueToNextWave }) {
   dom.hint = document.getElementById("shopHint");
 
   dom.refresh?.addEventListener("click", () => {
-    if (isGuestMirror()) return requestGuestAction({ action: "refresh" });
     if (refreshShopOffers()) renderShop();
     else renderShop(text.noGoldRefresh);
   });
   dom.continue?.addEventListener("click", () => {
-    if (isGuestMirror()) return requestGuestAction({ action: "ready" });
     if (state.shop?.manualDebugOpen) {
       state.shop.manualDebugOpen = false;
       closeShop();
@@ -89,7 +84,6 @@ export function isShopOpen() {
 }
 
 export function renderShop(message = "") {
-  if (isGuestMirror()) return withPlayerProfile("p2", () => renderActiveShop(message));
   return renderActiveShop(message);
 }
 
@@ -102,10 +96,8 @@ function renderActiveShop(message = "") {
   dom.refresh.textContent = canRefresh ? `${text.refresh} - ${cost} ${text.coin}` : `${text.refreshNoGold} - ${cost} ${text.coin}`;
   dom.refresh.disabled = !canRefresh;
   if (dom.continue) {
-    const selfReady = Boolean(state.waveReady?.[isGuestMirror() ? "p2" : "p1"]);
-    const peerReady = Boolean(state.waveReady?.[isGuestMirror() ? "p1" : "p2"]);
-    dom.continue.disabled = selfReady;
-    dom.continue.textContent = selfReady ? (peerReady ? "双方已准备" : "已准备，等待伙伴") : "准备下一波";
+    dom.continue.disabled = false;
+    dom.continue.textContent = "进入下一波";
   }
   dom.refresh.classList.toggle("no-gold-refresh", !canRefresh);
   dom.list.innerHTML = "";
@@ -136,7 +128,6 @@ function renderOffer(offer) {
   lock.textContent = offer.locked ? text.locked : text.lock;
   lock.disabled = soldOut;
   lock.addEventListener("click", () => {
-    if (isGuestMirror()) return requestGuestAction({ action: "lock", uid: offer.uid });
     toggleOfferLock(offer.uid);
     renderShop();
   });
@@ -148,7 +139,6 @@ function renderOffer(offer) {
   buy.disabled = Boolean(reason);
   buy.title = reason;
   buy.addEventListener("click", () => {
-    if (isGuestMirror()) return requestGuestAction({ action: "purchase", uid: offer.uid });
     const result = purchaseOffer(offer.uid);
     renderShop(result.ok ? (fuseTarget ? text.fuseSuccess : text.bought) : result.reason);
   });
@@ -222,7 +212,6 @@ function renderShopWeaponSlots(container, weaponSlots) {
       fuse.title = text.fuseHint;
       fuse.disabled = false;
       fuse.addEventListener("click", () => {
-        if (isGuestMirror()) return requestGuestAction({ action: "fuse", uid: slot.uid, materialUid: material.uid });
         const currentMaterial = findFuseCandidate(slot);
         const result = currentMaterial && fuseWeaponSlots(slot.uid, currentMaterial.uid);
         renderShop(result ? text.fuseSuccess : text.fuseHint);
@@ -238,7 +227,6 @@ function renderShopWeaponSlots(container, weaponSlots) {
     sell.disabled = Boolean(sellDisabledReason);
     sell.title = sellDisabledReason || `${text.sell} ${info.name}${text.gained} ${sellPrice} ${text.coin}`;
     sell.addEventListener("click", () => {
-      if (isGuestMirror()) return requestGuestAction({ action: "sellWeapon", uid: slot.uid });
       const current = state.inventory?.weaponSlots.find((entry) => entry.uid === slot.uid);
       if (!current) {
         renderShop(text.unknownWeapon);
@@ -254,11 +242,4 @@ function renderShopWeaponSlots(container, weaponSlots) {
     row.appendChild(actions);
     container.appendChild(row);
   }
-}
-
-function requestGuestAction(payload) {
-  if (payload?.action === "ready") sendReadyState(payload);
-  else sendShopAction(payload);
-  renderShop("请求已发送给主机。");
-  return true;
 }

@@ -52,6 +52,29 @@ export function currentAuthenticatedUser() {
   return authenticatedUser ? { ...authenticatedUser } : null;
 }
 
+export function isCurrentUserAdmin() {
+  const user = authenticatedUser;
+  if (!user) return false;
+  if (user.isAdmin === true) return true;
+  const tokens = [
+    user.role,
+    user.roleCode,
+    user.userType,
+    ...(Array.isArray(user.roles) ? user.roles : []),
+    ...(Array.isArray(user.permissions) ? user.permissions : []),
+  ].map((entry) => String(entry || "").trim().toLowerCase()).filter(Boolean);
+  return tokens.some((entry) => (
+    entry === "admin"
+    || entry === "administrator"
+    || entry === "super_admin"
+    || entry === "superadmin"
+    || entry === "管理员"
+    || entry.includes("admin")
+    || entry.includes("trial")
+    || entry.includes("debug")
+  ));
+}
+
 export function setBackendNickname(value) {
   nickname = normalizeNickname(value);
   try {
@@ -259,7 +282,22 @@ function normalizeAuthUser(value) {
   const id = String(value?.id || "").trim().slice(0, 96);
   const username = normalizeNickname(value?.username || value?.employeeId || "");
   const employeeId = String(value?.employeeId || "").trim().slice(0, 64);
-  return id && username ? { id, username, employeeId } : null;
+  const roles = normalizeStringList(value?.roles || value?.roleList || value?.authorities);
+  const permissions = normalizeStringList(value?.permissions || value?.permissionList || value?.menus);
+  const role = String(value?.role || value?.roleCode || value?.userType || "").trim().slice(0, 64);
+  const roleCode = String(value?.roleCode || "").trim().slice(0, 64);
+  const userType = String(value?.userType || "").trim().slice(0, 64);
+  const isAdmin = value?.isAdmin === true || value?.admin === true || value?.administrator === true;
+  return id && username ? { id, username, employeeId, role, roleCode, userType, roles, permissions, isAdmin } : null;
+}
+
+function normalizeStringList(value) {
+  const source = Array.isArray(value) ? value : typeof value === "string" ? value.split(/[,\s|]+/) : [];
+  return source
+    .map((entry) => typeof entry === "string" ? entry : entry?.role || entry?.roleCode || entry?.authority || entry?.permission || entry?.code || entry?.name)
+    .map((entry) => String(entry || "").trim().slice(0, 96))
+    .filter(Boolean)
+    .slice(0, 64);
 }
 
 function redirectToLogin(redirectTo) {

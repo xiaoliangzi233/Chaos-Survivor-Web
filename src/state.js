@@ -31,13 +31,10 @@ export const state = {
   map: null,
   player: null,
   players: null,
-  multiplayer: createMultiplayerState(),
   weapons: null,
   inventory: null,
   initialWeaponId: null,
   shop: null,
-  waveReady: { p1: false, p2: false },
-  upgradePhase: null,
   easterEggs: null,
   waveScenario: null,
   waveScenarioRuntime: null,
@@ -84,7 +81,7 @@ export function addCameraShake(amount, cap = 18) {
 export function createPlayer() {
   return {
     id: "p1",
-    name: "P1",
+    name: "玩家",
     color: "#42e8ff",
     x: 0,
     y: 0,
@@ -136,39 +133,6 @@ export function createPlayer() {
     trailTimer: 0,
     slideVx: 0,
     slideVy: 0,
-  };
-}
-
-export function createPeerPlayer() {
-  const player = createPlayer();
-  Object.assign(player, {
-    id: "p2",
-    name: "P2",
-    color: "#ff8bd8",
-    x: 58,
-    y: 0,
-    dirX: -1,
-    dirY: 0,
-  });
-  player.gold = 0;
-  player.weapons = createWeapons();
-  player.inventory = createInventory();
-  player.shop = null;
-  player.initialWeaponId = null;
-  return player;
-}
-
-export function createMultiplayerState(previous = {}) {
-  return {
-    enabled: Boolean(previous.enabled),
-    role: previous.role === "host" || previous.role === "guest" ? previous.role : "solo",
-    connected: Boolean(previous.connected),
-    peerName: previous.peerName || "",
-    latencyMs: Math.max(0, Math.round(Number(previous.latencyMs) || 0)),
-    jitterMs: Math.max(0, Math.round(Number(previous.jitterMs) || 0)),
-    snapshotIntervalMs: Math.max(0, Math.round(Number(previous.snapshotIntervalMs) || 0)),
-    status: previous.status || "idle",
-    statusLabel: previous.statusLabel || "",
   };
 }
 
@@ -246,7 +210,6 @@ export function createDebugState(previous = {}) {
 }
 
 export function createLobbyState(previous = {}) {
-  const peer = previous.peer || {};
   return {
     initialized: Boolean(previous.initialized),
     active: Boolean(previous.active),
@@ -254,10 +217,8 @@ export function createLobbyState(previous = {}) {
     shipTime: Number(previous.shipTime) || 0,
     player: {
       id: "p1",
-      name: "P1 主机",
+      name: "玩家",
       color: "#42e8ff",
-      name: "P1 主机",
-      name: "P1 Host",
       x: Number(previous.player?.x) || 120,
       y: Number(previous.player?.y) || 150,
       r: 15,
@@ -275,28 +236,9 @@ export function createLobbyState(previous = {}) {
       movePath: [],
       movePathIndex: 0,
     },
-    peer: {
-      id: "p2",
-      name: "P2 客机",
-      color: "#ff8bd8",
-      name: "P2 客机",
-      name: "P2 Guest",
-      x: Number(peer.x) || 164,
-      y: Number(peer.y) || 150,
-      r: 15,
-      speed: 245,
-      vx: Number(peer.vx) || 0,
-      vy: Number(peer.vy) || 0,
-      dirX: Number(peer.dirX) || 0,
-      dirY: Number(peer.dirY) || -1,
-      tilt: Number(peer.tilt) || 0,
-      stride: Number(peer.stride) || 0,
-      moving: Boolean(peer.moving),
-    },
     cameraX: Number(previous.cameraX) || 80,
     cameraY: Number(previous.cameraY) || 105,
     selectedWeaponId: previous.selectedWeaponId || "",
-    selectedPeerWeaponId: previous.selectedPeerWeaponId || previous.selectedWeaponId || "",
     selectedDifficultyId: previous.selectedDifficultyId || "",
     randomGoal: previous.randomGoal === "endless" ? "endless" : "twenty_waves",
     weaponPage: Math.max(0, Math.min(2, Math.floor(Number(previous.weaponPage) || 0))),
@@ -345,7 +287,6 @@ export function createRandomRunState() {
 export function resetRun(map) {
   const previousAi = state.ai;
   const previousDebug = state.debug;
-  const previousMultiplayer = state.multiplayer;
   world.enemies.length = 0;
   world.projectiles.length = 0;
   world.enemyProjectiles.length = 0;
@@ -387,15 +328,11 @@ export function resetRun(map) {
   state.cameraY = 0;
   state.map = map;
   state.player = createPlayer();
-  state.players = { p1: state.player, p2: createPeerPlayer() };
-  state.players.p1.x = -34;
-  state.players.p2.x = 34;
+  state.players = { p1: state.player };
   state.weapons = createWeapons();
   state.inventory = createInventory();
   state.initialWeaponId = null;
   state.shop = null;
-  state.waveReady = { p1: false, p2: false };
-  state.upgradePhase = null;
   state.easterEggs = createEasterEggState();
   state.waveScenario = null;
   state.waveScenarioRuntime = null;
@@ -403,5 +340,4 @@ export function resetRun(map) {
   state.difficultyId = state.difficultyId || "ember";
   state.ai = createAiState(previousAi || {});
   state.debug = createDebugState(previousDebug || {});
-  state.multiplayer = createMultiplayerState(previousMultiplayer || {});
 }

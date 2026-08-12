@@ -3,6 +3,7 @@ import {
   bootstrapBackendPlayer,
   configureBackendProgress,
   fetchBackendProgress,
+  requireAuthenticatedUser,
   saveBackendProgress,
   submitBackendRun,
 } from "../services/backendProgressService.js";
@@ -21,6 +22,10 @@ let progress = emptyProgress();
 
 export function configurePlayerProgress() {
   configureBackendProgress();
+}
+
+export async function requirePlayerLogin() {
+  return requireAuthenticatedUser({ redirectTo: "/login" });
 }
 
 export async function loadPlayerProgress({ difficultyIds: nextDifficultyIds = [] } = {}) {

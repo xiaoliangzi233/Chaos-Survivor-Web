@@ -1,14 +1,19 @@
 from __future__ import annotations
 
 import os
+import json
+import urllib.error
+import urllib.request
 from pathlib import Path
 
-from fastapi import Depends, FastAPI, HTTPException, Query
+from fastapi import Depends, FastAPI, Header, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 
 from .admin import admin_page, read_config_file, require_admin, validate_config_kind, write_config_file
 from .db import DEFAULT_DB_PATH, SurvivorDatabase
 from .schemas import ConfigDraft, PlayerBootstrap, ProgressSnapshot, RunSubmission
+
+AUTH_USER_URL = "http://113.249.91.32/sszl/user/simple-info"
 
 
 def create_app(db_path: str | Path | None = None) -> FastAPI:
@@ -19,13 +24,34 @@ def create_app(db_path: str | Path | None = None) -> FastAPI:
         CORSMiddleware,
         allow_origins=allowed_origins or ["*"],
         allow_methods=["GET", "POST", "PUT", "OPTIONS"],
-        allow_headers=["Content-Type", "X-Admin-Token"],
+        allow_headers=["Content-Type", "X-Admin-Token", "Authorization"],
     )
     app.state.database = database
 
     @app.get("/api/health")
     def health():
         return {"ok": True, "service": "survivor-backend"}
+
+    @app.get("/api/auth/simple-info")
+    def auth_simple_info(authorization: str | None = Header(default=None)):
+        token = (authorization or "").strip()
+        if not token:
+            raise HTTPException(status_code=401, detail="token_required")
+        request = urllib.request.Request(AUTH_USER_URL, headers={"Authorization": token}, method="GET")
+        try:
+            with urllib.request.urlopen(request, timeout=3) as response:
+                payload = response.read().decode("utf-8")
+        except urllib.error.HTTPError as exc:
+            raise HTTPException(status_code=exc.code, detail="auth_failed") from exc
+        except Exception as exc:
+            raise HTTPException(status_code=502, detail="auth_unavailable") from exc
+        try:
+            data = json.loads(payload)
+        except json.JSONDecodeError as exc:
+            raise HTTPException(status_code=502, detail="invalid_auth_response") from exc
+        if not data:
+            raise HTTPException(status_code=401, detail="auth_failed")
+        return data
 
     @app.post("/api/players/bootstrap")
     def bootstrap_player(payload: PlayerBootstrap):

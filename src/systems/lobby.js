@@ -68,17 +68,17 @@ export const LOBBY_WEAPON_STATIONS = [
 ];
 
 export const LOBBY_NPCS = [
-  { id: "guide", role: "向导", name: "伊芙", personality: "guide", roomId: "core", x: 260, y: 160, color: "#42e8ff", coat: "#173b50", homeNode: "core-guide", workNodes: ["core-guide", "core-social", "bridge-nav"] },
-  { id: "tactician", role: "战术调度员", name: "黎星", personality: "tactician", roomId: "core", x: -500, y: 300, color: "#ffd166", coat: "#493b20", homeNode: "core-tactics", workNodes: ["core-tactics", "bridge-nav", "core-social"] },
-  { id: "statistician", role: "统计员", name: "米洛", personality: "statistician", roomId: "data", x: -2280, y: -470, color: "#ffd166", coat: "#4a3520", homeNode: "data-recorder", workNodes: ["data-recorder", "data-lounge", "core-social"] },
-  { id: "archivist", role: "档案管理员", name: "诺薇", personality: "archivist", roomId: "data", x: -1480, y: -430, color: "#42e8ff", coat: "#17394c", homeNode: "data-codex", workNodes: ["data-codex", "data-lounge", "bridge-nav"] },
-  { id: "geneticist", role: "生物工程师", name: "赛恩", personality: "geneticist", roomId: "science", x: 1990, y: -820, color: "#77ff8a", coat: "#1e4638", homeNode: "science-gene", workNodes: ["science-gene", "science-med", "science-life", "core-social"] },
-  { id: "engineer", role: "维护工程师", name: "洛克", personality: "engineer", roomId: "engineering", x: 2030, y: 870, color: "#b48cff", coat: "#392954", homeNode: "engineering-rift", workNodes: ["engineering-rift", "engineering-reactor", "engineering-power", "core-social"] },
-  { id: "quartermaster", role: "军械员", name: "蕾薇", personality: "quartermaster", roomId: "combat", x: -1490, y: 980, color: "#ff7a8a", coat: "#52273a", homeNode: "combat-armory", workNodes: ["combat-armory", "combat-hangar", "core-social"] },
-  { id: "story-attendant", role: "剧情引航员", name: "阿岚", personality: "navigator", roomId: "bridge", x: -230, y: -1300, color: "#42e8ff", coat: "#173b50", homeNode: "bridge-story", workNodes: ["bridge-story", "bridge-nav", "core-social"] },
-  { id: "random-attendant", role: "异常分析员", name: "缄", personality: "analyst", roomId: "data", x: -1840, y: -1080, color: "#b48cff", coat: "#392954", homeNode: "data-random", workNodes: ["data-random", "data-lounge", "bridge-nav"] },
-  { id: "trial-attendant", role: "试炼教官", name: "凯因", personality: "instructor", roomId: "combat", x: -2080, y: 1220, color: "#ffb347", coat: "#54351c", homeNode: "combat-trial", workNodes: ["combat-trial", "combat-hangar", "core-social"] },
-  { id: "home-attendant", role: "家园管理员", name: "赫塔", personality: "steward", roomId: "habitat", x: 70, y: 1510, color: "#77ff8a", coat: "#1e4638", homeNode: "habitat-home", workNodes: ["habitat-home", "habitat-mess", "core-social"] },
+  { id: "guide", role: "向导", name: "蔡徐坤", personality: "guide", roomId: "core", x: 260, y: 160, color: "#42e8ff", coat: "#173b50", homeNode: "core-guide", workNodes: ["core-guide", "core-social", "bridge-nav"] },
+  { id: "tactician", role: "战术调度员", name: "张雪峰", personality: "tactician", roomId: "core", x: -500, y: 300, color: "#ffd166", coat: "#493b20", homeNode: "core-tactics", workNodes: ["core-tactics", "bridge-nav", "core-social"] },
+  { id: "statistician", role: "统计员", name: "科比", personality: "statistician", roomId: "data", x: -2280, y: -470, color: "#ffd166", coat: "#4a3520", homeNode: "data-recorder", workNodes: ["data-recorder", "data-lounge", "core-social"] },
+  { id: "archivist", role: "档案管理员", name: "郭德纲", personality: "archivist", roomId: "data", x: -1480, y: -430, color: "#42e8ff", coat: "#17394c", homeNode: "data-codex", workNodes: ["data-codex", "data-lounge", "bridge-nav"] },
+  { id: "geneticist", role: "生物工程师", name: "雷军", personality: "geneticist", roomId: "science", x: 1990, y: -820, color: "#77ff8a", coat: "#1e4638", homeNode: "science-gene", workNodes: ["science-gene", "science-med", "science-life", "core-social"] },
+  { id: "engineer", role: "维护工程师", name: "马保国", personality: "engineer", roomId: "engineering", x: 2030, y: 870, color: "#b48cff", coat: "#392954", homeNode: "engineering-rift", workNodes: ["engineering-rift", "engineering-reactor", "engineering-power", "core-social"] },
+  { id: "quartermaster", role: "军械员", name: "王境泽", personality: "quartermaster", roomId: "combat", x: -1490, y: 980, color: "#ff7a8a", coat: "#52273a", homeNode: "combat-armory", workNodes: ["combat-armory", "combat-hangar", "core-social"] },
+  { id: "story-attendant", role: "剧情引航员", name: "刘华强", personality: "navigator", roomId: "bridge", x: -230, y: -1300, color: "#42e8ff", coat: "#173b50", homeNode: "bridge-story", workNodes: ["bridge-story", "bridge-nav", "core-social"] },
+  { id: "random-attendant", role: "异常分析员", name: "罗翔", personality: "analyst", roomId: "data", x: -1840, y: -1080, color: "#b48cff", coat: "#392954", homeNode: "data-random", workNodes: ["data-random", "data-lounge", "bridge-nav"] },
+  { id: "trial-attendant", role: "试炼教官", name: "孙笑川", personality: "instructor", roomId: "combat", x: -2080, y: 1220, color: "#ffb347", coat: "#54351c", homeNode: "combat-trial", workNodes: ["combat-trial", "combat-hangar", "core-social"] },
+  { id: "home-attendant", role: "家园管理员", name: "丁真", personality: "steward", roomId: "habitat", x: 70, y: 1510, color: "#77ff8a", coat: "#1e4638", homeNode: "habitat-home", workNodes: ["habitat-home", "habitat-mess", "core-social"] },
 ];
 
 export const LOBBY_SCENERY = [
@@ -665,24 +665,53 @@ export function setLobbyPlayerMoveTarget(x, y) {
   const player = state.lobby.player;
   if (!player || state.mode !== "lobby" || state.lobby.modalOpen) return false;
   const destination = resolveLobbyPosition(Number(x) || 0, Number(y) || 0, player.r);
-  const direct = lobbySegmentWalkable(player.x, player.y, destination.x, destination.y, player.r);
-  const path = [];
-  if (!direct) {
-    const start = nearestNavNode(player.x, player.y);
-    const target = nearestNavNode(destination.x, destination.y);
-    for (const id of findLobbyPath(start.id, target.id)) {
-      const node = NAV_BY_ID.get(id);
-      if (node) path.push({ x: node.x, y: node.y });
-    }
-  }
-  const last = path[path.length - 1];
-  if (!last || Math.hypot(last.x - destination.x, last.y - destination.y) > 6) path.push(destination);
+  const path = findLobbyPointRoute(player.x, player.y, destination.x, destination.y, player.r);
   player.movePath = path;
   player.movePathIndex = 0;
   player.moveTargetX = destination.x;
   player.moveTargetY = destination.y;
   player.moveTargetActive = path.length > 0;
   return player.moveTargetActive;
+}
+
+function findLobbyPointRoute(startX, startY, targetX, targetY, radius = 15) {
+  if (lobbySegmentWalkable(startX, startY, targetX, targetY, radius)) return [{ x: targetX, y: targetY }];
+  const starts = reachableNavNodesFromPoint(startX, startY, radius);
+  const targets = reachableNavNodesFromPoint(targetX, targetY, radius);
+  let best = null;
+  for (const start of starts) {
+    for (const target of targets) {
+      const nodePath = findLobbyPath(start.node.id, target.node.id);
+      if (!nodePath.length) continue;
+      const nodeCost = nodePath.reduce((sum, id, index) => (
+        index === 0 ? sum : sum + nodeDistance(nodePath[index - 1], id)
+      ), 0);
+      const cost = start.cost + nodeCost + target.cost;
+      if (!best || cost < best.cost) best = { cost, nodePath };
+    }
+  }
+  const path = (best?.nodePath || []).map((id) => {
+    const node = NAV_BY_ID.get(id);
+    return node ? { x: node.x, y: node.y } : null;
+  }).filter(Boolean);
+  while (path.length > 1 && lobbySegmentWalkable(startX, startY, path[1].x, path[1].y, radius)) path.shift();
+  while (path.length && Math.hypot(path[0].x - startX, path[0].y - startY) <= 12) path.shift();
+  const last = path[path.length - 1];
+  if (!last || Math.hypot(last.x - targetX, last.y - targetY) > 6) path.push({ x: targetX, y: targetY });
+  return path;
+}
+
+function reachableNavNodesFromPoint(x, y, radius = 15) {
+  const nodes = NAV_NODES
+    .map((node) => ({
+      node,
+      cost: Math.hypot(node.x - x, node.y - y),
+      walkable: lobbySegmentWalkable(x, y, node.x, node.y, radius),
+    }))
+    .filter((entry) => entry.walkable)
+    .sort((a, b) => a.cost - b.cost);
+  if (nodes.length) return nodes.slice(0, 8);
+  return [{ node: nearestNavNode(x, y), cost: 0 }];
 }
 
 export function cancelLobbyPlayerMove() {

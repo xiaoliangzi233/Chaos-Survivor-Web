@@ -2,11 +2,15 @@ import { backendConfig } from "../config/backend-config.js";
 
 const PLAYER_ID_KEY = "pixel-survivor-player-id-v1";
 const NICKNAME_KEY = "pixel-survivor-player-nickname-v1";
+const AUTH_TOKEN_KEY = "pixel-survivor-auth-token-v1";
+const AUTH_USER_URL = "http://113.249.91.32/sszl/user/simple-info";
 const REQUEST_TIMEOUT_MS = 3000;
 
 let apiBaseUrl = "";
 let playerId = "";
 let nickname = "";
+let authToken = "";
+let authenticatedUser = null;
 let available = false;
 let lastError = "";
 
@@ -26,6 +30,8 @@ export function backendStatus() {
     apiBaseUrl,
     playerId,
     nickname,
+    authenticated: Boolean(authenticatedUser),
+    username: authenticatedUser?.username || nickname,
     lastError,
   };
 }
@@ -42,6 +48,10 @@ export function currentNickname() {
   return nickname || readNickname();
 }
 
+export function currentAuthenticatedUser() {
+  return authenticatedUser ? { ...authenticatedUser } : null;
+}
+
 export function setBackendNickname(value) {
   nickname = normalizeNickname(value);
   try {
@@ -50,6 +60,37 @@ export function setBackendNickname(value) {
     // Nickname persistence is best effort.
   }
   return nickname;
+}
+
+export async function requireAuthenticatedUser({ redirectTo = "/login" } = {}) {
+  if (isAuthDisabledForLocalTest()) {
+    return { id: currentPlayerId(), username: currentNickname(), employeeId: "", localTest: true };
+  }
+  authToken = readAuthToken();
+  if (!authToken) return redirectToLogin(redirectTo);
+  try {
+    const user = await fetchAuthenticatedUser(authToken);
+    authenticatedUser = normalizeAuthUser(user);
+    if (!authenticatedUser) throw new Error("invalid_user_info");
+    playerId = authenticatedUser.id;
+    setBackendNickname(authenticatedUser.username);
+    persistAuthToken(authToken);
+    return currentAuthenticatedUser();
+  } catch (error) {
+    clearAuthToken();
+    markFailure(error);
+    return redirectToLogin(redirectTo);
+  }
+}
+
+export function isAuthDisabledForLocalTest() {
+  try {
+    const params = new URLSearchParams(globalThis.location?.search || "");
+    const value = String(params.get("auth") || "").trim().toLowerCase();
+    return ["0", "off", "false", "no", "local"].includes(value);
+  } catch {
+    return false;
+  }
 }
 
 export async function bootstrapBackendPlayer() {
@@ -139,6 +180,7 @@ function resolveApiBaseUrl() {
 }
 
 function ensurePlayerId() {
+  if (authenticatedUser?.id) return authenticatedUser.id;
   try {
     const existing = globalThis.localStorage?.getItem(PLAYER_ID_KEY);
     if (existing) return existing;
@@ -151,11 +193,83 @@ function ensurePlayerId() {
 }
 
 function readNickname() {
+  if (authenticatedUser?.username) return authenticatedUser.username;
   try {
     return normalizeNickname(globalThis.localStorage?.getItem(NICKNAME_KEY) || backendConfig.defaultNickname);
   } catch {
     return normalizeNickname(backendConfig.defaultNickname);
   }
+}
+
+function readAuthToken() {
+  try {
+    const params = new URLSearchParams(globalThis.location?.search || "");
+    const fromQuery = params.get("token");
+    const token = String(fromQuery || globalThis.localStorage?.getItem(AUTH_TOKEN_KEY) || "").trim();
+    return token;
+  } catch {
+    return "";
+  }
+}
+
+function persistAuthToken(token) {
+  try {
+    globalThis.localStorage?.setItem(AUTH_TOKEN_KEY, token);
+  } catch {
+    // Auth token persistence is best effort.
+  }
+}
+
+function clearAuthToken() {
+  authenticatedUser = null;
+  authToken = "";
+  try {
+    globalThis.localStorage?.removeItem(AUTH_TOKEN_KEY);
+  } catch {
+    // Storage can be unavailable.
+  }
+}
+
+async function fetchAuthenticatedUser(token) {
+  if (apiBaseUrl) {
+    try {
+      return await requestJson("/api/auth/simple-info", { headers: { Authorization: token } });
+    } catch {
+      // Fall back to the documented endpoint when the optional same-origin backend is absent.
+    }
+  }
+  const controller = new AbortController();
+  const timeout = globalThis.setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  try {
+    const response = await fetch(AUTH_USER_URL, {
+      method: "GET",
+      headers: { Authorization: token },
+      signal: controller.signal,
+    });
+    const text = await response.text();
+    const data = text ? JSON.parse(text) : null;
+    if (!response.ok || !data) throw new Error(data?.detail || response.statusText || "auth_failed");
+    return data;
+  } finally {
+    globalThis.clearTimeout(timeout);
+  }
+}
+
+function normalizeAuthUser(value) {
+  const id = String(value?.id || "").trim().slice(0, 96);
+  const username = normalizeNickname(value?.username || value?.employeeId || "");
+  const employeeId = String(value?.employeeId || "").trim().slice(0, 64);
+  return id && username ? { id, username, employeeId } : null;
+}
+
+function redirectToLogin(redirectTo) {
+  const target = redirectTo || "/login";
+  try {
+    if (globalThis.location?.pathname !== target) globalThis.location.href = target;
+  } catch {
+    // Tests and non-browser contexts may not allow navigation.
+  }
+  return null;
 }
 
 function normalizeNickname(value) {

@@ -81,8 +81,11 @@ class BackendApiTest(unittest.TestCase):
         self.assertEqual(board.status_code, 200)
         entries = board.json()["entries"]
         self.assertEqual(len(entries), 1)
-        self.assertEqual(entries[0]["id"], "run-1")
+        self.assertEqual(entries[0]["playerId"], "anon-a")
         self.assertEqual(entries[0]["nickname"], "Ace")
+        self.assertEqual(entries[0]["totalKills"], 500)
+        self.assertEqual(entries[0]["totalSeconds"], 480)
+        self.assertEqual(entries[0]["clearedDifficulties"], ["Ember"])
 
     def test_admin_config_publish_validates_kind_and_writes_json(self):
         bad = self.client.put(

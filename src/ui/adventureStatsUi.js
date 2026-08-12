@@ -225,14 +225,12 @@ function renderLeaderboard() {
   );
   section.appendChild(controls);
 
-  const results = node("div", "adventure-table adventure-leaderboard-table");
-  results.appendChild(tableRow(["#", "玩家", "难度", "模式", "波次", "击杀", "时间", "武器", "结果"], true));
+  const results = node("div", "adventure-leaderboard-list");
   section.appendChild(results);
   dom.content.appendChild(section);
 
   const load = async () => {
-    results.replaceChildren(tableRow(["#", "玩家", "难度", "模式", "波次", "击杀", "时间", "武器", "结果"], true));
-    results.appendChild(tableRow(["...", "正在连接排行榜", "", "", "", "", "", "", ""], false));
+    results.replaceChildren(emptyState("正在连接排行榜", "同步同服玩家战绩中。"));
     const response = await fetchLeaderboards({
       mode: modeSelect.value,
       difficulty: difficultySelect.value,
@@ -240,37 +238,50 @@ function renderLeaderboard() {
       limit: 25,
     });
     if (requestId !== leaderboardRequestId || activeTab !== "leaderboard") return;
-    results.replaceChildren(tableRow(["#", "玩家", "难度", "模式", "波次", "击杀", "时间", "武器", "结果"], true));
+    results.replaceChildren();
     if (!response.enabled) {
-      results.appendChild(tableRow(["--", "未配置后端，使用 ?api=http://127.0.0.1:5010 启用", "", "", "", "", "", "", ""], false));
+      results.appendChild(emptyState("排行榜未启用", "未配置后端，使用 ?api=http://127.0.0.1:5010 启用。"));
       return;
     }
     if (response.error) {
-      results.appendChild(tableRow(["--", `排行榜不可用：${response.error}`, "", "", "", "", "", "", ""], false));
+      results.appendChild(emptyState("排行榜不可用", response.error));
       return;
     }
     if (!response.entries.length) {
-      results.appendChild(tableRow(["--", "暂无公开战报", "", "", "", "", "", "", ""], false));
+      results.appendChild(emptyState("暂无公开战报", "完成一局正式战斗后，玩家排行会在这里点亮。"));
       return;
     }
     response.entries.forEach((run, index) => {
-      results.appendChild(tableRow([
-        index + 1,
-        run.nickname || "Anonymous",
-        run.difficultyName || run.difficultyId,
-        modeLabel(run.modeKey),
-        run.wave,
-        formatNumber(run.kills),
-        formatDuration(run.seconds),
-        run.weaponName || run.weaponId || "--",
-        outcomeLabel(run.outcome),
-      ], false, run.outcome === "victory" ? "cleared" : ""));
+      results.appendChild(leaderboardCard(run, index, difficulties));
     });
   };
   modeSelect.addEventListener("change", load);
   difficultySelect.addEventListener("change", load);
   metricSelect.addEventListener("change", load);
   load();
+}
+
+function leaderboardCard(run, index, difficulties) {
+  const article = node("article", `adventure-leaderboard-card rank-${Math.min(index + 1, 4)}`);
+  const clearedNames = Array.isArray(run.clearedDifficulties) ? run.clearedDifficulties.filter(Boolean) : [];
+  const clearedIds = Array.isArray(run.clearedDifficultyIds) ? run.clearedDifficultyIds.filter(Boolean) : [];
+  const cleared = clearedNames.length ? clearedNames : clearedIds.map((id) => difficulties.find((entry) => entry.id === id)?.name || id);
+  const avatar = textNode("div", initials(run.nickname || "A"));
+  avatar.className = `adventure-leaderboard-avatar ${run.avatar || avatarClass(run.playerId || run.nickname)}`;
+  const identity = node("div", "adventure-leaderboard-identity");
+  identity.append(textNode("strong", run.nickname || "Anonymous"), textNode("span", `${formatNumber(run.runs)} 次出击 // ${formatNumber(run.victories)} 次通关`));
+  const rank = textNode("b", `#${index + 1}`);
+  const head = node("header");
+  head.append(rank, avatar, identity);
+  const metrics = node("div", "adventure-leaderboard-metrics");
+  metrics.append(
+    recordChip("击杀数", formatNumber(run.totalKills)),
+    recordChip("游玩总时长", formatDuration(run.totalSeconds)),
+    recordChip("最高波次", formatNumber(run.bestWave)),
+    recordChip("通关难度", cleared.length ? cleared.join(" / ") : "暂无"),
+  );
+  article.append(head, metrics);
+  return article;
 }
 
 function historyCard(run) {
@@ -387,6 +398,17 @@ function formatDuration(seconds) {
 
 function formatNumber(value) {
   return new Intl.NumberFormat("zh-CN").format(Math.max(0, Number(value) || 0));
+}
+
+function initials(value) {
+  return String(value || "A").trim().slice(0, 2).toUpperCase() || "A";
+}
+
+function avatarClass(value) {
+  let hash = 0;
+  const text = String(value || "pilot");
+  for (let index = 0; index < text.length; index++) hash = (hash * 31 + text.charCodeAt(index)) | 0;
+  return `pilot-${Math.abs(hash) % 8}`;
 }
 
 function formatDate(value) {

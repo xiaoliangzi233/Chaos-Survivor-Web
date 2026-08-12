@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import hashlib
 import sqlite3
 from contextlib import contextmanager
 from datetime import datetime, timezone
@@ -177,12 +178,12 @@ class SurvivorDatabase:
 
     def leaderboard(self, mode: str = "all", difficulty: str = "all", metric: str = "kills", limit: int = 20) -> list[dict[str, Any]]:
         metric_sql = {
-            "kills": "kills DESC, wave DESC, seconds ASC",
-            "wave": "wave DESC, kills DESC, seconds ASC",
-            "time": "seconds DESC, wave DESC, kills DESC",
-            "gold": "gold DESC, kills DESC, wave DESC",
-            "victory_speed": "CASE WHEN outcome = 'victory' THEN 0 ELSE 1 END ASC, seconds ASC, kills DESC",
-        }.get(metric, "kills DESC, wave DESC, seconds ASC")
+            "kills": "total_kills DESC, best_wave DESC, total_seconds ASC",
+            "wave": "best_wave DESC, total_kills DESC, total_seconds ASC",
+            "time": "total_seconds DESC, total_kills DESC, best_wave DESC",
+            "gold": "total_gold DESC, total_kills DESC, best_wave DESC",
+            "victory_speed": "victories DESC, best_victory_seconds ASC, total_kills DESC",
+        }.get(metric, "total_kills DESC, best_wave DESC, total_seconds ASC")
         clauses = []
         params: list[Any] = []
         if mode != "all":
@@ -192,11 +193,29 @@ class SurvivorDatabase:
             clauses.append("difficulty_id = ?")
             params.append(difficulty)
         where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
-        sql = f"SELECT * FROM runs {where} ORDER BY {metric_sql}, completed_at DESC LIMIT ?"
+        sql = f"""
+            SELECT
+              player_id,
+              nickname,
+              COUNT(*) AS runs,
+              SUM(CASE WHEN outcome = 'victory' THEN 1 ELSE 0 END) AS victories,
+              SUM(kills) AS total_kills,
+              SUM(seconds) AS total_seconds,
+              SUM(gold) AS total_gold,
+              MAX(wave) AS best_wave,
+              MIN(CASE WHEN outcome = 'victory' THEN seconds END) AS best_victory_seconds,
+              GROUP_CONCAT(DISTINCT CASE WHEN outcome = 'victory' THEN difficulty_id END) AS cleared_difficulty_ids,
+              GROUP_CONCAT(DISTINCT CASE WHEN outcome = 'victory' THEN difficulty_name END) AS cleared_difficulty_names
+            FROM runs
+            {where}
+            GROUP BY player_id, nickname
+            ORDER BY {metric_sql}
+            LIMIT ?
+        """
         params.append(max(1, min(100, int(limit))))
         with self.connect() as conn:
             rows = conn.execute(sql, params).fetchall()
-        return [self._run_row(row) for row in rows]
+        return [self._leaderboard_row(row) for row in rows]
 
     def read_config_snapshot(self, kind: str) -> dict[str, Any] | None:
         with self.connect() as conn:
@@ -286,4 +305,23 @@ class SurvivorDatabase:
             "weaponCount": row["weapon_count"],
             "itemCount": row["item_count"],
             "createdAt": row["created_at"],
+        }
+
+    @staticmethod
+    def _leaderboard_row(row: sqlite3.Row) -> dict[str, Any]:
+        cleared_ids = [entry for entry in (row["cleared_difficulty_ids"] or "").split(",") if entry]
+        cleared_names = [entry for entry in (row["cleared_difficulty_names"] or "").split(",") if entry]
+        return {
+            "playerId": row["player_id"],
+            "nickname": row["nickname"],
+            "avatar": f"pilot-{int(hashlib.sha1(row['player_id'].encode('utf-8')).hexdigest()[:8], 16) % 8}",
+            "runs": row["runs"],
+            "victories": row["victories"],
+            "totalKills": row["total_kills"] or 0,
+            "totalSeconds": row["total_seconds"] or 0,
+            "totalGold": row["total_gold"] or 0,
+            "bestWave": row["best_wave"] or 0,
+            "bestVictorySeconds": row["best_victory_seconds"] or 0,
+            "clearedDifficultyIds": cleared_ids,
+            "clearedDifficulties": cleared_names,
         }

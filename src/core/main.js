@@ -50,6 +50,7 @@ import {
   consumeLobbyFirstClearReaction,
   loadPlayerProgress,
   queueLobbyFirstClearReactions,
+  requirePlayerLogin,
   recordBestSurvivalSeconds,
   recordBestRandomEndlessWave,
   recordAdventureResult,
@@ -158,6 +159,9 @@ export async function bootGame() {
   await preloadCoordinator.initCore((progress, label) => setBootProgress(26 + progress * 12, label));
   window.__survivorRendererStats = () => renderBackend.getStats();
   configurePlayerProgress();
+  setBootProgress(40, "正在验证登录身份");
+  const authenticatedUser = await requirePlayerLogin();
+  if (!authenticatedUser) return;
   setBootProgress(42, "本地进度已就绪");
   setBootProgress(54, "正在加载武器与道具");
   await editableDataPromise;

@@ -31,6 +31,7 @@ import {
   lobbyNpcDialogue,
   lobbyInteriorRoomAt,
   lobbyRoomAt,
+  lobbySegmentWalkable,
   resolveLobbyPosition,
   selectedLobbyWeapon,
   setLobbyPlayerMoveTarget,
@@ -282,6 +283,13 @@ test("ground clicks steer the lobby player and keyboard input cancels the route"
 
   assert.equal(setLobbyPlayerMoveTarget(1900, -800), true);
   assert.ok(state.lobby.player.movePath.length >= 3);
+  assert.equal(lobbySegmentWalkable(
+    state.lobby.player.x,
+    state.lobby.player.y,
+    state.lobby.player.movePath[0].x,
+    state.lobby.player.movePath[0].y,
+    state.lobby.player.r,
+  ), true);
   input.right = true;
   updateLobby(0.05);
   input.right = false;

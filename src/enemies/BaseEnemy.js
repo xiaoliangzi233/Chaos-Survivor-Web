@@ -49,7 +49,7 @@ export class BaseEnemy {
     this.shielded = false;
     this.knockbackX = 0;
     this.knockbackY = 0;
-    this.difficultyAttackSpeed = (difficulty.enemyAttackSpeed || 1) * coop.attackSpeed;
+    this.difficultyAttackSpeed = difficulty.enemyAttackSpeed || 1;
     this.knockbackResistance = config.knockbackResistance ?? (this.boss ? 0.92 : this.elite ? 0.58 : Math.min(0.62, Math.max(0.16, (this.r - 10) / 36)));
   }
 

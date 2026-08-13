@@ -1,5 +1,6 @@
-// Default to the same origin backend. Use ?api=... to point at another service.
+// Local static servers do not provide the progress API. Set ?api=... or fill
+// this value when running with a real backend service.
 export const backendConfig = {
-  apiBaseUrl: ".",
+  apiBaseUrl: "",
   defaultNickname: "Anonymous",
 };

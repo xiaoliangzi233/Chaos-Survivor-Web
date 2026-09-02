@@ -68,6 +68,7 @@ import {
 import {
   cancelLobbyLaunch,
   cancelLobbyPlayerMove,
+  cancelLobbyTutorialAutoMove,
   configureLobbyDifficulties,
   configureLobbyWeapons,
   enterLobby,
@@ -79,6 +80,7 @@ import {
   setLobbyHoveredInteraction,
   setLobbyModalOpen,
   setLobbyPlayerMoveTarget,
+  startLobbyTutorial,
   updateLobby,
 } from "../systems/lobby.js";
 import { lobbyScreenToWorld } from "../systems/lobbyRenderer.js";
@@ -86,6 +88,7 @@ import {
   closeLobbyDialogue,
   initLobbyUi,
   openLobbyMessage,
+  openLobbyTutorialDialogue,
   openNpcDialogue,
   updateLobbyUi,
 } from "../ui/lobbyUi.js";
@@ -197,6 +200,8 @@ export async function bootGame() {
     clearWaveEventNotice();
     hideAllOverlays();
     enterLobby({ resetPosition: true });
+    const tutorialDialogue = startLobbyTutorial({ source: "auto" });
+    if (tutorialDialogue) openLobbyTutorialDialogue(tutorialDialogue);
     setMusicScene("lobby");
     playSfx("select");
   }
@@ -680,8 +685,10 @@ export async function bootGame() {
     if (!activate) return Boolean(target);
     if (!target) {
       ui.canvas.classList.remove("lobby-target-hover");
+      cancelLobbyTutorialAutoMove();
       return setLobbyPlayerMoveTarget(worldPoint.x, worldPoint.y);
     }
+    cancelLobbyTutorialAutoMove();
     cancelLobbyPlayerMove();
     return handleLobbyInteraction(target.id);
   }
@@ -691,6 +698,7 @@ export async function bootGame() {
     if (state.lobby.active) {
       const lobbyEvent = updateLobby(dt);
       if (lobbyEvent?.type === "launch") startWithLoadout(lobbyEvent.config);
+      if (lobbyEvent?.type === "tutorial-arrived" && lobbyEvent.dialogue) openLobbyTutorialDialogue(lobbyEvent.dialogue);
       return;
     }
     if (state.mode === "shop") {
@@ -783,7 +791,7 @@ export async function bootGame() {
     interactLobbyPointer: (event) => lobbyPointerInteraction(event, true),
     useActiveItem: () => useActiveItem(),
     hoverLobbyPointer: (event) => lobbyPointerInteraction(event, false),
-    cancelLobbyAction: cancelLobbyLaunch,
+    cancelLobbyAction: () => cancelLobbyLaunch() || cancelLobbyTutorialAutoMove(),
   });
   const menuMap = generateMap();
   resetRun(menuMap);

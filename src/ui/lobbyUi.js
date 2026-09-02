@@ -1,13 +1,23 @@
 import { state } from "../state.js";
 import {
+  advanceLobbyTutorial,
   allLobbyInteractions,
   endLobbyNpcConversation,
+  goToLobbyTutorialTarget,
   lobbyNpcRuntime,
   setLobbyModalOpen,
+  skipLobbyTutorial,
+  startLobbyTutorial,
 } from "../systems/lobby.js";
 import { drawLobbyNpcAvatar } from "../systems/lobbyRenderer.js";
 
 const GUIDE_TOPICS = [
+  {
+    id: "tutorial",
+    label: "新手引导",
+    action: "tutorial-start",
+    text: "我会按顺序带你走一遍大厅设施，再说明冒险模式的核心玩法。你可以随时打断移动，也可以之后再找我重看。",
+  },
   {
     id: "facilities",
     label: "星舰设施",
@@ -21,7 +31,7 @@ const GUIDE_TOPICS = [
   {
     id: "combat",
     label: "战斗与成长",
-    text: "击败敌人收集经验，升级时从三项强化中选择一项。每波结束后可进入商店购买、出售或合成武器与道具。标准战役共二十波，随机模式还提供无限目标。",
+    text: "击败敌人收集经验，升级时从三项强化中选择一项。每波结束后可进入商店购买、出售或合成武器与道具。标准冒险共二十波，随机模式还提供无限目标。",
   },
   {
     id: "world",
@@ -56,9 +66,17 @@ export function initLobbyUi(options = {}) {
   dom.dialogueClose = document.getElementById("lobbyDialogueCloseButton");
   dom.dialogueEnd = document.getElementById("lobbyDialogueEndButton");
   dom.dialogueConfirm = document.getElementById("lobbyDialogueConfirmButton");
+  dom.tutorialGo = document.getElementById("lobbyTutorialGoButton");
+  dom.tutorialNext = document.getElementById("lobbyTutorialNextButton");
+  dom.tutorialSkip = document.getElementById("lobbyTutorialSkipButton");
+  dom.tutorialFinish = document.getElementById("lobbyTutorialFinishButton");
   dom.dialogueClose?.addEventListener("click", closeLobbyDialogue);
   dom.dialogueEnd?.addEventListener("click", closeLobbyDialogue);
   dom.dialogueConfirm?.addEventListener("click", continueLobbyDialogue);
+  dom.tutorialGo?.addEventListener("click", goToCurrentTutorialTarget);
+  dom.tutorialNext?.addEventListener("click", openNextTutorialStep);
+  dom.tutorialSkip?.addEventListener("click", skipCurrentTutorial);
+  dom.tutorialFinish?.addEventListener("click", finishCurrentTutorial);
   dom.dialogue?.addEventListener("click", (event) => {
     if (event.target === dom.dialogue) closeLobbyDialogue();
   });
@@ -94,7 +112,7 @@ export function updateLobbyUi() {
     dom.launch.hidden = !launch;
     if (launch) {
       const progress = Math.min(1, launch.elapsed / launch.duration);
-      dom.launchText.textContent = `${launch.runMode === "random" ? "异常航线" : "稳定航线"}充能 ${Math.round(progress * 100)}%`;
+      dom.launchText.textContent = `${launch.runMode === "random" ? "异常航线" : "冒险航线"}充能 ${Math.round(progress * 100)}%`;
       dom.launchBar.style.setProperty("--launch-progress", `${progress * 100}%`);
     }
   }
@@ -125,6 +143,10 @@ export function openNpcDialogue(dialogue) {
   return openLobbyDialogue(dialogue || {});
 }
 
+export function openLobbyTutorialDialogue(dialogue) {
+  return openLobbyDialogue(dialogue || {});
+}
+
 export function openLobbyMessage({ role = "FACILITY STATUS", title, speaker, text, color = "#42e8ff" }) {
   openLobbyDialogue({
     role,
@@ -136,7 +158,7 @@ export function openLobbyMessage({ role = "FACILITY STATUS", title, speaker, tex
   });
 }
 
-export function openLobbyDialogue({ role, title, speaker, text, pages, color = "#42e8ff", portrait = "system", npcId = null, topics = [] }) {
+export function openLobbyDialogue({ role, title, speaker, text, pages, color = "#42e8ff", portrait = "system", npcId = null, topics = [], tutorial = null }) {
   if (!dom.dialogue) return false;
   dom.dialogueRole.textContent = role || "TRANSIT HUB";
   dom.dialogueTitle.textContent = title || "中转站通讯";
@@ -153,6 +175,7 @@ export function openLobbyDialogue({ role, title, speaker, text, pages, color = "
     npcId: npcId || (portrait !== "system" ? portrait : null),
     color,
     topics: topics.map((topic) => ({ ...topic, pages: normalizeDialoguePages(topic.pages, topic.text) })),
+    tutorial: normalizeTutorialState(tutorial),
   };
   for (const topic of dialogueState.topics) {
     const button = document.createElement("button");
@@ -161,10 +184,16 @@ export function openLobbyDialogue({ role, title, speaker, text, pages, color = "
     button.addEventListener("click", () => {
       for (const sibling of dom.dialogueTopics.querySelectorAll("button")) sibling.classList.remove("active");
       button.classList.add("active");
+      if (topic.action === "tutorial-start") {
+        const dialogue = startLobbyTutorial({ source: "manual" });
+        if (dialogue) openLobbyTutorialDialogue(dialogue);
+        return;
+      }
       dialogueState.activeTopicId = topic.id;
       dialogueState.pages = topic.pages;
       dialogueState.pageIndex = 0;
       renderDialoguePage();
+      renderTutorialActions();
     });
     dom.dialogueTopics.appendChild(button);
   }
@@ -173,6 +202,7 @@ export function openLobbyDialogue({ role, title, speaker, text, pages, color = "
   setLobbyModalOpen(true);
   onModalChange?.(true);
   renderDialoguePage();
+  renderTutorialActions();
   startPortraitAnimation();
   window.setTimeout(() => dom.dialogueConfirm?.focus({ preventScroll: true }), 0);
   return true;
@@ -188,6 +218,7 @@ export function continueLobbyDialogue() {
   if (dialogueState.pageIndex < dialogueState.pages.length - 1) {
     dialogueState.pageIndex++;
     renderDialoguePage();
+    renderTutorialActions();
     return true;
   }
   if (dialogueState.activeTopicId) {
@@ -196,6 +227,7 @@ export function continueLobbyDialogue() {
     dialogueState.pageIndex = Math.max(0, dialogueState.introPages.length - 1);
     for (const button of dom.dialogueTopics.querySelectorAll("button")) button.classList.remove("active");
     renderDialoguePage();
+    renderTutorialActions();
     dom.dialogueTopics.querySelector("button")?.focus({ preventScroll: true });
     return true;
   }
@@ -213,9 +245,63 @@ function renderDialoguePage() {
   const hasNext = index < count - 1;
   const returnsToTopics = !hasNext && Boolean(dialogueState.activeTopicId);
   if (dom.dialogueConfirm) {
-    dom.dialogueConfirm.hidden = !hasNext && !returnsToTopics;
+    dom.dialogueConfirm.hidden = Boolean(dialogueState.tutorial) || (!hasNext && !returnsToTopics);
     dom.dialogueConfirm.textContent = returnsToTopics ? "返回话题" : "继续";
   }
+}
+
+function renderTutorialActions() {
+  const tutorial = dialogueState?.tutorial;
+  const visible = Boolean(tutorial);
+  const hasPageNext = visible && dialogueState.pageIndex < dialogueState.pages.length - 1;
+  if (dom.tutorialGo) {
+    dom.tutorialGo.hidden = !visible || !tutorial.canGo;
+    dom.tutorialGo.textContent = tutorial.interrupted ? "重新前往设施" : "前往设施";
+  }
+  if (dom.tutorialNext) {
+    dom.tutorialNext.hidden = !visible || (tutorial.isLast && !hasPageNext);
+    dom.tutorialNext.textContent = hasPageNext ? "继续" : "下一步";
+  }
+  if (dom.tutorialSkip) dom.tutorialSkip.hidden = !visible || tutorial.isLast;
+  if (dom.tutorialFinish) dom.tutorialFinish.hidden = !visible || !tutorial.isLast || hasPageNext;
+  if (dom.dialogueEnd) dom.dialogueEnd.hidden = visible;
+}
+
+function normalizeTutorialState(value) {
+  if (!value || typeof value !== "object") return null;
+  return {
+    stepIndex: Math.max(0, Math.floor(Number(value.stepIndex) || 0)),
+    totalSteps: Math.max(1, Math.floor(Number(value.totalSteps) || 1)),
+    canGo: value.canGo !== false,
+    isLast: Boolean(value.isLast),
+    interrupted: Boolean(value.interrupted),
+  };
+}
+
+function goToCurrentTutorialTarget() {
+  closeLobbyDialogue();
+  goToLobbyTutorialTarget();
+}
+
+function openNextTutorialStep() {
+  if (dialogueState && dialogueState.pageIndex < dialogueState.pages.length - 1) {
+    dialogueState.pageIndex++;
+    renderDialoguePage();
+    renderTutorialActions();
+    return;
+  }
+  const dialogue = advanceLobbyTutorial();
+  if (dialogue) openLobbyTutorialDialogue(dialogue);
+  else closeLobbyDialogue();
+}
+
+function skipCurrentTutorial() {
+  skipLobbyTutorial();
+  closeLobbyDialogue();
+}
+
+function finishCurrentTutorial() {
+  openNextTutorialStep();
 }
 
 function startPortraitAnimation() {
@@ -270,6 +356,7 @@ export function closeLobbyDialogue() {
   window.cancelAnimationFrame(portraitFrame);
   portraitFrame = 0;
   dialogueState = null;
+  renderTutorialActions();
   setLobbyModalOpen(false);
   onModalChange?.(false);
   return true;

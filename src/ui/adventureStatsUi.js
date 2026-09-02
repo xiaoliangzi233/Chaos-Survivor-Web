@@ -382,7 +382,7 @@ function outcomeLabel(outcome) {
 
 function modeLabel(modeKey) {
   return {
-    standard: "剧情",
+    standard: "冒险",
     random_twenty_waves: "随机 20",
     random_endless: "随机无限",
   }[modeKey] || modeKey || "--";

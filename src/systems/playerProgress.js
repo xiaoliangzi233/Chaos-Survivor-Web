@@ -70,6 +70,26 @@ export function getLobbyFirstClearReactions() {
   return cloneValue(progress.lobbyFirstClearReactions);
 }
 
+export function getTutorialProgress() {
+  return cloneValue(progress.tutorial);
+}
+
+export function markTutorialSeenIntro() {
+  if (progress.tutorial.seenIntro) return false;
+  progress.tutorial.seenIntro = true;
+  persistCurrentProgress();
+  return true;
+}
+
+export function completeTutorial() {
+  if (progress.tutorial.completed && progress.tutorial.seenIntro) return false;
+  progress.tutorial.seenIntro = true;
+  progress.tutorial.completed = true;
+  progress.tutorial.completedAt = new Date().toISOString();
+  persistCurrentProgress();
+  return true;
+}
+
 export function queueLobbyFirstClearReactions(difficultyId, npcIds = []) {
   const normalizedDifficultyId = String(difficultyId || "").trim();
   if (!difficultyIds.includes(normalizedDifficultyId)) return false;
@@ -211,6 +231,7 @@ function normalizeProgress(value) {
     bestRandomEndlessWave: boundedInteger(value?.bestRandomEndlessWave, 0, 1_000_000),
     difficultyProgress: normalizedDifficulty,
     codex: Object.fromEntries(CODEX_TYPES.map((type) => [type, uniqueStrings(value?.codex?.[type])])),
+    tutorial: normalizeTutorialProgress(value?.tutorial),
     lobbyFirstClearReactions: normalizeReactionQueues(value?.lobbyFirstClearReactions),
     adventureStats: normalizeAdventureStats(value?.adventureStats),
   };
@@ -236,6 +257,11 @@ function mergeProgress(...values) {
     }
     for (const type of CODEX_TYPES) {
       merged.codex[type] = uniqueStrings([...merged.codex[type], ...source.codex[type]]);
+    }
+    merged.tutorial.seenIntro ||= source.tutorial.seenIntro;
+    merged.tutorial.completed ||= source.tutorial.completed;
+    if (source.tutorial.completedAt && (!merged.tutorial.completedAt || source.tutorial.completedAt < merged.tutorial.completedAt)) {
+      merged.tutorial.completedAt = source.tutorial.completedAt;
     }
     for (const [npcId, queue] of Object.entries(source.lobbyFirstClearReactions)) {
       merged.lobbyFirstClearReactions[npcId] = uniqueStrings([
@@ -369,6 +395,14 @@ function persistCurrentProgress() {
     // In-memory progress still works when storage is unavailable.
   }
   saveBackendProgress(getPlayerProgressSnapshot(), progress.adventureStats.revision);
+}
+
+function normalizeTutorialProgress(value) {
+  return {
+    seenIntro: Boolean(value?.seenIntro),
+    completed: Boolean(value?.completed),
+    completedAt: validCompletedAt(value?.completedAt) ? value.completedAt : "",
+  };
 }
 
 function discardLegacyProgress() {

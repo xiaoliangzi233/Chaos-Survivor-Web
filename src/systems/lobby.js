@@ -1,6 +1,11 @@
 import { input, state } from "../state.js";
 import { clamp, distSq } from "../utils.js";
-import { peekLobbyFirstClearReaction } from "./playerProgress.js";
+import {
+  completeTutorial,
+  getTutorialProgress,
+  markTutorialSeenIntro,
+  peekLobbyFirstClearReaction,
+} from "./playerProgress.js";
 import { isCurrentUserAdmin } from "../services/backendProgressService.js";
 
 export const LOBBY_WIDTH = 5600;
@@ -230,6 +235,100 @@ for (const [a, b] of NAV_EDGES) {
   NAV_LINKS.get(b)?.push(a);
 }
 
+const LOBBY_TUTORIAL_STEPS = [
+  {
+    id: "hub",
+    title: "中央枢纽",
+    target: { x: 0, y: 120 },
+    pages: [
+      "这里是中央枢纽，所有大厅路线都会从这里分流。你可以把它当成返航后的安全区：调整配置、查看记录、和船员交谈，都从这里开始。",
+      "靠近带光圈的设施、传送门或人员后按 E 交互；也可以直接点击大厅地面移动，点击可交互目标会直接尝试互动。",
+    ],
+  },
+  {
+    id: "difficulty",
+    title: "难度同步器",
+    target: { x: -480, y: -1060 },
+    pages: [
+      "舰桥里的难度同步器决定本次冒险的敌人强度、波次事件和解锁进度。只会显示当前账号已经解锁的难度。",
+      "靠近它按 E 会在已解锁难度之间循环。正式通关后，下一档难度会逐步开放。",
+    ],
+  },
+  {
+    id: "weapon-station",
+    title: "军械库武器台",
+    target: { x: -2050, y: 780 },
+    pages: [
+      "军械库里的武器台决定你的开场武器。被选中的武器台会带有明显强化光环，进入冒险后会直接装备。",
+      "武器会自动攻击敌人，但不同武器的节奏和站位要求不同。新手推荐先选弹道直观、容错高的武器熟悉移动。",
+    ],
+  },
+  {
+    id: "weapon-lever",
+    title: "武器组切换拉杆",
+    target: { x: -1900, y: 1115 },
+    pages: [
+      "这个拉杆用来切换当前展示的武器组。大厅一次只摆出四把武器，拉杆会翻到下一组。",
+      "如果你找不到想用的开场武器，先拉动它，再回到武器台选择。",
+    ],
+  },
+  {
+    id: "adventure-gate",
+    title: "冒险模式传送门",
+    target: { x: 0, y: -1380 },
+    pages: [
+      "冒险模式传送门会读取当前难度和开场武器，充能完成后直接进入标准二十波远征。",
+      "离开传送门范围或按 Esc 可以取消充能。准备好后站在门前按 E，就能开始正式冒险。",
+    ],
+  },
+  {
+    id: "recorder",
+    title: "冒险记录仪",
+    target: { x: -2260, y: -410 },
+    pages: [
+      "数据翼的冒险记录仪会展示总览、难度统计、单局历史和排行榜。",
+      "如果你想看哪把武器表现更好、某个难度是否已通关，先来这里查。",
+    ],
+  },
+  {
+    id: "codex",
+    title: "记录者终端",
+    target: { x: -1480, y: -390 },
+    pages: [
+      "记录者终端就是图鉴入口。敌人、武器、道具和波次事件都会在这里留下档案。",
+      "遇到新怪物或特殊事件后，回来翻图鉴能更快理解它们的行为和弱点。",
+    ],
+  },
+  {
+    id: "random",
+    title: "随机模式与异常协议仪",
+    target: { x: -1840, y: -1030 },
+    pages: [
+      "数据翼上方是随机模式入口和异常协议仪。随机模式会重组敌群、Boss 与事件，更适合熟悉基础玩法后挑战。",
+      "异常协议仪可以在二十波通关和无限模式之间切换。无限模式追求更远波次，不按标准通关目标结算。",
+    ],
+  },
+  {
+    id: "locked-facilities",
+    title: "待机设施",
+    target: { x: 1510, y: -650 },
+    pages: [
+      "科学翼、工程翼和生活区目前保留为大厅设施区。基因改造器、裂隙锚点和家园通道暂时不会给正式战斗加成。",
+      "这些区域现在主要用于空间导航、船员互动和后续系统扩展，不需要在第一次冒险前全部处理。",
+    ],
+  },
+  {
+    id: "core-gameplay",
+    title: "核心玩法",
+    target: { x: 0, y: 120 },
+    pages: [
+      "进入战斗后，你的重点是移动走位、收集经验、升级强化。武器会自动索敌，你要负责活下来并把资源吃到手。",
+      "每波结束会进入商店。你可以购买武器和道具、出售不需要的装备，也可以把同类武器合成更高品质。",
+      "标准冒险目标是撑过二十波并击败关键 Boss。失败不丢失大厅基础进度，胜利会记录难度通关并推动后续解锁。",
+    ],
+  },
+];
+
 const SOCIAL_LINES = {
   guide: ["你今天看起来状态不错。", "下一班跃迁还有一点时间。"],
   tactician: ["航线稳定，别让概率骗了你。", "我把出击参数又核对了一遍。"],
@@ -238,7 +337,7 @@ const SOCIAL_LINES = {
   geneticist: ["只是一次无害的取样。大概。", "生命维持的菌群比船员守时。"],
   engineer: ["只要还在响，就说明它还活着。", "那不是漏电，是氛围灯。"],
   quartermaster: ["好武器也得配一个敢扣扳机的人。", "别摸枪口，刚校准完。"],
-  navigator: ["稳定航线也会记住每一位乘客。", "星图今天很安静。"],
+  navigator: ["冒险航线也会记住每一位乘客。", "星图今天很安静。"],
   analyst: ["第七码头不存在——暂时。", "概率在眨眼，你看见了吗？"],
   instructor: ["站直。休息也要有休息的样子。", "训练不会骗人，成绩会。"],
   steward: ["生活区很快会重新热闹起来。", "门锁着，是为了让里面保持完整。"],
@@ -248,13 +347,14 @@ const NPC_DIALOGUES = {
   guide: {
     role: "TRANSIT GUIDE // ACTIVE", title: "星舰向导", intro: "欢迎回到霓虹中转舰。这里不是一座固定基地，而是一艘沿废墟时间线航行的中转方舟。",
     topics: [
+      { label: "新手引导", action: "tutorial-start", text: "我会按顺序带你走一遍大厅设施，再说明冒险模式的核心玩法。你可以随时打断移动，也可以之后再找我重看。" },
       ["星舰设施", "中央枢纽连接六个功能翼。舰桥负责航线，数据翼保存记录，科学翼维持生命，战斗翼管理军械，工程翼驱动跃迁，后部则是生活区。"],
       ["基础操作", "使用 WASD 或方向键移动。自动门会识别你，面向高亮的设备、入口或人员后按 E 交互。"],
       ["战斗与成长", "先在舰桥难度同步器、异常协议仪和军械库完成配置，再进入对应传送舱。战斗中的成长、商店和合成规则保持不变。"],
       ["世界背景", "灾变后，中转舰成为少数仍能穿越失稳时间线的载具。每次出击都在替舰队找回一段航路和记忆。"],
     ],
   },
-  tactician: { role: "TACTICAL CONTROL", title: "战术调度", intro: "我负责让你选的难度、武器和航线在同一份出击参数里。别担心，我比传送门更不喜欢意外。", topics: [["当前配置", "舰桥难度同步器只会列出已解锁协议。随机航线还会读取数据翼的异常目标，剧情航线则忽略它。"], ["出击建议", "先在军械库确认带强化光环的武器台，再前往舰桥检查难度同步器。入口充能期间离开范围或按 Esc 都可以取消。"]] },
+  tactician: { role: "TACTICAL CONTROL", title: "战术调度", intro: "我负责让你选的难度、武器和航线在同一份出击参数里。别担心，我比传送门更不喜欢意外。", topics: [["当前配置", "舰桥难度同步器只会列出已解锁协议。随机航线还会读取数据翼的异常目标，冒险航线则忽略它。"], ["出击建议", "先在军械库确认带强化光环的武器台，再前往舰桥检查难度同步器。入口充能期间离开范围或按 Esc 都可以取消。"]] },
   statistician: { role: "ADVENTURE LEDGER", title: "统计值守", intro: "记录阵列尚未重新接入主网，所以你现在看到的数字，严格来说只是很昂贵的装饰。", topics: [["工作", "我负责校验冒险次数、生存时间和收益分布。功能恢复前，我不会擅自读写你的局外数据。"], ["其他船员", "洛克总说故障率是情绪问题。我已经为这句话建立了单独的错误分类。"]] },
   archivist: { role: "ARCHIVE KEEPER", title: "记录者", intro: "档案不会替你作出判断。它只负责证明，那些敌人、武器和事件确实曾经存在。", topics: [["记录者", "旁边的终端连接现有图鉴。关闭图鉴后，你会回到当前舱室。"], ["星舰历史", "这艘舰最初并不承担战斗任务，它只是负责把研究人员送到仍然存在的时间线上。"]] },
   geneticist: { role: "BIOSCIENCE LAB", title: "生命科学", intro: "培养舱已经完成净化。强化序列还缺最后一组校准样本——放心，我没有说一定要用你的。", topics: [["基因改造器", "本阶段只保留设备和校准反馈，不会给予局外强化，也不会修改玩家进度。"], ["生命维持", "右侧循环槽培育着整艘舰的净化菌群。它们比大多数船员更可靠，也更安静。"]] },
@@ -374,7 +474,8 @@ export function updateLobby(dt) {
   lobby.cameraX += (lobby.player.x - lobby.cameraX) * Math.min(1, dt * 4.8);
   lobby.cameraY += (lobby.player.y - lobby.cameraY) * Math.min(1, dt * 4.8);
 
-  return updatePendingLaunch(dt);
+  const launchEvent = updatePendingLaunch(dt);
+  return launchEvent || updateLobbyTutorial(dt);
 }
 
 export function interactWithLobby(targetId = null, { player = state.lobby.player, allowLaunch = true } = {}) {
@@ -641,6 +742,137 @@ export function setLobbyToast(text, color = "#42e8ff", life = 2.8) {
   state.lobby.toast = { text, color, life, maxLife: life };
 }
 
+export function startLobbyTutorial({ source = "manual" } = {}) {
+  const progress = getTutorialProgress();
+  if (source === "auto" && (progress.completed || progress.seenIntro)) return null;
+  state.lobby.tutorial = {
+    active: true,
+    source,
+    stepIndex: 0,
+    autoMove: false,
+    interrupted: false,
+    targetX: 0,
+    targetY: 0,
+    arrivalPending: false,
+  };
+  if (source === "auto") markTutorialSeenIntro();
+  return lobbyTutorialDialogue();
+}
+
+export function advanceLobbyTutorial() {
+  const tutorial = ensureLobbyTutorial();
+  if (tutorial.stepIndex >= LOBBY_TUTORIAL_STEPS.length - 1) {
+    completeTutorial();
+    clearLobbyTutorialState();
+    setLobbyToast("新手引导已完成。祝你远征顺利。", "#77ff8a", 2.8);
+    return null;
+  }
+  tutorial.stepIndex++;
+  tutorial.autoMove = false;
+  tutorial.interrupted = false;
+  tutorial.arrivalPending = false;
+  return lobbyTutorialDialogue();
+}
+
+export function skipLobbyTutorial() {
+  const tutorial = ensureLobbyTutorial();
+  tutorial.active = false;
+  tutorial.autoMove = false;
+  tutorial.interrupted = false;
+  tutorial.arrivalPending = false;
+  cancelLobbyPlayerMove();
+  setLobbyToast("新手引导已跳过，可随时找向导重看。", "#ffd166", 2.6);
+  return true;
+}
+
+export function cancelLobbyTutorialAutoMove() {
+  const tutorial = state.lobby.tutorial;
+  if (!tutorial?.autoMove) return false;
+  tutorial.autoMove = false;
+  tutorial.interrupted = true;
+  tutorial.arrivalPending = false;
+  setLobbyToast("已取消自动带路，引导仍可继续。", "#ffd166", 2.2);
+  return true;
+}
+
+export function goToLobbyTutorialTarget() {
+  const tutorial = ensureLobbyTutorial();
+  const step = LOBBY_TUTORIAL_STEPS[tutorial.stepIndex];
+  if (!step?.target) return false;
+  tutorial.targetX = step.target.x;
+  tutorial.targetY = step.target.y;
+  tutorial.autoMove = true;
+  tutorial.interrupted = false;
+  tutorial.arrivalPending = false;
+  const moving = setLobbyPlayerMoveTarget(step.target.x, step.target.y);
+  if (!moving) {
+    tutorial.autoMove = false;
+    tutorial.arrivalPending = true;
+  }
+  return true;
+}
+
+function updateLobbyTutorial(dt) {
+  const tutorial = state.lobby.tutorial;
+  if (!tutorial?.active) return null;
+  if (tutorial.arrivalPending) {
+    tutorial.arrivalPending = false;
+    return { type: "tutorial-arrived", dialogue: lobbyTutorialDialogue() };
+  }
+  if (!tutorial.autoMove || tutorial.interrupted || state.lobby.modalOpen) return null;
+  const player = state.lobby.player;
+  const arrived = !player.moveTargetActive && Math.hypot(player.x - tutorial.targetX, player.y - tutorial.targetY) <= 52;
+  if (!arrived) return null;
+  tutorial.autoMove = false;
+  tutorial.arrivalPending = false;
+  setLobbyToast(`已到达：${LOBBY_TUTORIAL_STEPS[tutorial.stepIndex]?.title || "目标设施"}`, "#42e8ff", 1.8);
+  return { type: "tutorial-arrived", dialogue: lobbyTutorialDialogue() };
+}
+
+function ensureLobbyTutorial() {
+  state.lobby.tutorial ||= {};
+  state.lobby.tutorial.active = true;
+  state.lobby.tutorial.stepIndex = Math.max(0, Math.min(
+    LOBBY_TUTORIAL_STEPS.length - 1,
+    Math.floor(Number(state.lobby.tutorial.stepIndex) || 0),
+  ));
+  return state.lobby.tutorial;
+}
+
+function clearLobbyTutorialState() {
+  state.lobby.tutorial = {
+    active: false,
+    source: "",
+    stepIndex: 0,
+    autoMove: false,
+    interrupted: false,
+    targetX: 0,
+    targetY: 0,
+    arrivalPending: false,
+  };
+}
+
+export function lobbyTutorialDialogue() {
+  const tutorial = ensureLobbyTutorial();
+  const step = LOBBY_TUTORIAL_STEPS[Math.max(0, Math.min(LOBBY_TUTORIAL_STEPS.length - 1, tutorial.stepIndex))];
+  return {
+    role: `NEW PLAYER GUIDE // ${String(tutorial.stepIndex + 1).padStart(2, "0")}/${String(LOBBY_TUTORIAL_STEPS.length).padStart(2, "0")}`,
+    title: step.title,
+    speaker: "向导 · 蔡徐坤",
+    color: "#42e8ff",
+    portrait: "guide",
+    npcId: "guide",
+    pages: step.pages,
+    tutorial: {
+      stepIndex: tutorial.stepIndex,
+      totalSteps: LOBBY_TUTORIAL_STEPS.length,
+      canGo: Boolean(step.target),
+      isLast: tutorial.stepIndex >= LOBBY_TUTORIAL_STEPS.length - 1,
+      interrupted: Boolean(tutorial.interrupted),
+    },
+  };
+}
+
 export function clearLobbyInput() {
   input.up = false;
   input.down = false;
@@ -831,12 +1063,17 @@ export function lobbyNpcDialogue(id) {
     npcId: npc.id,
     text: firstClearText || base.intro,
     pages: firstClearText ? splitLobbyDialogue(firstClearText) : [base.intro, context],
-    topics: base.topics.map(([label, text], index) => ({
-      id: `${id}-${index}`,
-      label,
-      text,
-      pages: splitLobbyDialogue(text),
-    })),
+    topics: base.topics.map((topic, index) => {
+      const label = Array.isArray(topic) ? topic[0] : topic.label;
+      const text = Array.isArray(topic) ? topic[1] : topic.text;
+      return {
+        id: `${id}-${index}`,
+        label,
+        text,
+        action: Array.isArray(topic) ? "" : topic.action || "",
+        pages: splitLobbyDialogue(text),
+      };
+    }),
     firstClearDifficultyId: firstClearText ? firstClearDifficultyId : null,
   };
 }
@@ -953,6 +1190,7 @@ function updateLobbyPlayer(dt) {
   let ay = (input.down ? 1 : 0) - (input.up ? 1 : 0);
   let length = Math.hypot(ax, ay);
   if (length > 0.001) {
+    cancelLobbyTutorialAutoMove();
     cancelLobbyPlayerMove();
   } else if (player.moveTargetActive) {
     const path = player.movePath || [];

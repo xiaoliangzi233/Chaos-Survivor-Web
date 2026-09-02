@@ -82,7 +82,7 @@
         </div>
         <div id="lobbyLaunchStatus" class="lobby-launch-status" hidden>
           <div>
-            <strong id="lobbyLaunchText">稳定航线充能 0%</strong>
+            <strong id="lobbyLaunchText">冒险航线充能 0%</strong>
             <span>离开传送范围或按 <kbd>ESC</kbd> 取消</span>
           </div>
           <i id="lobbyLaunchBar"></i>
@@ -139,6 +139,10 @@
           <footer>
             <span id="lobbyDialoguePage">CHANNEL READY</span>
             <div class="lobby-dialogue-actions">
+              <button id="lobbyTutorialGoButton" type="button" hidden>前往设施</button>
+              <button id="lobbyTutorialNextButton" type="button" hidden>下一步</button>
+              <button id="lobbyTutorialSkipButton" type="button" hidden>跳过引导</button>
+              <button id="lobbyTutorialFinishButton" type="button" hidden>结束引导</button>
               <button id="lobbyDialogueEndButton" type="button">结束交谈</button>
               <button id="lobbyDialogueConfirmButton" type="button">继续</button>
             </div>

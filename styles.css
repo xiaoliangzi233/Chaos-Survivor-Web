@@ -6050,7 +6050,11 @@ body:not(.is-menu):not(.is-lobby):not(.story-open) #gameCanvas {
 }
 
 #lobbyDialogueEndButton,
-#lobbyDialogueConfirmButton {
+#lobbyDialogueConfirmButton,
+#lobbyTutorialGoButton,
+#lobbyTutorialNextButton,
+#lobbyTutorialSkipButton,
+#lobbyTutorialFinishButton {
   min-width: 112px;
   border: 1px solid rgba(66, 232, 255, 0.34);
   background: rgba(9, 24, 35, 0.9);
@@ -6059,14 +6063,20 @@ body:not(.is-menu):not(.is-lobby):not(.story-open) #gameCanvas {
   padding: 12px 14px;
 }
 
-#lobbyDialogueConfirmButton {
+#lobbyDialogueConfirmButton,
+#lobbyTutorialGoButton,
+#lobbyTutorialFinishButton {
   border-color: rgba(255, 209, 102, 0.62);
   color: #fff1bd;
   background: rgba(255, 209, 102, 0.1);
 }
 
 #lobbyDialogueEndButton:hover,
-#lobbyDialogueConfirmButton:hover {
+#lobbyDialogueConfirmButton:hover,
+#lobbyTutorialGoButton:hover,
+#lobbyTutorialNextButton:hover,
+#lobbyTutorialSkipButton:hover,
+#lobbyTutorialFinishButton:hover {
   border-color: #42e8ff;
   color: #fff;
   box-shadow: 0 0 18px rgba(66, 232, 255, 0.16);

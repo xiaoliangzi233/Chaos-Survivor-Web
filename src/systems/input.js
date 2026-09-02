@@ -32,7 +32,7 @@ export function bindInput({
       event.preventDefault();
     }
     const key = event.key?.toLowerCase();
-    if (event.code === "Escape" && !event.repeat && state.mode === "lobby" && state.lobby?.pendingLaunch) {
+    if (event.code === "Escape" && !event.repeat && state.mode === "lobby" && (state.lobby?.pendingLaunch || state.lobby?.tutorial?.autoMove)) {
       event.__survivorHandled = true;
       event.preventDefault();
       cancelLobbyAction?.();

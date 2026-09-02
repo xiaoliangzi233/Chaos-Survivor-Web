@@ -264,7 +264,7 @@ export class SlimeKing extends BaseEnemy {
         spawnPushVx: Math.cos(heirAngle) * 360,
         spawnPushVy: Math.sin(heirAngle) * 360,
       }, this.x + Math.cos(heirAngle) * heirDistance, this.y + Math.sin(heirAngle) * heirDistance);
-      heir.name = i ? "史莱姆王·右冠" : "史莱姆王·左冠";
+      heir.name = "史莱姆王";
       heir.splitChild = true;
       heir.rewardScale = 0.5;
       heir.phase2 = true;
@@ -279,6 +279,8 @@ export class SlimeKing extends BaseEnemy {
       heirs.push(heir);
       world.enemies.push(heir);
     }
+    const shared = { members: heirs, slimeKingSplit: true };
+    for (const heir of heirs) heir.shared = shared;
     world.boss = heirs[0];
     playSfx("slimeLand");
   }

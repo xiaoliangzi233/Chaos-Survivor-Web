@@ -483,10 +483,10 @@ export function showEnd(victory) {
   ui.endEyebrow.textContent = victory ? "VICTORY" : "RUN COMPLETE";
   ui.endTitle.textContent = victory ? "20 波已完成" : "生存结束";
   ui.endStats.innerHTML = "";
-  const runModeText = state.runMode === "random" ? "随机模式" : "标准模式";
+  const runModeText = state.runMode === "random" ? "随机模式" : "冒险模式";
   const randomGoalText = state.runMode === "random"
     ? state.randomGoal === "endless" ? "无限模式" : "20波通关"
-    : "固定战役";
+    : "二十波远征";
   [
     `模式 ${runModeText}`,
     `目标 ${randomGoalText}`,

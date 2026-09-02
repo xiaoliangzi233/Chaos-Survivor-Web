@@ -353,7 +353,9 @@ export class PixiBackend {
     const wormParticles = this.beginItems("worm-items");
     const bossActorParticles = this.beginItems("boss-actor-items");
     const tetherParticles = this.beginItems("tether-items");
+    const invisibleEnemies = activeWaveEffect("invisible_brain_eaters");
     for (const enemy of world.enemies) {
+      if (invisibleEnemies && !enemy.boss) continue;
       if (!isPixiBatchableEnemy(enemy) || !this.isVisible(enemy, frame, (enemy.r || 16) + 80)) continue;
       if (enemy.type === "storm_tyrant") {
         this.appendStormTyrantParticles(enemy, bossActorParticles);

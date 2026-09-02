@@ -43,7 +43,7 @@ export const LOBBY_CORRIDORS = [
 ];
 
 export const LOBBY_PORTALS = [
-  { id: "story-gate", kind: "story", roomId: "bridge", x: 0, y: -1515, color: "#42e8ff", label: "剧情模式", sublabel: "稳定时间线" },
+  { id: "story-gate", kind: "story", roomId: "bridge", x: 0, y: -1515, color: "#42e8ff", label: "冒险模式", sublabel: "二十波远征" },
   { id: "random-gate", kind: "random", roomId: "data", x: -2180, y: -1020, color: "#b48cff", label: "随机模式", sublabel: "异常时间线" },
   { id: "trial-gate", kind: "trial", roomId: "combat", x: -2260, y: 1170, color: "#ffb347", label: "试炼场", sublabel: "隔离升降梯" },
   { id: "home-gate", kind: "home", roomId: "habitat", x: 300, y: 1510, color: "#77ff8a", label: "家园", sublabel: "通道封锁" },
@@ -75,7 +75,7 @@ export const LOBBY_NPCS = [
   { id: "geneticist", role: "生物工程师", name: "雷军", personality: "geneticist", roomId: "science", x: 1990, y: -820, color: "#77ff8a", coat: "#1e4638", homeNode: "science-gene", workNodes: ["science-gene", "science-med", "science-life", "core-social"] },
   { id: "engineer", role: "维护工程师", name: "马保国", personality: "engineer", roomId: "engineering", x: 2030, y: 870, color: "#b48cff", coat: "#392954", homeNode: "engineering-rift", workNodes: ["engineering-rift", "engineering-reactor", "engineering-power", "core-social"] },
   { id: "quartermaster", role: "军械员", name: "王境泽", personality: "quartermaster", roomId: "combat", x: -1490, y: 980, color: "#ff7a8a", coat: "#52273a", homeNode: "combat-armory", workNodes: ["combat-armory", "combat-hangar", "core-social"] },
-  { id: "story-attendant", role: "剧情引航员", name: "刘华强", personality: "navigator", roomId: "bridge", x: -230, y: -1300, color: "#42e8ff", coat: "#173b50", homeNode: "bridge-story", workNodes: ["bridge-story", "bridge-nav", "core-social"] },
+  { id: "story-attendant", role: "冒险引航员", name: "刘华强", personality: "navigator", roomId: "bridge", x: -230, y: -1300, color: "#42e8ff", coat: "#173b50", homeNode: "bridge-story", workNodes: ["bridge-story", "bridge-nav", "core-social"] },
   { id: "random-attendant", role: "异常分析员", name: "罗翔", personality: "analyst", roomId: "data", x: -1840, y: -1080, color: "#b48cff", coat: "#392954", homeNode: "data-random", workNodes: ["data-random", "data-lounge", "bridge-nav"] },
   { id: "trial-attendant", role: "试炼教官", name: "孙笑川", personality: "instructor", roomId: "combat", x: -2080, y: 1220, color: "#ffb347", coat: "#54351c", homeNode: "combat-trial", workNodes: ["combat-trial", "combat-hangar", "core-social"] },
   { id: "home-attendant", role: "家园管理员", name: "丁真", personality: "steward", roomId: "habitat", x: 70, y: 1510, color: "#77ff8a", coat: "#1e4638", homeNode: "habitat-home", workNodes: ["habitat-home", "habitat-mess", "core-social"] },
@@ -260,7 +260,7 @@ const NPC_DIALOGUES = {
   geneticist: { role: "BIOSCIENCE LAB", title: "生命科学", intro: "培养舱已经完成净化。强化序列还缺最后一组校准样本——放心，我没有说一定要用你的。", topics: [["基因改造器", "本阶段只保留设备和校准反馈，不会给予局外强化，也不会修改玩家进度。"], ["生命维持", "右侧循环槽培育着整艘舰的净化菌群。它们比大多数船员更可靠，也更安静。"]] },
   engineer: { role: "ENGINEERING CREW", title: "跃迁维护", intro: "反应堆在唱歌，冷却泵在抱怨，说明一切正常。真正危险的时候，它们反而会一起安静。", topics: [["裂隙稳定器", "它是未来远征用的相位锚，本阶段只待机，不提供战斗加成。"], ["动力核心", "舰体靠三组脉冲反应环维持航行。你看到的橙色流光，是能量；闻到的焦味，不关你的事。"]] },
   quartermaster: { role: "ARMORY CONTROL", title: "军械管理", intro: "四个台位，一组四把。拉杆换组，靠近台位按 E 或直接点击，就能把那把武器写进开场配置。", topics: [["当前武器", "被选中的武器台会显示强化光环与“当前装备”。进入传送门后，实际装备读取同一个选择。"], ["军械库", "所有全息投影共用实际武器的视觉定义，新武器接入后也会自动出现在对应组。"]] },
-  navigator: { role: "STABLE TIMELINE", title: "剧情引航", intro: "稳定时间线已经锁定。入口会读取舰桥同步的难度和军械库的开场武器，不再要求二次确认。", topics: [["剧情航线", "充能完成后会沿用现有剧情播放和标准二十波流程。"], ["舰桥", "前方星图显示的不是距离，而是时间线之间还剩多少共同历史。"]] },
+  navigator: { role: "ADVENTURE ROUTE", title: "冒险引航", intro: "冒险航线已经锁定。入口会读取舰桥同步的难度和军械库的开场武器，不再要求二次确认。", topics: [["冒险航线", "充能完成后会直接进入标准二十波远征。"], ["舰桥", "前方星图显示的是本次远征的战场同步状态。"]] },
   analyst: { role: "ANOMALY ANALYSIS", title: "异常航线", intro: "随机不是没有规律。它只是把规律藏在你还没见过的下一波里。", topics: [["异常协议", "协议仪可以切换二十波通关与无限模式。随机入口会读取当前协议。"], ["概率", "每次航线都会重组敌人、Boss 与事件。记录可能被保留，但路线不会重复承诺。"]] },
   instructor: { role: "TRIAL AUTHORITY", title: "试炼教官", intro: "试炼场只认授权和结果。快速开局会污染成绩，这不是惩罚，是为了让正式记录保持可信。", topics: [["试炼场", "入口仍会打开原有密码认证和调试面板，并把大厅当前武器作为默认选项。"], ["训练", "调试能力不会改变正式模式的解锁与成绩规则。"]] },
   steward: { role: "HABITAT ACCESS", title: "生活区管理", intro: "生活翼仍在运行，但家园坐标没有完成稳定。门锁着不是拒绝，是为了保证你回来时里面还在。", topics: [["家园通道", "本阶段只播放封锁反馈，不会创建家园页面或持久化功能。"], ["船员生活", "食堂、休息舱和环境循环都已恢复。等家园锚点稳定，这里会比现在热闹得多。"]] },
@@ -505,7 +505,7 @@ export function allLobbyInteractions(player = state.lobby.player) {
       y: portal.y + 132,
       title: portal.label,
       hint: portal.kind === "story"
-        ? `充能进入稳定时间线 · ${selectedLobbyDifficulty()?.name || "未同步"}`
+        ? `充能进入冒险模式 · ${selectedLobbyDifficulty()?.name || "未同步"}`
         : portal.kind === "random"
           ? `充能进入异常时间线 · ${lobbyRandomGoalLabel()}`
           : portal.kind === "trial"

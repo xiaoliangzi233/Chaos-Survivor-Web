@@ -558,6 +558,7 @@ function updateHazards(dt) {
     h.life -= dt;
     if (h.minionSkill) updateMinionHazard(h, dt);
     switch (h.kind) {
+      case "gear_trap": updateGearTrap(h, dt); break;
       case "ember_mine": updateEmberMine(h, dt); break;
       case "gravity_well": updateGravityWell(h, dt); break;
       case "magnetic_node": updateMagneticNode(h, dt); break;
@@ -651,6 +652,28 @@ function hazardHitsPlayer(h, p, { darkEntityHazard, riftbladeBladeCorridor, scie
       : distSq(h.x, h.y, p.x, p.y) < (h.r + p.r) ** 2;
 }
 
+function updateGearTrap(h, dt) {
+  h.spin = (h.spin || 0) + dt * (h.moving ? 9.5 : 5.8);
+  if (!h.moving) return;
+  const half = WORLD_SIZE / 2 - Math.max(80, h.r || 40);
+  h.x += (h.vx || 0) * dt;
+  h.y += (h.vy || 0) * dt;
+  if (h.x < -half) {
+    h.x = -half;
+    h.vx = Math.abs(h.vx || 0);
+  } else if (h.x > half) {
+    h.x = half;
+    h.vx = -Math.abs(h.vx || 0);
+  }
+  if (h.y < -half) {
+    h.y = -half;
+    h.vy = Math.abs(h.vy || 0);
+  } else if (h.y > half) {
+    h.y = half;
+    h.vy = -Math.abs(h.vy || 0);
+  }
+}
+
 function applyHazardStatusEffects(h, p, result) {
   const allowStatus = allowsEnemyStatusEffects(h);
   if (allowStatus && result.damaged && h.frostDuration > 0) {
@@ -696,17 +719,12 @@ function compactRemoved(array) {
 function updateEliteSkill(e, dt) {
   if (!e?.elite || e.dead || e.boss) return;
   if (e.eliteGlobalShield) return applyEliteGlobalShield(e);
-  const slimeElite = isSlimeEnemy(e);
   e.eliteSkillCooldown ??= 3 + Math.random() * 1.2;
   e.eliteSkillInterval ??= e.eliteVariant === "giant" ? 5.2 : 4.4;
   e.eliteSkillProjectileCount ??= e.eliteVariant === "giant" ? 16 : 10;
   e.eliteSkillPulse = Math.max(0, (e.eliteSkillPulse || 0) - dt);
   if ((e.eliteSkillWindup || 0) > 0) {
     e.eliteSkillWindup = Math.max(0, e.eliteSkillWindup - dt);
-    if (!slimeElite && e.eliteSkillPulse <= 0) {
-      e.eliteSkillPulse = 0.16;
-      pulse(e.x, e.y, e.r * (2.2 + (e.eliteSkillWindup || 0)), "#ffd166", 0.18);
-    }
     if (e.eliteSkillWindup <= 0) releaseEliteSkill(e);
     return;
   }
@@ -714,7 +732,6 @@ function updateEliteSkill(e, dt) {
   if (e.eliteSkillCooldown > 0) return;
   e.eliteSkillWindup = e.eliteVariant === "giant" ? 0.82 : 0.62;
   e.eliteSkillPulse = 0;
-  if (!slimeElite) pulse(e.x, e.y, e.r * 3.1, "#ffd166", 0.34);
 }
 
 function releaseEliteSkill(e) {
@@ -753,16 +770,8 @@ function releaseElitePulse(e) {
     });
   }
   burst(e.x, e.y, e.eliteVariant === "giant" ? 24 : 16, visual.color, 210);
-  if (!isSlimeEnemy(e)) {
-    pulse(e.x, e.y, e.r * 3.6, visual.color, 0.42);
-    world.weaponFx.push({ kind: "shockRing", x: e.x, y: e.y, radius: e.r * 3.2, life: 0.34, maxLife: 0.34, color: visual.color });
-  }
   state.shake = Math.max(state.shake, e.eliteVariant === "giant" ? 7 : 4);
   e.eliteSkillCooldown = e.eliteSkillInterval;
-}
-
-function isSlimeEnemy(enemy) {
-  return Boolean(enemy?.type?.startsWith("slime_"));
 }
 
 export function eliteProjectileVisualFor(enemy) {

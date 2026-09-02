@@ -1830,14 +1830,14 @@ function updateSingularityProjectile(b, index, dt) {
     const dy = b.y - e.y;
     const dist = Math.max(1, Math.hypot(dx, dy));
     const pullT = clamp(1 - dist / b.pullRadius, 0, 1);
-    const bossPullScale = e.controlImmune ? 0 : e.boss ? 0.08 : 1;
+    const bossPullScale = e.controlImmune || e.elite ? 0 : e.boss ? 0.08 : 1;
     const pull = b.pullStrength * pullT * pullT * bossPullScale * dt;
     e.x += (dx / dist) * pull;
     e.y += (dy / dist) * pull;
     if (dist < b.damageRadius + e.r) {
       const damageScale = 0.35 + pullT * 0.9;
       damageEnemy(e, b.damage * damageScale * dt, b.x, b.y);
-      if (!e.boss && !e.controlImmune) applyKnockback(e, dx, dy, -22 * pullT);
+      if (!e.boss && !e.elite && !e.controlImmune) applyKnockback(e, dx, dy, -22 * pullT);
       affected++;
     }
   }
@@ -1870,7 +1870,7 @@ function singularityPulse(b, cachedHits = null) {
     damageEnemy(e, b.damage * (b.qualityRank >= 4 ? 0.62 : 0.42), b.x, b.y);
     const dx = b.x - e.x;
     const dy = b.y - e.y;
-    if (!e.boss) applyKnockback(e, dx, dy, -64);
+    if (!e.boss && !e.elite && !e.controlImmune) applyKnockback(e, dx, dy, -64);
   }
   world.weaponFx.push({
     kind: "voidPulse",
@@ -1895,7 +1895,7 @@ function collapseSingularity(b) {
     const d = Math.max(1, Math.hypot(dx, dy));
     const falloff = clamp(1 - d / b.collapseRadius, 0.22, 1);
     damageEnemy(e, b.collapseDamage * falloff, b.x, b.y);
-    applyKnockback(e, dx, dy, (e.boss ? 42 : 155) * falloff);
+    if (!e.elite && !e.controlImmune) applyKnockback(e, dx, dy, (e.boss ? 42 : 155) * falloff);
   }
   addCameraShake(Math.min(9, 3.2 + b.collapseRadius / 55));
   burst(b.x, b.y, 24 + b.qualityRank * 5, b.color, 230);

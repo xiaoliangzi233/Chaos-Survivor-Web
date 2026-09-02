@@ -5991,9 +5991,14 @@ body.is-lobby .menu-actions {
 }
 
 .end-actions {
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(160px, 1fr));
   justify-content: center;
   gap: 12px;
+}
+
+.end-actions button {
+  width: 100%;
 }
 
 @keyframes lobby-portrait-data {

@@ -42,7 +42,6 @@ import { loadEditableGameData } from "../config/editableGameData.js";
 import { initAi, updateAi } from "../ai/aiController.js";
 import { loadAiRunConfig, loadAiTrainingModeConfig } from "../ai/aiConfigLoader.js";
 import { difficultyCards } from "../difficulty.js";
-import { cancelStoryPlayback, initStoryUi, playDifficultyStoryIfNeeded } from "../ui/storyUi.js";
 import {
   configurePlayerProgress,
   consumeLobbyFirstClearReaction,
@@ -98,7 +97,6 @@ import {
 import { initNicknameUi, requestPlayerNickname } from "../ui/nicknameUi.js";
 import {
   bootstrapBackendPlayer,
-  currentPlayerId,
   isCurrentUserAdmin,
   submitBackendNickname,
 } from "../services/backendProgressService.js";
@@ -124,7 +122,6 @@ export async function bootGame() {
     },
   });
   initShopUi({ continueToNextWave: finishWaveTransition });
-  initStoryUi();
   initWaveEventUi();
   initNicknameUi();
   initHelpUi({
@@ -218,7 +215,7 @@ export async function bootGame() {
   }
 
   async function startWithLoadout({ difficulty, weapon, runMode = "standard", randomGoal = RANDOM_GOAL_TWENTY_WAVES }) {
-    if (!difficulty?.id || !weapon?.id || state.mode === "story") return false;
+    if (!difficulty?.id || !weapon?.id || state.mode === "launching") return false;
     state.lobby.lastLaunchConfig = {
       difficultyId: difficulty.id,
       weaponId: weapon.id,
@@ -246,35 +243,19 @@ export async function bootGame() {
     state.shop = createShopState();
     state.initialWeaponId = weapon.id;
     activateWeapon(weapon.id);
-    state.mode = "story";
-    let prepareDone = false;
-    let storyDone = false;
-    let latestProgress = 0;
-    let latestLabel = "正在准备战场";
-    const preparePromise = preloadCoordinator.prepareRun({
+    state.mode = "launching";
+    showRunLoading(0, "正在准备冒险");
+    await preloadCoordinator.prepareRun({
       map: runMap,
       difficultyId: difficulty.id,
       weaponId: weapon.id,
       runMode,
     }, (progress, label) => {
-      latestProgress = progress;
-      latestLabel = label || latestLabel;
-      if (storyDone) showRunLoading(latestProgress, latestLabel);
-    }).finally(() => {
-      prepareDone = true;
+      showRunLoading(progress, label || "正在准备冒险");
     });
-    const storyPromise = playDifficultyStoryIfNeeded({
-      difficultyId: difficulty.id,
-      playerId: currentPlayerId(),
-      alwaysPlay: Boolean(runtimeGameConfig.storyAlwaysPlay),
-    }).finally(() => {
-      storyDone = true;
-      if (!prepareDone) showRunLoading(latestProgress, latestLabel);
-    });
-    await Promise.all([preparePromise, storyPromise]);
     hideRunLoading();
 
-    if (state.mode !== "story") {
+    if (state.mode !== "launching") {
       preloadCoordinator.releaseRun();
       return false;
     }
@@ -473,7 +454,6 @@ export async function bootGame() {
 
   function returnToLobby() {
     if (["playing", "paused", "shop", "leveling"].includes(state.mode)) recordCurrentAdventure("abandoned");
-    cancelStoryPlayback();
     closeCodex();
     closeHelp();
     closeAdventureStats();
@@ -540,7 +520,6 @@ export async function bootGame() {
   async function startDebugRun({ difficultyId, weaponId, wave = 1 }) {
     if (!difficultyCards().some((entry) => entry.id === difficultyId)) return false;
     if (!STARTER_WEAPONS.some((entry) => entry.id === weaponId)) return false;
-    cancelStoryPlayback();
     closeCodex();
     closeHelp();
     closeAdventureStats();

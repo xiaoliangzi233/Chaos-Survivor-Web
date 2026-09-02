@@ -7,7 +7,7 @@ export const EVENT_CODEX_ENTRIES = [
   { id: "toxic_residue", icon: "T", name: "剧毒残留", category: "污染区域", desc: "培养液残留覆盖实验场，进入污染区后会持续受到毒性伤害。", color: "#72ffb4" },
   { id: "invisible_brain_eaters", icon: "?", name: "隐匿侵袭", category: "敌群异变", desc: "全部敌人进入低可见状态，只会在接近时显露轮廓。", color: "#b48cff" },
   { id: "gear_trap", icon: "#", name: "齿轮陷阱", category: "机关封锁", desc: "大量机械陷阱被投放到战场，接触运转中的齿轮会受到伤害。", color: "#f59e0b" },
-  { id: "mini_overdrive", icon: "+", name: "微型过载", category: "敌群异变", desc: "过载脉冲提升普通敌人的移动与攻击节奏，直到本波结束。", color: "#ff4d6d" },
+  { id: "mini_overdrive", icon: "+", name: "小东西大麻烦", category: "敌群异变", desc: "过载脉冲提升普通敌人的移动与攻击节奏，直到本波结束。", color: "#ff4d6d" },
   { id: "gravity_well_grid", icon: "O", name: "重力井", category: "空间异常", desc: "实验场生成多个引力节点，靠近核心的单位会被持续牵引。", color: "#8d6bff" },
   { id: "ember_mine_rain", icon: "*", name: "余烬雷雨", category: "爆炸封锁", desc: "余烬地雷成簇坠落并短暂预警，触发后会在附近产生高温爆炸。", color: "#ff7a1a" },
   { id: "prism_refraction", icon: "<>", name: "棱镜折射", category: "弹道异常", desc: "棱镜节点会折射经过的敌方弹幕，使原本稳定的弹道突然偏转。", color: "#f3f7ff" },

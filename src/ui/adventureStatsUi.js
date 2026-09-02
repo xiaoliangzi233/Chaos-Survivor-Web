@@ -116,7 +116,7 @@ function renderOverview(stats) {
   const table = node("div", "adventure-table");
   table.appendChild(tableRow(["航线", "冒险", "胜利", "胜率", "时间", "击杀"], true));
   for (const [key, label] of [
-    ["standard", "剧情模式"],
+    ["standard", "冒险模式"],
     ["random_twenty_waves", "随机 · 20 波"],
     ["random_endless", "随机 · 无限"],
   ]) {
@@ -203,7 +203,7 @@ function renderLeaderboard() {
   const controls = node("div", "adventure-stats-filters adventure-leaderboard-filters");
   const modeSelect = select([
     ["all", "全部模式"],
-    ["standard", "剧情模式"],
+    ["standard", "冒险模式"],
     ["random_twenty_waves", "随机 · 20 波"],
     ["random_endless", "随机 · 无限"],
   ]);
@@ -290,7 +290,7 @@ function historyCard(run) {
   const result = textNode("strong", outcomeLabel(run.outcome));
   const route = run.runMode === "random"
     ? `随机模式 · ${run.randomGoal === "endless" ? "无限" : "20 波"}`
-    : "剧情模式";
+    : "冒险模式";
   header.append(result, textNode("span", `${route} // ${formatDateTime(run.completedAt)}`));
   const title = textNode("h3", `${run.difficultyName} · ${run.weaponName}`);
   const metrics = node("div", "adventure-history-metrics");

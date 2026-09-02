@@ -22,7 +22,7 @@ const themedEnemyProjectileSprites = new Map();
 
 export function bossHudLayout(view, boss) {
   const twin = Boolean(boss?.shared?.members);
-  const barHeight = twin ? 38 : 28;
+  const barHeight = boss?.shared?.slimeKingSplit ? 44 : twin ? 38 : 28;
   return {
     title: {
       text: boss?.name || "Boss",
@@ -4589,7 +4589,7 @@ function drawConvictPillar(ctx, x, y, color, alpha) {
 function drawGearTrapHazard(ctx, h, alpha) {
   ctx.save();
   ctx.translate(h.x, h.y);
-  drawMiniGear(ctx, 0, 0, h.r * 0.8, 14, h.color, (h.spin || 0) + state.time * 7);
+  drawMiniGear(ctx, 0, 0, h.r * 0.8, 14, h.color, h.spin || 0);
   ctx.restore();
 }
 
@@ -5270,6 +5270,10 @@ function drawBossBar(ctx) {
   const { x, y, w } = layout.bar;
   drawBossTitle(ctx, layout.title.text, layout.title.x, layout.title.y, layout.title.w);
   if (b.shared?.members) {
+    if (b.shared.slimeKingSplit) {
+      drawSlimeKingSplitBossBar(ctx, b, x, y, w);
+      return;
+    }
     drawTwinBossBar(ctx, b, x, y, w);
     return;
   }
@@ -5586,6 +5590,55 @@ function drawTwinBossBar(ctx, b, x, y, w) {
   const azureHp = azure && !azure.dead ? `${Math.ceil(azure.hp)}/${Math.ceil(azure.maxHp)}` : "苍雷已毁";
   drawBossHpText(ctx, crimsonHp, y + 15, 10, "#05070b", "rgba(255,255,255,0.72)");
   drawBossHpText(ctx, azureHp, y + 31, 10, "#05070b", "rgba(255,255,255,0.72)");
+}
+
+function drawSlimeKingSplitBossBar(ctx, b, x, y, w) {
+  const members = [...(b.shared?.members || [])];
+  const alive = members.filter((e) => !e.dead);
+  if (alive.length <= 1) {
+    const solo = alive[0] || b;
+    const hpRatio = Math.max(0, solo.hp / solo.maxHp);
+    ctx.fillStyle = "rgba(6,18,10,0.92)";
+    ctx.fillRect(x, y + 12, w, 28);
+    ctx.fillStyle = "rgba(255,255,255,0.08)";
+    ctx.fillRect(x + 6, y + 17, w - 12, 18);
+    const fill = ctx.createLinearGradient(x, y, x + w, y);
+    fill.addColorStop(0, "#77ff8a");
+    fill.addColorStop(0.62, "#b7ff6a");
+    fill.addColorStop(1, "#ffd166");
+    ctx.fillStyle = fill;
+    ctx.fillRect(x + 6, y + 17, (w - 12) * hpRatio, 18);
+    ctx.strokeStyle = "rgba(119,255,138,0.9)";
+    ctx.lineWidth = 2;
+    ctx.strokeRect(x + 1, y + 13, w - 2, 26);
+    drawBossHpText(ctx, `史莱姆王 ${Math.ceil(Math.max(0, solo.hp))}/${Math.ceil(solo.maxHp)}`, y + 32, 13, "#06120a", "rgba(255,255,255,0.72)");
+    return;
+  }
+  ctx.fillStyle = "rgba(6,18,10,0.92)";
+  ctx.fillRect(x, y, w, 44);
+  const rows = [
+    { enemy: members[0], y: y + 7, from: "#77ff8a", to: "#d9ff77" },
+    { enemy: members[1], y: y + 25, from: "#ffd166", to: "#fff1a8" },
+  ];
+  for (const row of rows) {
+    ctx.fillStyle = "rgba(255,255,255,0.08)";
+    ctx.fillRect(x + 6, row.y, w - 12, 12);
+    if (!row.enemy || row.enemy.dead) continue;
+    const fill = ctx.createLinearGradient(x, row.y, x + w, row.y);
+    fill.addColorStop(0, row.from);
+    fill.addColorStop(1, row.to);
+    ctx.fillStyle = fill;
+    ctx.fillRect(x + 6, row.y, (w - 12) * Math.max(0, row.enemy.hp / row.enemy.maxHp), 12);
+  }
+  ctx.strokeStyle = "rgba(255,209,102,0.9)";
+  ctx.lineWidth = 2;
+  ctx.strokeRect(x + 1, y + 1, w - 2, 42);
+  for (const row of rows) {
+    const text = row.enemy && !row.enemy.dead
+      ? `史莱姆王 ${Math.ceil(row.enemy.hp)}/${Math.ceil(row.enemy.maxHp)}`
+      : "史莱姆王 已击败";
+    drawBossHpText(ctx, text, row.y + 10, 10, "#06120a", "rgba(255,255,255,0.72)");
+  }
 }
 function drawBossTitle(ctx, text, x, y, w) {
   ctx.save();

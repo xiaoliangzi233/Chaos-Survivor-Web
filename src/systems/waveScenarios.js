@@ -291,10 +291,16 @@ function spawnMirrorLaserGate(event) {
 
 function addScenarioHazard(x, y, event, angle) {
   const half = WORLD_SIZE / 2 - 80;
+  const movingGear = event.kind === "gear_trap" && event.moving;
+  const moveAngle = Number.isFinite(event.moveAngle) ? event.moveAngle : Math.random() * TAU;
+  const speed = movingGear ? Math.max(0, Number(event.speed) || 0) : 0;
   world.hazards.push({
     kind: event.kind || "gear_trap",
     x: Math.max(-half, Math.min(half, x)),
     y: Math.max(-half, Math.min(half, y)),
+    vx: Math.cos(moveAngle) * speed,
+    vy: Math.sin(moveAngle) * speed,
+    moving: movingGear,
     r: event.radius || (event.kind === "magma_crack" ? 34 : 38),
     color: event.color || "#f59e0b",
     damage: event.damage || 12,

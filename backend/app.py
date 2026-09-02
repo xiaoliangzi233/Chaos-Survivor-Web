@@ -11,7 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from .admin import admin_page, read_config_file, require_admin, validate_config_kind, write_config_file
 from .db import DEFAULT_DB_PATH, SurvivorDatabase
-from .schemas import ConfigDraft, PlayerBootstrap, ProgressSnapshot, RunSubmission
+from .schemas import ConfigDraft, PlayerBootstrap, PlayerNicknameUpdate, ProgressSnapshot, RunSubmission
 
 AUTH_USER_URL = "http://113.249.91.32/sszl/user/simple-info"
 
@@ -56,6 +56,10 @@ def create_app(db_path: str | Path | None = None) -> FastAPI:
     @app.post("/api/players/bootstrap")
     def bootstrap_player(payload: PlayerBootstrap):
         return {"player": database.upsert_player(payload.playerId, payload.nickname or "Anonymous")}
+
+    @app.post("/api/players/nickname")
+    def update_player_nickname(payload: PlayerNicknameUpdate):
+        return {"player": database.upsert_player(payload.playerId, payload.nickname)}
 
     @app.get("/api/progress/{player_id}")
     def get_progress(player_id: str):

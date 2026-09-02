@@ -18,6 +18,16 @@ class PlayerBootstrap(BaseModel):
         return value.strip()
 
 
+class PlayerNicknameUpdate(BaseModel):
+    playerId: str = Field(min_length=3, max_length=96)
+    nickname: str = Field(min_length=2, max_length=16)
+
+    @field_validator("playerId", "nickname")
+    @classmethod
+    def strip_text(cls, value: str) -> str:
+        return value.strip()
+
+
 class ProgressSnapshot(BaseModel):
     progress: dict[str, Any]
     revision: int = Field(default=0, ge=0)

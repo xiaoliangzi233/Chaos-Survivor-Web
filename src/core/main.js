@@ -460,7 +460,7 @@ export async function bootGame() {
     if (isInventoryOpen()) closeInventory();
     if (state.mode !== "playing") return;
     state.mode = "paused";
-    ui.pauseButton.textContent = "鈻?;
+    ui.pauseButton.textContent = "▶";
     pauseMusic();
     showPauseMenu();
   }

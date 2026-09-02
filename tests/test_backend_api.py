@@ -61,6 +61,31 @@ class BackendApiTest(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()["progress"]["bestSurvivalSeconds"], 300)
 
+    def test_player_nickname_update(self):
+        response = self.client.post("/api/players/bootstrap", json={"playerId": "anon-test", "nickname": "Pilot"})
+        self.assertEqual(response.status_code, 200)
+
+        response = self.client.post(
+            "/api/players/nickname",
+            json={
+                "playerId": "anon-test",
+                "userId": "anon-test",
+                "username": "",
+                "employeeId": "",
+                "nickname": "管理员",
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["player"]["nickname"], "管理员")
+
+        run = self.client.post("/api/runs", json=self.run_payload(playerId="anon-test"))
+        self.assertEqual(run.status_code, 200)
+        self.assertEqual(run.json()["run"]["nickname"], "管理员")
+
+    def test_player_nickname_update_validates_length(self):
+        response = self.client.post("/api/players/nickname", json={"playerId": "anon-test", "nickname": ""})
+        self.assertEqual(response.status_code, 422)
+
     def test_run_submission_rejections_and_leaderboard(self):
         self.client.post("/api/players/bootstrap", json={"playerId": "anon-a", "nickname": "Ace"})
         missing = self.client.post("/api/runs", json=self.run_payload(playerId="missing"))

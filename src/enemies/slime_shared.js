@@ -1,6 +1,6 @@
 ﻿import { TAU, WORLD_SIZE } from "../constants.js";
 import { state } from "../state.js";
-import { burst, pulse, trail } from "../effects.js";
+import { burst } from "../effects.js";
 import { clamp } from "../utils.js";
 import { playSfx } from "../audio.js";
 import { BaseEnemy } from "./BaseEnemy.js";
@@ -47,9 +47,6 @@ export class SlimeEnemy extends BaseEnemy {
       this.hopElapsed += dt;
       this.x += this.hopVx * dt;
       this.y += this.hopVy * dt;
-      if (Math.hypot(this.x - this.lastX, this.y - this.lastY) > 1) {
-        trail(this.x, this.y, this.lastX, this.lastY, this.slimeColors.trail, this.profile.trailSize);
-      }
       if (this.hopElapsed >= this.hopDuration) this.land();
     } else {
       this.hopTimer -= dt;
@@ -95,8 +92,6 @@ export class SlimeEnemy extends BaseEnemy {
     this.hopVy = 0;
     this.landSquash = 1;
     this.landAge = 0;
-    pulse(this.x, this.y + this.r * 0.45, this.r * this.profile.landPulse, this.slimeColors.trail, 0.18);
-    if (this.profile.landBurst > 0) burst(this.x, this.y + this.r * 0.35, this.profile.landBurst, this.slimeColors.trail, 70);
     playSfx("slimeLand");
   }
 

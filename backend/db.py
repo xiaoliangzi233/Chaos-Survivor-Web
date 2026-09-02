@@ -121,6 +121,21 @@ class SurvivorDatabase:
             row = conn.execute("SELECT * FROM players WHERE player_id = ?", (player_id,)).fetchone()
         return dict(row)
 
+    def get_or_create_player(self, player_id: str, nickname: str = "") -> dict[str, Any]:
+        now = utc_now()
+        with self.connect() as conn:
+            row = conn.execute("SELECT * FROM players WHERE player_id = ?", (player_id,)).fetchone()
+            if row is None:
+                conn.execute(
+                    """
+                    INSERT INTO players(player_id, nickname, created_at, updated_at)
+                    VALUES (?, ?, ?, ?)
+                    """,
+                    (player_id, nickname, now, now),
+                )
+                row = conn.execute("SELECT * FROM players WHERE player_id = ?", (player_id,)).fetchone()
+        return dict(row)
+
     def player_exists(self, player_id: str) -> bool:
         with self.connect() as conn:
             row = conn.execute("SELECT 1 FROM players WHERE player_id = ?", (player_id,)).fetchone()

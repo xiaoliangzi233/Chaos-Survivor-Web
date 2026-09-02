@@ -295,53 +295,99 @@ function drawWormBodyRibbon(ctx, e, flash) {
   ctx.save();
   ctx.lineCap = "round";
   ctx.lineJoin = "round";
-  ctx.strokeStyle = flash ? "#ffffff" : "#211331";
-  ctx.lineWidth = e.r * 1.08;
+  ctx.strokeStyle = flash ? "#ffffff" : "rgba(3, 7, 14, 0.9)";
+  ctx.lineWidth = e.r * 1.34;
   trace();
   ctx.stroke();
-  ctx.strokeStyle = flash ? "rgba(255,255,255,0.9)" : "rgba(255,101,216,0.78)";
-  ctx.lineWidth = e.r * 0.34;
+  ctx.strokeStyle = flash ? "rgba(255,255,255,0.9)" : "rgba(68, 232, 255, 0.22)";
+  ctx.lineWidth = e.r * 0.62;
+  trace();
+  ctx.stroke();
+  ctx.strokeStyle = flash ? "#ffffff" : "rgba(255,101,216,0.64)";
+  ctx.lineWidth = Math.max(2, e.r * 0.16);
   trace();
   ctx.stroke();
   ctx.restore();
 }
 
 function drawWormShadow(ctx, e) {
-  ctx.fillStyle = "rgba(0,0,0,0.26)";
+  ctx.fillStyle = "rgba(0,0,0,0.34)";
   for (let i = e.segments.length - 1; i >= 0; i--) {
     const seg = e.segments[i];
-    const rx = Math.max(e.r * 0.18, e.r * (0.72 - i * 0.025));
-    const ry = Math.max(e.r * 0.08, e.r * 0.24);
+    const rx = Math.max(e.r * 0.28, e.r * (0.9 - i * 0.025));
+    const ry = Math.max(e.r * 0.1, e.r * 0.28);
     ctx.beginPath();
-    ctx.ellipse(seg.x, seg.y + 10, rx, ry, seg.angle, 0, TAU);
+    ctx.ellipse(seg.x, seg.y + 12, rx, ry, seg.angle, 0, TAU);
     ctx.fill();
   }
   ctx.beginPath();
-  ctx.ellipse(e.x, e.y + 10, e.r * 0.9, e.r * 0.3, 0, 0, TAU);
+  ctx.ellipse(e.x, e.y + 13, e.r * 1.22, e.r * 0.36, e.headAngle, 0, TAU);
   ctx.fill();
 }
 
 function drawSegment(ctx, e, seg, i, flash) {
-  const r = e.r * Math.max(0.58, 0.82 - i * 0.018);
-  const core = flash ? "#ffffff" : i % 2 ? "#2c1740" : "#341a4f";
+  const taper = Math.max(0.48, 0.9 - i * 0.022);
+  const r = e.r * taper;
+  const pulseGlow = 0.5 + Math.sin(e.anim * 1.7 - i * 0.65) * 0.5;
+  const core = flash ? "#ffffff" : i % 2 ? "#121a26" : "#182231";
+  const plate = flash ? "#ffffff" : i % 2 ? "#273244" : "#202a3b";
   const accent = flash ? "#ffffff" : e.color;
   ctx.save();
   ctx.translate(seg.x, seg.y);
   ctx.rotate(seg.angle);
+  ctx.fillStyle = "rgba(0, 0, 0, 0.28)";
+  ctx.beginPath();
+  ctx.ellipse(0, r * 0.1, r * 1.04, r * 0.66, 0, 0, TAU);
+  ctx.fill();
+
   ctx.fillStyle = core;
   ctx.beginPath();
-  ctx.roundRect(-r * 0.92, -r * 0.62, r * 1.84, r * 1.24, 5);
+  ctx.roundRect(-r * 0.96, -r * 0.54, r * 1.92, r * 1.08, Math.max(3, r * 0.18));
   ctx.fill();
-  ctx.strokeStyle = accent;
-  ctx.lineWidth = 1.5;
+  ctx.strokeStyle = flash ? "#ffffff" : "#050912";
+  ctx.lineWidth = Math.max(2, r * 0.12);
   ctx.stroke();
-  ctx.fillStyle = accent;
-  ctx.fillRect(-r * 0.18, -r * 0.34, r * 0.36, r * 0.68);
-  ctx.strokeStyle = "rgba(255,255,255,0.42)";
+
+  for (const side of [-1, 1]) {
+    ctx.fillStyle = plate;
+    ctx.beginPath();
+    ctx.moveTo(-r * 0.72, side * r * 0.48);
+    ctx.lineTo(-r * 0.1, side * r * 0.7);
+    ctx.lineTo(r * 0.78, side * r * 0.42);
+    ctx.lineTo(r * 0.64, side * r * 0.12);
+    ctx.lineTo(-r * 0.5, side * r * 0.2);
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = flash ? "#ffffff" : "rgba(79, 208, 226, 0.34)";
+    ctx.lineWidth = 1;
+    ctx.stroke();
+  }
+
+  ctx.fillStyle = flash ? "#ffffff" : `rgba(66, 232, 255, ${0.42 + pulseGlow * 0.38})`;
+  ctx.shadowColor = flash ? "#ffffff" : "#42e8ff";
+  ctx.shadowBlur = 9 + pulseGlow * 8;
   ctx.beginPath();
-  ctx.moveTo(-r * 0.64, -r * 0.28);
-  ctx.lineTo(r * 0.64, -r * 0.28);
+  ctx.roundRect(-r * 0.14, -r * 0.42, r * 0.28, r * 0.84, Math.max(2, r * 0.08));
+  ctx.fill();
+  ctx.shadowBlur = 0;
+
+  ctx.strokeStyle = flash ? "#ffffff" : "rgba(255,255,255,0.5)";
+  ctx.beginPath();
+  ctx.moveTo(-r * 0.68, -r * 0.18);
+  ctx.lineTo(r * 0.62, -r * 0.28);
+  ctx.moveTo(-r * 0.68, r * 0.18);
+  ctx.lineTo(r * 0.62, r * 0.28);
   ctx.stroke();
+
+  if (i > e.segments.length - 4) {
+    ctx.fillStyle = flash ? "#ffffff" : `rgba(255, 101, 216, ${0.3 + pulseGlow * 0.34})`;
+    ctx.beginPath();
+    ctx.moveTo(-r * 1.1, 0);
+    ctx.lineTo(-r * 1.48, -r * 0.28);
+    ctx.lineTo(-r * 1.42, r * 0.28);
+    ctx.closePath();
+    ctx.fill();
+  }
   ctx.restore();
 }
 
@@ -349,47 +395,106 @@ function drawHead(ctx, e, flash) {
   const angle = e.headAngle;
   const charge = e.state === "charge";
   const strike = e.state === "strike";
+  const heat = charge || strike ? 1 : 0.45 + Math.sin(e.anim * 2.2) * 0.18;
   ctx.save();
   ctx.translate(e.x, e.y);
   ctx.rotate(angle);
-  const body = flash ? "#ffffff" : "#141827";
+  const body = flash ? "#ffffff" : "#111824";
+  const plate = flash ? "#ffffff" : "#253145";
   const accent = flash ? "#ffffff" : e.color;
+
+  ctx.fillStyle = "rgba(0,0,0,0.34)";
+  ctx.beginPath();
+  ctx.ellipse(-e.r * 0.08, e.r * 0.16, e.r * 1.44, e.r * 0.76, 0, 0, TAU);
+  ctx.fill();
+
   ctx.fillStyle = body;
   ctx.beginPath();
-  ctx.moveTo(e.r * 1.55, 0);
-  ctx.lineTo(e.r * 1.05, -e.r * 0.6);
-  ctx.lineTo(e.r * 0.2, -e.r * 0.88);
-  ctx.lineTo(-e.r * 1.05, -e.r * 0.58);
-  ctx.lineTo(-e.r * 1.22, 0);
-  ctx.lineTo(-e.r * 1.05, e.r * 0.58);
-  ctx.lineTo(e.r * 0.2, e.r * 0.88);
-  ctx.lineTo(e.r * 1.05, e.r * 0.6);
+  ctx.moveTo(e.r * 1.78, 0);
+  ctx.lineTo(e.r * 1.1, -e.r * 0.82);
+  ctx.lineTo(-e.r * 0.72, -e.r * 0.74);
+  ctx.lineTo(-e.r * 1.34, -e.r * 0.34);
+  ctx.lineTo(-e.r * 1.18, e.r * 0.34);
+  ctx.lineTo(-e.r * 0.72, e.r * 0.74);
+  ctx.lineTo(e.r * 1.1, e.r * 0.82);
+  ctx.closePath();
+  ctx.fill();
+  ctx.strokeStyle = flash ? "#ffffff" : "#050912";
+  ctx.lineWidth = 3;
+  ctx.stroke();
+
+  ctx.fillStyle = plate;
+  for (const side of [-1, 1]) {
+    ctx.beginPath();
+    ctx.moveTo(-e.r * 0.86, side * e.r * 0.28);
+    ctx.lineTo(e.r * 0.36, side * e.r * 0.62);
+    ctx.lineTo(e.r * 1.06, side * e.r * 0.46);
+    ctx.lineTo(e.r * 0.76, side * e.r * 0.14);
+    ctx.lineTo(-e.r * 0.62, side * e.r * 0.08);
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = "rgba(255,255,255,0.22)";
+    ctx.lineWidth = 1.1;
+    ctx.stroke();
+  }
+
+  ctx.strokeStyle = accent;
+  ctx.lineWidth = 2.4;
+  ctx.shadowColor = accent;
+  ctx.shadowBlur = charge ? 18 : 9;
+  ctx.beginPath();
+  ctx.moveTo(-e.r * 1.0, 0);
+  ctx.lineTo(e.r * 1.42, 0);
+  ctx.stroke();
+  ctx.shadowBlur = 0;
+
+  ctx.fillStyle = flash ? "#ffffff" : "#080c13";
+  ctx.beginPath();
+  ctx.moveTo(e.r * 1.78, 0);
+  ctx.lineTo(e.r * 1.12, -e.r * 0.2);
+  ctx.lineTo(e.r * 0.5, 0);
+  ctx.lineTo(e.r * 1.12, e.r * 0.2);
   ctx.closePath();
   ctx.fill();
   ctx.strokeStyle = accent;
-  ctx.lineWidth = 2.2;
+  ctx.lineWidth = 1.6;
   ctx.stroke();
-  ctx.fillStyle = "#291638";
+
+  ctx.fillStyle = flash ? "#ffffff" : `rgba(66, 232, 255, ${0.52 + heat * 0.32})`;
+  ctx.shadowColor = "#42e8ff";
+  ctx.shadowBlur = 12 + heat * 10;
   ctx.beginPath();
-  ctx.moveTo(e.r * 1.55, 0);
-  ctx.lineTo(e.r * 0.9, -e.r * 0.08);
-  ctx.lineTo(e.r * 0.28, 0);
-  ctx.lineTo(e.r * 0.9, e.r * 0.36);
-  ctx.lineTo(e.r * 1.34, e.r * 0.3);
+  ctx.moveTo(e.r * 0.08, -e.r * 0.22);
+  ctx.lineTo(e.r * 0.88, -e.r * 0.14);
+  ctx.lineTo(e.r * 0.66, 0);
+  ctx.lineTo(e.r * 0.88, e.r * 0.14);
+  ctx.lineTo(e.r * 0.08, e.r * 0.22);
   ctx.closePath();
   ctx.fill();
-  ctx.strokeStyle = "rgba(255,255,255,0.46)";
-  ctx.lineWidth = 1.2;
-  ctx.stroke();
+  ctx.shadowBlur = 0;
+
   ctx.fillStyle = charge || strike ? "#ffffff" : "#ffb8f2";
+  ctx.shadowColor = accent;
+  ctx.shadowBlur = charge ? 14 : 5;
   for (const side of [-1, 1]) {
     ctx.beginPath();
-    ctx.moveTo(e.r * 0.28, side * e.r * 0.43);
-    ctx.lineTo(e.r * 0.82, side * e.r * 0.32);
-    ctx.lineTo(e.r * 0.44, side * e.r * 0.12);
+    ctx.moveTo(e.r * 0.26, side * e.r * 0.44);
+    ctx.lineTo(e.r * 0.94, side * e.r * 0.42);
+    ctx.lineTo(e.r * 0.52, side * e.r * 0.16);
     ctx.closePath();
     ctx.fill();
   }
+  ctx.shadowBlur = 0;
+
+  ctx.strokeStyle = "rgba(255,255,255,0.54)";
+  ctx.lineWidth = 1.2;
+  ctx.beginPath();
+  ctx.moveTo(-e.r * 0.84, -e.r * 0.38);
+  ctx.lineTo(-e.r * 0.18, -e.r * 0.48);
+  ctx.moveTo(-e.r * 0.84, e.r * 0.38);
+  ctx.lineTo(-e.r * 0.18, e.r * 0.48);
+  ctx.stroke();
+
   ctx.fillStyle = "#ffffff";
   for (const [x, y] of [[1.03, -0.05], [1.31, 0.08]]) {
     ctx.beginPath();
@@ -399,13 +504,6 @@ function drawHead(ctx, e, flash) {
     ctx.closePath();
     ctx.fill();
   }
-  ctx.fillStyle = accent;
-  ctx.fillRect(e.r * 1.18, -e.r * 0.38, e.r * 0.14, e.r * 0.09);
-  ctx.strokeStyle = "rgba(255,255,255,0.5)";
-  ctx.beginPath();
-  ctx.moveTo(-e.r * 0.7, 0);
-  ctx.lineTo(e.r * 0.82, 0);
-  ctx.stroke();
   if (strike) {
     ctx.strokeStyle = "rgba(255,255,255,0.72)";
     ctx.lineWidth = 2;
@@ -423,11 +521,19 @@ function drawCharge(ctx, e) {
   ctx.save();
   ctx.translate(e.x, e.y);
   ctx.rotate(e.strikeAngle);
-  ctx.strokeStyle = `rgba(255,101,216,${0.34 + Math.sin(e.anim * 10) * 0.12})`;
-  ctx.lineWidth = 3;
+  ctx.strokeStyle = `rgba(66,232,255,${0.28 + Math.sin(e.anim * 10) * 0.1})`;
+  ctx.lineWidth = 5;
   ctx.beginPath();
   ctx.moveTo(e.r, 0);
   ctx.lineTo(240, 0);
+  ctx.stroke();
+  ctx.strokeStyle = `rgba(255,101,216,${0.28 + Math.sin(e.anim * 12) * 0.1})`;
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(e.r * 1.1, -e.r * 0.28);
+  ctx.lineTo(226, -18);
+  ctx.moveTo(e.r * 1.1, e.r * 0.28);
+  ctx.lineTo(226, 18);
   ctx.stroke();
   ctx.restore();
 }

@@ -394,8 +394,11 @@ export function playLevelGoldRain({ count = 96, duration = 1850 } = {}) {
   for (let i = 0; i < amount; i++) {
     const coin = document.createElement("span");
     coin.className = i % 5 === 0 ? "big" : i % 3 === 0 ? "spark" : "";
-    coin.style.setProperty("--x", `${Math.random() * 100}vw`);
-    coin.style.setProperty("--drift", `${(Math.random() - 0.5) * 220}px`);
+    const x = Math.random() * 100;
+    const centerBias = 1 - Math.min(1, Math.abs(x - 50) / 50);
+    coin.style.setProperty("--x", `${x}vw`);
+    coin.style.setProperty("--drift", `${(Math.random() - 0.5) * 180}px`);
+    coin.style.setProperty("--pile-y", `${10 + Math.random() * 24 + centerBias * 54}px`);
     const delay = Math.random() * 820;
     const fall = 980 + Math.random() * 780;
     coin.style.setProperty("--delay", `${delay}ms`);
@@ -403,13 +406,15 @@ export function playLevelGoldRain({ count = 96, duration = 1850 } = {}) {
     coin.style.setProperty("--spin", `${Math.random() * 720 - 360}deg`);
     coin.textContent = i % 7 === 0 ? "$" : "G";
     layer.appendChild(coin);
-    window.setTimeout(() => coin.remove(), delay + fall + 260);
   }
   window.clearTimeout(layer._goldRainTimer);
   layer._goldRainTimer = window.setTimeout(() => {
     layer.classList.add("ending");
     window.setTimeout(() => {
-      if (!layer.children.length) layer.remove();
+      if (layer.classList.contains("ending")) {
+        layer.replaceChildren();
+        layer.remove();
+      }
     }, 260);
   }, duration + 900);
 }

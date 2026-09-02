@@ -368,7 +368,7 @@ function normalizeAuthUser(value) {
 
 function normalizeBackendPlayer(value) {
   if (!value || typeof value !== "object") return null;
-  const id = String(value.id || value.playerId || value.userId || authenticatedUser?.id || "").trim().slice(0, 96);
+  const id = String(value.id || value.playerId || value.player_id || value.userId || authenticatedUser?.id || "").trim().slice(0, 96);
   const userId = String(value.userId || authenticatedUser?.id || id).trim().slice(0, 96);
   const username = String(value.username || authenticatedUser?.username || "").trim().slice(0, 64);
   const employeeId = String(value.employeeId || authenticatedUser?.employeeId || "").trim().slice(0, 64);

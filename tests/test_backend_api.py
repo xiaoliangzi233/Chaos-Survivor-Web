@@ -82,6 +82,19 @@ class BackendApiTest(unittest.TestCase):
         self.assertEqual(run.status_code, 200)
         self.assertEqual(run.json()["run"]["nickname"], "管理员")
 
+    def test_bootstrap_preserves_existing_nickname(self):
+        response = self.client.post("/api/players/bootstrap", json={"playerId": "anon-test"})
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.json()["needsNickname"])
+
+        response = self.client.post("/api/players/nickname", json={"playerId": "anon-test", "nickname": "管理员"})
+        self.assertEqual(response.status_code, 200)
+
+        response = self.client.post("/api/players/bootstrap", json={"playerId": "anon-test", "nickname": ""})
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(response.json()["needsNickname"])
+        self.assertEqual(response.json()["player"]["nickname"], "管理员")
+
     def test_player_nickname_update_validates_length(self):
         response = self.client.post("/api/players/nickname", json={"playerId": "anon-test", "nickname": ""})
         self.assertEqual(response.status_code, 422)

@@ -10,7 +10,7 @@ RandomGoal = Literal["twenty_waves", "endless"]
 
 class PlayerBootstrap(BaseModel):
     playerId: str = Field(min_length=3, max_length=96)
-    nickname: str = Field(default="Anonymous", max_length=32)
+    nickname: str = Field(default="", max_length=32)
 
     @field_validator("playerId", "nickname")
     @classmethod

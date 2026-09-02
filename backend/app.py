@@ -55,11 +55,13 @@ def create_app(db_path: str | Path | None = None) -> FastAPI:
 
     @app.post("/api/players/bootstrap")
     def bootstrap_player(payload: PlayerBootstrap):
-        return {"player": database.upsert_player(payload.playerId, payload.nickname or "Anonymous")}
+        player = database.get_or_create_player(payload.playerId, payload.nickname)
+        return {"player": player, "needsNickname": not bool(player.get("nickname"))}
 
     @app.post("/api/players/nickname")
     def update_player_nickname(payload: PlayerNicknameUpdate):
-        return {"player": database.upsert_player(payload.playerId, payload.nickname)}
+        player = database.upsert_player(payload.playerId, payload.nickname)
+        return {"player": player, "needsNickname": False}
 
     @app.get("/api/progress/{player_id}")
     def get_progress(player_id: str):

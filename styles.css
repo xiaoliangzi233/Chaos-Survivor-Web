@@ -2285,6 +2285,7 @@ h2 {
     inset 3px 3px 0 rgba(255, 255, 255, 0.34);
   transform: translate3d(-50%, 0, 0) rotate(0deg);
   animation: levelGoldFall var(--fall) cubic-bezier(0.18, 0.78, 0.28, 1) var(--delay) both;
+  animation-fill-mode: both;
 }
 
 .level-gold-rain span.big {
@@ -2311,8 +2312,8 @@ h2 {
     opacity: 1;
   }
   100% {
-    opacity: 0;
-    transform: translate3d(calc(-50% + var(--drift)), 128vh, 0) rotate(var(--spin)) scale(1.05);
+    opacity: 1;
+    transform: translate3d(calc(-50% + var(--drift)), calc(100vh + 40px - var(--pile-y)), 0) rotate(var(--spin)) scale(1.05);
   }
 }
 
@@ -4423,8 +4424,12 @@ body.story-open .menu-actions {
   bottom: clamp(112px, 13vh, 142px);
   width: min(870px, 56vw);
   min-height: 252px;
+  max-height: calc(100dvh - clamp(112px, 13vh, 142px) - 28px);
+  box-sizing: border-box;
   padding: 22px 30px 20px 34px;
-  overflow: hidden;
+  overflow: auto;
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--story-accent, #7ddff2) 48%, transparent) rgba(4, 11, 17, 0.4);
   border: 1px solid color-mix(in srgb, var(--story-accent, #7ddff2) 78%, transparent);
   border-radius: 0;
   color: #f2f6f8;
@@ -4434,6 +4439,14 @@ body.story-open .menu-actions {
   clip-path: polygon(0 0, calc(100% - 18px) 0, 100% 18px, 100% 100%, 0 100%);
   box-shadow: inset 0 0 32px rgba(0, 0, 0, 0.3), 0 24px 70px rgba(0, 0, 0, 0.42), 0 0 22px color-mix(in srgb, var(--story-accent, #7ddff2) 8%, transparent);
   backdrop-filter: blur(12px);
+}
+
+.story-panel::-webkit-scrollbar {
+  width: 6px;
+}
+
+.story-panel::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--story-accent, #7ddff2) 42%, transparent);
 }
 
 .story-panel::before,
@@ -4676,6 +4689,7 @@ body.story-open .menu-actions {
   .story-panel {
     bottom: 92px;
     min-height: 218px;
+    max-height: calc(100dvh - 116px);
     padding: 17px 26px 17px 30px;
   }
 

@@ -19,7 +19,7 @@ export const NEON_WAVE_SCENARIOS = [
   { wave: 4, pool: ["lancer", "mech_worm", ...BASIC_SLIMES], spawnRate: 1.16, effect: "scrap_wind" },
   { wave: 5, pool: ["zombie", "lancer", "mech_worm"], spawnRate: 1.06, elite: { id: "mech_worm", variant: "elite", count: 1 } },
   { wave: 6, pool: ["doctor", "zombie", ...BASIC_SLIMES], spawnRate: 1.02 },
-  { wave: 7, pool: ["doctor", "mech_worm", "lancer", ...BASIC_SLIMES], spawnRate: 1.14, event: { type: "hazard_field", count: 22, kind: "toxic_residue", color: "#72ffb4", radius: 112, life: 999, fullWave: true, damage: 0, poisonDps: 8, poisonDuration: 3.4, minPlayerDistance: 260 } },
+  { wave: 7, pool: ["doctor", "mech_worm", "lancer", ...BASIC_SLIMES], spawnRate: 1.14, event: { type: "hazard_field", count: 22, kind: "toxic_residue", color: "#9dff3f", radius: 112, life: 999, fullWave: true, damage: 0, poisonDps: 8, poisonDuration: 3.4, minPlayerDistance: 260 } },
   { wave: 8, pool: ALL_SLIMES, spawnRate: 1.42, elite: { id: "slime_large", variant: "giant", count: 1 } },
   { wave: 9, pool: ["pentastar", "razorbat", "wisp", ...BASIC_SLIMES], spawnRate: 1.24, effect: "blind" },
   { wave: 10, pool: [], spawnRate: 0, boss: "slime_king" },

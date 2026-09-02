@@ -15,7 +15,6 @@ import {
   setBootProgress,
   showRunLoading,
   hideRunLoading,
-  playLevelGoldRain,
 } from "../ui/ui.js";
 import { generateMap } from "../systems/map.js";
 import { bindInput } from "../systems/input.js";
@@ -358,18 +357,8 @@ export async function bootGame() {
     p.level++;
     p.xpNeed = xpNeedForLevel(p.level);
     playSfx("level");
-    playLevelGoldRainWithSound();
     showLevelChoices(playerId);
     return true;
-  }
-
-  function playLevelGoldRainWithSound(options = {}) {
-    playLevelGoldRain(options);
-    playSfx("coin");
-    const chimes = Math.max(6, Math.min(16, Math.floor(options.chimes || 12)));
-    for (let i = 0; i < chimes; i++) {
-      window.setTimeout(() => playSfx("coin"), i * 70 + Math.random() * 45);
-    }
   }
 
   function completeWave() {

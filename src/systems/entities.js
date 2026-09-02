@@ -696,13 +696,14 @@ function compactRemoved(array) {
 function updateEliteSkill(e, dt) {
   if (!e?.elite || e.dead || e.boss) return;
   if (e.eliteGlobalShield) return applyEliteGlobalShield(e);
+  const slimeElite = isSlimeEnemy(e);
   e.eliteSkillCooldown ??= 3 + Math.random() * 1.2;
   e.eliteSkillInterval ??= e.eliteVariant === "giant" ? 5.2 : 4.4;
   e.eliteSkillProjectileCount ??= e.eliteVariant === "giant" ? 16 : 10;
   e.eliteSkillPulse = Math.max(0, (e.eliteSkillPulse || 0) - dt);
   if ((e.eliteSkillWindup || 0) > 0) {
     e.eliteSkillWindup = Math.max(0, e.eliteSkillWindup - dt);
-    if (e.eliteSkillPulse <= 0) {
+    if (!slimeElite && e.eliteSkillPulse <= 0) {
       e.eliteSkillPulse = 0.16;
       pulse(e.x, e.y, e.r * (2.2 + (e.eliteSkillWindup || 0)), "#ffd166", 0.18);
     }
@@ -713,7 +714,7 @@ function updateEliteSkill(e, dt) {
   if (e.eliteSkillCooldown > 0) return;
   e.eliteSkillWindup = e.eliteVariant === "giant" ? 0.82 : 0.62;
   e.eliteSkillPulse = 0;
-  pulse(e.x, e.y, e.r * 3.1, "#ffd166", 0.34);
+  if (!slimeElite) pulse(e.x, e.y, e.r * 3.1, "#ffd166", 0.34);
 }
 
 function releaseEliteSkill(e) {
@@ -752,10 +753,16 @@ function releaseElitePulse(e) {
     });
   }
   burst(e.x, e.y, e.eliteVariant === "giant" ? 24 : 16, visual.color, 210);
-  pulse(e.x, e.y, e.r * 3.6, visual.color, 0.42);
-  world.weaponFx.push({ kind: "shockRing", x: e.x, y: e.y, radius: e.r * 3.2, life: 0.34, maxLife: 0.34, color: visual.color });
+  if (!isSlimeEnemy(e)) {
+    pulse(e.x, e.y, e.r * 3.6, visual.color, 0.42);
+    world.weaponFx.push({ kind: "shockRing", x: e.x, y: e.y, radius: e.r * 3.2, life: 0.34, maxLife: 0.34, color: visual.color });
+  }
   state.shake = Math.max(state.shake, e.eliteVariant === "giant" ? 7 : 4);
   e.eliteSkillCooldown = e.eliteSkillInterval;
+}
+
+function isSlimeEnemy(enemy) {
+  return Boolean(enemy?.type?.startsWith("slime_"));
 }
 
 export function eliteProjectileVisualFor(enemy) {

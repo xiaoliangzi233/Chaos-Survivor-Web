@@ -172,20 +172,7 @@ export function render(ctx, options = {}) {
       if (e.shielded && !e.globalShielded) drawEnemyShield(ctx, e);
       continue;
     }
-    if (miniOverdrive && !e.boss) {
-      ctx.save();
-      ctx.translate(e.x, e.y);
-      ctx.scale(0.5, 0.5);
-      ctx.translate(-e.x, -e.y);
-      e.draw(ctx);
-      drawEliteOutline(ctx, e);
-      if (e.shielded && !e.globalShielded) drawEnemyShield(ctx, e);
-      ctx.restore();
-    } else {
-      e.draw(ctx);
-      drawEliteOutline(ctx, e);
-      if (e.shielded && !e.globalShielded) drawEnemyShield(ctx, e);
-    }
+    drawEnemyStack(ctx, e, { miniOverdrive: miniOverdrive && !e.boss });
   }
   drawDrones(ctx);
   drawPlayer(ctx, state.player, { label: "", moving: input.up || input.down || input.left || input.right || Math.abs(input.vx) > 0.05 || Math.abs(input.vy) > 0.05 });
@@ -4799,24 +4786,61 @@ function drawInfernoBeaconHazard(ctx, h, alpha) {
 }
 
 function drawToxicResidueHazard(ctx, h, alpha) {
+  const pulse = 0.5 + Math.sin(state.time * 3.2 + (h.spin || 0)) * 0.5;
+  const wobble = Math.sin(state.time * 1.4 + h.x * 0.01) * 0.12;
+  const color = h.color || "#9dff3f";
   ctx.save();
   ctx.translate(h.x, h.y);
-  ctx.fillStyle = hexToRgba("#06130b", 0.52 * alpha);
+  ctx.rotate((h.angle || 0) + wobble);
+  ctx.globalCompositeOperation = "source-over";
+  glow(ctx, 0, 0, h.r * 1.15, 0.2 * alpha, color);
+  ctx.fillStyle = hexToRgba("#071607", 0.78 * alpha);
   ctx.beginPath();
-  ctx.arc(0, 0, h.r, 0, TAU);
+  ctx.ellipse(0, 0, h.r * 1.08, h.r * 0.84, 0, 0, TAU);
   ctx.fill();
-  ctx.fillStyle = hexToRgba(h.color, 0.08 * alpha);
+
+  ctx.globalCompositeOperation = "lighter";
+  ctx.fillStyle = hexToRgba(color, (0.2 + pulse * 0.08) * alpha);
   ctx.beginPath();
-  ctx.ellipse(0, 0, h.r * 0.94, h.r * 0.72, Math.sin(state.time + h.y) * 0.2, 0, TAU);
+  ctx.ellipse(0, 0, h.r * 0.98, h.r * 0.74, -wobble * 1.5, 0, TAU);
   ctx.fill();
-  ctx.strokeStyle = hexToRgba("#d7ffe4", 0.16 * alpha);
-  ctx.lineWidth = 1;
-  for (let i = 0; i < 5; i++) {
-    const a = i / 5 * TAU + state.time * 0.18;
+
+  ctx.strokeStyle = hexToRgba("#dfff8a", (0.52 + pulse * 0.18) * alpha);
+  ctx.lineWidth = Math.max(3, h.r * 0.045);
+  ctx.beginPath();
+  ctx.ellipse(0, 0, h.r * 1.08, h.r * 0.84, 0, 0, TAU);
+  ctx.stroke();
+
+  ctx.strokeStyle = hexToRgba("#101b06", 0.72 * alpha);
+  ctx.lineWidth = Math.max(4, h.r * 0.055);
+  ctx.lineCap = "round";
+  for (let i = -3; i <= 3; i++) {
+    const y = i * h.r * 0.18 + Math.sin(state.time * 1.8 + i) * h.r * 0.02;
     ctx.beginPath();
-    ctx.arc(Math.cos(a) * h.r * 0.35, Math.sin(a) * h.r * 0.24, h.r * 0.08, 0, TAU);
+    ctx.moveTo(-h.r * 0.66, y - h.r * 0.12);
+    ctx.quadraticCurveTo(-h.r * 0.08, y + h.r * 0.12, h.r * 0.62, y - h.r * 0.08);
     ctx.stroke();
   }
+
+  ctx.fillStyle = hexToRgba("#eaff8a", 0.72 * alpha);
+  for (let i = 0; i < 10; i++) {
+    const a = i / 10 * TAU + (h.spin || 0) + state.time * 0.2;
+    const rx = Math.cos(a) * h.r * (0.18 + (i % 4) * 0.12);
+    const ry = Math.sin(a * 1.7) * h.r * (0.16 + (i % 3) * 0.1);
+    const bubble = h.r * (0.025 + (i % 3) * 0.012) * (0.8 + pulse * 0.4);
+    ctx.beginPath();
+    ctx.arc(rx, ry, bubble, 0, TAU);
+    ctx.fill();
+  }
+
+  ctx.strokeStyle = hexToRgba("#f3ffbd", 0.5 * alpha);
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(-h.r * 0.52, -h.r * 0.52);
+  ctx.lineTo(-h.r * 0.18, -h.r * 0.44);
+  ctx.moveTo(h.r * 0.22, h.r * 0.48);
+  ctx.lineTo(h.r * 0.58, h.r * 0.36);
+  ctx.stroke();
   ctx.restore();
 }
 
@@ -5109,6 +5133,61 @@ function drawEnemyShield(ctx, e) {
   ctx.closePath();
   ctx.stroke();
   ctx.restore();
+}
+
+function drawEnemyStack(ctx, e, { miniOverdrive = false } = {}) {
+  const stylizeMotion = shouldStylizeEnemyMotion(e);
+  if (!stylizeMotion && !miniOverdrive) {
+    e.draw(ctx);
+    drawEliteOutline(ctx, e);
+    if (e.shielded && !e.globalShielded) drawEnemyShield(ctx, e);
+    return;
+  }
+
+  const pose = stylizeMotion ? smoothEnemyPose(e) : { x: e.x, y: e.y, lean: 0, squash: 1, stretch: 1 };
+  ctx.save();
+  ctx.translate(pose.x, pose.y);
+  if (miniOverdrive) ctx.scale(0.5, 0.5);
+  if (stylizeMotion) {
+    ctx.rotate(pose.lean);
+    ctx.scale(pose.squash, pose.stretch);
+  }
+  ctx.translate(-e.x, -e.y);
+  e.draw(ctx);
+  drawEliteOutline(ctx, e);
+  if (e.shielded && !e.globalShielded) drawEnemyShield(ctx, e);
+  ctx.restore();
+}
+
+function shouldStylizeEnemyMotion(e) {
+  if (!e || e.boss) return false;
+  if (e.type?.startsWith("slime_")) return false;
+  if (e.behavior === "mech_worm") return false;
+  return typeof e.draw === "function";
+}
+
+function smoothEnemyPose(e) {
+  e.__renderX ??= e.x;
+  e.__renderY ??= e.y;
+  e.__lastRenderTargetX ??= e.x;
+  e.__lastRenderTargetY ??= e.y;
+  const targetDx = e.x - e.__lastRenderTargetX;
+  const targetDy = e.y - e.__lastRenderTargetY;
+  e.__lastRenderTargetX = e.x;
+  e.__lastRenderTargetY = e.y;
+  e.__renderX += (e.x - e.__renderX) * 0.58;
+  e.__renderY += (e.y - e.__renderY) * 0.58;
+  const speedHint = Math.min(1, Math.hypot(targetDx, targetDy) / 5.5);
+  const phase = (e.anim || state.time * 4) * 1.35 + (e.phase || 0);
+  const lean = clamp((e.x - e.__renderX) * 0.012, -0.14, 0.14) + Math.sin(phase * 0.55) * 0.018 * speedHint;
+  const gait = Math.sin(phase);
+  return {
+    x: e.__renderX,
+    y: e.__renderY + Math.abs(gait) * -1.6 * speedHint,
+    lean,
+    squash: 1 + Math.abs(gait) * 0.025 * speedHint,
+    stretch: 1 - Math.abs(gait) * 0.018 * speedHint,
+  };
 }
 
 function drawEliteOutline(ctx, e) {

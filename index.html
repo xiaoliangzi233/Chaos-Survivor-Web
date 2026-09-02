@@ -395,6 +395,20 @@
         </div>
       </section>
 
+      <section id="nicknameOverlay" class="overlay nickname-overlay" aria-hidden="true">
+        <form id="nicknameForm" class="panel nickname-panel ui-shell" autocomplete="off">
+          <p class="eyebrow">PLAYER CALLSIGN</p>
+          <h2>设置玩家昵称</h2>
+          <p class="nickname-copy">当前账号 <strong id="nicknameUsername">SIGNED USER</strong> 首次进入游戏，请设置一个大厅和排行榜显示用的昵称。</p>
+          <label class="nickname-field">
+            <span>昵称</span>
+            <input id="nicknameInput" name="nickname" type="text" minlength="2" maxlength="16" required placeholder="输入 2-16 个字符" />
+          </label>
+          <p id="nicknameError" class="nickname-error" aria-live="polite"></p>
+          <button id="nicknameSubmitButton" type="submit" class="primary">确认昵称</button>
+        </form>
+      </section>
+
       <section id="storyOverlay" class="overlay story-overlay" aria-hidden="true" tabindex="-1">
         <div class="story-stage" role="dialog" aria-modal="true" aria-labelledby="storyTitle" aria-describedby="storyText">
           <div class="story-atmosphere" aria-hidden="true">

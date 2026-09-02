@@ -278,6 +278,7 @@ function itemStatusPriority(itemId) {
 
 function renderChip(element, icon, label, value) {
   if (!element) return;
+  const displayValue = element === ui.goldText ? formatHudNumber(value) : value;
   element.classList.add("hud-chip");
   let iconNode = element.querySelector("i");
   let labelNode = element.querySelector("b");
@@ -290,7 +291,14 @@ function renderChip(element, icon, label, value) {
   }
   if (iconNode.textContent !== String(icon)) iconNode.textContent = icon;
   if (labelNode.textContent !== String(label)) labelNode.textContent = label;
-  if (valueNode.textContent !== String(value)) valueNode.textContent = value;
+  if (valueNode.textContent !== String(displayValue)) valueNode.textContent = displayValue;
+}
+
+function formatHudNumber(value) {
+  const number = Math.max(0, Math.floor(Number(value) || 0));
+  if (number < 10000) return String(number);
+  if (number < 1_000_000) return `${(number / 1000).toFixed(number < 100000 ? 1 : 0)}K`;
+  return `${(number / 1_000_000).toFixed(1)}M`;
 }
 
 function flashHudValue(element, className) {
@@ -388,12 +396,14 @@ export function playLevelGoldRain({ count = 96, duration = 1850 } = {}) {
     coin.className = i % 5 === 0 ? "big" : i % 3 === 0 ? "spark" : "";
     coin.style.setProperty("--x", `${Math.random() * 100}vw`);
     coin.style.setProperty("--drift", `${(Math.random() - 0.5) * 220}px`);
-    coin.style.setProperty("--delay", `${Math.random() * 820}ms`);
-    coin.style.setProperty("--fall", `${860 + Math.random() * 620}ms`);
+    const delay = Math.random() * 820;
+    const fall = 980 + Math.random() * 780;
+    coin.style.setProperty("--delay", `${delay}ms`);
+    coin.style.setProperty("--fall", `${fall}ms`);
     coin.style.setProperty("--spin", `${Math.random() * 720 - 360}deg`);
     coin.textContent = i % 7 === 0 ? "$" : "G";
     layer.appendChild(coin);
-    window.setTimeout(() => coin.remove(), duration + 700);
+    window.setTimeout(() => coin.remove(), delay + fall + 260);
   }
   window.clearTimeout(layer._goldRainTimer);
   layer._goldRainTimer = window.setTimeout(() => {
@@ -401,7 +411,7 @@ export function playLevelGoldRain({ count = 96, duration = 1850 } = {}) {
     window.setTimeout(() => {
       if (!layer.children.length) layer.remove();
     }, 260);
-  }, duration);
+  }, duration + 900);
 }
 
 export function hideChoices() {

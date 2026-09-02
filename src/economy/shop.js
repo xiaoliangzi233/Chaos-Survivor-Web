@@ -233,6 +233,9 @@ function createItemOffer(excludedUniqueItemIds = new Set()) {
   const rarity = offerQualityForItem(template, weightedQuality(ITEM_RARITY_WEIGHTS));
   const rank = QUALITY_ORDER.indexOf(rarity);
   const quality = QUALITY_INFO[rarity] || QUALITY_INFO.common;
+  const wave = Math.max(1, state.wave || 1);
+  const waveScale = 1 + Math.max(0, wave - 1) * 0.09 + Math.floor(wave / 5) * 0.08;
+  const waveSurcharge = wave * (2.5 + Math.max(0, rank) * 1.2);
   return {
     uid: state.shop.nextOfferUid++,
     id: template.id,
@@ -241,7 +244,7 @@ function createItemOffer(excludedUniqueItemIds = new Set()) {
     name: template.singleQuality ? template.name : `${quality.name}${template.name}`,
     rarity,
     category: "道具",
-    price: Math.floor((template.basePrice + state.wave * (1.5 + rank * 0.8)) * (QUALITY_INFO[rarity]?.mult || 1) * premiumQualityPriceMultiplier(rarity)),
+    price: Math.floor((template.basePrice * waveScale + waveSurcharge) * (QUALITY_INFO[rarity]?.mult || 1) * premiumQualityPriceMultiplier(rarity)),
     maxPurchases: 1,
     purchaseCount: 0,
     quantity: 1,

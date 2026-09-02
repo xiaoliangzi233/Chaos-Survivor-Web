@@ -11,6 +11,8 @@ let playerId = "";
 let nickname = "";
 let authToken = "";
 let authenticatedUser = null;
+let backendPlayer = null;
+let needsNickname = false;
 let available = false;
 let lastError = "";
 
@@ -31,6 +33,7 @@ export function backendStatus() {
     playerId,
     nickname,
     authenticated: Boolean(authenticatedUser),
+    needsNickname,
     username: authenticatedUser?.username || nickname,
     lastError,
   };
@@ -50,6 +53,10 @@ export function currentNickname() {
 
 export function currentAuthenticatedUser() {
   return authenticatedUser ? { ...authenticatedUser } : null;
+}
+
+export function currentBackendPlayer() {
+  return backendPlayer ? { ...backendPlayer } : null;
 }
 
 export function isCurrentUserAdmin() {
@@ -77,8 +84,10 @@ export function isCurrentUserAdmin() {
 
 export function setBackendNickname(value) {
   nickname = normalizeNickname(value);
+  if (backendPlayer) backendPlayer.nickname = nickname;
   try {
     globalThis.localStorage?.setItem(NICKNAME_KEY, nickname);
+    globalThis.localStorage?.setItem(scopedNicknameKey(), nickname);
   } catch {
     // Nickname persistence is best effort.
   }
@@ -96,7 +105,7 @@ export async function requireAuthenticatedUser({ redirectTo = "/login" } = {}) {
     authenticatedUser = normalizeAuthUser(user);
     if (!authenticatedUser) throw new Error("invalid_user_info");
     playerId = authenticatedUser.id;
-    setBackendNickname(authenticatedUser.username);
+    nickname = readNickname();
     persistAuthToken(authToken);
     return currentAuthenticatedUser();
   } catch (error) {
@@ -110,9 +119,11 @@ export function isAuthDisabledForLocalTest() {
   try {
     const params = new URLSearchParams(globalThis.location?.search || "");
     const value = String(params.get("auth") || "").trim().toLowerCase();
-    return ["0", "off", "false", "no", "local"].includes(value);
+    if (["1", "on", "true", "yes", "login"].includes(value)) return false;
+    if (["0", "off", "false", "no", "local"].includes(value)) return true;
+    return backendConfig.requireLogin === false;
   } catch {
-    return false;
+    return backendConfig.requireLogin === false;
   }
 }
 
@@ -121,14 +132,52 @@ export async function bootstrapBackendPlayer() {
   try {
     const result = await requestJson("/api/players/bootstrap", {
       method: "POST",
-      body: JSON.stringify({ playerId: currentPlayerId(), nickname: currentNickname() }),
+      body: JSON.stringify(playerBootstrapPayload()),
     });
     available = true;
     lastError = "";
-    return result.player || result;
+    const player = normalizeBackendPlayer(result?.player || result);
+    backendPlayer = player;
+    needsNickname = Boolean(result?.needsNickname || player?.needsNickname || !player?.nickname);
+    if (player?.id) playerId = player.userId || player.id;
+    if (player?.nickname) {
+      setBackendNickname(player.nickname);
+      needsNickname = false;
+    }
+    return { ...(player || {}), needsNickname };
   } catch (error) {
     markFailure(error);
     return null;
+  }
+}
+
+export async function submitBackendNickname(value) {
+  if (!apiBaseUrl) return null;
+  const nextNickname = normalizeNickname(value);
+  try {
+    const result = await requestJson("/api/players/nickname", {
+      method: "POST",
+      body: JSON.stringify({
+        ...playerBootstrapPayload(),
+        nickname: nextNickname,
+      }),
+    });
+    available = true;
+    lastError = "";
+    const player = normalizeBackendPlayer(result?.player || result) || {
+      id: currentPlayerId(),
+      userId: authenticatedUser?.id || currentPlayerId(),
+      username: authenticatedUser?.username || "",
+      nickname: nextNickname,
+    };
+    backendPlayer = player;
+    if (player.id) playerId = player.userId || player.id;
+    setBackendNickname(player.nickname || nextNickname);
+    needsNickname = false;
+    return { ...backendPlayer, needsNickname: false };
+  } catch (error) {
+    markFailure(error);
+    throw error;
   }
 }
 
@@ -215,13 +264,39 @@ function ensurePlayerId() {
   }
 }
 
+function playerBootstrapPayload() {
+  const storedNickname = readStoredNickname();
+  return {
+    playerId: currentPlayerId(),
+    userId: authenticatedUser?.id || currentPlayerId(),
+    username: authenticatedUser?.username || "",
+    employeeId: authenticatedUser?.employeeId || "",
+    nickname: storedNickname || "",
+  };
+}
+
 function readNickname() {
+  const storedNickname = readStoredNickname();
+  if (storedNickname) return storedNickname;
   if (authenticatedUser?.username) return authenticatedUser.username;
+  return normalizeNickname(backendConfig.defaultNickname);
+}
+
+function readStoredNickname() {
   try {
-    return normalizeNickname(globalThis.localStorage?.getItem(NICKNAME_KEY) || backendConfig.defaultNickname);
+    const text = String(
+      globalThis.localStorage?.getItem(scopedNicknameKey())
+      || (!authenticatedUser ? globalThis.localStorage?.getItem(NICKNAME_KEY) : "")
+      || "",
+    ).trim();
+    return text ? normalizeNickname(text) : "";
   } catch {
-    return normalizeNickname(backendConfig.defaultNickname);
+    return "";
   }
+}
+
+function scopedNicknameKey() {
+  return authenticatedUser?.id ? `${NICKNAME_KEY}:${authenticatedUser.id}` : NICKNAME_KEY;
 }
 
 function readAuthToken() {
@@ -289,6 +364,23 @@ function normalizeAuthUser(value) {
   const userType = String(value?.userType || "").trim().slice(0, 64);
   const isAdmin = value?.isAdmin === true || value?.admin === true || value?.administrator === true;
   return id && username ? { id, username, employeeId, role, roleCode, userType, roles, permissions, isAdmin } : null;
+}
+
+function normalizeBackendPlayer(value) {
+  if (!value || typeof value !== "object") return null;
+  const id = String(value.id || value.playerId || value.userId || authenticatedUser?.id || "").trim().slice(0, 96);
+  const userId = String(value.userId || authenticatedUser?.id || id).trim().slice(0, 96);
+  const username = String(value.username || authenticatedUser?.username || "").trim().slice(0, 64);
+  const employeeId = String(value.employeeId || authenticatedUser?.employeeId || "").trim().slice(0, 64);
+  const rawNickname = String(value.nickname || value.displayName || "").trim();
+  return id ? {
+    id,
+    userId,
+    username,
+    employeeId,
+    nickname: rawNickname ? normalizeNickname(rawNickname) : "",
+    needsNickname: Boolean(value.needsNickname),
+  } : null;
 }
 
 function normalizeStringList(value) {

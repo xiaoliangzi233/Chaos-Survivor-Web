@@ -28,10 +28,11 @@ export async function requirePlayerLogin() {
   return requireAuthenticatedUser({ redirectTo: "/login" });
 }
 
-export async function loadPlayerProgress({ difficultyIds: nextDifficultyIds = [] } = {}) {
+export async function loadPlayerProgress({ difficultyIds: nextDifficultyIds = [], backendPlayer = undefined } = {}) {
   difficultyIds = uniqueStrings(nextDifficultyIds);
   let cached = normalizeProgress(readCachedProgress());
-  if (await bootstrapBackendPlayer()) {
+  const player = backendPlayer === undefined ? await bootstrapBackendPlayer() : backendPlayer;
+  if (player && !player.needsNickname) {
     const remote = await fetchBackendProgress();
     if (remote) cached = mergeProgress(cached, remote);
   }

@@ -5,7 +5,7 @@ import { burst, particle, pulse, trail } from "../effects.js";
 import { playSfx } from "../audio.js";
 import { QUALITY_INFO, QUALITY_ORDER, recomputeAllWeapons } from "../economy/inventory.js";
 import { recordCodexEntry } from "./codex.js";
-import { ITEM_DATA_DEFS, onEditableDataChanged } from "../config/editableGameData.js";
+import { ITEM_DATA_DEFS, REMOVED_ITEM_IDS, onEditableDataChanged } from "../config/editableGameData.js";
 import { playerStatusModifiers, restorePlayerHealth } from "./statusEffects.js";
 
 const QUALITY_VALUES = {
@@ -53,7 +53,9 @@ onEditableDataChanged(syncItemDefs);
 
 function syncItemDefs() {
   ITEM_DEFS.length = 0;
-  ITEM_DEFS.push(...ITEM_DATA_DEFS.map((item) => ({ ...item, apply: ITEM_EFFECTS[item.id] })));
+  ITEM_DEFS.push(...ITEM_DATA_DEFS
+    .filter((item) => !REMOVED_ITEM_IDS.has(item.id))
+    .map((item) => ({ ...item, apply: ITEM_EFFECTS[item.id] })));
 }
 
 export function applyItemPurchase(offer) {

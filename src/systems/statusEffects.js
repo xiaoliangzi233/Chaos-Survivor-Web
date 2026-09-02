@@ -50,6 +50,7 @@ export function applyPlayerStatus(
 ) {
   const def = PLAYER_STATUS_DEFS[id];
   if (!player || !def) return false;
+  if (isOrdinaryEnemyStatusSource(source)) return false;
   const effects = ensurePlayerStatusEffects(player);
   const existing = effects[id];
   const current = existing || { id, timer: 0, duration: 0, stacks: 0, source: null };
@@ -64,6 +65,10 @@ export function applyPlayerStatus(
   player.statusFlash = Math.max(player.statusFlash || 0, 0.28);
   player.statusFlashColor = def.color;
   return true;
+}
+
+function isOrdinaryEnemyStatusSource(source) {
+  return Boolean(source?.type && !source.boss);
 }
 
 export function updatePlayerStatusEffects(dt, player = state.player) {

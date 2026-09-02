@@ -2,5 +2,6 @@
 // this value when running with a real backend service.
 export const backendConfig = {
   apiBaseUrl: "",
+  requireLogin: false,
   defaultNickname: "Anonymous",
 };

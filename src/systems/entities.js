@@ -442,22 +442,23 @@ function updateEnemyProjectiles(dt) {
 function applyEnemyProjectileDamage(projectile, player) {
   const result = applyPlayerDamage(projectile.damage, projectile, player);
   player.invuln = 0.5;
-  if (result.damaged && projectile.burnDuration > 0) {
+  const allowStatus = allowsEnemyStatusEffects(projectile);
+  if (allowStatus && result.damaged && projectile.burnDuration > 0) {
     player.burnTimer = Math.max(player.burnTimer || 0, projectile.burnDuration);
     player.burnDps = Math.max(player.burnDps || 0, projectile.burnDps || 0);
   }
-  if (result.damaged && projectile.poisonDuration > 0) {
+  if (allowStatus && result.damaged && projectile.poisonDuration > 0) {
     player.burnTimer = Math.max(player.burnTimer || 0, projectile.poisonDuration);
     player.burnDps = Math.max(player.burnDps || 0, projectile.poisonDps || 0);
   }
-  if (result.damaged && projectile.frostDuration > 0) {
+  if (allowStatus && result.damaged && projectile.frostDuration > 0) {
     if (projectile.frostMarks) applyFrostMark(player, { duration: projectile.frostDuration, slow: projectile.frostSlow || 0.18, freezeDuration: projectile.freezeDuration || 5 });
     else {
       player.frostTimer = Math.max(player.frostTimer || 0, projectile.frostDuration);
       player.frostSlow = Math.max(player.frostSlow || 0, projectile.frostSlow || 0.18);
     }
   }
-  if (result.damaged && projectile.statusId) {
+  if (allowStatus && result.damaged && projectile.statusId) {
     applyPlayerStatus(player, projectile.statusId, {
       duration: projectile.statusDuration,
       stacks: projectile.statusStacks || 1,
@@ -467,6 +468,14 @@ function applyEnemyProjectileDamage(projectile, player) {
   burst(player.x, player.y, 8, projectile.color, 100);
   playSfx("hurt");
   return result;
+}
+
+function allowsEnemyStatusEffects(source) {
+  if (!source) return true;
+  if (source.bossProjectile || source.owner?.boss || source.bossHazard || source.stormTyrantOwner || source.polarOwner) return true;
+  if (source.owner?.type && !source.owner.boss) return false;
+  if (source.minionOwner?.type && !source.minionOwner.boss) return false;
+  return !source.sourceType || Boolean(source.bossProjectile);
 }
 
 function isEnemyProjectileOutsideMap(b) {
@@ -643,18 +652,19 @@ function hazardHitsPlayer(h, p, { darkEntityHazard, riftbladeBladeCorridor, scie
 }
 
 function applyHazardStatusEffects(h, p, result) {
-  if (result.damaged && h.frostDuration > 0) {
+  const allowStatus = allowsEnemyStatusEffects(h);
+  if (allowStatus && result.damaged && h.frostDuration > 0) {
     if (h.frostMarks) applyFrostMark(p, { duration: h.frostDuration, slow: h.frostSlow || 0.18, freezeDuration: h.freezeDuration || 5 });
     else {
       p.frostTimer = Math.max(p.frostTimer || 0, h.frostDuration);
       p.frostSlow = Math.max(p.frostSlow || 0, h.frostSlow || 0.18);
     }
   }
-  if ((result.damaged || h.kind === "toxic_residue") && h.poisonDuration > 0) {
+  if (allowStatus && (result.damaged || h.kind === "toxic_residue") && h.poisonDuration > 0) {
     p.burnTimer = Math.max(p.burnTimer || 0, h.poisonDuration);
     p.burnDps = Math.max(p.burnDps || 0, h.poisonDps || 0);
   }
-  if (result.damaged && h.statusId) {
+  if (allowStatus && result.damaged && h.statusId) {
     applyPlayerStatus(p, h.statusId, {
       duration: h.statusDuration,
       stacks: h.statusStacks || 1,

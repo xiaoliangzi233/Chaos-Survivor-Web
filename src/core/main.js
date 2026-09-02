@@ -96,7 +96,13 @@ import {
   initAdventureStatsUi,
   openAdventureStats,
 } from "../ui/adventureStatsUi.js";
-import { currentPlayerId, isCurrentUserAdmin } from "../services/backendProgressService.js";
+import { initNicknameUi, requestPlayerNickname } from "../ui/nicknameUi.js";
+import {
+  bootstrapBackendPlayer,
+  currentPlayerId,
+  isCurrentUserAdmin,
+  submitBackendNickname,
+} from "../services/backendProgressService.js";
 
 const LEVEL_CHOICE_REFRESH_COST = 10;
 
@@ -121,6 +127,7 @@ export async function bootGame() {
   initShopUi({ continueToNextWave: finishWaveTransition });
   initStoryUi();
   initWaveEventUi();
+  initNicknameUi();
   initHelpUi({
     onBeforeOpen: () => {
       closeCodex();
@@ -151,6 +158,16 @@ export async function bootGame() {
   setBootProgress(40, "正在验证登录身份");
   const authenticatedUser = await requirePlayerLogin();
   if (!authenticatedUser) return;
+  setBootProgress(42, "正在初始化玩家档案");
+  let backendPlayer = await bootstrapBackendPlayer();
+  if (backendPlayer?.needsNickname) {
+    setBootProgress(42, "请设置玩家昵称");
+    backendPlayer = await requestPlayerNickname({
+      username: authenticatedUser.username,
+      submitNickname: submitBackendNickname,
+    });
+    if (!backendPlayer) return;
+  }
   setBootProgress(42, "本地进度已就绪");
   setBootProgress(54, "正在加载武器与道具");
   await editableDataPromise;
@@ -159,7 +176,7 @@ export async function bootGame() {
   setBootProgress(66, "正在校准难度曲线");
   await difficultyConfigPromise;
   setBootProgress(72, "正在同步玩家进度");
-  await loadPlayerProgress({ difficultyIds: difficultyOrder });
+  await loadPlayerProgress({ difficultyIds: difficultyOrder, backendPlayer });
   loadDifficultyProgress();
   configureLobbyDifficulties(difficultyCards());
   setBootProgress(78, "正在生成敌人档案");
@@ -348,9 +365,10 @@ export async function bootGame() {
 
   function playLevelGoldRainWithSound(options = {}) {
     playLevelGoldRain(options);
-    const chimes = Math.max(3, Math.min(10, Math.floor(options.chimes || 6)));
+    playSfx("coin");
+    const chimes = Math.max(6, Math.min(16, Math.floor(options.chimes || 12)));
     for (let i = 0; i < chimes; i++) {
-      window.setTimeout(() => playSfx("coin"), i * 95 + Math.random() * 55);
+      window.setTimeout(() => playSfx("coin"), i * 70 + Math.random() * 45);
     }
   }
 
@@ -442,7 +460,7 @@ export async function bootGame() {
     if (isInventoryOpen()) closeInventory();
     if (state.mode !== "playing") return;
     state.mode = "paused";
-    ui.pauseButton.textContent = "▶";
+    ui.pauseButton.textContent = "鈻?;
     pauseMusic();
     showPauseMenu();
   }
@@ -640,30 +658,30 @@ export async function bootGame() {
     const messages = {
       home: {
         role: "ACCESS DENIED // HABITAT LINK",
-        title: "家园通道封锁",
-        speaker: "通道管理员 · 赫塔",
-        text: "家园区的空间坐标仍在漂移。等稳定锚点修复后，我会重新开放这条通道；现在强行接入只会把你送进墙里。",
+        title: "居住区尚未开放",
+        speaker: "通道管理员 - 赫塔",
+        text: "这条舱段还在恢复供能。等基地稳定后，居住区会开放更多互动内容。",
         color: "#77ff8a",
       },
       gene: {
         role: "GENE FORGE // CALIBRATION",
-        title: "基因改造器",
-        speaker: "生物工程师 · 赛恩",
-        text: "培养舱已经完成净化，强化序列却还缺最后一组校准样本。局外强化功能暂未开放，别碰那根绿色导管。",
+        title: "基因熔炉校准中",
+        speaker: "基因工程师 - 罗岚",
+        text: "样本库正在重建索引。暂时不要触碰培养槽，除非你想被登记成实验素材。",
         color: "#77ff8a",
       },
       rift: {
         role: "RIFT ANCHOR // STANDBY",
-        title: "裂隙稳定器",
-        speaker: "维护工程师 · 洛克",
-        text: "这是给未来远征准备的裂隙锚。外环、相位锁和冷却泵都在待机，本阶段不会产生任何额外功能或战斗加成。",
+        title: "裂隙锚点待机",
+        speaker: "裂隙技师 - 阿衡",
+        text: "锚点信号还不稳定。等校准完成后，这里会接入更危险也更有价值的任务。",
         color: "#b48cff",
       },
       "ship-status": {
         role: "TRANSIT ARK // NOMINAL",
-        title: "霓虹中转舰状态",
-        speaker: "星舰任务核心",
-        text: "导航、动力、生命维持、医疗、门禁与通讯系统均在运行。家园坐标和远征裂隙锚仍处于校准状态，不会影响当前出击。",
+        title: "方舟航行状态正常",
+        speaker: "舰桥广播",
+        text: "外层护盾维持在安全阈值，资源回收队正在返航。继续完成作战任务，可逐步解锁更多舱段。",
         color: "#42e8ff",
       },
     };
@@ -779,7 +797,13 @@ export async function bootGame() {
     requestAnimationFrame(loop);
   }
 
-  window.addEventListener("resize", () => renderBackend.resize());
+  const resizeGame = () => renderBackend.resize();
+  window.addEventListener("resize", resizeGame);
+  window.visualViewport?.addEventListener("resize", resizeGame);
+  const rootResizeObserver = typeof ResizeObserver === "function"
+    ? new ResizeObserver(resizeGame)
+    : null;
+  if (rootResizeObserver && ui.canvas.parentElement) rootResizeObserver.observe(ui.canvas.parentElement);
   bindInput({
     start,
     restart: restartRun,

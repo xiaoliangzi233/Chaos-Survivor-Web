@@ -14,6 +14,54 @@ export const ITEM_RARITY_WEIGHTS = [
   ["legendary", 1.5],
 ];
 
+export const REMOVED_ITEM_IDS = new Set([
+  "kinetic_capacitor",
+  "afterimage_relay",
+  "hunter_protocol",
+  "target_relay",
+  "near_miss_coil",
+  "thermal_reactor",
+  "cryo_prism",
+  "corrosion_flask",
+  "plague_beacon",
+  "resonance_engine",
+  "gravity_anchor",
+  "holo_decoy",
+  "sentry_array",
+  "reclaimer_drone",
+  "phase_barricade",
+  "mirror_array",
+  "absorption_lattice",
+  "static_barrier",
+  "crisis_echo",
+  "reprisal_protocol",
+  "bounty_scanner",
+  "debt_terminal",
+  "reserve_vault",
+  "scrap_recycler",
+  "gambler_core",
+  "challenge_beacon",
+  "crisis_insurance",
+  "revival_bloom",
+  "emergency_transfer",
+  "final_protocol",
+  "ballistic_loom",
+  "echo_magazine",
+  "orbit_deflector",
+  "tractor_warhead",
+  "rift_prism",
+  "polarity_inverter",
+  "xp_yeast",
+  "gold_alchemy",
+  "supply_signal",
+  "soul_vessel",
+  "pulse_drive",
+  "stasis_field",
+  "warp_gate",
+  "medic_swarm",
+  "overload_core",
+]);
+
 export const WEAPON_BASE_STATS = {
   arc: { level: 0, timer: 0, cooldown: 0.58, damage: 65, range: 720, chainRange: 205, chains: 3, falloff: 0.78, quality: "common", qualityMult: 1 },
   ice: { level: 0, timer: 0.8, cooldown: 0.84, count: 1, damage: 53, range: 980, speed: 500, turnSpeed: 5.8, freezeDuration: 0.45, quality: "common", qualityMult: 1 },
@@ -153,6 +201,7 @@ function mergeMap(target, patch = {}) {
 function mergeArrayById(target, patch) {
   for (const value of patch) {
     if (!value?.id) continue;
+    if (REMOVED_ITEM_IDS.has(value.id)) continue;
     const index = target.findIndex((entry) => entry.id === value.id);
     if (index >= 0) target[index] = { ...target[index], ...value };
     else target.push({ ...value });

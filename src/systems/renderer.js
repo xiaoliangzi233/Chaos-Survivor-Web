@@ -110,9 +110,10 @@ function qualityColor(quality, fallback) {
 }
 
 export function resizeCanvas(canvas, ctx) {
+  const container = canvas.parentElement || document.documentElement;
   viewport.dpr = Math.min(window.devicePixelRatio || 1, 2);
-  viewport.width = Math.max(320, Math.floor(window.innerWidth));
-  viewport.height = Math.max(420, Math.floor(window.innerHeight));
+  viewport.width = Math.max(320, Math.floor(container.clientWidth || window.innerWidth));
+  viewport.height = Math.max(420, Math.floor(container.clientHeight || window.innerHeight));
   canvas.width = Math.floor(viewport.width * viewport.dpr);
   canvas.height = Math.floor(viewport.height * viewport.dpr);
   canvas.style.width = `${viewport.width}px`;

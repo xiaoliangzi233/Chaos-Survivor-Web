@@ -79,7 +79,6 @@ import {
   selectedLobbyWeapon,
   setLobbyHoveredInteraction,
   setLobbyModalOpen,
-  setLobbyPlayerMoveTarget,
   startLobbyTutorial,
   updateLobby,
 } from "../systems/lobby.js";
@@ -723,8 +722,7 @@ export async function bootGame() {
     if (!activate) return Boolean(target);
     if (!target) {
       ui.canvas.classList.remove("lobby-target-hover");
-      cancelLobbyTutorialAutoMove();
-      return setLobbyPlayerMoveTarget(worldPoint.x, worldPoint.y);
+      return false;
     }
     cancelLobbyTutorialAutoMove();
     cancelLobbyPlayerMove();

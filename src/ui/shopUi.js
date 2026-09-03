@@ -13,6 +13,7 @@ import {
   weaponSellPrice,
 } from "../economy/shop.js";
 import { itemIconHtml } from "./itemIcon.js";
+import { weaponIconHtml } from "./weaponIcon.js";
 
 const dom = {};
 let continueHandler = null;
@@ -144,7 +145,7 @@ function renderOffer(offer) {
     renderShop(result.ok ? (fuseTarget ? text.fuseSuccess : text.bought) : result.reason);
   });
 
-  const icon = isWeapon ? `<i>${offer.icon}</i>` : itemIconHtml(offer.itemId || offer.id, offer.icon);
+  const icon = isWeapon ? weaponIconHtml(offer.weaponId || offer.id, offer.icon) : itemIconHtml(offer.itemId || offer.id, offer.icon);
   card.innerHTML = `
     <div class="shop-card-top">
       ${icon}
@@ -201,7 +202,7 @@ function renderShopWeaponSlots(container, weaponSlots) {
     const info = WEAPON_INFO[slot.id] || { icon: "?", name: slot.id || text.unknownWeapon };
     const quality = QUALITY_INFO[slot.quality] || QUALITY_INFO.common;
     row.innerHTML = `
-      <i style="color:${quality.color}">${info.icon}</i>
+      ${weaponIconHtml(slot.id, info.icon)}
       <span><strong>${info.name}</strong><small style="color:${quality.color}">${quality.name}</small></span>`;
     const actions = document.createElement("div");
     actions.className = "shop-slot-actions";

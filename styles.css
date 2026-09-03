@@ -297,17 +297,34 @@ canvas {
   text-shadow: 0 0 10px rgba(180, 140, 255, 0.7);
 }
 
-.item-sprite-icon {
+.item-sprite-icon,
+.weapon-sprite-icon,
+.upgrade-sprite-icon {
   display: inline-grid;
   place-items: center;
   overflow: hidden;
-  background-image: url("./assets/visual/item-atlas-v1.png") !important;
   background-repeat: no-repeat !important;
-  background-size: 700% 300% !important;
-  background-position: var(--item-atlas-pos-x, 0%) var(--item-atlas-pos-y, 0%) !important;
   image-rendering: pixelated;
   color: transparent !important;
   text-shadow: none !important;
+}
+
+.item-sprite-icon {
+  background-image: url("./assets/visual/item-atlas-v1.png") !important;
+  background-size: 700% 300% !important;
+  background-position: var(--item-atlas-pos-x, 0%) var(--item-atlas-pos-y, 0%) !important;
+}
+
+.weapon-sprite-icon {
+  background-image: url("./assets/ui/weapon-atlas-v1.png") !important;
+  background-size: 400% 300% !important;
+  background-position: var(--weapon-atlas-pos-x, 0%) var(--weapon-atlas-pos-y, 0%) !important;
+}
+
+.upgrade-sprite-icon {
+  background-image: url("./assets/ui/upgrade-atlas-v1.png") !important;
+  background-size: 400% 300% !important;
+  background-position: var(--upgrade-atlas-pos-x, 0%) var(--upgrade-atlas-pos-y, 0%) !important;
 }
 
 .quick-item-icon {
@@ -700,6 +717,11 @@ canvas {
   animation: upgradeIconPop 520ms cubic-bezier(0.18, 1.2, 0.22, 1) both;
 }
 
+.upgrade-pick-fx .upgrade-sprite-icon {
+  width: 72px;
+  height: 72px;
+}
+
 .upgrade-pick-fx strong {
   position: absolute;
   top: calc(50% + 72px);
@@ -708,7 +730,7 @@ canvas {
   text-shadow: 0 0 18px rgba(66, 232, 255, 0.42);
 }
 
-.upgrade-pick-fx i {
+.upgrade-pick-fx > i {
   position: absolute;
   width: 54vmin;
   height: 1px;
@@ -717,10 +739,10 @@ canvas {
   animation: upgradeLine 680ms ease-out both;
 }
 
-.upgrade-pick-fx i:nth-of-type(1) { --n: 1; }
-.upgrade-pick-fx i:nth-of-type(2) { --n: 2; }
-.upgrade-pick-fx i:nth-of-type(3) { --n: 3; }
-.upgrade-pick-fx i:nth-of-type(4) { --n: 4; }
+.upgrade-pick-fx > i:nth-of-type(1) { --n: 1; }
+.upgrade-pick-fx > i:nth-of-type(2) { --n: 2; }
+.upgrade-pick-fx > i:nth-of-type(3) { --n: 3; }
+.upgrade-pick-fx > i:nth-of-type(4) { --n: 4; }
 
 @keyframes upgradePickFade {
   0% { opacity: 0; }
@@ -1673,8 +1695,11 @@ body.codex-open .menu-actions {
 }
 
 .codex-card .item-sprite-icon,
+.codex-card .weapon-sprite-icon,
 .codex-detail-title .item-sprite-icon,
+.codex-detail-title .weapon-sprite-icon,
 .shop-card-top .item-sprite-icon,
+.shop-card-top .weapon-sprite-icon,
 .item-status-chip .item-sprite-icon {
   color: transparent;
   font-size: 0;
@@ -2112,10 +2137,9 @@ h2 {
 }
 
 .level-choice-card .upgrade-icon i {
-  width: auto;
-  height: auto;
+  width: 42px;
+  height: 42px;
   margin: 0;
-  background: transparent;
   color: inherit;
   font-size: 24px;
 }
@@ -2762,7 +2786,8 @@ h2 {
   font-size: 20px;
 }
 
-.shop-card-top .item-sprite-icon {
+.shop-card-top .item-sprite-icon,
+.shop-card-top .weapon-sprite-icon {
   background-color: rgba(2, 9, 19, 0.82);
 }
 
@@ -3232,7 +3257,9 @@ h2 {
 }
 
 .weapon-detail-title .item-sprite-icon,
-.weapon-detail-icon.item-sprite-icon {
+.weapon-detail-title .weapon-sprite-icon,
+.weapon-detail-icon.item-sprite-icon,
+.weapon-detail-icon.weapon-sprite-icon {
   width: 52px;
   height: 52px;
   flex: 0 0 52px;
@@ -6165,6 +6192,11 @@ body.is-lobby .menu-actions {
   font-style: normal;
 }
 
+.weapon-slot .weapon-sprite-icon,
+.fuse-mini .weapon-sprite-icon {
+  background-color: rgba(3, 8, 16, 0.7);
+}
+
 .curse-panel {
   width: min(1040px, calc(100vw - 28px));
   border-color: rgba(180, 140, 255, 0.38);
@@ -6257,28 +6289,12 @@ body.is-lobby .menu-actions {
   100% { transform: translateY(54px); opacity: 0; }
 }
 
-/* Game-native neon cursors */
-:root {
-  --game-cursor-default: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='30' height='30' viewBox='0 0 30 30'%3E%3Cpath d='M3 3h8v3H7v4H3zm16 0h8v8h-4V7h-4zM3 19h4v4h4v4H3zm20 4v-4h4v8h-8v-4z' fill='%2342e8ff'/%3E%3Cpath d='M14 8h2v6h6v2h-6v6h-2v-6H8v-2h6z' fill='%23dffcff'/%3E%3C/svg%3E") 15 15, auto;
-  --game-cursor-action: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='32' viewBox='0 0 32 32'%3E%3Cpath d='M4 2l21 14-9 2 5 9-5 3-5-9-7 7z' fill='%2307141d' stroke='%2342e8ff' stroke-width='2'/%3E%3Cpath d='M8 7l11 8-6 1-3 6z' fill='%23ffd166'/%3E%3C/svg%3E") 5 3, pointer;
-}
-
-html,
-body,
-canvas,
-.overlay,
-input,
-select {
-  cursor: var(--game-cursor-default);
-}
-
 button,
 a,
 label,
 select,
-option,
-#gameCanvas.lobby-target-hover {
-  cursor: var(--game-cursor-action);
+option {
+  cursor: pointer;
 }
 
 body:not(.is-menu):not(.is-lobby):not(.story-open) #gameCanvas {

@@ -17,6 +17,7 @@ import {
 } from "../economy/shop.js";
 import { ITEM_DEFS, equipActiveItem } from "../systems/items.js";
 import { itemIconHtml } from "./itemIcon.js";
+import { weaponIconHtml } from "./weaponIcon.js";
 
 let initialized = false;
 let previousMode = "playing";
@@ -228,7 +229,7 @@ function renderSlots() {
       const isMaterial = fuseMaterialUid === slot.uid;
       const canUseAsMaterial = selected && canFuseWeapons(selected, slot).ok;
       button.className = `weapon-slot${isActive ? " active" : ""}${isMaterial ? " material" : ""}${canUseAsMaterial ? " fuseable" : ""}`;
-      button.innerHTML = `<i style="color:${quality.color}">${info.icon}</i><span><strong>${info.name}</strong><small style="color:${quality.color}">${quality.name}</small></span>`;
+      button.innerHTML = `${weaponIconHtml(slot.id, info.icon)}<span><strong>${info.name}</strong><small style="color:${quality.color}">${quality.name}</small></span>`;
       button.addEventListener("click", () => {
         const current = selectedWeaponSlot();
         if (current && canFuseWeapons(current, slot).ok) {
@@ -277,7 +278,7 @@ function renderWeaponDetail() {
   dom.detail.innerHTML = `
     <div class="weapon-detail-card">
       <div class="weapon-detail-title">
-        <i class="weapon-detail-icon" style="color:${quality.color}">${info.icon}</i>
+        ${weaponIconHtml(slot.id, info.icon, "weapon-detail-icon")}
         <div>
           <strong>${info.name}</strong>
           <div class="quality-chip" style="color:${quality.color}">${quality.name}</div>
@@ -409,7 +410,7 @@ function renderFuseMini(slot, label) {
   return `
     <div class="fuse-mini">
       <span>${label}</span>
-      <i style="color:${quality.color}">${info.icon}</i>
+      ${weaponIconHtml(slot.id, info.icon)}
       <strong>${info.name}</strong>
       <small style="color:${quality.color}">${quality.name}</small>
     </div>`;

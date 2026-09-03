@@ -3,9 +3,9 @@ import { EVENT_CODEX_ENTRIES } from "../config/event-codex-config.js";
 import { createDecorativeEnemy, enemyConfig } from "../systems/enemyRegistry.js";
 import { getCodexEntries } from "../systems/codex.js";
 import { ITEM_DEFS, itemDescription } from "../systems/items.js";
-import { drawWeaponPreview } from "./weaponPreview.js";
 import { MINION_MECHANIC_TIPS } from "../systems/minionMechanics.js";
 import { drawItemAtlasIcon, itemIconHtml } from "./itemIcon.js";
+import { drawWeaponAtlasIcon, weaponIconHtml } from "./weaponIcon.js";
 
 const CATEGORIES = [
   { id: "enemies", label: "敌人", eyebrow: "遭遇记录" },
@@ -244,7 +244,7 @@ function renderList(entries) {
     button.type = "button";
     button.className = `codex-card${entry.id === selectedId ? " active" : ""}`;
     button.style.setProperty("--codex-color", entry.color);
-    const icon = entry.type === "items" ? itemIconHtml(entry.itemId || entry.id, entry.icon) : `<i>${entry.icon}</i>`;
+    const icon = codexIconHtml(entry);
     button.innerHTML = `
       ${icon}
       <span>
@@ -299,7 +299,7 @@ function renderDetail(entry) {
   canvas.className = "codex-preview";
   const title = document.createElement("div");
   title.className = "codex-detail-title";
-  const icon = entry.type === "items" ? itemIconHtml(entry.itemId || entry.id, entry.icon) : `<i>${entry.icon}</i>`;
+  const icon = codexIconHtml(entry);
   title.innerHTML = `${icon}<span><em>${entry.tag}</em><strong>${entry.name}</strong></span>`;
   const desc = document.createElement("p");
   desc.textContent = entry.desc;
@@ -314,6 +314,12 @@ function renderDetail(entry) {
   startPreview(canvas, entry);
 }
 
+function codexIconHtml(entry) {
+  if (entry.type === "items") return itemIconHtml(entry.itemId || entry.id, entry.icon);
+  if (entry.type === "weapons") return weaponIconHtml(entry.id, entry.icon);
+  return `<i>${entry.icon}</i>`;
+}
+
 function startPreview(canvas, entry) {
   let raf = 0;
   let enemy = null;
@@ -321,7 +327,7 @@ function startPreview(canvas, entry) {
   const ctx = canvas.getContext("2d");
   const frame = (now) => {
     const t = now / 1000;
-    if (entry.type === "weapons") drawWeaponPreview(ctx, canvas, { id: entry.id, quality: "rare" }, t);
+    if (entry.type === "weapons") drawWeaponAtlasPreview(ctx, canvas, entry, t);
     else if (entry.type === "enemies") drawEnemyPreview(ctx, canvas, enemy, entry, t);
     else if (entry.type === "events") drawEventPreview(ctx, canvas, entry, t);
     else drawItemPreview(ctx, canvas, entry, t);
@@ -386,6 +392,37 @@ function drawItemPreview(ctx, canvas, entry, t) {
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
   ctx.fillText(entry.icon || "?", 0, 0);
+  ctx.restore();
+}
+
+function drawWeaponAtlasPreview(ctx, canvas, entry, t) {
+  const { w, h } = setupPreviewCanvas(ctx, canvas);
+  drawPreviewGrid(ctx, w, h, t, entry.color);
+  const cx = w / 2;
+  const cy = h / 2;
+  const pulse = 1 + Math.sin(t * 3.2) * 0.05;
+  const glow = ctx.createRadialGradient(cx, cy, 5, cx, cy, Math.min(w, h) * 0.46);
+  glow.addColorStop(0, hexToRgba(entry.color, 0.42));
+  glow.addColorStop(0.44, hexToRgba(entry.color, 0.13));
+  glow.addColorStop(1, "rgba(0,0,0,0)");
+  ctx.fillStyle = glow;
+  ctx.fillRect(0, 0, w, h);
+
+  ctx.save();
+  ctx.translate(cx, cy + Math.sin(t * 2.1) * 7);
+  ctx.rotate(Math.sin(t * 1.6) * 0.06);
+  ctx.scale(pulse, pulse);
+  if (drawWeaponAtlasIcon(ctx, entry.id, 0, 0, 132)) {
+    ctx.restore();
+    return;
+  }
+  ctx.shadowColor = entry.color;
+  ctx.shadowBlur = 24;
+  ctx.fillStyle = "#f8fbff";
+  ctx.font = "700 66px 'Zpix', 'Courier New', monospace";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText(entry.icon || "W", 0, 0);
   ctx.restore();
 }
 

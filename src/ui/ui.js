@@ -12,6 +12,8 @@ import {
 } from "../economy/inventory.js";
 import { activePlayerStatusEffects } from "../systems/statusEffects.js";
 import { createItemIconElement, itemIconHtml } from "./itemIcon.js";
+import { upgradeIconHtml } from "./upgradeIcon.js";
+import { weaponIconHtml } from "./weaponIcon.js";
 
 const hudLast = {
   hp: null,
@@ -345,7 +347,7 @@ export function showChoices({ eyebrow, title, items, onPick, refresh = null, con
     button.className = isLevelUp ? "choice-card level-choice-card" : "choice-card";
     button.innerHTML = isLevelUp
       ? `
-        <div class="upgrade-icon"><i>${item.icon}</i></div>
+        <div class="upgrade-icon">${upgradeIconHtml(item, item.icon)}</div>
         <div class="upgrade-copy">
           <span>${item.stat || "强化"}</span>
           <strong>${item.name}</strong>
@@ -569,7 +571,7 @@ function renderWeaponSlots() {
       const info = WEAPON_INFO[slot.id];
       const quality = QUALITY_INFO[slot.quality];
       button.className = `weapon-slot${state.inventory.selectedWeaponUid === slot.uid ? " active" : ""}`;
-      button.innerHTML = `<i style="color:${quality.color}">${info.icon}</i><strong>${info.name}</strong><small style="color:${quality.color}">${quality.name}</small>`;
+      button.innerHTML = `${weaponIconHtml(slot.id, info.icon)}<strong>${info.name}</strong><small style="color:${quality.color}">${quality.name}</small>`;
       button.addEventListener("click", () => {
         selectWeaponSlot(slot.uid);
         renderInventory();
@@ -593,7 +595,7 @@ function renderWeaponDetail() {
   ui.weaponDetail.innerHTML = `
     <div class="weapon-detail-card">
       <div class="weapon-detail-title">
-        <i class="weapon-detail-icon" style="color:${quality.color}">${info.icon}</i>
+        ${weaponIconHtml(slot.id, info.icon, "weapon-detail-icon")}
         <div>
           <strong>${info.name}</strong>
           <div class="quality-chip" style="color:${quality.color}">${quality.name}</div>
@@ -642,7 +644,7 @@ function playUpgradePickFx(item) {
   fx.className = "upgrade-pick-fx";
   fx.setAttribute("aria-hidden", "true");
   fx.innerHTML = `
-    ${itemIconHtml(item, item.icon || "*")}
+    <span>${upgradeIconHtml(item, item.icon || "*")}</span>
     <strong>${item.name || "强化完成"}</strong>
     <i></i><i></i><i></i><i></i>`;
   document.body.appendChild(fx);

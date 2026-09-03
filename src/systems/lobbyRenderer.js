@@ -1,7 +1,8 @@
 import { TAU } from "../constants.js";
 import { state } from "../state.js";
 import { clamp, hexToRgba } from "../utils.js";
-import { drawWeaponHologram, weaponPreviewColor } from "../ui/weaponPreview.js";
+import { weaponPreviewColor } from "../ui/weaponPreview.js";
+import { drawWeaponAtlasIcon } from "../ui/weaponIcon.js";
 import { renderScreenLighting } from "./lighting.js";
 import { drawPlayerAvatar } from "./playerAvatar.js";
 import {
@@ -976,7 +977,16 @@ function drawWeaponStation(ctx, station, time) {
     ctx.lineTo(38, -52);
     ctx.lineTo(66, 86);
     ctx.stroke();
-    drawWeaponHologram(ctx, weapon, time, { scale: 0.5, alpha: 0.88 * projectionAlpha, color });
+    ctx.globalAlpha *= 0.92 * projectionAlpha;
+    ctx.shadowColor = color;
+    ctx.shadowBlur = 18;
+    if (!drawWeaponAtlasIcon(ctx, weapon.id, 0, 0, 108)) {
+      ctx.fillStyle = "#f8fbff";
+      ctx.font = `bold 34px ${FONT}`;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(weapon.icon || "W", 0, 0);
+    }
     ctx.restore();
     drawWeaponStationLabel(ctx, weapon.name, color, 0, 82, selected);
   }

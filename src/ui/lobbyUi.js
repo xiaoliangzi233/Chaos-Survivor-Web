@@ -256,7 +256,7 @@ function renderTutorialActions() {
   const hasPageNext = visible && dialogueState.pageIndex < dialogueState.pages.length - 1;
   if (dom.tutorialGo) {
     dom.tutorialGo.hidden = !visible || !tutorial.canGo;
-    dom.tutorialGo.textContent = tutorial.interrupted ? "重新前往设施" : "前往设施";
+    dom.tutorialGo.textContent = tutorial?.interrupted ? "重新前往设施" : "前往设施";
   }
   if (dom.tutorialNext) {
     dom.tutorialNext.hidden = !visible || (tutorial.isLast && !hasPageNext);

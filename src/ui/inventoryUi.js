@@ -16,6 +16,7 @@ import {
   weaponSellPrice,
 } from "../economy/shop.js";
 import { ITEM_DEFS, equipActiveItem } from "../systems/items.js";
+import { itemIconHtml } from "./itemIcon.js";
 
 let initialized = false;
 let previousMode = "playing";
@@ -340,7 +341,7 @@ function renderItemDetail() {
   dom.detail.innerHTML = `
     <div class="weapon-detail-card item-detail-card">
       <div class="weapon-detail-title">
-        <i class="weapon-detail-icon" style="color:${quality.color}">${item.icon || "?"}</i>
+        ${itemIconHtml(item, item.icon || "?", "weapon-detail-icon")}
         <div>
           <strong>${item.name || item.id}</strong>
           <div class="quality-chip" style="color:${quality.color}">${quality.name}</div>
@@ -433,7 +434,7 @@ function renderItems() {
     const tipText = `${item.name || item.id}: ${item.desc || ""}`;
     row.setAttribute("data-tip", tipText);
     row.innerHTML = `
-      <i>${item.icon || "?"}</i>
+      ${itemIconHtml(item, item.icon || "?")}
       <strong>x${qty}</strong>
       <button type="button" class="item-sell-button">${text.sell} ${price}</button>`;
     row.addEventListener("mouseenter", (event) => showItemTooltip(event, tipText));

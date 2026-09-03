@@ -46,6 +46,7 @@ class BackendApiTest(unittest.TestCase):
             "runs",
             "config_snapshots",
             "admin_events",
+            "feedback",
         }.issubset(db.table_names()))
 
     def test_player_progress_round_trip(self):
@@ -124,6 +125,26 @@ class BackendApiTest(unittest.TestCase):
         self.assertEqual(entries[0]["totalKills"], 500)
         self.assertEqual(entries[0]["totalSeconds"], 480)
         self.assertEqual(entries[0]["clearedDifficulties"], ["Ember"])
+
+    def test_feedback_submit_and_list(self):
+        self.client.post("/api/players/bootstrap", json={"playerId": "anon-a", "nickname": "Ace"})
+
+        missing = self.client.post("/api/feedback", json={"playerId": "missing", "nickname": "Ghost", "message": "按钮点不了"})
+        self.assertEqual(missing.status_code, 404)
+
+        invalid = self.client.post("/api/feedback", json={"playerId": "anon-a", "nickname": "Ace", "message": "短"})
+        self.assertEqual(invalid.status_code, 422)
+
+        created = self.client.post("/api/feedback", json={"playerId": "anon-a", "nickname": "Ace", "message": "随机模式进入后界面卡住"})
+        self.assertEqual(created.status_code, 200)
+        self.assertEqual(created.json()["feedback"]["nickname"], "Ace")
+        self.assertEqual(created.json()["feedback"]["status"], "open")
+
+        listed = self.client.get("/api/feedback?limit=10")
+        self.assertEqual(listed.status_code, 200)
+        entries = listed.json()["entries"]
+        self.assertEqual(len(entries), 1)
+        self.assertEqual(entries[0]["message"], "随机模式进入后界面卡住")
 
     def test_admin_config_publish_validates_kind_and_writes_json(self):
         bad = self.client.put(

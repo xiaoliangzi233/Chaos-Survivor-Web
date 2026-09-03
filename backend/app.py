@@ -11,7 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from .admin import admin_page, read_config_file, require_admin, validate_config_kind, write_config_file
 from .db import DEFAULT_DB_PATH, SurvivorDatabase
-from .schemas import ConfigDraft, PlayerBootstrap, PlayerNicknameUpdate, ProgressSnapshot, RunSubmission
+from .schemas import ConfigDraft, FeedbackSubmission, PlayerBootstrap, PlayerNicknameUpdate, ProgressSnapshot, RunSubmission
 
 AUTH_USER_URL = "http://113.249.91.32/sszl/user/simple-info"
 
@@ -100,6 +100,20 @@ def create_app(db_path: str | Path | None = None) -> FastAPI:
         limit: int = Query(default=20, ge=1, le=100),
     ):
         return {"entries": database.leaderboard(mode, difficulty, metric, limit)}
+
+    @app.post("/api/feedback")
+    def submit_feedback(payload: FeedbackSubmission):
+        if not database.player_exists(payload.playerId):
+            raise HTTPException(status_code=404, detail="player_not_found")
+        try:
+            feedback = database.insert_feedback(payload.playerId, payload.nickname, payload.message)
+        except KeyError as exc:
+            raise HTTPException(status_code=404, detail="player_not_found") from exc
+        return {"feedback": feedback}
+
+    @app.get("/api/feedback")
+    def list_feedback(limit: int = Query(default=60, ge=1, le=100)):
+        return {"entries": database.list_feedback(limit)}
 
     @app.get("/api/config/{kind}")
     def get_config(kind: str):

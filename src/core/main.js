@@ -97,6 +97,8 @@ import {
   initAdventureStatsUi,
   openAdventureStats,
 } from "../ui/adventureStatsUi.js";
+import { initCurseUi, openCurseSelection } from "../ui/curseUi.js";
+import { closeFeedback, initFeedbackUi, openFeedback } from "../ui/feedbackUi.js";
 import { initNicknameUi, requestPlayerNickname } from "../ui/nicknameUi.js";
 import {
   bootstrapBackendPlayer,
@@ -116,6 +118,14 @@ export async function bootGame() {
       if (state.lobby.active) setLobbyModalOpen(open);
     },
   });
+  initFeedbackUi({
+    onOpen: () => {
+      if (state.lobby.active) setLobbyModalOpen(true);
+    },
+    onClose: () => {
+      if (state.lobby.active) setLobbyModalOpen(false);
+    },
+  });
   initCodexUi({
     onOpen: () => {
       if (state.lobby.active) setLobbyModalOpen(true);
@@ -127,6 +137,7 @@ export async function bootGame() {
   initShopUi({ continueToNextWave: finishWaveTransition });
   initWaveEventUi();
   initNicknameUi();
+  initCurseUi();
   initHelpUi({
     onBeforeOpen: () => {
       closeCodex();
@@ -196,6 +207,7 @@ export async function bootGame() {
     closeCodex();
     closeHelp();
     closeAdventureStats();
+    closeFeedback();
     closeLobbyDialogue();
     clearWaveEventNotice();
     hideAllOverlays();
@@ -211,6 +223,7 @@ export async function bootGame() {
     closeHelp();
     closeLobbyDialogue();
     closeAdventureStats();
+    closeFeedback();
     clearWaveEventNotice();
     hideAllOverlays();
     leaveLobby();
@@ -219,17 +232,19 @@ export async function bootGame() {
     return true;
   }
 
-  async function startWithLoadout({ difficulty, weapon, runMode = "standard", randomGoal = RANDOM_GOAL_TWENTY_WAVES }) {
+  async function startWithLoadout({ difficulty, weapon, runMode = "standard", randomGoal = RANDOM_GOAL_TWENTY_WAVES, curses = [] }) {
     if (!difficulty?.id || !weapon?.id || state.mode === "launching") return false;
     state.lobby.lastLaunchConfig = {
       difficultyId: difficulty.id,
       weaponId: weapon.id,
       runMode: runMode === RUN_MODE_RANDOM ? RUN_MODE_RANDOM : "standard",
       randomGoal: randomGoal === RANDOM_GOAL_ENDLESS ? RANDOM_GOAL_ENDLESS : RANDOM_GOAL_TWENTY_WAVES,
+      curses: runMode === RUN_MODE_RANDOM ? [...curses] : [],
     };
     closeCodex();
     closeHelp();
     closeAdventureStats();
+    closeFeedback();
     clearWaveEventNotice();
     hideAllOverlays();
     leaveLobby();
@@ -242,6 +257,7 @@ export async function bootGame() {
     configureRandomModeRun({
       runMode: runMode === RUN_MODE_RANDOM ? RUN_MODE_RANDOM : "standard",
       randomGoal: randomGoal === RANDOM_GOAL_ENDLESS ? RANDOM_GOAL_ENDLESS : RANDOM_GOAL_TWENTY_WAVES,
+      curses,
     });
     state.waveDuration = isRandomMode() ? randomWaveDurationFor(state.wave) : waveDurationFor(state.wave);
     state.waveTimeLeft = state.waveDuration;
@@ -462,6 +478,7 @@ export async function bootGame() {
     closeCodex();
     closeHelp();
     closeAdventureStats();
+    closeFeedback();
     closeLobbyDialogue();
     clearWaveEventNotice();
     stopMusic();
@@ -489,6 +506,9 @@ export async function bootGame() {
       outcome,
       runMode: state.runMode,
       randomGoal: state.randomGoal,
+      curses: state.randomRun?.curses || [],
+      curseScore: state.randomRun?.curseScore || 0,
+      curseRewardMultiplier: state.randomRun?.curseRewardMultiplier || 1,
       difficultyId: state.difficultyId,
       difficultyName: state.difficulty?.name || state.difficultyId,
       weaponId: state.initialWeaponId,
@@ -519,7 +539,19 @@ export async function bootGame() {
       weapon,
       runMode: previous.runMode,
       randomGoal: previous.randomGoal,
+      curses: previous.curses || [],
     });
+  }
+
+  async function startRandomWithCurses(config) {
+    setLobbyModalOpen(true);
+    const curses = await openCurseSelection(config.curses || []);
+    setLobbyModalOpen(false);
+    if (!curses) {
+      playSfx("deny");
+      return false;
+    }
+    return startWithLoadout({ ...config, curses });
   }
 
   async function startDebugRun({ difficultyId, weaponId, wave = 1 }) {
@@ -620,6 +652,12 @@ export async function bootGame() {
       playSfx("select");
       return true;
     }
+    if (interaction.action === "feedback") {
+      setLobbyModalOpen(true);
+      openFeedback();
+      playSfx("select");
+      return true;
+    }
     if (interaction.action === "npc-talk") {
       const dialogue = lobbyNpcDialogue(interaction.npcId);
       if (dialogue && openNpcDialogue(dialogue) && dialogue.firstClearDifficultyId) {
@@ -697,7 +735,10 @@ export async function bootGame() {
     updateAi(dt);
     if (state.lobby.active) {
       const lobbyEvent = updateLobby(dt);
-      if (lobbyEvent?.type === "launch") startWithLoadout(lobbyEvent.config);
+      if (lobbyEvent?.type === "launch") {
+        if (lobbyEvent.config?.runMode === RUN_MODE_RANDOM) startRandomWithCurses(lobbyEvent.config);
+        else startWithLoadout(lobbyEvent.config);
+      }
       if (lobbyEvent?.type === "tutorial-arrived" && lobbyEvent.dialogue) openLobbyTutorialDialogue(lobbyEvent.dialogue);
       return;
     }
@@ -735,6 +776,9 @@ export async function bootGame() {
     if (!debugFreeze && state.mode === "playing" && !bossWave && state.waveTimeLeft <= 0) completeWave();
   }
 
+  let lastRenderError = "";
+  let lastRenderErrorAt = 0;
+
   function loop(now) {
     if (!lastTime) lastTime = now - FRAME_MS;
     const elapsed = now - lastTime;
@@ -755,7 +799,17 @@ export async function bootGame() {
     framePerformance.begin("update", now);
     update(dt);
     framePerformance.end("update");
-    renderBackend.renderFrame();
+    try {
+      renderBackend.renderFrame();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      const errorAt = performance.now();
+      if (message !== lastRenderError || errorAt - lastRenderErrorAt > 1000) {
+        lastRenderError = message;
+        lastRenderErrorAt = errorAt;
+        console.error("[render] 帧渲染异常，已跳过本帧：", error);
+      }
+    }
     framePerformance.begin("hud");
     updateHud(fps);
     updateLobbyUi();
@@ -780,6 +834,14 @@ export async function bootGame() {
     ? new ResizeObserver(resizeGame)
     : null;
   if (rootResizeObserver && ui.canvas.parentElement) rootResizeObserver.observe(ui.canvas.parentElement);
+  let dprQuery = null;
+  const handleDprChange = () => {
+    if (dprQuery) dprQuery.removeEventListener("change", handleDprChange);
+    if (Math.abs((window.devicePixelRatio || 1) - viewport.dpr) > 0.001) resizeGame();
+    dprQuery = window.matchMedia(`(resolution: ${window.devicePixelRatio}dppx)`);
+    dprQuery.addEventListener?.("change", handleDprChange);
+  };
+  if (typeof window.matchMedia === "function") handleDprChange();
   bindInput({
     start,
     restart: restartRun,

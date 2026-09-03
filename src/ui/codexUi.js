@@ -5,6 +5,7 @@ import { getCodexEntries } from "../systems/codex.js";
 import { ITEM_DEFS, itemDescription } from "../systems/items.js";
 import { drawWeaponPreview } from "./weaponPreview.js";
 import { MINION_MECHANIC_TIPS } from "../systems/minionMechanics.js";
+import { drawItemAtlasIcon, itemIconHtml } from "./itemIcon.js";
 
 const CATEGORIES = [
   { id: "enemies", label: "敌人", eyebrow: "遭遇记录" },
@@ -182,11 +183,12 @@ function updateFooterStatus(unlocked, total) {
 function itemCodexEntry(item, type) {
   const qualityId = itemCodexQuality(item);
   const quality = QUALITY_INFO[qualityId] || QUALITY_INFO.common;
-  return {
-    type,
-    id: item.id,
-    icon: item.icon,
-    name: item.name,
+    return {
+      type,
+      id: item.id,
+      icon: item.icon,
+      itemId: item.id,
+      name: item.name,
     tag: item.unique ? `唯一 · ${quality.name}` : `${quality.name}道具`,
     desc: itemDescription(item, qualityId) || item.desc,
     color: quality.color,
@@ -242,8 +244,9 @@ function renderList(entries) {
     button.type = "button";
     button.className = `codex-card${entry.id === selectedId ? " active" : ""}`;
     button.style.setProperty("--codex-color", entry.color);
+    const icon = entry.type === "items" ? itemIconHtml(entry.itemId || entry.id, entry.icon) : `<i>${entry.icon}</i>`;
     button.innerHTML = `
-      <i>${entry.icon}</i>
+      ${icon}
       <span>
         <strong>${entry.name}</strong>
         <em>${entry.tag}</em>
@@ -296,7 +299,8 @@ function renderDetail(entry) {
   canvas.className = "codex-preview";
   const title = document.createElement("div");
   title.className = "codex-detail-title";
-  title.innerHTML = `<i>${entry.icon}</i><span><em>${entry.tag}</em><strong>${entry.name}</strong></span>`;
+  const icon = entry.type === "items" ? itemIconHtml(entry.itemId || entry.id, entry.icon) : `<i>${entry.icon}</i>`;
+  title.innerHTML = `${icon}<span><em>${entry.tag}</em><strong>${entry.name}</strong></span>`;
   const desc = document.createElement("p");
   desc.textContent = entry.desc;
   const meta = document.createElement("div");
@@ -365,6 +369,10 @@ function drawItemPreview(ctx, canvas, entry, t) {
   ctx.translate(cx, cy + Math.sin(t * 2.3) * 6);
   ctx.rotate(Math.sin(t * 1.7) * 0.08);
   ctx.scale(pulse, pulse);
+  if (drawItemAtlasIcon(ctx, entry.itemId || entry.id, 0, 0, 118)) {
+    ctx.restore();
+    return;
+  }
   for (let i = 0; i < 10; i++) {
     const a = t * 0.9 + (i / 10) * Math.PI * 2;
     const r = 56 + Math.sin(t * 2 + i) * 8;

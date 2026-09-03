@@ -12,6 +12,7 @@ import {
   weaponSellDisabledReason,
   weaponSellPrice,
 } from "../economy/shop.js";
+import { itemIconHtml } from "./itemIcon.js";
 
 const dom = {};
 let continueHandler = null;
@@ -143,9 +144,10 @@ function renderOffer(offer) {
     renderShop(result.ok ? (fuseTarget ? text.fuseSuccess : text.bought) : result.reason);
   });
 
+  const icon = isWeapon ? `<i>${offer.icon}</i>` : itemIconHtml(offer.itemId || offer.id, offer.icon);
   card.innerHTML = `
     <div class="shop-card-top">
-      <i>${offer.icon}</i>
+      ${icon}
       <div>
         <strong>${offer.name}</strong>
         <span style="color:${quality.color}">${quality.name} · ${offer.category}</span>

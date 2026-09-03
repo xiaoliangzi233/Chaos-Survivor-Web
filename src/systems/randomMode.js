@@ -13,6 +13,15 @@ const RANDOM_NORMAL_CAP = 120;
 const RANDOM_BOSS_CAP = 73;
 const DEFAULT_RANDOM_SEED = 0x51f15e;
 
+export const RANDOM_CURSE_DEFS = Object.freeze([
+  { id: "scarred_horde", name: "伤痕群潮", score: 1, rewardBonus: 0.08, effects: { hp: 0.1, spawnRate: 0.05 }, desc: "敌人生命和刷新速度小幅提升。" },
+  { id: "hungry_blades", name: "饥饿刃性", score: 1, rewardBonus: 0.08, effects: { damage: 0.09, speed: 0.02 }, desc: "敌人伤害提升，并更主动追击。" },
+  { id: "overclocked_nerves", name: "超频神经", score: 2, rewardBonus: 0.16, effects: { speed: 0.07, spawnRate: 0.08, enemyLimit: 10 }, desc: "敌人移动更快，同时场上敌人上限提高。" },
+  { id: "elite_signal", name: "精英信号", score: 2, rewardBonus: 0.18, effects: { eliteChance: 0.22, damage: 0.05 }, desc: "非 Boss 随机波次更容易混入精英威胁。" },
+  { id: "event_bleed", name: "事件渗漏", score: 2, rewardBonus: 0.18, effects: { eventChance: 0.12, hp: 0.06 }, desc: "随机事件出现概率提升，敌人生命小幅提升。" },
+  { id: "void_interest", name: "虚空利息", score: 3, rewardBonus: 0.28, effects: { hp: 0.16, damage: 0.12, speed: 0.04, spawnRate: 0.08 }, desc: "敌人全面强化，但收益倍率显著提高。" },
+]);
+
 const EVENT_BLUEPRINTS = {
   blind: { effect: "blind", tags: ["visibility"], weight: 0.85 },
   ice_skate: { effect: "ice_skate", tags: ["movement"], weight: 0.75 },
@@ -89,9 +98,13 @@ export function setRandomModeEnemyCatalogProvider(provider) {
   enemyCatalogProvider = typeof provider === "function" ? provider : () => ({});
 }
 
-export function createRandomRunState(seed = null) {
+export function createRandomRunState(seed = null, curses = []) {
+  const selectedCurses = normalizeRandomCurses(curses);
   return {
     seed: Number.isFinite(Number(seed)) ? Number(seed) : randomSeed(),
+    curses: selectedCurses,
+    curseScore: randomCurseScore(selectedCurses),
+    curseRewardMultiplier: randomCurseRewardMultiplier(selectedCurses),
     scenarios: {},
     eventHistory: [],
     enemyCaps: {
@@ -101,10 +114,10 @@ export function createRandomRunState(seed = null) {
   };
 }
 
-export function configureRandomModeRun({ runMode = RUN_MODE_STANDARD, randomGoal = RANDOM_GOAL_TWENTY_WAVES, seed = null } = {}) {
+export function configureRandomModeRun({ runMode = RUN_MODE_STANDARD, randomGoal = RANDOM_GOAL_TWENTY_WAVES, seed = null, curses = [] } = {}) {
   state.runMode = runMode === RUN_MODE_RANDOM ? RUN_MODE_RANDOM : RUN_MODE_STANDARD;
   state.randomGoal = randomGoal === RANDOM_GOAL_ENDLESS ? RANDOM_GOAL_ENDLESS : RANDOM_GOAL_TWENTY_WAVES;
-  state.randomRun = createRandomRunState(seed);
+  state.randomRun = createRandomRunState(seed, state.runMode === RUN_MODE_RANDOM ? curses : []);
   return state.randomRun;
 }
 
@@ -136,13 +149,13 @@ export function randomWaveSpawnPool(wave = state.wave) {
 }
 
 export function randomWaveSpawnRate(wave = state.wave) {
-  return randomWaveScenarioFor(wave)?.spawnRate ?? 1;
+  return (randomWaveScenarioFor(wave)?.spawnRate ?? 1) * randomCurseProfile().spawnRate;
 }
 
 export function randomEnemyLimitForWave(wave = state.wave) {
   const difficultyLimit = currentDifficulty()?.enemyLimit || RANDOM_NORMAL_CAP;
   const scenario = randomWaveScenarioFor(wave);
-  const cap = scenario?.boss ? RANDOM_BOSS_CAP : RANDOM_NORMAL_CAP;
+  const cap = (scenario?.boss ? RANDOM_BOSS_CAP : RANDOM_NORMAL_CAP) + randomCurseProfile().enemyLimitBonus;
   return Math.max(1, Math.min(difficultyLimit, cap));
 }
 
@@ -151,9 +164,9 @@ export function randomGrowthMultiplierForWave(wave = state.wave, { boss = false 
   const effectiveWave = randomEffectiveWave(wave);
   const scale = boss ? 0.65 : 1;
   return {
-    hp: 1 + effectiveWave * 0.045 * scale,
-    damage: 1 + effectiveWave * 0.025 * scale,
-    speed: Math.min(1.22, 1 + effectiveWave * 0.006 * scale),
+    hp: (1 + effectiveWave * 0.045 * scale) * randomCurseProfile().hp,
+    damage: (1 + effectiveWave * 0.025 * scale) * randomCurseProfile().damage,
+    speed: Math.min(1.4, (1 + effectiveWave * 0.006 * scale) * randomCurseProfile().speed),
   };
 }
 
@@ -172,9 +185,41 @@ export function randomModeCompletionReached(wave = state.wave) {
 export function randomEventProbabilitiesForWave(wave) {
   return {
     first: Math.min(0.75, 0.10 + wave * 0.03),
-    second: wave < 8 ? 0 : Math.min(0.45, (wave - 7) * 0.035),
-    third: wave < 15 ? 0 : Math.min(0.18, (wave - 14) * 0.03),
+    second: wave < 8 ? 0 : Math.min(0.45, (wave - 7) * 0.035 + randomCurseProfile().eventChanceBonus),
+    third: wave < 15 ? 0 : Math.min(0.18, (wave - 14) * 0.03 + randomCurseProfile().eventChanceBonus * 0.5),
   };
+}
+
+export function normalizeRandomCurses(curses = []) {
+  const ids = new Set((Array.isArray(curses) ? curses : []).map((entry) => typeof entry === "string" ? entry : entry?.id));
+  return RANDOM_CURSE_DEFS.filter((curse) => ids.has(curse.id)).map((curse) => curse.id);
+}
+
+export function randomCurseScore(curses = state.randomRun?.curses || []) {
+  const selected = new Set(normalizeRandomCurses(curses));
+  return RANDOM_CURSE_DEFS.reduce((sum, curse) => sum + (selected.has(curse.id) ? curse.score : 0), 0);
+}
+
+export function randomCurseRewardMultiplier(curses = state.randomRun?.curses || []) {
+  const selected = new Set(normalizeRandomCurses(curses));
+  const bonus = RANDOM_CURSE_DEFS.reduce((sum, curse) => sum + (selected.has(curse.id) ? curse.rewardBonus : 0), 0);
+  return Math.round((1 + bonus) * 100) / 100;
+}
+
+export function randomCurseProfile(curses = state.randomRun?.curses || []) {
+  const selected = new Set(normalizeRandomCurses(curses));
+  const profile = { hp: 1, damage: 1, speed: 1, spawnRate: 1, enemyLimitBonus: 0, eventChanceBonus: 0, eliteChanceBonus: 0 };
+  for (const curse of RANDOM_CURSE_DEFS) {
+    if (!selected.has(curse.id)) continue;
+    profile.hp += curse.effects.hp || 0;
+    profile.damage += curse.effects.damage || 0;
+    profile.speed += curse.effects.speed || 0;
+    profile.spawnRate += curse.effects.spawnRate || 0;
+    profile.enemyLimitBonus += curse.effects.enemyLimit || 0;
+    profile.eventChanceBonus += curse.effects.eventChance || 0;
+    profile.eliteChanceBonus += curse.effects.eliteChance || 0;
+  }
+  return profile;
 }
 
 export function randomEffectiveWave(wave) {
@@ -207,6 +252,7 @@ function generateRandomScenario(wave) {
   };
   if (bossId) scenario.boss = bossId;
   else if (forcedBoss) scenario.elite = randomEliteForPool(pool, rng);
+  else if (rng() < randomCurseProfile().eliteChanceBonus) scenario.elite = randomEliteForPool(pool, rng);
   mergePrimaryRandomEvent(scenario);
   return scenario;
 }

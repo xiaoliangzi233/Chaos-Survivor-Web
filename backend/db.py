@@ -95,8 +95,20 @@ class SurvivorDatabase:
                   created_at TEXT NOT NULL
                 );
 
+                CREATE TABLE IF NOT EXISTS feedback (
+                  id INTEGER PRIMARY KEY AUTOINCREMENT,
+                  player_id TEXT NOT NULL REFERENCES players(player_id) ON DELETE CASCADE,
+                  nickname TEXT NOT NULL,
+                  message TEXT NOT NULL,
+                  status TEXT NOT NULL DEFAULT 'open',
+                  created_at TEXT NOT NULL
+                );
+
                 CREATE INDEX IF NOT EXISTS idx_runs_leaderboard
                   ON runs(mode_key, difficulty_id, outcome, kills DESC, wave DESC, seconds ASC);
+
+                CREATE INDEX IF NOT EXISTS idx_feedback_created_at
+                  ON feedback(created_at DESC);
                 """
             )
 
@@ -232,6 +244,35 @@ class SurvivorDatabase:
             rows = conn.execute(sql, params).fetchall()
         return [self._leaderboard_row(row) for row in rows]
 
+    def insert_feedback(self, player_id: str, nickname: str, message: str) -> dict[str, Any]:
+        now = utc_now()
+        with self.connect() as conn:
+            player = conn.execute("SELECT nickname FROM players WHERE player_id = ?", (player_id,)).fetchone()
+            if player is None:
+                raise KeyError("player_not_found")
+            display_name = nickname or player["nickname"] or "Anonymous"
+            conn.execute(
+                """
+                INSERT INTO feedback(player_id, nickname, message, status, created_at)
+                VALUES (?, ?, ?, 'open', ?)
+                """,
+                (player_id, display_name, message, now),
+            )
+            row = conn.execute("SELECT * FROM feedback WHERE id = last_insert_rowid()").fetchone()
+        return self._feedback_row(row)
+
+    def list_feedback(self, limit: int = 60) -> list[dict[str, Any]]:
+        with self.connect() as conn:
+            rows = conn.execute(
+                """
+                SELECT * FROM feedback
+                ORDER BY created_at DESC, id DESC
+                LIMIT ?
+                """,
+                (max(1, min(100, int(limit))),),
+            ).fetchall()
+        return [self._feedback_row(row) for row in rows]
+
     def read_config_snapshot(self, kind: str) -> dict[str, Any] | None:
         with self.connect() as conn:
             row = conn.execute("SELECT * FROM config_snapshots WHERE kind = ?", (kind,)).fetchone()
@@ -339,4 +380,15 @@ class SurvivorDatabase:
             "bestVictorySeconds": row["best_victory_seconds"] or 0,
             "clearedDifficultyIds": cleared_ids,
             "clearedDifficulties": cleared_names,
+        }
+
+    @staticmethod
+    def _feedback_row(row: sqlite3.Row) -> dict[str, Any]:
+        return {
+            "id": row["id"],
+            "playerId": row["player_id"],
+            "nickname": row["nickname"],
+            "message": row["message"],
+            "status": row["status"],
+            "createdAt": row["created_at"],
         }

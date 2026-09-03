@@ -28,6 +28,25 @@ class PlayerNicknameUpdate(BaseModel):
         return value.strip()
 
 
+class FeedbackSubmission(BaseModel):
+    playerId: str = Field(min_length=3, max_length=96)
+    nickname: str = Field(default="Anonymous", max_length=32)
+    message: str = Field(min_length=4, max_length=500)
+
+    @field_validator("playerId", "nickname")
+    @classmethod
+    def strip_feedback_identity(cls, value: str) -> str:
+        return value.strip()
+
+    @field_validator("message")
+    @classmethod
+    def trim_feedback_message(cls, value: str) -> str:
+        message = value.strip()
+        if len(message) < 4:
+            raise ValueError("feedback_too_short")
+        return message
+
+
 class ProgressSnapshot(BaseModel):
     progress: dict[str, Any]
     revision: int = Field(default=0, ge=0)

@@ -505,6 +505,23 @@
         </div>
       </section>
 
+      <section id="curseOverlay" class="overlay curse-overlay" aria-hidden="true">
+        <div class="panel curse-panel ui-shell ui-shell--curse" role="dialog" aria-modal="true" aria-labelledby="curseTitle">
+          <p class="eyebrow">RANDOM MODE // CURSE CONTRACT</p>
+          <h2 id="curseTitle">选择随机诅咒</h2>
+          <div class="curse-summary">
+            <span>诅咒值 <strong id="curseScore">0</strong></span>
+            <span>收益倍率 <strong id="curseReward">100%</strong></span>
+          </div>
+          <div id="curseList" class="curse-list"></div>
+          <div class="curse-actions">
+            <button id="curseCancelButton" type="button">取消</button>
+            <button id="curseClearButton" type="button">清空诅咒</button>
+            <button id="curseConfirmButton" type="button" class="primary">确认并进入随机模式</button>
+          </div>
+        </div>
+      </section>
+
       <section id="inventoryOverlay" class="overlay" aria-hidden="true">
         <div class="panel inventory-panel ui-shell ui-shell--inventory">
           <div class="inventory-head">
@@ -537,6 +554,34 @@
             <section class="inventory-items">
               <h3>所持道具 <span>0</span></h3>
               <div id="itemList" class="item-list"></div>
+            </section>
+          </div>
+        </div>
+      </section>
+      <section id="feedbackOverlay" class="overlay feedback-overlay" aria-hidden="true">
+        <div class="panel feedback-panel ui-shell ui-shell--feedback" role="dialog" aria-modal="true" aria-labelledby="feedbackTitle">
+          <header class="feedback-head">
+            <div>
+              <p class="eyebrow">BUG FEEDBACK // PUBLIC BOARD</p>
+              <h2 id="feedbackTitle">反馈终端</h2>
+            </div>
+            <button id="feedbackCloseButton" type="button" aria-label="关闭反馈终端">×</button>
+          </header>
+          <div class="feedback-layout">
+            <form id="feedbackForm" class="feedback-form">
+              <label for="feedbackMessage">反馈内容</label>
+              <textarea id="feedbackMessage" maxlength="500" minlength="4" rows="6" placeholder="描述你遇到的问题、所在模式、波次或触发方式。"></textarea>
+              <div class="feedback-form-actions">
+                <span id="feedbackStatus" aria-live="polite">所有反馈会即时公开给其他玩家。</span>
+                <button id="feedbackSubmitButton" type="submit" class="primary">提交反馈</button>
+              </div>
+            </form>
+            <section class="feedback-board" aria-label="玩家反馈列表">
+              <div class="feedback-board-head">
+                <strong>公开反馈</strong>
+                <button id="feedbackRefreshButton" type="button">刷新</button>
+              </div>
+              <div id="feedbackList" class="feedback-list"></div>
             </section>
           </div>
         </div>

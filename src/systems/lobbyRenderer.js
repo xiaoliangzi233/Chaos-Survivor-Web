@@ -639,7 +639,7 @@ function drawDevice(ctx, device, time) {
   });
   drawInteractionRing(ctx, device.id, device.color, device.kind === "missionTable" ? 132 : 96, 36);
   if (device.kind === "missionTable") drawMissionTable(ctx, device, time);
-  else if (device.kind === "recorder" || device.kind === "codex") drawArchiveDevice(ctx, device, time);
+  else if (device.kind === "recorder" || device.kind === "codex" || device.kind === "feedback") drawArchiveDevice(ctx, device, time);
   else if (device.kind === "gene") drawGeneModifier(ctx, device, time);
   else if (device.kind === "rift") drawRiftStabilizer(ctx, device, time);
   else if (device.kind === "lever") drawLever(ctx, device);
@@ -1111,6 +1111,8 @@ function drawLobbyProp(ctx, prop, time) {
         ctx.fill();
       }
     }
+  } else if (prop.kind === "worklight") {
+    drawLobbyWorklight(ctx, prop, time, pulse);
   } else {
     ctx.fillStyle = "#17252e";
     ctx.strokeStyle = "#536772";
@@ -1137,6 +1139,91 @@ function drawLobbyProp(ctx, prop, time) {
   if (!["planter", "bench"].includes(prop.kind)) {
     drawPixelDecal(ctx, { x: 0, y: prop.kind === "server" || prop.kind === "vendor" ? -70 : -24, size: 13, color: profile.color, kind: profile.decal, alpha: 0.32 });
   }
+  ctx.restore();
+}
+
+function drawLobbyWorklight(ctx, prop, time, pulse) {
+  const color = prop.color || "#ffd166";
+  const flicker = 0.84 + Math.sin(time * 7.3 + hashString(prop.id) * 0.7) * 0.05 + Math.sin(time * 23.7) * 0.05;
+  ctx.save();
+
+  const halo = ctx.createRadialGradient(0, -56, 4, 0, -56, 64);
+  halo.addColorStop(0, hexToRgba("#ffffff", 0.3 * pulse * flicker));
+  halo.addColorStop(0.35, hexToRgba(color, 0.18 * pulse));
+  halo.addColorStop(1, hexToRgba(color, 0));
+  ctx.fillStyle = halo;
+  ctx.beginPath();
+  ctx.arc(0, -56, 64, 0, TAU);
+  ctx.fill();
+
+  ctx.lineCap = "round";
+  ctx.strokeStyle = "#2e434e";
+  ctx.lineWidth = 4;
+  for (const side of [-1, 1]) {
+    ctx.beginPath();
+    ctx.moveTo(0, -20);
+    ctx.lineTo(side * 25, 17);
+    ctx.stroke();
+  }
+  ctx.beginPath();
+  ctx.moveTo(0, -20);
+  ctx.lineTo(0, 18);
+  ctx.stroke();
+  ctx.fillStyle = "#1a2a33";
+  for (const foot of [-25, 0, 25]) {
+    ctx.fillRect(foot - 4, 16, 9, 4);
+  }
+  ctx.strokeStyle = "#425b68";
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(0, -20);
+  ctx.lineTo(0, 18);
+  ctx.stroke();
+
+  ctx.fillStyle = "#3d5561";
+  ctx.fillRect(-2.5, -56, 5, 38);
+
+  ctx.save();
+  ctx.translate(0, -58);
+  ctx.rotate(0.12 + Math.sin(time * 1.3 + hashString(prop.id)) * 0.02);
+  ctx.fillStyle = "#0d1820";
+  ctx.strokeStyle = "#5d7482";
+  ctx.lineWidth = 2.5;
+  roundRect(ctx, -20, -14, 40, 26, 5);
+  ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = "#2b414d";
+  for (let i = 0; i < 3; i++) ctx.fillRect(-14 + i * 9, -11, 3, 19);
+  ctx.strokeStyle = hexToRgba(color, 0.9 * flicker);
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.arc(15, -1, 10.5, 0, TAU);
+  ctx.stroke();
+  ctx.fillStyle = hexToRgba("#ffffff", flicker);
+  ctx.beginPath();
+  ctx.arc(15, -1, 7.5, 0, TAU);
+  ctx.fill();
+  ctx.fillStyle = hexToRgba(color, 0.85 * pulse);
+  ctx.beginPath();
+  ctx.arc(15, -1, 3, 0, TAU);
+  ctx.fill();
+  ctx.restore();
+
+  ctx.save();
+  ctx.globalCompositeOperation = "lighter";
+  const cone = ctx.createLinearGradient(12, -52, 70, 8);
+  cone.addColorStop(0, hexToRgba(color, 0.2 * pulse * flicker));
+  cone.addColorStop(1, hexToRgba(color, 0));
+  ctx.fillStyle = cone;
+  ctx.beginPath();
+  ctx.moveTo(10, -52);
+  ctx.lineTo(72, -14);
+  ctx.lineTo(64, 14);
+  ctx.lineTo(4, -44);
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
+
   ctx.restore();
 }
 

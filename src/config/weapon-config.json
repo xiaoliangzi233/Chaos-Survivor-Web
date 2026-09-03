@@ -31,7 +31,7 @@
     "tesla_mine_chain": { "level": 0, "timer": 1.1, "cooldown": 2.05, "count": 1, "damage": 34, "range": 760, "triggerRadius": 118, "chainRange": 185, "chainCount": 4, "nodeLife": 5.2, "armTime": 0.24, "pulseCooldown": 0.62, "fieldRadius": 108, "quality": "common", "qualityMult": 1 },
     "starfall_scepter": { "level": 0, "timer": 1.6, "cooldown": 2.65, "count": 1, "damage": 72, "range": 1180, "stars": 3, "radius": 92, "scarRadius": 86, "scarDuration": 1.25, "warningTime": 0.42, "fallTime": 0.72, "quality": "common", "qualityMult": 1 },
     "phase_needler": { "level": 0, "timer": 0.9, "cooldown": 1.18, "count": 1, "damage": 38, "range": 780, "speed": 1040, "needles": 2, "pierce": 3, "phaseDelay": 0.42, "phaseRadius": 74, "phaseDamage": 56, "quality": "common", "qualityMult": 1 },
-    "echo_tuning_fork": { "level": 0, "timer": 0.75, "cooldown": 1.35, "count": 1, "damage": 54, "range": 520, "angle": 1.2252211349000193, "echoRadius": 118, "echoDamage": 34, "echoDuration": 0.55, "resonanceDamage": 28, "quality": "common", "qualityMult": 1 },
+    "echo_tuning_fork": { "level": 0, "timer": 0.75, "cooldown": 1.35, "count": 1, "damage": 42, "range": 430, "angle": 1.2252211349000193, "echoRadius": 92, "echoDamage": 25, "echoDuration": 0.55, "resonanceDamage": 20, "quality": "common", "qualityMult": 1 },
     "rift_loom": { "level": 0, "timer": 1.25, "cooldown": 2.2, "count": 1, "damage": 34, "range": 760, "anchors": 3, "radius": 142, "lineWidth": 18, "life": 0.8, "collapseDamage": 72, "scarDamage": 28, "quality": "common", "qualityMult": 1 }
   }
 }

@@ -166,6 +166,9 @@ export function recordAdventureResult(summary = {}) {
     level: boundedInteger(summary.level, 1, 1_000_000),
     weaponCount: boundedInteger(summary.weaponCount, 0, 1_000),
     itemCount: boundedInteger(summary.itemCount, 0, 1_000_000),
+    curses: normalizeRunCurses(summary.curses),
+    curseScore: boundedInteger(summary.curseScore, 0, 999),
+    curseRewardMultiplier: boundedNumber(summary.curseRewardMultiplier, 1, 99),
   };
   current.revision++;
   current.updatedAt = record.completedAt;
@@ -353,6 +356,9 @@ function normalizeAdventureRun(value) {
     level: boundedInteger(value.level, 1, 1_000_000),
     weaponCount: boundedInteger(value.weaponCount, 0, 1_000),
     itemCount: boundedInteger(value.itemCount, 0, 1_000_000),
+    curses: normalizeRunCurses(value.curses),
+    curseScore: boundedInteger(value.curseScore, 0, 999),
+    curseRewardMultiplier: boundedNumber(value.curseRewardMultiplier, 1, 99),
   };
 }
 
@@ -441,6 +447,17 @@ function boundedInteger(value, minimum, maximum) {
   const number = Number(value);
   if (!Number.isFinite(number)) return minimum;
   return Math.min(maximum, Math.max(minimum, Math.floor(number)));
+}
+
+function boundedNumber(value, minimum, maximum) {
+  const number = Number(value);
+  if (!Number.isFinite(number)) return minimum;
+  return Math.min(maximum, Math.max(minimum, number));
+}
+
+function normalizeRunCurses(value) {
+  if (!Array.isArray(value)) return [];
+  return uniqueStrings(value).slice(0, 16);
 }
 
 function minimumPositive(first, second) {

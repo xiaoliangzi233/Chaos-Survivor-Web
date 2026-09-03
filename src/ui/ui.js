@@ -11,6 +11,7 @@ import {
   WEAPON_INFO,
 } from "../economy/inventory.js";
 import { activePlayerStatusEffects } from "../systems/statusEffects.js";
+import { createItemIconElement, itemIconHtml } from "./itemIcon.js";
 
 const hudLast = {
   hp: null,
@@ -55,6 +56,8 @@ export const ui = {
   startOverlay: document.getElementById("startOverlay"),
   levelOverlay: document.getElementById("levelOverlay"),
   runLoadingOverlay: document.getElementById("runLoadingOverlay"),
+  curseOverlay: document.getElementById("curseOverlay"),
+  feedbackOverlay: document.getElementById("feedbackOverlay"),
   runLoadingText: document.getElementById("runLoadingText"),
   runLoadingBar: document.getElementById("runLoadingBar"),
   runLoadingPercent: document.getElementById("runLoadingPercent"),
@@ -154,7 +157,12 @@ export function updateHud(fps, now = performance.now()) {
   const activeItem = state.inventory?.items?.find((item) => item.itemId === state.inventory?.activeItemId);
   if (ui.activeItemButton) {
     ui.activeItemButton.hidden = !activeItem;
-    ui.activeItemButton.querySelector("span").textContent = activeItem ? activeItem.icon || "模块" : "模块";
+    const label = ui.activeItemButton.querySelector("span");
+    if (label) {
+      label.textContent = "";
+      if (activeItem) label.appendChild(createItemIconElement(activeItem, activeItem.icon || "模块", "quick-item-icon"));
+      else label.textContent = "模块";
+    }
     ui.activeItemButton.title = activeItem ? `${activeItem.name} // F` : "战术模块";
   }
   const hp = Math.max(0, Math.ceil(p.hp));
@@ -252,8 +260,7 @@ function renderItemStatusBar(player) {
     chip.className = `item-status-chip${entry.itemId === "tardigrade" && (player.currentWaveShields || 0) <= 0 ? " depleted" : ""}`;
     chip.title = `${entry.name}：${entry.desc || "已装备道具"}`;
     chip.setAttribute("aria-label", `${entry.name} ${entry.status}`);
-    const icon = document.createElement("i");
-    icon.textContent = entry.icon || "◇";
+    const icon = createItemIconElement(entry, entry.icon || "◇");
     const name = document.createElement("b");
     name.textContent = entry.name;
     const value = document.createElement("strong");
@@ -346,7 +353,7 @@ export function showChoices({ eyebrow, title, items, onPick, refresh = null, con
           <p>${item.desc}</p>
         </div>
         <b>选择</b>`
-      : `<i>${item.icon}</i><strong>${item.name}</strong><p>${item.desc}</p>`;
+      : `${itemIconHtml(item, item.icon)}<strong>${item.name}</strong><p>${item.desc}</p>`;
     button.addEventListener("click", () => {
       if (isLevelUp) playUpgradePickFx(item);
       onPick(item);
@@ -438,6 +445,10 @@ export function showInventory() {
 export function hideInventory() {
   ui.inventoryOverlay.classList.remove("active");
   ui.inventoryOverlay.setAttribute("aria-hidden", "true");
+  ui.curseOverlay?.classList.remove("active");
+  ui.curseOverlay?.setAttribute("aria-hidden", "true");
+  ui.feedbackOverlay?.classList.remove("active");
+  ui.feedbackOverlay?.setAttribute("aria-hidden", "true");
 }
 
 export function renderInventory() {
@@ -490,6 +501,10 @@ export function showEnd(victory) {
   [
     `模式 ${runModeText}`,
     `目标 ${randomGoalText}`,
+    ...(state.runMode === "random" ? [
+      `诅咒值 ${state.randomRun?.curseScore || 0}`,
+      `收益倍率 ${Math.round((state.randomRun?.curseRewardMultiplier || 1) * 100)}%`,
+    ] : []),
     `到达波次 ${state.wave}`,
     `难度 ${state.difficulty?.name || "未选择"}`,
     `时间 ${formatTime(state.time)}`,
@@ -602,7 +617,7 @@ function renderItems() {
     const row = document.createElement("div");
     row.className = "item-card";
     const qty = item.qty;
-    row.innerHTML = `<span>${item.icon} ${item.name}</span><strong>x${qty}</strong><small>${item.desc}</small>`;
+    row.innerHTML = `<span>${itemIconHtml(item, item.icon)} ${item.name}</span><strong>x${qty}</strong><small>${item.desc}</small>`;
     ui.itemList.appendChild(row);
   }
 }
@@ -627,7 +642,7 @@ function playUpgradePickFx(item) {
   fx.className = "upgrade-pick-fx";
   fx.setAttribute("aria-hidden", "true");
   fx.innerHTML = `
-    <span>${item.icon || "*"}</span>
+    ${itemIconHtml(item, item.icon || "*")}
     <strong>${item.name || "强化完成"}</strong>
     <i></i><i></i><i></i><i></i>`;
   document.body.appendChild(fx);

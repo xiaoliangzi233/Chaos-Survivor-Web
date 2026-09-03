@@ -166,7 +166,7 @@ export class PixiBackend {
     this.overlayCanvas.style.height = `${viewport.height}px`;
     this.overlayCtx.setTransform(viewport.dpr, 0, 0, viewport.dpr, 0, 0);
     this.overlayCtx.imageSmoothingEnabled = false;
-    this.app.renderer.resize(viewport.width, viewport.height);
+    this.app.renderer.resize(viewport.width, viewport.height, viewport.dpr);
     this.syncScreenSprites();
   }
 

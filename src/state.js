@@ -285,6 +285,9 @@ export function xpNeedForLevel(level) {
 export function createRandomRunState() {
   return {
     seed: 0,
+    curses: [],
+    curseScore: 0,
+    curseRewardMultiplier: 1,
     scenarios: {},
     eventHistory: [],
     enemyCaps: {

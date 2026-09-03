@@ -240,6 +240,40 @@ export async function fetchLeaderboards({ mode = "all", difficulty = "all", metr
   }
 }
 
+export async function submitFeedback({ message } = {}) {
+  if (!apiBaseUrl) return { ok: false, enabled: false, error: "backend_disabled" };
+  try {
+    const result = await requestJson("/api/feedback", {
+      method: "POST",
+      body: JSON.stringify({
+        playerId: currentPlayerId(),
+        nickname: currentNickname(),
+        message: String(message || "").trim(),
+      }),
+    });
+    available = true;
+    lastError = "";
+    return { ok: true, enabled: true, feedback: result?.feedback || null };
+  } catch (error) {
+    markFailure(error);
+    return { ok: false, enabled: true, error: lastError };
+  }
+}
+
+export async function listFeedback({ limit = 60 } = {}) {
+  if (!apiBaseUrl) return { entries: [], enabled: false };
+  const params = new URLSearchParams({ limit: String(limit) });
+  try {
+    const result = await requestJson(`/api/feedback?${params}`);
+    available = true;
+    lastError = "";
+    return { entries: Array.isArray(result.entries) ? result.entries : [], enabled: true };
+  } catch (error) {
+    markFailure(error);
+    return { entries: [], enabled: true, error: lastError };
+  }
+}
+
 function resolveApiBaseUrl() {
   try {
     const params = new URLSearchParams(globalThis.location?.search || "");

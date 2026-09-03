@@ -2,10 +2,12 @@ import { GEM_LIMIT, TAU } from "../constants.js";
 import { state, world } from "../state.js";
 import { difficultyMultiplier } from "../difficulty.js";
 import { coinDropMultiplier } from "./items.js";
+import { isRandomMode, randomCurseRewardMultiplier } from "./randomMode.js";
 
 export function dropGem(x, y, value) {
   if (world.gems.length >= GEM_LIMIT) world.gems.shift();
-  world.gems.push({ x, y, value: Math.max(1, Math.round(value * difficultyMultiplier("xpGain"))), phase: Math.random() * TAU });
+  const curse = isRandomMode() ? randomCurseRewardMultiplier() : 1;
+  world.gems.push({ x, y, value: Math.max(1, Math.round(value * difficultyMultiplier("xpGain") * curse)), phase: Math.random() * TAU });
 }
 
 export function dropCoin(x, y, amount) {
@@ -31,10 +33,12 @@ export function coinAmountForEnemy(enemy) {
   if (!enemy || enemy.elite || (enemy.category !== "小怪" && !enemy.boss)) return 0;
   if (enemy.boss) {
     const amount = enemy.coinDrop ?? Math.max(90, Math.round((enemy.xp || 100) * 0.55));
-    return Math.max(30, Math.round(amount * (enemy.rewardScale ?? 1) * difficultyMultiplier("coinGain") * coinDropMultiplier()));
+    const curse = isRandomMode() ? randomCurseRewardMultiplier() : 1;
+    return Math.max(30, Math.round(amount * (enemy.rewardScale ?? 1) * difficultyMultiplier("coinGain") * coinDropMultiplier() * curse));
   }
   const amount = 1 + Math.floor(Math.random() * 3) + Math.floor((enemy.xp || 1) / 10) + Math.floor(state.wave / 7);
-  return Math.min(24, Math.max(1, Math.round(amount * difficultyMultiplier("coinGain") * coinDropMultiplier())));
+  const curse = isRandomMode() ? randomCurseRewardMultiplier() : 1;
+  return Math.min(42, Math.max(1, Math.round(amount * difficultyMultiplier("coinGain") * coinDropMultiplier() * curse)));
 }
 
 export function dropEnemyRewards(enemy) {

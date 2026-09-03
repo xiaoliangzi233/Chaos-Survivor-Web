@@ -109,8 +109,8 @@ function qualityColor(quality, fallback) {
   return !quality || quality === "common" ? fallback : QUALITY_COLORS[quality] || fallback;
 }
 
-export function resizeCanvas(canvas, ctx) {
-  const container = canvas.parentElement || document.documentElement;
+export function resizeCanvas(canvas, ctx, containerOverride = null) {
+  const container = containerOverride || canvas.parentElement || document.documentElement;
   viewport.dpr = Math.min(window.devicePixelRatio || 1, 2);
   viewport.width = Math.max(320, Math.floor(container.clientWidth || window.innerWidth));
   viewport.height = Math.max(420, Math.floor(container.clientHeight || window.innerHeight));

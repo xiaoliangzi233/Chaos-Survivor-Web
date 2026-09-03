@@ -28,6 +28,12 @@ import {
 
 const PIXI_MODULE_PATH = "../../../vendor/pixi/pixi.min.mjs";
 
+export function syncCanvasTextureSize(texture, width, height, dpr) {
+  if (!texture?.source) return;
+  texture.source.resize?.(width, height, dpr);
+  texture.update?.();
+}
+
 export class PixiBackend {
   constructor() {
     this.name = "pixi-webgl";
@@ -159,14 +165,22 @@ export class PixiBackend {
 
   resize() {
     if (!this.baseCanvas || !this.app) return;
-    resizeCanvas(this.baseCanvas, this.baseCtx);
+    const visibleContainer = this.canvas?.parentElement || null;
+    resizeCanvas(this.baseCanvas, this.baseCtx, visibleContainer);
+    if (this.canvas) {
+      this.canvas.style.width = `${viewport.width}px`;
+      this.canvas.style.height = `${viewport.height}px`;
+    }
     this.overlayCanvas.width = this.baseCanvas.width;
     this.overlayCanvas.height = this.baseCanvas.height;
     this.overlayCanvas.style.width = `${viewport.width}px`;
     this.overlayCanvas.style.height = `${viewport.height}px`;
     this.overlayCtx.setTransform(viewport.dpr, 0, 0, viewport.dpr, 0, 0);
     this.overlayCtx.imageSmoothingEnabled = false;
-    this.app.renderer.resize(viewport.width, viewport.height, viewport.dpr);
+    this.app.renderer.resolution = viewport.dpr;
+    this.app.renderer.resize(viewport.width, viewport.height);
+    syncCanvasTextureSize(this.baseTexture, viewport.width, viewport.height, viewport.dpr);
+    syncCanvasTextureSize(this.overlayTexture, viewport.width, viewport.height, viewport.dpr);
     this.syncScreenSprites();
   }
 
@@ -1156,10 +1170,27 @@ export class PixiBackend {
       contextLost: this.contextLost,
       particles: { ...this.frameCounts },
       glyphTextures: this.glyphTextures.size,
+      screenTextures: {
+        base: canvasTextureStats(this.baseTexture),
+        overlay: canvasTextureStats(this.overlayTexture),
+      },
       viewport: { ...viewport },
       ...framePerformance.getStats(),
     };
   }
+}
+
+function canvasTextureStats(texture) {
+  if (!texture?.source) return null;
+  return {
+    width: texture.width,
+    height: texture.height,
+    sourceWidth: texture.source.width,
+    sourceHeight: texture.source.height,
+    pixelWidth: texture.source.pixelWidth,
+    pixelHeight: texture.source.pixelHeight,
+    resolution: texture.source.resolution,
+  };
 }
 
 function drawGlyphByName(ctx, name) {

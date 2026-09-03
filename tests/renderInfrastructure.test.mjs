@@ -8,7 +8,10 @@ import { world } from "../src/state.js";
 import {
   isPixiBatchableEnemy,
   isPixiBatchableHazard,
+  resizeCanvas,
+  viewport,
 } from "../src/systems/renderer.js";
+import { syncCanvasTextureSize } from "../src/systems/renderers/pixiBackend.js";
 
 test("SpatialGrid returns the same circular-query results as a full scan", () => {
   const grid = new SpatialGrid(WORLD_SIZE, CELL_SIZE);
@@ -86,4 +89,67 @@ test("storm tyrant actors and expensive storm hazards use direct Pixi batches", 
   assert.equal(isPixiBatchableEnemy({ type: "storm_tyrant", boss: true, elite: false }), true);
   assert.equal(isPixiBatchableHazard({ kind: "storm_laser_net" }), true);
   assert.equal(isPixiBatchableHazard({ kind: "storm_strike" }), true);
+});
+
+test("resizeCanvas restores viewport dimensions from the explicit container", () => {
+  const previousWindow = globalThis.window;
+  const previousDocument = globalThis.document;
+  globalThis.window = { devicePixelRatio: 1.5, innerWidth: 1280, innerHeight: 720 };
+  globalThis.document = { documentElement: { clientWidth: 1280, clientHeight: 720 } };
+  try {
+    const canvas = {
+      width: 0,
+      height: 0,
+      style: {},
+      parentElement: { clientWidth: 640, clientHeight: 420 },
+    };
+    const ctx = {
+      transform: null,
+      imageSmoothingEnabled: true,
+      setTransform(...args) {
+        this.transform = args;
+      },
+    };
+    const container = { clientWidth: 960, clientHeight: 540 };
+
+    resizeCanvas(canvas, ctx, container);
+    assert.equal(viewport.width, 960);
+    assert.equal(viewport.height, 540);
+    assert.equal(canvas.width, 1440);
+    assert.equal(canvas.height, 810);
+    assert.equal(canvas.style.width, "960px");
+    assert.equal(canvas.style.height, "540px");
+
+    container.clientWidth = 1280;
+    container.clientHeight = 720;
+    resizeCanvas(canvas, ctx, container);
+    assert.equal(viewport.width, 1280);
+    assert.equal(viewport.height, 720);
+    assert.equal(canvas.width, 1920);
+    assert.equal(canvas.height, 1080);
+    assert.deepEqual(ctx.transform, [1.5, 0, 0, 1.5, 0, 0]);
+    assert.equal(ctx.imageSmoothingEnabled, false);
+  } finally {
+    globalThis.window = previousWindow;
+    globalThis.document = previousDocument;
+  }
+});
+
+test("syncCanvasTextureSize refreshes Pixi canvas texture dimensions after resize", () => {
+  const calls = [];
+  const texture = {
+    source: {
+      resize(width, height, dpr) {
+        calls.push({ width, height, dpr });
+      },
+    },
+    updated: false,
+    update() {
+      this.updated = true;
+    },
+  };
+
+  syncCanvasTextureSize(texture, 1280, 720, 1.5);
+  assert.deepEqual(calls, [{ width: 1280, height: 720, dpr: 1.5 }]);
+  assert.equal(texture.updated, true);
 });

@@ -1,5 +1,5 @@
 import { getAdventureStats } from "../systems/playerProgress.js";
-import { backendStatus, fetchLeaderboards } from "../services/backendProgressService.js";
+import { backendStatus, fetchContestLeaderboard, fetchLeaderboards } from "../services/backendProgressService.js";
 
 const dom = {};
 let options = {};
@@ -206,6 +206,7 @@ function renderLeaderboard() {
     ["standard", "冒险模式"],
     ["random_twenty_waves", "随机 · 20 波"],
     ["random_endless", "随机 · 无限"],
+    ["contest_today", "每日赛"],
   ]);
   const difficultySelect = select([
     ["all", "全部难度"],
@@ -231,12 +232,17 @@ function renderLeaderboard() {
 
   const load = async () => {
     results.replaceChildren(emptyState("正在连接排行榜", "同步同服玩家战绩中。"));
-    const response = await fetchLeaderboards({
-      mode: modeSelect.value,
-      difficulty: difficultySelect.value,
-      metric: metricSelect.value,
-      limit: 25,
-    });
+    const contestMode = modeSelect.value === "contest_today";
+    difficultySelect.disabled = contestMode;
+    metricSelect.disabled = contestMode;
+    const response = contestMode
+      ? await fetchContestLeaderboard({ contestId: "today", limit: 25 })
+      : await fetchLeaderboards({
+        mode: modeSelect.value,
+        difficulty: difficultySelect.value,
+        metric: metricSelect.value,
+        limit: 25,
+      });
     if (requestId !== leaderboardRequestId || activeTab !== "leaderboard") return;
     results.replaceChildren();
     if (!response.enabled) {
@@ -252,13 +258,36 @@ function renderLeaderboard() {
       return;
     }
     response.entries.forEach((run, index) => {
-      results.appendChild(leaderboardCard(run, index, difficulties));
+      results.appendChild(contestMode ? contestLeaderboardCard(run, index) : leaderboardCard(run, index, difficulties));
     });
   };
   modeSelect.addEventListener("change", load);
   difficultySelect.addEventListener("change", load);
   metricSelect.addEventListener("change", load);
   load();
+}
+
+function contestLeaderboardCard(run, index) {
+  const article = node("article", `adventure-leaderboard-card contest-rank rank-${Math.min(index + 1, 4)}`);
+  const avatar = textNode("div", initials(run.nickname || "A"));
+  avatar.className = `adventure-leaderboard-avatar ${run.avatar || avatarClass(run.playerId || run.nickname)}`;
+  const identity = node("div", "adventure-leaderboard-identity");
+  identity.append(
+    textNode("strong", run.nickname || "Anonymous"),
+    textNode("span", `${run.outcome === "victory" ? "通关" : "未通关"} // ${run.difficultyName || run.difficultyId} // ${run.weaponName || run.weaponId}`),
+  );
+  const rank = textNode("b", `#${index + 1}`);
+  const head = node("header");
+  head.append(rank, avatar, identity);
+  const metrics = node("div", "adventure-leaderboard-metrics");
+  metrics.append(
+    recordChip("积分", formatNumber(run.score)),
+    recordChip("波次", run.wave),
+    recordChip("击杀", formatNumber(run.kills)),
+    recordChip("用时", formatDuration(run.seconds)),
+  );
+  article.append(head, metrics);
+  return article;
 }
 
 function leaderboardCard(run, index, difficulties) {

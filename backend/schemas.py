@@ -80,6 +80,34 @@ class RunSubmission(BaseModel):
         return value.strip()
 
 
+class ContestRunSubmission(BaseModel):
+    id: str = Field(min_length=1, max_length=128)
+    contestId: str = Field(min_length=8, max_length=96)
+    playerId: str = Field(min_length=3, max_length=96)
+    completedAt: str = Field(default="", max_length=64)
+    score: int = Field(default=0, ge=0, le=1_000_000_000)
+    outcome: Literal["victory", "defeat"]
+    seconds: int = Field(default=0, ge=0, le=86400)
+    wave: int = Field(default=0, ge=0, le=1_000_000)
+    kills: int = Field(default=0, ge=0, le=100_000_000)
+    bossKills: int = Field(default=0, ge=0, le=1_000_000)
+    gold: int = Field(default=0, ge=0, le=1_000_000_000)
+    level: int = Field(default=1, ge=1, le=1_000_000)
+    weaponId: str = Field(default="", max_length=64)
+    weaponName: str = Field(default="", max_length=64)
+    difficultyId: str = Field(default="unknown", max_length=64)
+    difficultyName: str = Field(default="unknown", max_length=64)
+    seed: int = Field(default=0, ge=0, le=4_294_967_295)
+    expectedSeed: int = Field(default=0, ge=0, le=4_294_967_295)
+    tainted: bool = False
+    debug: bool = False
+
+    @field_validator("id", "contestId", "playerId", "difficultyId", "difficultyName", "weaponId", "weaponName", "completedAt")
+    @classmethod
+    def trim_contest_text(cls, value: str) -> str:
+        return value.strip()
+
+
 class ConfigDraft(BaseModel):
     data: dict[str, Any]
 

@@ -240,6 +240,42 @@ export async function fetchLeaderboards({ mode = "all", difficulty = "all", metr
   }
 }
 
+export async function submitContestRun(run) {
+  if (!apiBaseUrl || !run) return { ok: false, enabled: false, error: "backend_disabled" };
+  try {
+    const result = await requestJson("/api/contest-runs", {
+      method: "POST",
+      body: JSON.stringify({ ...run, playerId: currentPlayerId() }),
+    });
+    available = true;
+    lastError = "";
+    return {
+      ok: true,
+      enabled: true,
+      run: result?.run || null,
+      best: result?.best || result?.run || null,
+      updated: Boolean(result?.updated),
+    };
+  } catch (error) {
+    markFailure(error);
+    return { ok: false, enabled: true, error: lastError };
+  }
+}
+
+export async function fetchContestLeaderboard({ contestId = "today", limit = 50 } = {}) {
+  if (!apiBaseUrl) return { entries: [], enabled: false };
+  const params = new URLSearchParams({ contestId, limit: String(limit) });
+  try {
+    const result = await requestJson(`/api/contest-leaderboards?${params}`);
+    available = true;
+    lastError = "";
+    return { entries: Array.isArray(result.entries) ? result.entries : [], enabled: true, contestId: result.contestId || contestId };
+  } catch (error) {
+    markFailure(error);
+    return { entries: [], enabled: true, error: lastError };
+  }
+}
+
 export async function submitFeedback({ message } = {}) {
   if (!apiBaseUrl) return { ok: false, enabled: false, error: "backend_disabled" };
   try {

@@ -57,6 +57,7 @@ export const LOBBY_PORTALS = [
 export const LOBBY_DEVICES = [
   { id: "mission-table", kind: "missionTable", action: "ship-status", roomId: "core", x: 0, y: -90, color: "#42e8ff", label: "星舰任务全息桌", collider: { w: 250, h: 118 } },
   { id: "difficulty-sync", kind: "difficulty", action: "difficulty", roomId: "bridge", x: -480, y: -1180, color: "#ffd166", label: "难度同步器", collider: { w: 160, h: 100 } },
+  { id: "daily-contest-terminal", kind: "contest", action: "contest", roomId: "bridge", x: 480, y: -1180, color: "#ff8bd8", label: "每日赛终端", collider: { w: 174, h: 106 } },
   { id: "adventure-recorder", kind: "recorder", action: "recorder", roomId: "data", x: -2130, y: -520, color: "#ffd166", label: "冒险记录仪", collider: { w: 170, h: 104 } },
   { id: "codex-terminal", kind: "codex", action: "codex", roomId: "data", x: -1640, y: -500, color: "#42e8ff", label: "记录者终端", collider: { w: 175, h: 100 } },
   { id: "feedback-terminal", kind: "feedback", action: "feedback", roomId: "data", x: -1900, y: -500, color: "#77ff8a", label: "反馈终端", collider: { w: 172, h: 102 } },
@@ -621,6 +622,7 @@ export function allLobbyInteractions(player = state.lobby.player) {
       difficulty: `切换已解锁难度 · 当前 ${selectedLobbyDifficulty()?.name || "未同步"}`,
       randomProtocol: `切换随机目标 · 当前 ${lobbyRandomGoalLabel()}`,
       missionTable: "查看霓虹中转舰运行状态",
+      contest: "进入今日固定赛题，与同服玩家争夺每日排行",
       recorder: "查看正式冒险总览、难度档案与单局历史",
       codex: "查阅敌人、武器、道具与事件记录",
       feedback: "提交 Bug 反馈，并查看所有玩家的公开反馈",

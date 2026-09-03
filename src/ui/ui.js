@@ -94,6 +94,10 @@ export const ui = {
   endEyebrow: document.getElementById("endEyebrow"),
   endTitle: document.getElementById("endTitle"),
   endStats: document.getElementById("endStats"),
+  contestResults: document.getElementById("contestResults"),
+  contestSyncStatus: document.getElementById("contestSyncStatus"),
+  contestLocalResult: document.getElementById("contestLocalResult"),
+  contestLeaderboardList: document.getElementById("contestLeaderboardList"),
   touchStick: document.getElementById("touchStick"),
 };
 
@@ -485,6 +489,7 @@ export function hideAllOverlays() {
   ui.inventoryOverlay.setAttribute("aria-hidden", "true");
   ui.endOverlay.classList.remove("active");
   ui.endOverlay.setAttribute("aria-hidden", "true");
+  resetContestResults();
 }
 
 export function pickThree(items) {
@@ -493,12 +498,17 @@ export function pickThree(items) {
 
 export function showEnd(victory) {
   const p = state.player;
-  ui.endEyebrow.textContent = victory ? "VICTORY" : "RUN COMPLETE";
-  ui.endTitle.textContent = victory ? "20 波已完成" : "生存结束";
+  const contestMode = state.runMode === "contest";
+  ui.endEyebrow.textContent = contestMode ? "DAILY CONTEST" : victory ? "VICTORY" : "RUN COMPLETE";
+  ui.endTitle.textContent = contestMode
+    ? victory ? "每日赛完成" : "每日赛结束"
+    : victory ? "20 波已完成" : "生存结束";
   ui.endStats.innerHTML = "";
-  const runModeText = state.runMode === "random" ? "随机模式" : "冒险模式";
+  const runModeText = contestMode ? "每日赛" : state.runMode === "random" ? "随机模式" : "冒险模式";
   const randomGoalText = state.runMode === "random"
     ? state.randomGoal === "endless" ? "无限模式" : "20波通关"
+    : contestMode
+      ? "固定赛题"
     : "二十波远征";
   [
     `模式 ${runModeText}`,
@@ -520,7 +530,55 @@ export function showEnd(victory) {
   });
   ui.endOverlay.classList.add("active");
   ui.endOverlay.setAttribute("aria-hidden", "false");
+  if (!contestMode) resetContestResults();
   updateBestText();
+}
+
+export function renderContestResults({ localResult = null, leaderboard = [], status = "", message = "" } = {}) {
+  if (!ui.contestResults) return;
+  ui.contestResults.hidden = false;
+  if (ui.contestSyncStatus) ui.contestSyncStatus.textContent = status || "READY";
+  if (ui.contestLocalResult) {
+    ui.contestLocalResult.replaceChildren();
+    if (localResult) {
+      ui.contestLocalResult.append(
+        recordChip("本局积分", formatNumber(localResult.score)),
+        recordChip("波次", localResult.wave),
+        recordChip("击败", formatNumber(localResult.kills)),
+        recordChip("用时", formatTime(localResult.seconds || 0)),
+      );
+    }
+    if (message) ui.contestLocalResult.appendChild(textNode("p", message));
+  }
+  if (ui.contestLeaderboardList) {
+    ui.contestLeaderboardList.replaceChildren();
+    if (!leaderboard.length) {
+      const empty = document.createElement("div");
+      empty.className = "contest-empty";
+      empty.textContent = message || "暂无排行榜数据";
+      ui.contestLeaderboardList.appendChild(empty);
+    } else {
+      leaderboard.forEach((entry, index) => ui.contestLeaderboardList.appendChild(contestLeaderboardRow(entry, index)));
+    }
+  }
+}
+
+function resetContestResults() {
+  if (ui.contestResults) ui.contestResults.hidden = true;
+  ui.contestLocalResult?.replaceChildren();
+  ui.contestLeaderboardList?.replaceChildren();
+  if (ui.contestSyncStatus) ui.contestSyncStatus.textContent = "";
+}
+
+function contestLeaderboardRow(entry, index) {
+  const row = document.createElement("article");
+  row.className = `contest-row rank-${Math.min(index + 1, 4)}`;
+  const rank = textNode("b", `#${index + 1}`);
+  const name = textNode("strong", entry.nickname || "Anonymous");
+  const meta = textNode("span", `${entry.outcome === "victory" ? "通关" : "未通关"} // 第 ${entry.wave} 波 // ${formatTime(entry.seconds || 0)}`);
+  const score = textNode("em", formatNumber(entry.score || 0));
+  row.append(rank, name, meta, score);
+  return row;
 }
 
 function renderInventoryStats() {

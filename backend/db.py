@@ -104,8 +104,35 @@ class SurvivorDatabase:
                   created_at TEXT NOT NULL
                 );
 
+                CREATE TABLE IF NOT EXISTS contest_runs (
+                  contest_id TEXT NOT NULL,
+                  player_id TEXT NOT NULL REFERENCES players(player_id) ON DELETE CASCADE,
+                  nickname TEXT NOT NULL,
+                  run_id TEXT NOT NULL,
+                  completed_at TEXT NOT NULL,
+                  score INTEGER NOT NULL,
+                  outcome TEXT NOT NULL,
+                  seconds INTEGER NOT NULL,
+                  wave INTEGER NOT NULL,
+                  kills INTEGER NOT NULL,
+                  boss_kills INTEGER NOT NULL,
+                  gold INTEGER NOT NULL,
+                  level INTEGER NOT NULL,
+                  weapon_id TEXT NOT NULL,
+                  weapon_name TEXT NOT NULL,
+                  difficulty_id TEXT NOT NULL,
+                  difficulty_name TEXT NOT NULL,
+                  seed INTEGER NOT NULL,
+                  created_at TEXT NOT NULL,
+                  updated_at TEXT NOT NULL,
+                  PRIMARY KEY(contest_id, player_id)
+                );
+
                 CREATE INDEX IF NOT EXISTS idx_runs_leaderboard
                   ON runs(mode_key, difficulty_id, outcome, kills DESC, wave DESC, seconds ASC);
+
+                CREATE INDEX IF NOT EXISTS idx_contest_runs_leaderboard
+                  ON contest_runs(contest_id, score DESC, outcome, wave DESC, kills DESC, seconds ASC);
 
                 CREATE INDEX IF NOT EXISTS idx_feedback_created_at
                   ON feedback(created_at DESC);
@@ -244,6 +271,77 @@ class SurvivorDatabase:
             rows = conn.execute(sql, params).fetchall()
         return [self._leaderboard_row(row) for row in rows]
 
+    def upsert_contest_run(self, run: dict[str, Any]) -> dict[str, Any]:
+        now = utc_now()
+        with self.connect() as conn:
+            player = conn.execute("SELECT nickname FROM players WHERE player_id = ?", (run["playerId"],)).fetchone()
+            if player is None:
+                raise KeyError("player_not_found")
+            existing = conn.execute(
+                "SELECT * FROM contest_runs WHERE contest_id = ? AND player_id = ?",
+                (run["contestId"], run["playerId"]),
+            ).fetchone()
+            should_update = existing is None or self._contest_run_is_better(run, existing)
+            if should_update:
+                conn.execute(
+                    """
+                    INSERT INTO contest_runs(
+                      contest_id, player_id, nickname, run_id, completed_at, score, outcome, seconds,
+                      wave, kills, boss_kills, gold, level, weapon_id, weapon_name, difficulty_id,
+                      difficulty_name, seed, created_at, updated_at
+                    )
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ON CONFLICT(contest_id, player_id) DO UPDATE SET
+                      nickname = excluded.nickname,
+                      run_id = excluded.run_id,
+                      completed_at = excluded.completed_at,
+                      score = excluded.score,
+                      outcome = excluded.outcome,
+                      seconds = excluded.seconds,
+                      wave = excluded.wave,
+                      kills = excluded.kills,
+                      boss_kills = excluded.boss_kills,
+                      gold = excluded.gold,
+                      level = excluded.level,
+                      weapon_id = excluded.weapon_id,
+                      weapon_name = excluded.weapon_name,
+                      difficulty_id = excluded.difficulty_id,
+                      difficulty_name = excluded.difficulty_name,
+                      seed = excluded.seed,
+                      updated_at = excluded.updated_at
+                    """,
+                    (
+                        run["contestId"], run["playerId"], player["nickname"], run["id"], run["completedAt"] or now,
+                        run["score"], run["outcome"], run["seconds"], run["wave"], run["kills"],
+                        run["bossKills"], run["gold"], run["level"], run["weaponId"], run["weaponName"],
+                        run["difficultyId"], run["difficultyName"], run["seed"], now, now,
+                    ),
+                )
+            row = conn.execute(
+                "SELECT * FROM contest_runs WHERE contest_id = ? AND player_id = ?",
+                (run["contestId"], run["playerId"]),
+            ).fetchone()
+        return {"run": self._contest_run_row(row), "updated": should_update}
+
+    def contest_leaderboard(self, contest_id: str, limit: int = 50) -> list[dict[str, Any]]:
+        with self.connect() as conn:
+            rows = conn.execute(
+                """
+                SELECT * FROM contest_runs
+                WHERE contest_id = ?
+                ORDER BY
+                  score DESC,
+                  CASE WHEN outcome = 'victory' THEN 1 ELSE 0 END DESC,
+                  wave DESC,
+                  kills DESC,
+                  seconds ASC,
+                  updated_at ASC
+                LIMIT ?
+                """,
+                (contest_id, max(1, min(100, int(limit)))),
+            ).fetchall()
+        return [self._contest_run_row(row) for row in rows]
+
     def insert_feedback(self, player_id: str, nickname: str, message: str) -> dict[str, Any]:
         now = utc_now()
         with self.connect() as conn:
@@ -380,6 +478,50 @@ class SurvivorDatabase:
             "bestVictorySeconds": row["best_victory_seconds"] or 0,
             "clearedDifficultyIds": cleared_ids,
             "clearedDifficulties": cleared_names,
+        }
+
+    @staticmethod
+    def _contest_run_is_better(run: dict[str, Any], existing: sqlite3.Row) -> bool:
+        new_rank = (
+            run["score"],
+            1 if run["outcome"] == "victory" else 0,
+            run["wave"],
+            run["kills"],
+            -run["seconds"],
+        )
+        old_rank = (
+            existing["score"],
+            1 if existing["outcome"] == "victory" else 0,
+            existing["wave"],
+            existing["kills"],
+            -existing["seconds"],
+        )
+        return new_rank > old_rank
+
+    @staticmethod
+    def _contest_run_row(row: sqlite3.Row) -> dict[str, Any]:
+        return {
+            "contestId": row["contest_id"],
+            "playerId": row["player_id"],
+            "nickname": row["nickname"],
+            "id": row["run_id"],
+            "completedAt": row["completed_at"],
+            "score": row["score"],
+            "outcome": row["outcome"],
+            "seconds": row["seconds"],
+            "wave": row["wave"],
+            "kills": row["kills"],
+            "bossKills": row["boss_kills"],
+            "gold": row["gold"],
+            "level": row["level"],
+            "weaponId": row["weapon_id"],
+            "weaponName": row["weapon_name"],
+            "difficultyId": row["difficulty_id"],
+            "difficultyName": row["difficulty_name"],
+            "seed": row["seed"],
+            "avatar": f"pilot-{int(hashlib.sha1(row['player_id'].encode('utf-8')).hexdigest()[:8], 16) % 8}",
+            "createdAt": row["created_at"],
+            "updatedAt": row["updated_at"],
         }
 
     @staticmethod

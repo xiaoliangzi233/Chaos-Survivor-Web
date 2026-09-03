@@ -47,6 +47,7 @@ class BackendApiTest(unittest.TestCase):
             "config_snapshots",
             "admin_events",
             "feedback",
+            "contest_runs",
         }.issubset(db.table_names()))
 
     def test_player_progress_round_trip(self):
@@ -146,6 +147,54 @@ class BackendApiTest(unittest.TestCase):
         self.assertEqual(len(entries), 1)
         self.assertEqual(entries[0]["message"], "随机模式进入后界面卡住")
 
+    def test_contest_run_submission_keeps_daily_best(self):
+        self.client.post("/api/players/bootstrap", json={"playerId": "anon-a", "nickname": "Ace"})
+        self.client.post("/api/players/bootstrap", json={"playerId": "anon-b", "nickname": "Bolt"})
+        contest_id = "daily-2026-09-03-v1"
+        seed = self.contest_seed(contest_id)
+
+        missing = self.client.post("/api/contest-runs", json=self.contest_payload(playerId="missing", contestId=contest_id, seed=seed, expectedSeed=seed))
+        self.assertEqual(missing.status_code, 404)
+
+        tainted = self.client.post("/api/contest-runs", json=self.contest_payload(id="tainted", contestId=contest_id, seed=seed, expectedSeed=seed, tainted=True))
+        self.assertEqual(tainted.status_code, 400)
+
+        bad_seed = self.client.post("/api/contest-runs", json=self.contest_payload(id="bad-seed", contestId=contest_id, seed=seed + 1, expectedSeed=seed + 1))
+        self.assertEqual(bad_seed.status_code, 400)
+
+        first = self.client.post("/api/contest-runs", json=self.contest_payload(id="contest-a-1", contestId=contest_id, seed=seed, expectedSeed=seed, score=50000, kills=200))
+        self.assertEqual(first.status_code, 200)
+        self.assertTrue(first.json()["updated"])
+
+        lower = self.client.post("/api/contest-runs", json=self.contest_payload(id="contest-a-2", contestId=contest_id, seed=seed, expectedSeed=seed, score=45000, kills=900))
+        self.assertEqual(lower.status_code, 200)
+        self.assertFalse(lower.json()["updated"])
+        self.assertEqual(lower.json()["best"]["id"], "contest-a-1")
+        self.assertEqual(lower.json()["best"]["score"], 50000)
+
+        higher = self.client.post("/api/contest-runs", json=self.contest_payload(id="contest-a-3", contestId=contest_id, seed=seed, expectedSeed=seed, score=52000, seconds=500))
+        self.assertEqual(higher.status_code, 200)
+        self.assertTrue(higher.json()["updated"])
+
+        second_player = self.client.post("/api/contest-runs", json=self.contest_payload(
+            id="contest-b-1",
+            playerId="anon-b",
+            contestId=contest_id,
+            seed=seed,
+            expectedSeed=seed,
+            score=52000,
+            seconds=420,
+            kills=260,
+        ))
+        self.assertEqual(second_player.status_code, 200)
+
+        board = self.client.get(f"/api/contest-leaderboards?contestId={contest_id}&limit=10")
+        self.assertEqual(board.status_code, 200)
+        entries = board.json()["entries"]
+        self.assertEqual([entry["playerId"] for entry in entries], ["anon-b", "anon-a"])
+        self.assertEqual(entries[0]["score"], 52000)
+        self.assertEqual(entries[0]["seconds"], 420)
+
     def test_admin_config_publish_validates_kind_and_writes_json(self):
         bad = self.client.put(
             "/api/admin/config/not-real",
@@ -191,6 +240,38 @@ class BackendApiTest(unittest.TestCase):
         }
         payload.update(overrides)
         return payload
+
+    @staticmethod
+    def contest_payload(**overrides):
+        payload = {
+            "id": "contest-run",
+            "contestId": "daily-2026-09-03-v1",
+            "playerId": "anon-a",
+            "score": 50000,
+            "outcome": "victory",
+            "seconds": 420,
+            "wave": 20,
+            "kills": 100,
+            "bossKills": 2,
+            "gold": 80,
+            "level": 12,
+            "weaponId": "arc",
+            "weaponName": "Arc",
+            "difficultyId": "ember",
+            "difficultyName": "Ember",
+            "seed": 0,
+            "expectedSeed": 0,
+        }
+        payload.update(overrides)
+        return payload
+
+    @staticmethod
+    def contest_seed(contest_id):
+        value = 0x811C9DC5
+        for char in contest_id:
+            value ^= ord(char)
+            value = (value * 0x01000193) & 0xFFFFFFFF
+        return value
 
 
 if __name__ == "__main__":

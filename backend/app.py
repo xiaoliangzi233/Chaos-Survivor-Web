@@ -11,9 +11,18 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from .admin import admin_page, read_config_file, require_admin, validate_config_kind, write_config_file
 from .db import DEFAULT_DB_PATH, SurvivorDatabase
-from .schemas import ConfigDraft, FeedbackSubmission, PlayerBootstrap, PlayerNicknameUpdate, ProgressSnapshot, RunSubmission
+from .schemas import ConfigDraft, ContestRunSubmission, FeedbackSubmission, PlayerBootstrap, PlayerNicknameUpdate, ProgressSnapshot, RunSubmission
 
 AUTH_USER_URL = "http://113.249.91.32/sszl/user/simple-info"
+
+
+def contest_seed_from_id(contest_id: str) -> int:
+    value = contest_id or ""
+    hash_value = 0x811C9DC5
+    for char in value:
+        hash_value ^= ord(char)
+        hash_value = (hash_value * 0x01000193) & 0xFFFFFFFF
+    return hash_value
 
 
 def create_app(db_path: str | Path | None = None) -> FastAPI:
@@ -100,6 +109,32 @@ def create_app(db_path: str | Path | None = None) -> FastAPI:
         limit: int = Query(default=20, ge=1, le=100),
     ):
         return {"entries": database.leaderboard(mode, difficulty, metric, limit)}
+
+    @app.post("/api/contest-runs")
+    def submit_contest_run(payload: ContestRunSubmission):
+        if payload.tainted or payload.debug:
+            raise HTTPException(status_code=400, detail="tainted_run_rejected")
+        if not payload.contestId.startswith("daily-") or payload.seed != contest_seed_from_id(payload.contestId):
+            raise HTTPException(status_code=400, detail="contest_seed_mismatch")
+        if not database.player_exists(payload.playerId):
+            raise HTTPException(status_code=404, detail="player_not_found")
+        try:
+            result = database.upsert_contest_run(payload.model_dump())
+        except KeyError as exc:
+            raise HTTPException(status_code=404, detail="player_not_found") from exc
+        return {"run": result["run"], "best": result["run"], "updated": result["updated"]}
+
+    @app.get("/api/contest-leaderboards")
+    def contest_leaderboards(
+        contestId: str = Query(default="today", max_length=96),
+        limit: int = Query(default=50, ge=1, le=100),
+    ):
+        from datetime import datetime, timezone
+
+        normalized = contestId.strip()
+        if normalized == "today":
+            normalized = f"daily-{datetime.now(timezone.utc).date().isoformat()}-v1"
+        return {"contestId": normalized, "entries": database.contest_leaderboard(normalized, limit)}
 
     @app.post("/api/feedback")
     def submit_feedback(payload: FeedbackSubmission):

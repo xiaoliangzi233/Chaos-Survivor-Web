@@ -640,6 +640,7 @@ function drawDevice(ctx, device, time) {
   });
   drawInteractionRing(ctx, device.id, device.color, device.kind === "missionTable" ? 132 : 96, 36);
   if (device.kind === "missionTable") drawMissionTable(ctx, device, time);
+  else if (device.kind === "contest") drawContestTerminal(ctx, device, time);
   else if (device.kind === "recorder" || device.kind === "codex" || device.kind === "feedback") drawArchiveDevice(ctx, device, time);
   else if (device.kind === "gene") drawGeneModifier(ctx, device, time);
   else if (device.kind === "rift") drawRiftStabilizer(ctx, device, time);
@@ -653,6 +654,41 @@ function drawDevice(ctx, device, time) {
     active: state.lobby.nearbyInteractionId === device.id || state.lobby.hoveredInteractionId === device.id,
   });
   ctx.restore();
+}
+
+function drawContestTerminal(ctx, device, time) {
+  drawObjectShadow(ctx, 0, 35, 96, 28);
+  drawMachineBase(ctx, 0, 20, 86, 42, device.color);
+  ctx.fillStyle = "#111827";
+  ctx.strokeStyle = hexToRgba(device.color, 0.68);
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.roundRect(-66, -92, 132, 86, 10);
+  ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = hexToRgba("#020617", 0.92);
+  ctx.fillRect(-54, -80, 108, 58);
+  ctx.strokeStyle = hexToRgba(device.color, 0.85);
+  ctx.lineWidth = 2;
+  ctx.strokeRect(-54, -80, 108, 58);
+  const pulse = 0.55 + Math.sin(time * 4.6) * 0.25;
+  ctx.fillStyle = hexToRgba(device.color, pulse);
+  for (let i = 0; i < 5; i++) {
+    const x = -42 + i * 21;
+    const h = 12 + ((i * 9 + Math.floor(time * 8)) % 28);
+    ctx.fillRect(x, -34 - h, 10, h);
+  }
+  ctx.fillStyle = "#f8fbff";
+  ctx.font = `bold 9px ${FONT}`;
+  ctx.textAlign = "center";
+  ctx.fillText("DAILY", 0, -96);
+  ctx.font = `8px ${FONT}`;
+  ctx.fillStyle = device.color;
+  ctx.fillText("FIXED SEED", 0, -13);
+  ctx.fillStyle = hexToRgba("#ffffff", 0.78);
+  ctx.fillRect(-38, 0, 76, 6);
+  ctx.fillStyle = hexToRgba(device.color, 0.9);
+  ctx.fillRect(-38, 0, 76 * ((Math.sin(time * 2.2) + 1) * 0.5), 6);
 }
 
 function drawMissionTable(ctx, device, time) {

@@ -29,6 +29,7 @@ AGENTS.md
 道具.md
 
 # Local runtime artifacts
+.deploy/
 .edge-profile/
 *.log
 *.tmp

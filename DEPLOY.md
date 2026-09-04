@@ -1,15 +1,27 @@
-# Survivor Docker 部署
+# Survivor 部署说明
 
-本项目部署到赛数助理测试服务器 `1.14.93.50`，只使用 Docker Compose 启动。前端由 Nginx 容器提供，后端由 FastAPI 容器提供。
+本项目部署到服务器 `1.14.93.50`，浏览器访问地址为：
 
 ```text
-服务器：1.14.93.50
-用户：root
-远程目录：/opt/survivor
-前端容器：survivor-frontend
-后端容器：survivor-backend
-访问地址：http://139.155.133.14:8081/survivor/
+http://139.155.133.14:18080/survivor/
 ```
+
+当前只保留一套部署方式：
+
+- 前端静态文件由服务器宿主机 Nginx 发布。
+- 对外访问端口默认是独立端口 `18080`，也就是 `http://139.155.133.14:18080/survivor/`，避免影响服务器上已有测试环境或医疗系统主站。
+- `/survivor/api/` 和 `/survivor/admin` 由 Nginx 反向代理到后端容器。
+- 后端 FastAPI 使用 Docker 镜像和容器运行。
+- 后端容器内部监听 `5010`，宿主机默认映射到 `127.0.0.1:18081`，不会占用服务器已有的 `5010`。
+- 后续部署默认不重建后端镜像，避免重复安装 Python 依赖。
+
+服务器需要已经安装：
+
+- `docker`
+- `nginx`
+- `unzip`
+
+脚本不会安装这些服务。
 
 ## 首次部署
 
@@ -21,69 +33,140 @@
 
 脚本会自动完成：
 
-1. 打包当前项目的 Docker 部署文件
-2. 上传到 `root@1.14.93.50:/tmp/survivor-fullstack.zip`
-3. 在服务器解压到 `/opt/survivor`
-4. 生成 `.env`
-5. 执行 `docker compose up -d --build --remove-orphans`
-6. 自动检查 `http://127.0.0.1:8081/survivor/` 和 `http://127.0.0.1:8081/survivor/api/health`
-
-服务器已有 Docker，因此部署脚本不会安装 Docker，也不会在 `survivor` 下再创建 `docker` 子目录。
+1. 打包当前项目。
+2. 上传到 `root@1.14.93.50:/tmp/survivor-fullstack.zip`。
+3. 解压到服务器 `/opt/survivor`。
+4. 首次构建后端 Docker 镜像 `survivor-backend:latest`。
+5. 首次创建并启动后端容器 `survivor-backend`。
+6. 写入 Nginx 路由片段 `/etc/nginx/snippets/survivor-locations.conf`。
+7. 默认写入独立端口配置 `/etc/nginx/conf.d/survivor.conf`，监听 `18080`。
+8. 执行 `nginx -t` 并重载 Nginx。
+9. 检查页面和后端健康接口。
 
 首次连接服务器时，命令行可能要求确认主机指纹，输入 `yes`。如果没有配置 SSH 密钥，会提示输入 `root` 密码。
-
-如果登录服务不是宿主机的 `8080` 端口，需要指定真实地址：
-
-```powershell
-.\deploy-fullstack.cmd -AuthProxyPass "http://真实登录服务地址"
-```
-
-如果要指定管理后台 token：
-
-```powershell
-.\deploy-fullstack.cmd -AdminToken "your-strong-admin-token"
-```
 
 部署完成后访问：
 
 ```text
-http://139.155.133.14:8081/survivor/
-http://139.155.133.14:8081/survivor/api/health
-http://139.155.133.14:8081/survivor/admin
-```
-
-正常情况下不需要再登录服务器手动启动。脚本结束时，前端 Nginx 容器和后端 FastAPI 容器都已经启动。
-
-部署成功后，本机会自动打开浏览器访问 `http://139.155.133.14:8081/survivor/`。如果不想自动打开浏览器：
-
-```powershell
-.\deploy-fullstack.cmd -NoBrowser
+http://139.155.133.14:18080/survivor/
+http://139.155.133.14:18080/survivor/api/health
+http://139.155.133.14:18080/survivor/admin
 ```
 
 ## 后续部署
 
-代码修改后，仍然执行同一个命令：
+如果只改了前端、配置、图片、样式，仍然执行：
 
 ```powershell
 .\deploy-fullstack.cmd
 ```
 
-脚本会重新上传代码，并在服务器执行：
+后续部署会：
 
-```bash
-cd /opt/survivor
-docker compose up -d --build
+- 覆盖 `/opt/survivor` 中的项目文件。
+- 更新 Nginx 静态文件。
+- 执行 `docker restart survivor-backend`。
+- 重载 Nginx。
+
+后续部署默认不会重新构建后端镜像，因此不会重复安装 Python 依赖。
+
+如果修改了后端代码、`backend/requirements.txt` 或 `backend/Dockerfile`，执行：
+
+```powershell
+.\deploy-fullstack.cmd -RebuildBackend
 ```
 
-如果要和部署脚本保持一致：
+这会重新构建 `survivor-backend:latest`，然后删除旧后端容器并用新镜像重新创建。后端数据保存在 Docker volume `survivor-data`，重建容器不会清空数据。
 
-```bash
-docker compose up -d --build --remove-orphans
+如果服务器的 `18081` 也被其他服务占用，可以换一个宿主机端口：
+
+```powershell
+.\deploy-fullstack.cmd -BackendHostPort 18082
 ```
 
-Docker 会重建镜像并滚动替换容器。后端 SQLite 数据保存在 Docker volume `survivor-data`，后续部署不会清空玩家数据。
+如果服务器的 `18080` 已经被非 Nginx 服务占用，Nginx 无法接管 `http://139.155.133.14:18080/survivor/`。先在服务器上查看：
 
-## 服务器常用命令
+```bash
+ss -ltnp '( sport = :18080 )'
+```
+
+如果占用者是 Nginx，脚本会写入独立的 `/etc/nginx/conf.d/survivor.conf`；如果占用者是其他业务，脚本只会报错，不会自动停止。
+
+如果需要换其他公网端口，可以这样部署：
+
+```powershell
+.\deploy-fullstack.cmd -FrontendHostPort 18082 -PublicBaseUrl "http://139.155.133.14:18082/survivor"
+```
+
+## 清空后重新部署
+
+如果服务器之前部署失败，可以先登录服务器：
+
+```powershell
+ssh root@1.14.93.50
+```
+
+然后执行：
+
+```bash
+docker stop survivor-backend 2>/dev/null || true
+docker rm survivor-backend 2>/dev/null || true
+docker stop survivor-frontend 2>/dev/null || true
+docker rm survivor-frontend 2>/dev/null || true
+docker rmi survivor-backend:latest 2>/dev/null || true
+rm -rf /opt/survivor
+rm -f /etc/nginx/conf.d/survivor.conf
+rm -f /etc/nginx/snippets/survivor-locations.conf
+nginx -t && systemctl reload nginx
+```
+
+如果提示 `18081` 被占用，继续查看占用进程：
+
+```bash
+ss -ltnp '( sport = :18081 )'
+```
+
+如果这是其他业务服务，不要停止它，部署时改用 `-BackendHostPort` 指定其他端口。
+
+如果要连玩家数据一起清空，再额外执行：
+
+```bash
+docker volume rm survivor-data 2>/dev/null || true
+```
+
+然后回到本机项目根目录重新部署：
+
+```powershell
+.\deploy-fullstack.cmd
+```
+
+## 登录服务
+
+当前 Nginx 会把：
+
+```text
+/sszl/
+```
+
+代理到：
+
+```text
+http://127.0.0.1:8080
+```
+
+也就是服务器本机的登录服务。游戏中的用户信息接口最终会走：
+
+```text
+http://139.155.133.14:18080/sszl/user/simple-info
+```
+
+如果登录服务端口不同，部署时指定：
+
+```powershell
+.\deploy-fullstack.cmd -AuthProxyPass "http://127.0.0.1:你的端口"
+```
+
+## 常用命令
 
 登录服务器：
 
@@ -91,79 +174,57 @@ Docker 会重建镜像并滚动替换容器。后端 SQLite 数据保存在 Dock
 ssh root@1.14.93.50
 ```
 
-进入部署目录：
+查看后端容器：
 
 ```bash
-cd /opt/survivor
+docker ps --filter name=survivor-backend
 ```
 
-查看容器状态：
+查看后端日志：
 
 ```bash
-docker compose ps
+docker logs -f survivor-backend
 ```
 
-查看日志：
+重启后端：
 
 ```bash
-docker compose logs -f
+docker restart survivor-backend
 ```
 
-重启服务：
+重载 Nginx：
 
 ```bash
-docker compose restart
+nginx -t && systemctl reload nginx
 ```
 
-停止服务：
-
-```bash
-docker compose down
-```
-
-重新构建并启动：
-
-```bash
-docker compose up -d --build
-```
-
-## 部署结构
-
-Docker Compose 配置：
-
-```text
-docker-compose.yml
-```
-
-前端 Nginx：
-
-```text
-Dockerfile
-deploy/nginx/docker-fullstack.conf.template
-```
-
-后端服务：
-
-```text
-backend/Dockerfile
-backend/requirements.txt
-```
-
-Nginx 容器内路由：
+## 路由结构
 
 ```text
 /survivor/       -> 前端页面
-/survivor/api/   -> survivor-backend:5010
-/survivor/admin  -> survivor-backend:5010/admin
-/sszl/           -> 登录服务，由 AUTH_PROXY_PASS 指定
+/survivor/api/   -> 后端宿主机端口 127.0.0.1:18081/api/
+/survivor/admin  -> 后端宿主机端口 127.0.0.1:18081/admin
+/sszl/           -> 登录服务 127.0.0.1:8080
 ```
 
-前端发布时会自动使用同源后端：
+服务器当前已经有 `/etc/nginx/conf.d/kcj.conf` 作为 80 端口默认主站。默认部署会避开这个主站，改用独立端口 `18080` 的 `/etc/nginx/conf.d/survivor.conf`。只有显式指定 `-FrontendHostPort 80` 时，脚本才会把 `/survivor` 路由 include 到现有 80 主站。
+
+前端发布配置保持同源访问：
 
 ```json
 {
   "apiBaseUrl": ".",
   "requireLogin": true,
-  "defaultNickname": "游客"
+  "defaultNickname": "游客",
+  "authFailureMode": "redirect",
+  "loginRedirectUrl": "http://139.155.133.14:8081/login"
 }
 ```
+
+登录成功检测逻辑：
+
+- 游戏会先请求 `/survivor/api/auth/simple-info`。
+- 后端会继续请求服务器本机登录接口 `/sszl/user/simple-info`。
+- 如果同源后端校验失败，前端会直接请求 `/sszl/user/simple-info`，浏览器会自动携带 Cookie。
+- 返回结果能解析出 `id` 和 `username` 时，认为登录成功。
+- 登录失败后由 `authFailureMode` 控制：`redirect` 跳转到 `loginRedirectUrl`，`guest` 以游客身份进入游戏。

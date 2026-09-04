@@ -25,7 +25,7 @@ export async function configurePlayerProgress() {
 }
 
 export async function requirePlayerLogin() {
-  return requireAuthenticatedUser({ redirectTo: "/login" });
+  return requireAuthenticatedUser();
 }
 
 export async function loadPlayerProgress({ difficultyIds: nextDifficultyIds = [], backendPlayer = undefined } = {}) {

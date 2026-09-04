@@ -2,6 +2,8 @@ const DEFAULT_BACKEND_CONFIG = {
   apiBaseUrl: "",
   requireLogin: false,
   defaultNickname: "Anonymous",
+  authFailureMode: "guest",
+  loginRedirectUrl: "",
 };
 
 // Local static servers do not provide the progress API. Set ?api=... or fill
@@ -33,5 +35,16 @@ function normalizeBackendConfig(value) {
     defaultNickname: typeof source.defaultNickname === "string"
       ? source.defaultNickname
       : DEFAULT_BACKEND_CONFIG.defaultNickname,
+    authFailureMode: normalizeAuthFailureMode(source.authFailureMode),
+    loginRedirectUrl: typeof source.loginRedirectUrl === "string"
+      ? source.loginRedirectUrl
+      : DEFAULT_BACKEND_CONFIG.loginRedirectUrl,
   };
+}
+
+function normalizeAuthFailureMode(value) {
+  const mode = String(value || "").trim().toLowerCase();
+  return mode === "redirect" || mode === "guest"
+    ? mode
+    : DEFAULT_BACKEND_CONFIG.authFailureMode;
 }

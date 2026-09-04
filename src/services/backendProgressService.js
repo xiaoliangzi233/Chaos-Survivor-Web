@@ -95,12 +95,11 @@ export function setBackendNickname(value) {
   return nickname;
 }
 
-export async function requireAuthenticatedUser({ redirectTo = "/login" } = {}) {
+export async function requireAuthenticatedUser({ redirectTo = "" } = {}) {
   if (isAuthDisabledForLocalTest()) {
     return { id: currentPlayerId(), username: currentNickname(), employeeId: "", localTest: true };
   }
   authToken = readAuthToken();
-  if (!authToken) return redirectToLogin(redirectTo);
   try {
     const user = await fetchAuthenticatedUser(authToken);
     authenticatedUser = normalizeAuthUser(user);
@@ -376,7 +375,8 @@ async function fetchAuthenticatedUser(token) {
   try {
     const response = await fetch(AUTH_USER_PATH, {
       method: "GET",
-      headers: { Authorization: token },
+      headers: token ? { Authorization: token } : {},
+      credentials: "include",
       signal: controller.signal,
     });
     const text = await response.text();
@@ -428,7 +428,11 @@ function normalizeStringList(value) {
 }
 
 function redirectToLogin(redirectTo) {
-  const target = redirectTo || "/login";
+  const target = redirectTo || backendConfig.loginRedirectUrl || "";
+  if (backendConfig.authFailureMode !== "redirect") {
+    return { id: currentPlayerId(), username: currentNickname(), employeeId: "", guest: true };
+  }
+  if (!target) return null;
   try {
     if (globalThis.location?.pathname !== target) globalThis.location.href = target;
   } catch {

@@ -1,0 +1,46 @@
+# Include this file inside the existing port 80 server block before location /.
+# Example:
+#   include /etc/nginx/snippets/survivor-locations.conf;
+
+location = /survivor {
+    return 301 /survivor/;
+}
+
+location ^~ /sszl/ {
+    proxy_pass http://127.0.0.1:8080;
+    proxy_http_version 1.1;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+}
+
+location ^~ /survivor/api/ {
+    proxy_pass http://127.0.0.1:18081/api/;
+    proxy_http_version 1.1;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+}
+
+location = /survivor/admin {
+    proxy_pass http://127.0.0.1:18081/admin;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+}
+
+location ~ ^/survivor/(deploy|scripts|tests|docs|backend|worker)/ {
+    return 404;
+}
+
+location ^~ /survivor/ {
+    root /opt;
+    try_files $uri $uri/ /survivor/index.html;
+    expires off;
+    add_header Cache-Control "no-store, no-cache, must-revalidate, max-age=0" always;
+    add_header Pragma "no-cache" always;
+    add_header Expires "0" always;
+}

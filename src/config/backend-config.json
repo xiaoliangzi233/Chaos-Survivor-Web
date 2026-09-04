@@ -1,5 +1,7 @@
 {
-  "apiBaseUrl": "",
+  "apiBaseUrl": ".",
   "requireLogin": true,
-  "defaultNickname": "游客"
+  "defaultNickname": "游客",
+  "authFailureMode": "guest",
+  "loginRedirectUrl": "http://139.155.133.14:8081/login"
 }

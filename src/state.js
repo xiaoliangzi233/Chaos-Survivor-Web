@@ -13,7 +13,6 @@ export const state = {
   runMode: "standard",
   randomGoal: "twenty_waves",
   randomRun: createRandomRunState(),
-  contest: createContestState(),
   spawnedBossWaves: new Set(),
   thiefSpawnWave: 0,
   thiefSpawnCount: 0,
@@ -256,7 +255,6 @@ export function createLobbyState(previous = {}) {
     talkingNpcId: null,
     pendingLaunch: null,
     lastLaunchConfig: previous.lastLaunchConfig ? { ...previous.lastLaunchConfig } : null,
-    contestBriefedFor: previous.contestBriefedFor || "",
     tutorial: {
       active: Boolean(previous.tutorial?.active),
       source: previous.tutorial?.source || "",
@@ -299,26 +297,6 @@ export function createRandomRunState() {
   };
 }
 
-export function createContestState(previous = {}) {
-  return {
-    active: Boolean(previous.active),
-    contestId: previous.contestId || "",
-    dateKey: previous.dateKey || "",
-    seed: Number(previous.seed) || 0,
-    difficultyId: previous.difficultyId || "",
-    difficultyName: previous.difficultyName || "",
-    weaponId: previous.weaponId || "",
-    weaponName: previous.weaponName || "",
-    waveGoal: Math.max(1, Math.floor(Number(previous.waveGoal) || 20)),
-    startedAt: previous.startedAt || "",
-    submitted: Boolean(previous.submitted),
-    tainted: Boolean(previous.tainted),
-    lastResult: previous.lastResult || null,
-    leaderboard: Array.isArray(previous.leaderboard) ? [...previous.leaderboard] : [],
-    syncStatus: previous.syncStatus || "",
-  };
-}
-
 export function resetRun(map) {
   const previousAi = state.ai;
   const previousDebug = state.debug;
@@ -347,7 +325,6 @@ export function resetRun(map) {
   state.runMode = "standard";
   state.randomGoal = "twenty_waves";
   state.randomRun = createRandomRunState();
-  state.contest = createContestState();
   state.spawnedBossWaves = new Set();
   state.thiefSpawnWave = 0;
   state.thiefSpawnCount = 0;

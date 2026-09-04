@@ -14,7 +14,6 @@ import {
 import { framePerformance } from "../performanceMonitor.js";
 import { availableEnemyIdsForWave, createDecorativeEnemy, decorativeEnemyIds } from "../enemyRegistry.js";
 import { activeWaveEffect } from "../waveScenarios.js";
-import { preloadEnemySpriteAtlases } from "../../enemies/enemySprites.js";
 import {
   applyEnemyVisualVariant,
   applyEnemyBakePose,
@@ -197,7 +196,6 @@ export class PixiBackend {
     this.releaseRunTextures();
     onProgress(0.2, "生成 Pixi 公共纹理");
     this.ensureGlyphTextures();
-    await preloadEnemySpriteAtlases();
     const enemyIds = this.enemyIdsForRun(context);
     this.ensureEnemyTextures(enemyIds, (prepared, total) => {
       onProgress(0.2 + prepared / Math.max(1, total) * 0.35, `烘焙敌人纹理 ${prepared}/${total}`);

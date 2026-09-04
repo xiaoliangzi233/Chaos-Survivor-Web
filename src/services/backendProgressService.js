@@ -1,9 +1,9 @@
-import { backendConfig } from "../config/backend-config.js";
+import { backendConfig, loadBackendConfig } from "../config/backend-config.js";
 
 const PLAYER_ID_KEY = "pixel-survivor-player-id-v1";
 const NICKNAME_KEY = "pixel-survivor-player-nickname-v1";
 const AUTH_TOKEN_KEY = "pixel-survivor-auth-token-v1";
-const AUTH_USER_URL = "http://113.249.91.32/sszl/user/simple-info";
+const AUTH_USER_PATH = "/sszl/user/simple-info";
 const REQUEST_TIMEOUT_MS = 3000;
 
 let apiBaseUrl = "";
@@ -16,7 +16,8 @@ let needsNickname = false;
 let available = false;
 let lastError = "";
 
-export function configureBackendProgress() {
+export async function configureBackendProgress() {
+  await loadBackendConfig();
   apiBaseUrl = resolveApiBaseUrl();
   playerId = ensurePlayerId();
   nickname = readNickname();
@@ -240,42 +241,6 @@ export async function fetchLeaderboards({ mode = "all", difficulty = "all", metr
   }
 }
 
-export async function submitContestRun(run) {
-  if (!apiBaseUrl || !run) return { ok: false, enabled: false, error: "backend_disabled" };
-  try {
-    const result = await requestJson("/api/contest-runs", {
-      method: "POST",
-      body: JSON.stringify({ ...run, playerId: currentPlayerId() }),
-    });
-    available = true;
-    lastError = "";
-    return {
-      ok: true,
-      enabled: true,
-      run: result?.run || null,
-      best: result?.best || result?.run || null,
-      updated: Boolean(result?.updated),
-    };
-  } catch (error) {
-    markFailure(error);
-    return { ok: false, enabled: true, error: lastError };
-  }
-}
-
-export async function fetchContestLeaderboard({ contestId = "today", limit = 50 } = {}) {
-  if (!apiBaseUrl) return { entries: [], enabled: false };
-  const params = new URLSearchParams({ contestId, limit: String(limit) });
-  try {
-    const result = await requestJson(`/api/contest-leaderboards?${params}`);
-    available = true;
-    lastError = "";
-    return { entries: Array.isArray(result.entries) ? result.entries : [], enabled: true, contestId: result.contestId || contestId };
-  } catch (error) {
-    markFailure(error);
-    return { entries: [], enabled: true, error: lastError };
-  }
-}
-
 export async function submitFeedback({ message } = {}) {
   if (!apiBaseUrl) return { ok: false, enabled: false, error: "backend_disabled" };
   try {
@@ -409,7 +374,7 @@ async function fetchAuthenticatedUser(token) {
   const controller = new AbortController();
   const timeout = globalThis.setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
   try {
-    const response = await fetch(AUTH_USER_URL, {
+    const response = await fetch(AUTH_USER_PATH, {
       method: "GET",
       headers: { Authorization: token },
       signal: controller.signal,

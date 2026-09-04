@@ -1,5 +1,5 @@
 export const UPGRADE_ATLAS_URL = new URL("../../assets/ui/upgrade-atlas-v1.png", import.meta.url).href;
-export const UPGRADE_ATLAS_CELL = 128;
+export const UPGRADE_ATLAS_CELL = 32;
 const UPGRADE_ATLAS_COLS = 4;
 const UPGRADE_ATLAS_ROWS = 3;
 

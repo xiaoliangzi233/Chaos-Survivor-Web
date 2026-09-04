@@ -1,5 +1,5 @@
 export const ITEM_ATLAS_URL = new URL("../../assets/visual/item-atlas-v1.png", import.meta.url).href;
-export const ITEM_ATLAS_CELL = 64;
+export const ITEM_ATLAS_CELL = 32;
 
 export const ITEM_ATLAS_COORDS = Object.freeze({
   heart_container: [0, 0],

@@ -69,11 +69,8 @@ const LAB_PALETTE = {
   rust: "#9a4f2f",
 };
 
-export function generateMap(seed = null) {
-  const mapSeed = Number.isFinite(Number(seed))
-    ? Math.floor(Number(seed)) >>> 0
-    : Math.floor(Math.random() * 2147483647);
-  const rng = mulberry32(mapSeed);
+export function generateMap() {
+  const rng = mulberry32(Math.floor(Math.random() * 2147483647));
   const half = WORLD_SIZE / 2;
   const tileSize = 96;
   const rooms = createLabRooms(rng, half);
@@ -92,7 +89,7 @@ export function generateMap(seed = null) {
   const doors = createDoorways(rooms, corridors);
   addDoorwayDecals(rng, doors, floorDecals);
 
-  const map = { seed: mapSeed, tileSize, palette: LAB_PALETTE, rooms, corridors, doors, tiles, props, energyLines, floorDecals, cableRuns, fogBanks };
+  const map = { tileSize, palette: LAB_PALETTE, rooms, corridors, doors, tiles, props, energyLines, floorDecals, cableRuns, fogBanks };
   constrainMapGeometry(map, half);
   finalizeMapLayers(map);
   applyMapVisualProfiles(map);

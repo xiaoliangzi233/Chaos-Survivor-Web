@@ -20,8 +20,8 @@ export const ADVENTURE_HISTORY_LIMIT = 200;
 let difficultyIds = [];
 let progress = emptyProgress();
 
-export function configurePlayerProgress() {
-  configureBackendProgress();
+export async function configurePlayerProgress() {
+  await configureBackendProgress();
 }
 
 export async function requirePlayerLogin() {

@@ -9,7 +9,6 @@ import { maybeTriggerBossSignature } from "../systems/easterEggs.js";
 import { dropEnemyRewards } from "../systems/rewards.js";
 import { randomGrowthMultiplierForWave } from "../systems/randomMode.js";
 import { notifyMinionDamaged, notifyMinionKilled } from "../systems/minionMechanics.js";
-import { drawZombieMoveSprite } from "./enemySprites.js";
 
 export class BaseEnemy {
   constructor(config, x, y) {
@@ -341,15 +340,9 @@ function drawEnemyShape(ctx, e) {
     ctx.strokeStyle = hurt ? "#ff4d6d" : e.elite ? "#ffd166" : "rgba(255,255,255,0.55)";
     ctx.lineWidth = hurt ? 3 : e.elite ? 3 : 1.5;
     ctx.strokeRect(-e.r * 0.75, -e.r * 1.2, e.r * 1.5, e.r * 2.2);
-  } else if (isZombieEnemy(e) && drawZombieMoveSprite(ctx, e)) {
-    return;
   } else {
     drawZombieShape(ctx, e);
   }
-}
-
-function isZombieEnemy(e) {
-  return e.id === "zombie" || e.type === "zombie";
 }
 
 function drawFallbackSlimeShape(ctx, e) {

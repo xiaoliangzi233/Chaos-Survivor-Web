@@ -5,7 +5,6 @@ import { getCodexEntries } from "./codex.js";
 
 export const RUN_MODE_STANDARD = "standard";
 export const RUN_MODE_RANDOM = "random";
-export const RUN_MODE_CONTEST = "contest";
 export const RANDOM_GOAL_TWENTY_WAVES = "twenty_waves";
 export const RANDOM_GOAL_ENDLESS = "endless";
 export const RANDOM_WAVE_SECONDS = 60;
@@ -116,7 +115,7 @@ export function createRandomRunState(seed = null, curses = []) {
 }
 
 export function configureRandomModeRun({ runMode = RUN_MODE_STANDARD, randomGoal = RANDOM_GOAL_TWENTY_WAVES, seed = null, curses = [] } = {}) {
-  state.runMode = runMode === RUN_MODE_RANDOM ? RUN_MODE_RANDOM : runMode === RUN_MODE_CONTEST ? RUN_MODE_CONTEST : RUN_MODE_STANDARD;
+  state.runMode = runMode === RUN_MODE_RANDOM ? RUN_MODE_RANDOM : RUN_MODE_STANDARD;
   state.randomGoal = randomGoal === RANDOM_GOAL_ENDLESS ? RANDOM_GOAL_ENDLESS : RANDOM_GOAL_TWENTY_WAVES;
   state.randomRun = createRandomRunState(seed, state.runMode === RUN_MODE_RANDOM ? curses : []);
   return state.randomRun;

@@ -1,5 +1,5 @@
 export const WEAPON_ATLAS_URL = new URL("../../assets/ui/weapon-atlas-v1.png", import.meta.url).href;
-export const WEAPON_ATLAS_CELL = 128;
+export const WEAPON_ATLAS_CELL = 32;
 const WEAPON_ATLAS_COLS = 4;
 const WEAPON_ATLAS_ROWS = 3;
 

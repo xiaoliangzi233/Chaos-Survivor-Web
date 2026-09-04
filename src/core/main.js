@@ -11,7 +11,6 @@ import {
   hideAllOverlays,
   pickThree,
   showEnd,
-  renderContestResults,
   loadGameConfig,
   setBootProgress,
   showRunLoading,
@@ -38,7 +37,6 @@ import { monitorRuntimeBudgets } from "../systems/runtimeBudgets.js";
 import { populateDeterministicStressScenario, stressScenarioRequested } from "../systems/stressScenario.js";
 import { playSfx, startMusic, stopMusic, pauseMusic, resumeMusic, setMusicScene } from "../audio.js";
 import { CAMERA_ZOOM } from "../constants.js";
-import { mulberry32 } from "../utils.js";
 import { difficultyOrder, loadDifficultyProgress, recordDifficultyVictory, selectDifficulty, setupDifficultyConfig } from "../difficulty.js";
 import { loadEditableGameData } from "../config/editableGameData.js";
 import { initAi, updateAi } from "../ai/aiController.js";
@@ -60,7 +58,6 @@ import { initDebugModeUi, updateDebugModeUi } from "../ui/debugModeUi.js";
 import {
   RANDOM_GOAL_ENDLESS,
   RANDOM_GOAL_TWENTY_WAVES,
-  RUN_MODE_CONTEST,
   RUN_MODE_RANDOM,
   configureRandomModeRun,
   isRandomEndlessMode,
@@ -104,18 +101,9 @@ import { closeFeedback, initFeedbackUi, openFeedback } from "../ui/feedbackUi.js
 import { initNicknameUi, requestPlayerNickname } from "../ui/nicknameUi.js";
 import {
   bootstrapBackendPlayer,
-  currentPlayerId,
   isCurrentUserAdmin,
-  fetchContestLeaderboard,
-  submitContestRun,
   submitBackendNickname,
 } from "../services/backendProgressService.js";
-import {
-  buildContestRunSubmission,
-  buildDailyContestSpec,
-  createContestState as createActiveContestState,
-  isContestSubmissionClean,
-} from "../systems/dailyContest.js";
 
 const LEVEL_CHOICE_REFRESH_COST = 10;
 
@@ -175,7 +163,7 @@ export async function bootGame() {
   const preloadCoordinator = new PreloadCoordinator(renderBackend);
   await preloadCoordinator.initCore((progress, label) => setBootProgress(26 + progress * 12, label));
   window.__survivorRendererStats = () => renderBackend.getStats();
-  configurePlayerProgress();
+  await configurePlayerProgress();
   setBootProgress(40, "正在验证登录身份");
   const authenticatedUser = await requirePlayerLogin();
   if (!authenticatedUser) return;
@@ -212,7 +200,6 @@ export async function bootGame() {
   let fpsFrames = 0;
   let nextStatsPublishAt = 0;
   let debugUi = null;
-  let restoreContestRandom = null;
 
   function start() {
     if (isHelpOpen()) return;
@@ -244,19 +231,14 @@ export async function bootGame() {
     return true;
   }
 
-  async function startWithLoadout({ difficulty, weapon, runMode = "standard", randomGoal = RANDOM_GOAL_TWENTY_WAVES, curses = [], contest = null }) {
+  async function startWithLoadout({ difficulty, weapon, runMode = "standard", randomGoal = RANDOM_GOAL_TWENTY_WAVES, curses = [] }) {
     if (!difficulty?.id || !weapon?.id || state.mode === "launching") return false;
-    const normalizedRunMode = runMode === RUN_MODE_RANDOM ? RUN_MODE_RANDOM : runMode === RUN_MODE_CONTEST ? RUN_MODE_CONTEST : "standard";
-    const contestSpec = normalizedRunMode === RUN_MODE_CONTEST
-      ? contest || buildDailyContestSpec({ difficulties: difficultyCards(), weapons: STARTER_WEAPONS })
-      : null;
     state.lobby.lastLaunchConfig = {
       difficultyId: difficulty.id,
       weaponId: weapon.id,
-      runMode: normalizedRunMode,
+      runMode: runMode === RUN_MODE_RANDOM ? RUN_MODE_RANDOM : "standard",
       randomGoal: randomGoal === RANDOM_GOAL_ENDLESS ? RANDOM_GOAL_ENDLESS : RANDOM_GOAL_TWENTY_WAVES,
-      curses: normalizedRunMode === RUN_MODE_RANDOM ? [...curses] : [],
-      contest: contestSpec,
+      curses: runMode === RUN_MODE_RANDOM ? [...curses] : [],
     };
     closeCodex();
     closeHelp();
@@ -268,17 +250,14 @@ export async function bootGame() {
     setMusicScene("battle", { autoplay: false });
     selectDifficulty(difficulty.id);
     preloadCoordinator.releaseRun();
-    const runMap = generateMap(contestSpec?.seed ?? null);
+    const runMap = generateMap();
     resetRun(runMap);
     selectDifficulty(difficulty.id);
-    if (contestSpec) state.contest = createActiveContestState(contestSpec);
-    deactivateContestRandom();
     configureRandomModeRun({
-      runMode: normalizedRunMode,
+      runMode: runMode === RUN_MODE_RANDOM ? RUN_MODE_RANDOM : "standard",
       randomGoal: randomGoal === RANDOM_GOAL_ENDLESS ? RANDOM_GOAL_ENDLESS : RANDOM_GOAL_TWENTY_WAVES,
-      curses: normalizedRunMode === RUN_MODE_RANDOM ? curses : [],
+      curses,
     });
-    if (contestSpec) state.contest = createActiveContestState(contestSpec);
     state.waveDuration = isRandomMode() ? randomWaveDurationFor(state.wave) : waveDurationFor(state.wave);
     state.waveTimeLeft = state.waveDuration;
     state.shop = createShopState();
@@ -290,18 +269,16 @@ export async function bootGame() {
       map: runMap,
       difficultyId: difficulty.id,
       weaponId: weapon.id,
-      runMode: normalizedRunMode,
+      runMode,
     }, (progress, label) => {
       showRunLoading(progress, label || "正在准备冒险");
     });
     hideRunLoading();
 
     if (state.mode !== "launching") {
-      deactivateContestRandom();
       preloadCoordinator.releaseRun();
       return false;
     }
-    if (contestSpec) activateContestRandom(contestSpec.seed);
     state.mode = "playing";
     resetWaveScenarioState();
     const scenario = applyWaveStartScenario();
@@ -449,10 +426,8 @@ export async function bootGame() {
     resetWaveScenarioState();
     state.mode = "ended";
     state.victory = victory;
-    const contestMode = state.runMode === RUN_MODE_CONTEST && state.contest?.active;
-    deactivateContestRandom();
-    if (!contestMode) recordCurrentAdventure(victory ? "victory" : "defeat");
-    if (victory && !state.debug?.runTainted && !isRandomMode() && !contestMode) {
+    recordCurrentAdventure(victory ? "victory" : "defeat");
+    if (victory && !state.debug?.runTainted && !isRandomMode()) {
       const result = recordDifficultyVictory();
       if (result?.firstClear && result.difficultyId) {
         queueLobbyFirstClearReactions(result.difficultyId, [
@@ -461,13 +436,12 @@ export async function bootGame() {
         ]);
       }
     }
-    if (!state.debug?.runTainted && !contestMode) recordBestSurvivalSeconds(Math.floor(state.time));
+    if (!state.debug?.runTainted) recordBestSurvivalSeconds(Math.floor(state.time));
     if (isRandomEndlessMode() && !state.debug?.runTainted) recordBestRandomEndlessWave(state.wave);
     hidePauseMenu();
     closeInventory();
     closeShop();
     showEnd(victory);
-    if (contestMode) finalizeContestRun(victory ? "victory" : "defeat");
     playSfx(victory ? "victory" : "defeat");
     stopMusic();
   }
@@ -499,7 +473,7 @@ export async function bootGame() {
   }
 
   function returnToLobby() {
-    if (["playing", "paused", "shop", "leveling"].includes(state.mode) && state.runMode !== RUN_MODE_CONTEST) recordCurrentAdventure("abandoned");
+    if (["playing", "paused", "shop", "leveling"].includes(state.mode)) recordCurrentAdventure("abandoned");
     closeCodex();
     closeHelp();
     closeAdventureStats();
@@ -507,7 +481,6 @@ export async function bootGame() {
     closeLobbyDialogue();
     clearWaveEventNotice();
     stopMusic();
-    deactivateContestRandom();
     preloadCoordinator.releaseRun();
     resetRun(generateMap());
     state.shop = createShopState();
@@ -554,11 +527,8 @@ export async function bootGame() {
 
   function restartRun() {
     const previous = state.lobby.lastLaunchConfig;
-    const contestSpec = previous?.runMode === RUN_MODE_CONTEST
-      ? buildDailyContestSpec({ difficulties: difficultyCards(), weapons: STARTER_WEAPONS })
-      : null;
-    const difficulty = difficultyCards().find((entry) => entry.id === (contestSpec?.difficultyId || previous?.difficultyId) && (previous?.runMode === RUN_MODE_CONTEST || entry.unlocked !== false));
-    const weapon = STARTER_WEAPONS.find((entry) => entry.id === (contestSpec?.weaponId || previous?.weaponId));
+    const difficulty = difficultyCards().find((entry) => entry.id === previous?.difficultyId && entry.unlocked !== false);
+    const weapon = STARTER_WEAPONS.find((entry) => entry.id === previous?.weaponId);
     if (!difficulty || !weapon) {
       returnToLobby();
       return false;
@@ -569,100 +539,7 @@ export async function bootGame() {
       runMode: previous.runMode,
       randomGoal: previous.randomGoal,
       curses: previous.curses || [],
-      contest: contestSpec || previous.contest || null,
     });
-  }
-
-  async function showDailyContestBriefing(contest) {
-    let bestLine = "当前个人最佳：暂无公开成绩";
-    const board = await fetchContestLeaderboard({ contestId: contest.contestId, limit: 100 });
-    const best = (board.entries || []).find((entry) => entry.playerId === currentPlayerId());
-    if (best) bestLine = `当前个人最佳：${best.score} 分 · 第 ${best.wave} 波 · 击败 ${best.kills} · ${best.outcome === "victory" ? "已通关" : "未通关"}`;
-    openLobbyMessage({
-      role: "DAILY CONTEST // FIXED SEED",
-      title: "每日赛终端",
-      speaker: `赛题 ${contest.dateKey}`,
-      text: [
-        `今日赛题：${contest.difficultyName} · ${contest.weaponName}`,
-        `地图 Seed：${contest.seed}`,
-        "规则：固定难度、固定初始武器、固定地图和固定随机序列。调试或污染战局不会提交。",
-        bestLine,
-        "关闭通讯后再次使用终端即可开始今日赛。",
-      ],
-      color: "#ff8bd8",
-    });
-  }
-
-  function startDailyContestRun(contest = null) {
-    contest ||= buildDailyContestSpec({ difficulties: difficultyCards(), weapons: STARTER_WEAPONS });
-    const difficulty = difficultyCards().find((entry) => entry.id === contest.difficultyId) || difficultyCards()[0];
-    const weapon = STARTER_WEAPONS.find((entry) => entry.id === contest.weaponId) || STARTER_WEAPONS[0];
-    if (!difficulty || !weapon) {
-      openLobbyMessage({
-        role: "DAILY CONTEST // OFFLINE",
-        title: "每日赛无法启动",
-        speaker: "每日赛终端",
-        text: "赛题配置还没有准备好。请稍后重试，或先进入普通冒险。",
-        color: "#ff8bd8",
-      });
-      playSfx("deny");
-      return false;
-    }
-    return startWithLoadout({
-      difficulty,
-      weapon,
-      runMode: RUN_MODE_CONTEST,
-      randomGoal: RANDOM_GOAL_TWENTY_WAVES,
-      curses: [],
-      contest,
-    });
-  }
-
-  async function finalizeContestRun(outcome) {
-    const contest = state.contest;
-    if (!contest?.active || contest.submitted) return false;
-    const run = buildContestRunSubmission({
-      contest,
-      state,
-      outcome,
-      debug: state.debug?.enabled,
-      tainted: state.debug?.runTainted || contest.tainted,
-    });
-    state.contest.lastResult = run;
-    renderContestResults({ localResult: run, status: "SYNCING", message: "正在同步今日排行榜。" });
-    if (!isContestSubmissionClean(run)) {
-      state.contest.submitted = true;
-      state.contest.syncStatus = "rejected";
-      renderContestResults({ localResult: run, status: "REJECTED", message: "调试、污染或非每日赛 seed 的成绩不会提交。" });
-      return false;
-    }
-    const submitted = await submitContestRun(run);
-    const board = await fetchContestLeaderboard({ contestId: contest.contestId, limit: 50 });
-    const entries = board.entries || [];
-    state.contest.submitted = submitted.ok;
-    state.contest.syncStatus = submitted.ok ? "synced" : "offline";
-    state.contest.leaderboard = entries;
-    const status = submitted.ok ? submitted.updated ? "BEST UPDATED" : "BEST KEPT" : "OFFLINE";
-    const message = submitted.ok
-      ? submitted.updated ? "本局已成为你今天的最佳成绩。" : "本局未超过你今天的最佳成绩，排行榜保留最高分。"
-      : "排行榜离线，成绩未同步。";
-    renderContestResults({ localResult: submitted.best || run, leaderboard: entries, status, message });
-    return submitted.ok;
-  }
-
-  function activateContestRandom(seed) {
-    deactivateContestRandom();
-    const originalRandom = Math.random;
-    const rng = mulberry32((Number(seed) ^ 0x9e3779b9) >>> 0);
-    Math.random = rng;
-    restoreContestRandom = () => {
-      Math.random = originalRandom;
-      restoreContestRandom = null;
-    };
-  }
-
-  function deactivateContestRandom() {
-    if (restoreContestRandom) restoreContestRandom();
   }
 
   async function startRandomWithCurses(config) {
@@ -774,17 +651,6 @@ export async function bootGame() {
       playSfx("select");
       return true;
     }
-    if (interaction.action === "contest") {
-      const contest = buildDailyContestSpec({ difficulties: difficultyCards(), weapons: STARTER_WEAPONS });
-      if (state.lobby.contestBriefedFor !== contest.contestId) {
-        state.lobby.contestBriefedFor = contest.contestId;
-        showDailyContestBriefing(contest);
-      } else {
-        startDailyContestRun(contest);
-      }
-      playSfx("select");
-      return true;
-    }
     if (interaction.action === "feedback") {
       setLobbyModalOpen(true);
       openFeedback();
@@ -869,7 +735,6 @@ export async function bootGame() {
       const lobbyEvent = updateLobby(dt);
       if (lobbyEvent?.type === "launch") {
         if (lobbyEvent.config?.runMode === RUN_MODE_RANDOM) startRandomWithCurses(lobbyEvent.config);
-        else if (lobbyEvent.config?.runMode === RUN_MODE_CONTEST) startDailyContestRun();
         else startWithLoadout(lobbyEvent.config);
       }
       if (lobbyEvent?.type === "tutorial-arrived" && lobbyEvent.dialogue) openLobbyTutorialDialogue(lobbyEvent.dialogue);
@@ -1021,7 +886,7 @@ export async function bootGame() {
       getLoadoutOptions: () => ({
         difficulties: difficultyCards(),
         weapons: STARTER_WEAPONS,
-        runModes: ["standard", "random", "contest"],
+        runModes: ["standard", "random"],
         randomGoals: [RANDOM_GOAL_TWENTY_WAVES, RANDOM_GOAL_ENDLESS],
       }),
     },

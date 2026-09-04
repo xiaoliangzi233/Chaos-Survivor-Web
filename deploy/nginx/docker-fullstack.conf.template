@@ -1,0 +1,65 @@
+server {
+    listen 80;
+    server_name _;
+
+    root /usr/share/nginx/html;
+    index index.html;
+    if_modified_since off;
+    etag off;
+
+    location = /survivor {
+        return 301 /survivor/;
+    }
+
+    location ^~ /sszl/ {
+        proxy_pass ${AUTH_PROXY_PASS};
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    location ^~ /survivor/api/ {
+        proxy_pass http://survivor-backend:5010/api/;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    location = /survivor/admin {
+        proxy_pass http://survivor-backend:5010/admin;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    location ~ ^/survivor/(deploy|scripts|tests|docs|backend|worker)/ {
+        return 404;
+    }
+
+    location ^~ /survivor/ {
+        rewrite ^/survivor/(.*)$ /$1 break;
+        try_files $uri $uri/ /index.html;
+        expires off;
+        add_header Cache-Control "no-store, no-cache, must-revalidate, max-age=0" always;
+        add_header Pragma "no-cache" always;
+        add_header Expires "0" always;
+    }
+
+    location / {
+        return 404;
+    }
+
+    location ~* ^/survivor/.+\.(js|mjs|css|png|jpg|jpeg|gif|ico|svg|webp|mp3|wav|ogg|json)$ {
+        rewrite ^/survivor/(.*)$ /$1 break;
+        expires off;
+        add_header Cache-Control "no-store, no-cache, must-revalidate, max-age=0" always;
+        add_header Pragma "no-cache" always;
+        add_header Expires "0" always;
+        try_files $uri =404;
+    }
+}

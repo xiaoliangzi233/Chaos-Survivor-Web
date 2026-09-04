@@ -37,7 +37,9 @@ def create_app(db_path: str | Path | None = None) -> FastAPI:
         token = (authorization or "").strip()
         if not token:
             raise HTTPException(status_code=401, detail="token_required")
-        upstream_url = f"{str(request.base_url).rstrip('/')}{AUTH_USER_PATH}"
+        upstream_url = os.environ.get("AUTH_USER_URL", "").strip()
+        if not upstream_url:
+            upstream_url = f"{str(request.base_url).rstrip('/')}{AUTH_USER_PATH}"
         upstream_request = urllib.request.Request(upstream_url, headers={"Authorization": token}, method="GET")
         try:
             with urllib.request.urlopen(upstream_request, timeout=3) as response:

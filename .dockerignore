@@ -1,4 +1,5 @@
 .git
+.deploy
 .edge-ai-test
 .agents/
 .VSCodeCounter/
@@ -6,6 +7,8 @@ scripts
 tests
 **/__pycache__
 *.pyc
+backend/*.sqlite3
+backend/*.sqlite3-*
 *.md
 *.tar
 *.zip

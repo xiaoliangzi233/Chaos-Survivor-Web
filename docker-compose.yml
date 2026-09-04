@@ -1,10 +1,39 @@
 services:
-  survivor:
+  survivor-frontend:
     build:
       context: .
       dockerfile: Dockerfile
-    image: survivor:latest
-    container_name: survivor
+      args:
+        NGINX_CONF: deploy/nginx/docker-fullstack.conf.template
+        NGINX_TEMPLATE: "true"
+        API_BASE_URL: "."
+        REQUIRE_LOGIN: "true"
+    image: survivor-frontend:latest
+    container_name: survivor-frontend
+    depends_on:
+      - survivor-backend
     ports:
-      - "127.0.0.1:5000:80"
+      - "8081:80"
+    environment:
+      AUTH_PROXY_PASS: "${AUTH_PROXY_PASS:-http://host.docker.internal:8080}"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     restart: unless-stopped
+
+  survivor-backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    image: survivor-backend:latest
+    container_name: survivor-backend
+    environment:
+      ADMIN_TOKEN: "${ADMIN_TOKEN:-local-admin}"
+      AUTH_USER_URL: "http://survivor-frontend/sszl/user/simple-info"
+      SURVIVOR_DB: "/data/survivor.sqlite3"
+      ALLOWED_ORIGINS: "*"
+    volumes:
+      - survivor-data:/data
+    restart: unless-stopped
+
+volumes:
+  survivor-data:

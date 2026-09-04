@@ -1,234 +1,169 @@
-# Survivor 打包与部署
+# Survivor Docker 部署
 
-本项目是原生 HTML/CSS/JavaScript 游戏，前端不需要构建工具。默认推荐先部署静态前端：Nginx 负责托管页面和静态资源，登录接口使用同主机相对路径 `/sszl/user/simple-info`。
-
-服务器信息：
+本项目部署到赛数助理测试服务器 `1.14.93.50`，只使用 Docker Compose 启动。前端由 Nginx 容器提供，后端由 FastAPI 容器提供。
 
 ```text
-服务器：123.60.184.90
+服务器：1.14.93.50
 用户：root
-默认站点目录：/var/www/survivor
+远程目录：/opt/survivor
+前端容器：survivor-frontend
+后端容器：survivor-backend
+访问地址：http://139.155.133.14:8081/survivor/
 ```
 
-## 上线前配置
+## 首次部署
 
-登录开关在：
-
-```text
-src/config/backend-config.json
-```
-
-需要部署后默认登录时设置：
-
-```json
-{
-  "apiBaseUrl": "",
-  "requireLogin": true,
-  "defaultNickname": "Anonymous"
-}
-```
-
-`apiBaseUrl` 留空时，前端会直接请求当前服务器下的 `/sszl/user/simple-info`，不再写死服务器 IP。
-
-## 一键部署
-
-在 Windows 本机项目根目录执行：
+在本机项目根目录执行：
 
 ```powershell
-.\deploy-static.cmd
-```
-
-等价 PowerShell 命令：
-
-```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\deploy-static.ps1
+.\deploy-fullstack.cmd
 ```
 
 脚本会自动完成：
 
-1. 从当前项目复制前端发布文件到 `.deploy/stage`
-2. 压缩为 `.deploy/survivor-web.zip`
-3. 通过 `scp` 上传到 `root@123.60.184.90:/tmp/survivor-web.zip`
-4. 通过 `ssh` 登录服务器
-5. 备份旧 `/var/www/survivor` 为 `/var/www/survivor.bak.<时间戳>`
-6. 清空并解压新前端文件到 `/var/www/survivor`
+1. 打包当前项目的 Docker 部署文件
+2. 上传到 `root@1.14.93.50:/tmp/survivor-fullstack.zip`
+3. 在服务器解压到 `/opt/survivor`
+4. 生成 `.env`
+5. 执行 `docker compose up -d --build --remove-orphans`
+6. 自动检查 `http://127.0.0.1:8081/survivor/` 和 `http://127.0.0.1:8081/survivor/api/health`
 
-第一次连接服务器时，`ssh/scp` 可能会要求确认主机指纹，输入 `yes` 即可。服务器使用密码登录时会提示输入 root 密码；使用密钥登录时会自动走本机 SSH 配置。
+服务器已有 Docker，因此部署脚本不会安装 Docker，也不会在 `survivor` 下再创建 `docker` 子目录。
 
-## 同时写入 Nginx 配置
+首次连接服务器时，命令行可能要求确认主机指纹，输入 `yes`。如果没有配置 SSH 密钥，会提示输入 `root` 密码。
 
-如果服务器还没有配置 Nginx，可以用：
+如果登录服务不是宿主机的 `8080` 端口，需要指定真实地址：
 
 ```powershell
-.\deploy-static.cmd -ConfigureNginx
+.\deploy-fullstack.cmd -AuthProxyPass "http://真实登录服务地址"
 ```
 
-它会在服务器写入：
+如果要指定管理后台 token：
+
+```powershell
+.\deploy-fullstack.cmd -AdminToken "your-strong-admin-token"
+```
+
+部署完成后访问：
 
 ```text
-/etc/nginx/conf.d/survivor.conf
+http://139.155.133.14:8081/survivor/
+http://139.155.133.14:8081/survivor/api/health
+http://139.155.133.14:8081/survivor/admin
 ```
 
-并执行：
+正常情况下不需要再登录服务器手动启动。脚本结束时，前端 Nginx 容器和后端 FastAPI 容器都已经启动。
+
+部署成功后，本机会自动打开浏览器访问 `http://139.155.133.14:8081/survivor/`。如果不想自动打开浏览器：
+
+```powershell
+.\deploy-fullstack.cmd -NoBrowser
+```
+
+## 后续部署
+
+代码修改后，仍然执行同一个命令：
+
+```powershell
+.\deploy-fullstack.cmd
+```
+
+脚本会重新上传代码，并在服务器执行：
 
 ```bash
-nginx -t
-systemctl reload nginx
+cd /opt/survivor
+docker compose up -d --build
 ```
 
-默认监听 80 端口，访问地址：
+如果要和部署脚本保持一致：
 
-```text
-http://123.60.184.90/
+```bash
+docker compose up -d --build --remove-orphans
 ```
 
-如果要换站点目录：
+Docker 会重建镜像并滚动替换容器。后端 SQLite 数据保存在 Docker volume `survivor-data`，后续部署不会清空玩家数据。
 
-```powershell
-.\deploy-static.cmd -RemoteDir /var/www/survivor-test
-```
-
-如果 SSH 端口不是 22：
-
-```powershell
-.\deploy-static.cmd -SshPort 2222
-```
-
-如果只想验证打包、不上传服务器：
-
-```powershell
-.\deploy-static.cmd -PackageOnly
-```
-
-## 手动打包
-
-如果只想手动打包，可以在项目根目录运行：
-
-```powershell
-Compress-Archive -Force `
-  -Path index.html,styles.css,favicon.ico,assets,src,styles,vendor `
-  -DestinationPath survivor-web.zip
-```
-
-发布包需要包含：
-
-```text
-index.html
-styles.css
-favicon.ico
-assets/
-src/
-styles/
-vendor/
-```
-
-不要上传这些开发或服务端目录到静态站点：
-
-```text
-.git/
-tests/
-scripts/
-deploy/
-docs/
-backend/
-worker/
-```
-
-## 手动上传与部署
-
-上传：
-
-```powershell
-scp .\survivor-web.zip root@123.60.184.90:/tmp/survivor-web.zip
-```
+## 服务器常用命令
 
 登录服务器：
 
 ```powershell
-ssh root@123.60.184.90
+ssh root@1.14.93.50
 ```
 
-服务器上执行：
+进入部署目录：
 
 ```bash
-mkdir -p /var/www/survivor
-cp -a /var/www/survivor /var/www/survivor.bak.$(date +%Y%m%d%H%M%S) 2>/dev/null || true
-find /var/www/survivor -mindepth 1 -maxdepth 1 -exec rm -rf {} +
-unzip -oq /tmp/survivor-web.zip -d /var/www/survivor
+cd /opt/survivor
 ```
 
-Nginx 配置参考：
-
-```nginx
-server {
-    listen 80;
-    server_name 123.60.184.90;
-
-    root /var/www/survivor;
-    index index.html;
-
-    if_modified_since off;
-    etag off;
-
-    location ~ ^/(deploy|scripts|tests|docs|backend|worker)/ {
-        return 404;
-    }
-
-    location / {
-        try_files $uri $uri/ /index.html;
-        expires off;
-        add_header Cache-Control "no-store, no-cache, must-revalidate, max-age=0" always;
-        add_header Pragma "no-cache" always;
-        add_header Expires "0" always;
-    }
-
-    location ~* \.(js|mjs|css|png|jpg|jpeg|gif|ico|svg|webp|mp3|wav|ogg|json)$ {
-        expires off;
-        add_header Cache-Control "no-store, no-cache, must-revalidate, max-age=0" always;
-        add_header Pragma "no-cache" always;
-        add_header Expires "0" always;
-        try_files $uri =404;
-    }
-}
-```
-
-检查并重载：
+查看容器状态：
 
 ```bash
-nginx -t
-systemctl reload nginx
+docker compose ps
 ```
 
-## 服务器准备
-
-服务器需要有 `nginx` 和 `unzip`。
-
-Ubuntu/Debian：
+查看日志：
 
 ```bash
-apt update
-apt install -y nginx unzip
+docker compose logs -f
 ```
 
-CentOS/Rocky/Alma：
+重启服务：
 
 ```bash
-yum install -y nginx unzip
-systemctl enable --now nginx
+docker compose restart
 ```
 
-如果云服务器安全组或系统防火墙未放行 80 端口，需要放行后才能通过浏览器访问。
+停止服务：
 
-## 可选后端
+```bash
+docker compose down
+```
 
-`backend/` 是可选 FastAPI + SQLite 服务，用于服务端存档、排行榜、反馈和管理配置。只部署游戏前端和登录校验时，不需要上传 `backend/`。
+重新构建并启动：
 
-如果后续要启用后端，建议使用独立部署方案：
+```bash
+docker compose up -d --build
+```
+
+## 部署结构
+
+Docker Compose 配置：
 
 ```text
-Nginx 静态站点：/
-Python 后端：127.0.0.1:5010
-Nginx 代理：/api/ -> 127.0.0.1:5010
+docker-compose.yml
 ```
 
-届时再把 `src/config/backend-config.json` 中的 `apiBaseUrl` 设为同源 API，例如空字符串配合 Nginx 代理，或显式设置为后端地址。
+前端 Nginx：
+
+```text
+Dockerfile
+deploy/nginx/docker-fullstack.conf.template
+```
+
+后端服务：
+
+```text
+backend/Dockerfile
+backend/requirements.txt
+```
+
+Nginx 容器内路由：
+
+```text
+/survivor/       -> 前端页面
+/survivor/api/   -> survivor-backend:5010
+/survivor/admin  -> survivor-backend:5010/admin
+/sszl/           -> 登录服务，由 AUTH_PROXY_PASS 指定
+```
+
+前端发布时会自动使用同源后端：
+
+```json
+{
+  "apiBaseUrl": ".",
+  "requireLogin": true,
+  "defaultNickname": "游客"
+}
+```
